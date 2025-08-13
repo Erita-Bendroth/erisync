@@ -136,49 +136,71 @@ const ScheduleView = () => {
         .select('id, user_id, first_name, last_name');
 
       // Apply filtering based on user role and view mode
+      console.log('fetchEmployees - userRoles:', userRoles.map(r => r.role));
+      console.log('fetchEmployees - isTeamMember():', isTeamMember());
+      console.log('fetchEmployees - isManager():', isManager());
+      console.log('fetchEmployees - isPlanner():', isPlanner());
+      console.log('fetchEmployees - viewMode:', viewMode);
+      
       if (isTeamMember() && !isManager() && !isPlanner()) {
+        console.log('User is pure team member, applying team member filtering');
         if (viewMode === "my-schedule") {
           // Show only the current user
+          console.log('Showing only current user for my-schedule view');
           query = query.eq('user_id', user!.id);
         } else if (viewMode === "my-team") {
+          console.log('Fetching team members for my-team view');
           // Show users from the current user's team(s)
-          const { data: userTeams } = await supabase
+          const { data: userTeams, error: teamsError } = await supabase
             .from('team_members')
             .select('team_id')
             .eq('user_id', user!.id);
           
+          console.log('User teams result:', { userTeams, teamsError });
+          
           if (userTeams && userTeams.length > 0) {
             const teamIds = userTeams.map(ut => ut.team_id);
-            const { data: teamMembers } = await supabase
+            console.log('User is in teams:', teamIds);
+            
+            const { data: teamMembers, error: membersError } = await supabase
               .from('team_members')
               .select('user_id')
               .in('team_id', teamIds);
             
+            console.log('Team members result:', { teamMembers, membersError });
+            
             if (teamMembers && teamMembers.length > 0) {
               const userIds = teamMembers.map(tm => tm.user_id);
-              query = query.in('user_id', userIds);
               console.log('Team member viewing team - showing users:', userIds);
+              query = query.in('user_id', userIds);
             } else {
               // Fallback to show only current user if no team members found
-              query = query.eq('user_id', user!.id);
               console.log('No team members found, showing only current user');
+              query = query.eq('user_id', user!.id);
             }
           } else {
             // Fallback to show only current user if not in any teams
-            query = query.eq('user_id', user!.id);
             console.log('User not in any teams, showing only current user');
+            query = query.eq('user_id', user!.id);
           }
         }
-      } else if (selectedTeam !== "all") {
-        // For planners/managers, apply team filter if specific team is selected
-        const { data: teamMembers } = await supabase
-          .from('team_members')
-          .select('user_id')
-          .eq('team_id', selectedTeam);
-        
-        if (teamMembers && teamMembers.length > 0) {
-          const userIds = teamMembers.map(tm => tm.user_id);
-          query = query.in('user_id', userIds);
+      } else {
+        console.log('User has elevated role, applying manager/planner filtering');
+        if (selectedTeam !== "all") {
+          console.log('Applying team filter for elevated user, selectedTeam:', selectedTeam);
+          // For planners/managers, apply team filter if specific team is selected
+          const { data: teamMembers } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', selectedTeam);
+          
+          if (teamMembers && teamMembers.length > 0) {
+            const userIds = teamMembers.map(tm => tm.user_id);
+            console.log('Filtering to team members:', userIds);
+            query = query.in('user_id', userIds);
+          }
+        } else {
+          console.log('Showing all employees for elevated user');
         }
       }
 

@@ -28,12 +28,27 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
+    // Check if user is authenticated with retries
+    let user = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (!user && attempts < maxAttempts) {
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+      if (currentUser && !error) {
+        user = currentUser;
+        break;
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+      }
+    }
+    
     if (!user) {
       toast({
         title: "Error",
-        description: "Auth session missing! Please sign in again.",
+        description: "Authentication session expired. Please sign in again.",
         variant: "destructive",
       });
       return;

@@ -95,21 +95,28 @@ const TeamManagement = () => {
         .select("*")
         .order("name");
 
-      // For team members, only show teams they are part of
+      // For team members (not admin/planner/manager), only show teams they are part of
       if (userRole === 'teammember') {
-        const { data: userTeamMemberships } = await supabase
+        console.log("Fetching teams for team member...");
+        const { data: userTeamMemberships, error: membershipError } = await supabase
           .from("team_members")
           .select("team_id")
           .eq("user_id", user!.id);
         
+        console.log("User team memberships:", userTeamMemberships, "Error:", membershipError);
+        
         if (userTeamMemberships && userTeamMemberships.length > 0) {
           const teamIds = userTeamMemberships.map(tm => tm.team_id);
+          console.log("Filtering teams to only show team IDs:", teamIds);
           query = query.in("id", teamIds);
         } else {
           // User is not part of any teams, return empty array
+          console.log("User not in any teams, showing empty list");
           setTeams([]);
           return;
         }
+      } else {
+        console.log("User has elevated role, showing all teams");
       }
 
       const { data, error } = await query;
@@ -219,7 +226,7 @@ const TeamManagement = () => {
       else if (roles.some(r => r.role === "teammember")) role = "teammember";
       
       setUserRole(role);
-      console.log("User role set to:", role);
+      console.log("User role set to:", role, "from roles:", roles.map(r => r.role));
     } catch (error) {
       console.error("Error fetching user role:", error);
     }
