@@ -24,15 +24,23 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Create Supabase client
+    // Create Supabase client with proper auth
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
 
     const { country_code, year, user_id } = await req.json()
+    console.log('Request received:', { country_code, year, user_id })
 
     if (!country_code || !year || !user_id) {
+      console.error('Missing required parameters:', { country_code, year, user_id })
       return new Response(
         JSON.stringify({ error: 'Country code, year, and user_id are required' }),
         { 
@@ -66,13 +74,18 @@ Deno.serve(async (req) => {
       user_id: user_id
     }))
 
-    // Use upsert to avoid duplicate entries - now include user_id in conflict
+    console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
+
+    // First try a simple insert without upsert to test RLS
     const { data, error } = await supabaseClient
       .from('holidays')
-      .upsert(holidayData, { 
-        onConflict: 'date,country_code,user_id',
-        ignoreDuplicates: false 
-      })
+      .insert(holidayData)
+
+    console.log('Insert result:', { 
+      success: !error, 
+      error: error ? { code: error.code, message: error.message, details: error.details } : null,
+      insertedCount: data?.length || 0 
+    });
 
     if (error) {
       console.error('Database error:', error)
