@@ -62,24 +62,34 @@ const UserManagement = () => {
     if (!user) return;
     
     try {
+      console.log('Checking permissions for user:', user.id, user.email);
+      
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id);
       
-      if (error) throw error;
+      console.log('User roles query result:', { data, error });
+      
+      if (error) {
+        console.error('Error fetching user roles:', error);
+        throw error;
+      }
       
       const roles = data?.map(r => r.role) || [];
-      setHasAdminAccess(roles.includes('admin'));
+      console.log('User roles:', roles);
+      setHasAdminAccess(roles.includes('admin') || roles.includes('planner'));
       
     } catch (error) {
       console.error("Error checking permissions:", error);
+      setHasAdminAccess(false);
     }
   };
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('Fetching users...');
       
       // Fetch users with their profiles, roles, and teams
       const { data: profiles, error: profilesError } = await supabase
@@ -92,6 +102,8 @@ const UserManagement = () => {
           country_code,
           requires_password_change
         `);
+
+      console.log('Profiles query result:', { profiles, error: profilesError });
 
       if (profilesError) throw profilesError;
 
