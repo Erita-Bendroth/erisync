@@ -25,14 +25,31 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
     confirmPassword: "",
   });
 
+  // Clear form when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      console.log('Modal opened, form cleared');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  // Add debugging for modal render
+  console.log('PasswordChangeModal rendered, isOpen:', isOpen);
+  console.log('User from context:', user ? { id: user.id, email: user.email } : 'null');
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Password change form submitted');
     
     // Check if user is available from context
     if (!user) {
-      console.error('No user found in auth context');
+      console.error('No user found in auth context during password change');
       toast({
         title: "Error",
         description: "Please sign in again to change your password.",
