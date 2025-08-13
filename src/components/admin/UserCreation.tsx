@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validateEmail, validatePassword, sanitizeInput } from "@/lib/validation";
 
+interface Team {
+  id: string;
+  name: string;
+}
+
 interface UserCreationProps {
   onUserCreated: () => void;
 }
@@ -17,13 +22,33 @@ interface UserCreationProps {
 const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [formData, setFormData] = useState({
     email: "",
     firstName: "",
     lastName: "",
     role: "",
     countryCode: "US",
+    teamId: "",
   });
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
+
+  const fetchTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setTeams(data || []);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    }
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +86,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
           lastName: sanitizeInput(formData.lastName),
           role: formData.role,
           countryCode: formData.countryCode,
+          teamId: formData.teamId,
           requiresPasswordChange: true
         }
       });
@@ -79,6 +105,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
         lastName: "",
         role: "",
         countryCode: "US",
+        teamId: "",
       });
       
       onUserCreated();
@@ -159,11 +186,28 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
               <SelectTrigger>
                 <SelectValue placeholder="Select user role" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover border border-border shadow-md z-50">
                 <SelectItem value="teammember">Team Member</SelectItem>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="planner">Planner</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="team">Team (Optional)</Label>
+            <Select onValueChange={(value) => setFormData({ ...formData, teamId: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select team (optional)" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border border-border shadow-md z-50">
+                <SelectItem value="">No Team</SelectItem>
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -174,14 +218,57 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
               <SelectTrigger>
                 <SelectValue placeholder="Select country" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover border border-border shadow-md z-50 max-h-60 overflow-y-auto">
+                <SelectItem value="AD">Andorra</SelectItem>
+                <SelectItem value="AL">Albania</SelectItem>
+                <SelectItem value="AT">Austria</SelectItem>
+                <SelectItem value="BA">Bosnia and Herzegovina</SelectItem>
+                <SelectItem value="BE">Belgium</SelectItem>
+                <SelectItem value="BG">Bulgaria</SelectItem>
+                <SelectItem value="BY">Belarus</SelectItem>
+                <SelectItem value="CH">Switzerland</SelectItem>
+                <SelectItem value="CY">Cyprus</SelectItem>
+                <SelectItem value="CZ">Czech Republic</SelectItem>
+                <SelectItem value="DE">Germany</SelectItem>
+                <SelectItem value="DK">Denmark</SelectItem>
+                <SelectItem value="EE">Estonia</SelectItem>
+                <SelectItem value="ES">Spain</SelectItem>
+                <SelectItem value="FI">Finland</SelectItem>
+                <SelectItem value="FR">France</SelectItem>
+                <SelectItem value="GB">United Kingdom</SelectItem>
+                <SelectItem value="GE">Georgia</SelectItem>
+                <SelectItem value="GR">Greece</SelectItem>
+                <SelectItem value="HR">Croatia</SelectItem>
+                <SelectItem value="HU">Hungary</SelectItem>
+                <SelectItem value="IE">Ireland</SelectItem>
+                <SelectItem value="IS">Iceland</SelectItem>
+                <SelectItem value="IT">Italy</SelectItem>
+                <SelectItem value="LI">Liechtenstein</SelectItem>
+                <SelectItem value="LT">Lithuania</SelectItem>
+                <SelectItem value="LU">Luxembourg</SelectItem>
+                <SelectItem value="LV">Latvia</SelectItem>
+                <SelectItem value="MC">Monaco</SelectItem>
+                <SelectItem value="MD">Moldova</SelectItem>
+                <SelectItem value="ME">Montenegro</SelectItem>
+                <SelectItem value="MK">North Macedonia</SelectItem>
+                <SelectItem value="MT">Malta</SelectItem>
+                <SelectItem value="NL">Netherlands</SelectItem>
+                <SelectItem value="NO">Norway</SelectItem>
+                <SelectItem value="PL">Poland</SelectItem>
+                <SelectItem value="PT">Portugal</SelectItem>
+                <SelectItem value="RO">Romania</SelectItem>
+                <SelectItem value="RS">Serbia</SelectItem>
+                <SelectItem value="RU">Russia</SelectItem>
+                <SelectItem value="SE">Sweden</SelectItem>
+                <SelectItem value="SI">Slovenia</SelectItem>
+                <SelectItem value="SK">Slovakia</SelectItem>
+                <SelectItem value="SM">San Marino</SelectItem>
+                <SelectItem value="TR">Turkey</SelectItem>
+                <SelectItem value="UA">Ukraine</SelectItem>
                 <SelectItem value="US">United States</SelectItem>
                 <SelectItem value="CA">Canada</SelectItem>
-                <SelectItem value="GB">United Kingdom</SelectItem>
                 <SelectItem value="AU">Australia</SelectItem>
-                <SelectItem value="DE">Germany</SelectItem>
-                <SelectItem value="FR">France</SelectItem>
-                <SelectItem value="NL">Netherlands</SelectItem>
+                <SelectItem value="VA">Vatican City</SelectItem>
               </SelectContent>
             </Select>
           </div>

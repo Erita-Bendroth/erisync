@@ -24,7 +24,7 @@ serve(async (req) => {
       }
     );
 
-    const { email, password, firstName, lastName, role, countryCode, requiresPasswordChange } = await req.json();
+    const { email, password, firstName, lastName, role, countryCode, teamId, requiresPasswordChange } = await req.json();
 
     // Validate input
     if (!email || !password || !firstName || !lastName || !role) {
@@ -85,6 +85,21 @@ serve(async (req) => {
 
     if (roleError) {
       console.error('Role assignment error:', roleError);
+    }
+
+    // Assign to team if teamId is provided
+    if (teamId) {
+      const { error: teamError } = await supabaseAdmin
+        .from('team_members')
+        .insert({
+          user_id: user.user!.id,
+          team_id: teamId,
+          is_manager: role === 'manager'
+        });
+
+      if (teamError) {
+        console.error('Team assignment error:', teamError);
+      }
     }
 
     return new Response(
