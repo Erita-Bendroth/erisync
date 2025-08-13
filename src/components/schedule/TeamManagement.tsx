@@ -67,8 +67,13 @@ const TeamManagement = () => {
   }, []);
 
   useEffect(() => {
+    console.log("Teams effect triggered, teams:", teams);
     if (teams.length > 0) {
-      teams.forEach(team => fetchTeamMembers(team.id));
+      console.log("Fetching members for teams:", teams.map(t => t.name));
+      teams.forEach(team => {
+        console.log(`About to fetch members for team: ${team.name} (${team.id})`);
+        fetchTeamMembers(team.id);
+      });
     }
   }, [teams]);
 
