@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +26,11 @@ interface ScheduleEntry {
   };
 }
 
+interface Team {
+  id: string;
+  name: string;
+}
+
 interface UserRole {
   role: string;
 }
@@ -35,6 +41,8 @@ const ScheduleView = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
@@ -48,9 +56,17 @@ const ScheduleView = () => {
 
   useEffect(() => {
     if (user && userRoles.length > 0) {
+      fetchTeams();
       fetchScheduleEntries();
     }
   }, [user, currentWeek, userRoles]);
+
+  useEffect(() => {
+    // Refetch entries when team selection changes
+    if (user && userRoles.length > 0) {
+      fetchScheduleEntries();
+    }
+  }, [selectedTeam]);
 
   const fetchUserRoles = async () => {
     try {
@@ -62,6 +78,20 @@ const ScheduleView = () => {
       setUserRoles(data || []);
     } catch (error) {
       console.error("Error fetching user roles:", error);
+    }
+  };
+
+  const fetchTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setTeams(data || []);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
     }
   };
 
@@ -104,7 +134,12 @@ const ScheduleView = () => {
         query = query.eq("user_id", user!.id);
         console.log('Filtering to only show user\'s own entries');
       } else {
-        console.log('Showing all entries (manager/planner view)');
+        // For planners/managers, apply team filter if one is selected
+        if (selectedTeam !== "all") {
+          query = query.eq("team_id", selectedTeam);
+          console.log('Filtering by team:', selectedTeam);
+        }
+        console.log('Showing entries for managers/planners');
       }
 
       const { data, error } = await query;
@@ -226,29 +261,52 @@ const ScheduleView = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">Schedule View</h2>
           <p className="text-muted-foreground">
             Week of {format(weekStart, "MMM d")} - {format(addDays(weekStart, 6), "MMM d, yyyy")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          {/* Team Filter - Only show for planners and managers */}
           {(isManager() || isPlanner()) && (
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Entry
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium whitespace-nowrap">Team:</label>
+              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                <SelectTrigger className="w-48 bg-background">
+                  <SelectValue placeholder="Select team" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border z-50">
+                  <SelectItem value="all">All Teams</SelectItem>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
-          <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())}>
-            Today
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigateWeek("next")}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            {(isManager() || isPlanner()) && (
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Entry
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())}>
+              Today
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigateWeek("next")}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
