@@ -54,10 +54,22 @@ const ScheduleView = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
   // Show only Monday-Friday for work days
   const workDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
+
+  const handleEditShift = (entry: ScheduleEntry) => {
+    if (isManager() || isPlanner()) {
+      setEditingEntry(entry);
+      // TODO: Open edit modal/form
+      toast({
+        title: "Edit Shift",
+        description: `Editing ${entry.profiles.first_name}'s ${entry.activity_type} shift on ${format(new Date(entry.date), "MMM d")}`,
+      });
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -452,12 +464,12 @@ const ScheduleView = () => {
                                 <div key={entry.id} className="space-y-1">
                                   <Badge
                                     variant="secondary"
-                                    className={`text-xs ${getActivityColor(entry)} block`}
-                                    title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift`}
+                                    className={`text-xs ${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity`}
+                                    title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift - Click to edit`}
+                                    onClick={() => (isManager() || isPlanner()) && handleEditShift(entry)}
                                   >
-                                    <div className="flex flex-col items-center">
-                                      <span className="font-semibold">{employee.initials}</span>
-                                      <span className="text-xs">
+                                    <div className="flex flex-col items-center py-1">
+                                      <span className="text-xs font-medium">
                                         {entry.shift_type === "early" ? "Early" : 
                                          entry.shift_type === "late" ? "Late" : "Normal"}
                                       </span>
@@ -468,7 +480,7 @@ const ScheduleView = () => {
                                   </Badge>
                                   {entry.notes && (
                                     <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
-                                      {entry.notes.substring(0, 20)}...
+                                      {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
                                     </p>
                                   )}
                                 </div>
