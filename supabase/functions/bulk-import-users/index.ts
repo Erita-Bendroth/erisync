@@ -31,6 +31,8 @@ Deno.serve(async (req) => {
     const { users, teams } = await req.json()
 
     console.log(`Starting bulk import: ${users.length} users, ${teams?.length || 0} teams`)
+    console.log('Sample user data:', JSON.stringify(users[0], null, 2))
+    console.log('Sample team data:', teams && teams.length > 0 ? JSON.stringify(teams[0], null, 2) : 'No teams')
 
     const results = {
       users: { created: 0, updated: 0, errors: [] as string[] },
