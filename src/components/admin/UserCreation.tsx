@@ -29,7 +29,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
     lastName: "",
     role: "",
     countryCode: "US",
-    teamId: "",
+    teamId: "no-team",
   });
 
   useEffect(() => {
@@ -105,7 +105,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
         lastName: "",
         role: "",
         countryCode: "US",
-        teamId: "",
+        teamId: "no-team",
       });
       
       onUserCreated();
@@ -202,7 +202,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
                 <SelectValue placeholder="Select team (optional)" />
               </SelectTrigger>
               <SelectContent className="bg-popover border border-border shadow-md z-50">
-                <SelectItem value="">No Team</SelectItem>
+                <SelectItem value="no-team">No Team</SelectItem>
                 {teams.map((team) => (
                   <SelectItem key={team.id} value={team.id}>
                     {team.name}

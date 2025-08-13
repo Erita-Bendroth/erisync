@@ -87,8 +87,8 @@ serve(async (req) => {
       console.error('Role assignment error:', roleError);
     }
 
-    // Assign to team if teamId is provided
-    if (teamId) {
+    // Assign to team if teamId is provided and not "no-team"
+    if (teamId && teamId !== "no-team") {
       const { error: teamError } = await supabaseAdmin
         .from('team_members')
         .insert({
