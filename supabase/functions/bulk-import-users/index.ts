@@ -22,10 +22,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Create Supabase admin client
+    // Create Supabase admin client with RLS disabled
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        db: { schema: 'public' },
+        auth: { persistSession: false }
+      }
     )
 
     const { users, teams } = await req.json()
@@ -300,6 +304,7 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
             onConflict: 'user_id,team_id',
             ignoreDuplicates: false // Allow updates
           })
+          .select() // This helps with debugging
 
         if (teamMemberError) {
           results.teamMembers.errors.push(`Team membership for ${userData.email}: ${teamMemberError.message}`)
