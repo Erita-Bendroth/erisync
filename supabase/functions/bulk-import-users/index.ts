@@ -99,32 +99,43 @@ Deno.serve(async (req) => {
 
         if (authError) {
           if (authError.message.includes('already registered')) {
-            // User exists, get their ID
-            const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers()
-            const user = existingUser.users.find(u => u.email === userData.email)
+            // User exists, get their ID from auth
+            const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
             
-            if (user) {
-              // Update profile if it exists
-              const { error: profileError } = await supabaseAdmin
-                .from('profiles')
-                .upsert({
-                  user_id: user.id,
-                  email: userData.email,
-                  first_name: userData.employeeId || userData.email.split('@')[0],
-                  last_name: '',
-                  country_code: 'US'
-                })
+            if (!listError && existingUsers) {
+              const user = existingUsers.users.find(u => u.email === userData.email)
+              
+              if (user) {
+                console.log(`Found existing user: ${userData.email}, ID: ${user.id}`)
+                
+                // Update profile with password change flag
+                const { error: profileError } = await supabaseAdmin
+                  .from('profiles')
+                  .upsert({
+                    user_id: user.id,
+                    email: userData.email,
+                    first_name: userData.employeeId || userData.email.split('@')[0],
+                    last_name: '',
+                    country_code: 'US',
+                    requires_password_change: true
+                  }, { 
+                    onConflict: 'user_id' 
+                  })
 
-              if (profileError) {
-                results.users.errors.push(`Profile for ${userData.email}: ${profileError.message}`)
+                if (profileError) {
+                  results.users.errors.push(`Profile update for ${userData.email}: ${profileError.message}`)
+                } else {
+                  results.users.updated++
+                  console.log(`Updated profile for: ${userData.email}`)
+                }
+
+                // Handle roles and team membership for existing user
+                await assignUserRole(supabaseAdmin, user.id, userData, results, teamManagerMap)
               } else {
-                results.users.updated++
+                results.users.errors.push(`Could not find existing user: ${userData.email}`)
               }
-
-              // Handle roles and team membership for existing user
-              await assignUserRole(supabaseAdmin, user.id, userData, results, teamManagerMap)
             } else {
-              results.users.errors.push(`Could not find existing user: ${userData.email}`)
+              results.users.errors.push(`Error listing users for ${userData.email}: ${listError?.message}`)
             }
           } else {
             results.users.errors.push(`Auth error for ${userData.email}: ${authError.message}`)
@@ -208,18 +219,22 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
 
     const role = roleMapping[userData.role] || 'teammember'
 
-    // Assign role
+    // Assign role (use upsert to handle duplicates)
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
+      .upsert({
         user_id: userId,
         role: role
+      }, { 
+        onConflict: 'user_id,role',
+        ignoreDuplicates: true 
       })
 
     if (roleError && !roleError.message.includes('duplicate')) {
       results.roles.errors.push(`Role for ${userData.email}: ${roleError.message}`)
     } else if (!roleError) {
       results.roles.created++
+      console.log(`Assigned role ${role} to ${userData.email}`)
     }
 
     // Assign to team if provided
@@ -262,16 +277,20 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
 
         const { error: teamMemberError } = await supabaseAdmin
           .from('team_members')
-          .insert({
+          .upsert({
             user_id: userId,
             team_id: teamId,
             is_manager: isManager
+          }, { 
+            onConflict: 'user_id,team_id',
+            ignoreDuplicates: false // Allow updates
           })
 
-        if (teamMemberError && !teamMemberError.message.includes('duplicate')) {
+        if (teamMemberError) {
           results.teamMembers.errors.push(`Team membership for ${userData.email}: ${teamMemberError.message}`)
-        } else if (!teamMemberError) {
+        } else {
           results.teamMembers.created++
+          console.log(`Successfully assigned ${userData.email} to team ${userData.teamName}`)
         }
       }
     }
