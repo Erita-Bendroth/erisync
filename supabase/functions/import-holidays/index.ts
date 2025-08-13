@@ -58,7 +58,10 @@ Deno.serve(async (req) => {
     )
 
     if (!holidaysResponse.ok) {
-      throw new Error(`Failed to fetch holidays: ${holidaysResponse.statusText}`)
+      const errorText = await holidaysResponse.text()
+      console.error(`Failed to fetch holidays: ${holidaysResponse.status} - ${holidaysResponse.statusText}`)
+      console.error(`Response body: ${errorText}`)
+      throw new Error(`Failed to fetch holidays: ${holidaysResponse.statusText} (${holidaysResponse.status})`)
     }
 
     const holidays: Holiday[] = await holidaysResponse.json()
@@ -88,8 +91,13 @@ Deno.serve(async (req) => {
     });
 
     if (error) {
-      console.error('Database error:', error)
-      throw error
+      console.error('Database error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      throw new Error(`Database error: ${error.message} (${error.code})`)
     }
 
     console.log(`Successfully imported ${holidayData.length} holidays`)
