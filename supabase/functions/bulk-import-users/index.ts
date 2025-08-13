@@ -46,7 +46,8 @@ Deno.serve(async (req) => {
     }
 
     // First, create/update teams and track manager assignments
-    const teamManagerMap = new Map<string, string>() // teamName -> managerEmail
+    const teamManagerMap = new Map<string, string>() // teamId -> managerEmail
+    const teamIdToNameMap = new Map<string, string>() // teamId -> teamName
     
     if (teams && teams.length > 0) {
       for (const team of teams) {
@@ -75,10 +76,11 @@ Deno.serve(async (req) => {
             results.teams.updated++
           }
 
-          // Track manager assignment for later
+          // Track manager assignment and team mapping for later
           if (team.managerEmail) {
-            teamManagerMap.set(team.teamName, team.managerEmail)
+            teamManagerMap.set(team.teamId, team.managerEmail)
           }
+          teamIdToNameMap.set(team.teamId, team.teamName)
         } catch (error) {
           results.teams.errors.push(`Team ${team.teamName}: ${error.message}`)
         }
@@ -129,7 +131,7 @@ Deno.serve(async (req) => {
 
           // Handle roles and team membership for existing user
           console.log(`Calling assignUserRole for existing user: ${userData.email}`)
-          await assignUserRole(supabaseAdmin, existingUser.id, userData, results, teamManagerMap)
+          await assignUserRole(supabaseAdmin, existingUser.id, userData, results, teamManagerMap, teamIdToNameMap)
         } else {
           // Create new user
           const standardPassword = "VestasTemp2025!"
@@ -176,7 +178,7 @@ Deno.serve(async (req) => {
 
           // Handle roles and team membership
           console.log(`Calling assignUserRole for new user: ${userData.email}`)
-          await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap)
+          await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap, teamIdToNameMap)
         }
 
       } catch (error) {
@@ -218,9 +220,11 @@ Deno.serve(async (req) => {
   }
 })
 
-async function assignUserRole(supabaseAdmin: any, userId: string, userData: UserImportData, results: any, teamManagerMap: Map<string, string>) {
+async function assignUserRole(supabaseAdmin: any, userId: string, userData: UserImportData, results: any, teamManagerMap: Map<string, string>, teamIdToNameMap: Map<string, string>) {
   try {
-    console.log(`assignUserRole called for ${userData.email}, userId: ${userId}, teamName: ${userData.teamName}, role: ${userData.role}`)
+    const teamName = userData.teamName || teamIdToNameMap.get(userData.teamId || '') || 'Unknown'
+    console.log(`assignUserRole called for ${userData.email}, userId: ${userId}, teamId: ${userData.teamId}, teamName: ${teamName}, role: ${userData.role}`)
+    
     // Map role names to our enum values
     const roleMapping: Record<string, string> = {
       'Planner': 'planner',
@@ -250,10 +254,37 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
 
     // Assign to team if provided
     if (userData.teamId || userData.teamName) {
-      let teamId = userData.teamId
+      let actualTeamId = null
 
-      // If we have teamName but no teamId, look up the team
-      if (!teamId && userData.teamName) {
+      // First priority: use teamId if provided and look up the actual UUID
+      if (userData.teamId) {
+        console.log(`Looking up team by teamId: ${userData.teamId}`)
+        const { data: team, error: teamLookupError } = await supabaseAdmin
+          .from('teams')
+          .select('id, name')
+          .ilike('name', `%${userData.teamId}%`)
+          .single()
+        
+        if (!teamLookupError && team) {
+          actualTeamId = team.id
+          console.log(`Found team with ID: ${actualTeamId} for teamId: ${userData.teamId}`)
+        } else {
+          // Fallback: try exact match on team name using teamId as name
+          const { data: teamByName, error: nameError } = await supabaseAdmin
+            .from('teams')
+            .select('id, name')
+            .eq('name', userData.teamId)
+            .single()
+          
+          if (!nameError && teamByName) {
+            actualTeamId = teamByName.id
+            console.log(`Found team by name match: ${actualTeamId}`)
+          }
+        }
+      }
+
+      // Fallback: use teamName if teamId lookup failed
+      if (!actualTeamId && userData.teamName) {
         console.log(`Looking up team by name: ${userData.teamName}`)
         const { data: team, error: teamLookupError } = await supabaseAdmin
           .from('teams')
@@ -261,60 +292,62 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
           .eq('name', userData.teamName)
           .single()
         
-        if (teamLookupError) {
-          console.error(`Error looking up team ${userData.teamName}: ${teamLookupError.message}`)
-          results.teamMembers.errors.push(`Team lookup for ${userData.teamName}: ${teamLookupError.message}`)
-          return
+        if (!teamLookupError && team) {
+          actualTeamId = team.id
+          console.log(`Found team ${userData.teamName} with ID: ${actualTeamId}`)
         }
-        
-        teamId = team?.id
-        console.log(`Found team ${userData.teamName} with ID: ${teamId}`)
       }
 
-      if (teamId) {
-        // Determine if this user should be a manager of this team
-        let isManager = false
-        
-        // Method 1: Check if their role is 'manager' AND they're designated as manager for this team
-        if (role === 'manager') {
-          // Check if they're designated as manager for this specific team
-          const designatedManager = teamManagerMap.get(userData.teamName || '')
-          if (designatedManager === userData.email) {
-            isManager = true
-          }
-          // Also check if ManagerEmail field in user data matches current user
-          else if (userData.managerEmail === userData.email) {
-            isManager = true
-          }
-          // Fallback: if role is manager and no specific manager is designated, make them manager
-          else if (!designatedManager) {
-            isManager = true
-          }
+      if (!actualTeamId) {
+        console.error(`Could not find team for user ${userData.email}, teamId: ${userData.teamId}, teamName: ${userData.teamName}`)
+        results.teamMembers.errors.push(`Team not found for ${userData.email}: teamId=${userData.teamId}, teamName=${userData.teamName}`)
+        return
+      }
+
+      // Determine if this user should be a manager of this team
+      let isManager = false
+      
+      // Method 1: Check if their role is 'manager' AND they're designated as manager for this team
+      if (role === 'manager') {
+        // Check if they're designated as manager for this specific team using teamId
+        const designatedManager = teamManagerMap.get(userData.teamId || '')
+        if (designatedManager === userData.email) {
+          isManager = true
         }
-
-        console.log(`Assigning ${userData.email} to team ${userData.teamName}, isManager: ${isManager}`)
-
-        const { error: teamMemberError } = await supabaseAdmin
-          .from('team_members')
-          .upsert({
-            user_id: userId,
-            team_id: teamId,
-            is_manager: isManager
-          }, { 
-            onConflict: 'user_id,team_id',
-            ignoreDuplicates: false // Allow updates
-          })
-          .select() // This helps with debugging
-
-        if (teamMemberError) {
-          results.teamMembers.errors.push(`Team membership for ${userData.email}: ${teamMemberError.message}`)
-        } else {
-          results.teamMembers.created++
-          console.log(`Successfully assigned ${userData.email} to team ${userData.teamName}`)
+        // Also check if ManagerEmail field in user data matches current user
+        else if (userData.managerEmail === userData.email) {
+          isManager = true
         }
+        // Fallback: if role is manager and no specific manager is designated, make them manager
+        else if (!designatedManager) {
+          isManager = true
+        }
+      }
+
+      console.log(`Assigning ${userData.email} to team ${teamName} (UUID: ${actualTeamId}), isManager: ${isManager}`)
+
+      const { error: teamMemberError } = await supabaseAdmin
+        .from('team_members')
+        .upsert({
+          user_id: userId,
+          team_id: actualTeamId,
+          is_manager: isManager
+        }, { 
+          onConflict: 'user_id,team_id',
+          ignoreDuplicates: false // Allow updates
+        })
+        .select() // This helps with debugging
+
+      if (teamMemberError) {
+        console.error(`Team membership error for ${userData.email}:`, teamMemberError)
+        results.teamMembers.errors.push(`Team membership for ${userData.email}: ${teamMemberError.message}`)
+      } else {
+        results.teamMembers.created++
+        console.log(`Successfully assigned ${userData.email} to team ${teamName}`)
       }
     }
   } catch (error) {
+    console.error(`Role assignment error for ${userData.email}:`, error)
     results.roles.errors.push(`Role assignment for ${userData.email}: ${error.message}`)
   }
 }

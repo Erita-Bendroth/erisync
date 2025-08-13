@@ -250,7 +250,7 @@ const BulkUserImport = () => {
                     </div>
                     <div className="flex gap-2">
                       <Badge variant="outline">{user.role}</Badge>
-                      {user.teamName && <Badge variant="secondary">{user.teamName}</Badge>}
+                      {(user.teamName || user.teamId) && <Badge variant="secondary">{user.teamName || user.teamId}</Badge>}
                     </div>
                   </div>
                 ))}
