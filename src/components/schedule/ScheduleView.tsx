@@ -46,7 +46,8 @@ const ScheduleView = () => {
   const [loading, setLoading] = useState(true);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const totalDays = 28; // 4 weeks = 28 days
+  const allDays = Array.from({ length: totalDays }, (_, i) => addDays(weekStart, i));
 
   useEffect(() => {
     if (user) {
@@ -98,11 +99,11 @@ const ScheduleView = () => {
   const fetchScheduleEntries = async () => {
     try {
       setLoading(true);
-      const weekEnd = addDays(weekStart, 6);
+      const fourWeeksEnd = addDays(weekStart, totalDays - 1); // 4 weeks total
       
-      console.log('Fetching schedule entries for:', {
+      console.log('Fetching schedule entries for 4 weeks:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
-        weekEnd: format(weekEnd, "yyyy-MM-dd"),
+        fourWeeksEnd: format(fourWeeksEnd, "yyyy-MM-dd"),
         userId: user?.id,
         userRoles: userRoles.map(r => r.role)
       });
@@ -126,20 +127,21 @@ const ScheduleView = () => {
           teams (name)
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(weekEnd, "yyyy-MM-dd"))
+        .lte("date", format(fourWeeksEnd, "yyyy-MM-dd"))
         .order("date");
 
-      // If user is just a team member (not manager or planner), only show their own entries
+      // Apply filtering based on user roles and team selection
       if (isTeamMember() && !isManager() && !isPlanner()) {
+        // Team members only see their own entries
         query = query.eq("user_id", user!.id);
         console.log('Filtering to only show user\'s own entries');
+      } else if (selectedTeam !== "all") {
+        // For planners/managers, apply team filter if specific team is selected
+        query = query.eq("team_id", selectedTeam);
+        console.log('Filtering by team:', selectedTeam);
       } else {
-        // For planners/managers, apply team filter if one is selected
-        if (selectedTeam !== "all") {
-          query = query.eq("team_id", selectedTeam);
-          console.log('Filtering by team:', selectedTeam);
-        }
-        console.log('Showing entries for managers/planners');
+        // Planners/managers viewing "All Teams" - show all entries
+        console.log('Showing all entries for all teams (planners/managers view)');
       }
 
       const { data, error } = await query;
@@ -263,9 +265,9 @@ const ScheduleView = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Schedule View</h2>
+          <h2 className="text-2xl font-bold">4-Week Schedule Overview</h2>
           <p className="text-muted-foreground">
-            Week of {format(weekStart, "MMM d")} - {format(addDays(weekStart, 6), "MMM d, yyyy")}
+            {format(weekStart, "MMM d")} - {format(addDays(weekStart, totalDays - 1), "MMM d, yyyy")}
           </p>
         </div>
         
@@ -310,60 +312,76 @@ const ScheduleView = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-4">
-        {weekDays.map((day, index) => {
-          const dayEntries = getEntriesForDay(day);
-          const isToday = isSameDay(day, new Date());
+      {/* 4 Weeks Grid with Week Headers */}
+      <div className="space-y-6">
+        {Array.from({ length: 4 }, (_, weekIndex) => {
+          const weekStartDate = addDays(weekStart, weekIndex * 7);
+          const weekDays = Array.from({ length: 7 }, (_, dayIndex) => addDays(weekStartDate, dayIndex));
           
           return (
-            <Card key={index} className={isToday ? "ring-2 ring-primary" : ""}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {format(day, "EEE")}
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  {format(day, "MMM d")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {dayEntries.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No entries</p>
-                ) : (
-                  dayEntries.map((entry) => (
-                    <div key={entry.id} className="space-y-1">
-                      <div className="flex flex-col gap-1">
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs ${getShiftColor(entry.shift_type)}`}
-                        >
-                          {entry.shift_type === "early" ? "Early Shift" : 
-                           entry.shift_type === "late" ? "Late Shift" : "Normal Shift"}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs ${getActivityColor(entry)}`}
-                        >
-                          {getActivityDisplay(entry)}
-                        </Badge>
-                      </div>
-                      <div className="text-xs">
-                        <p className="font-medium">
-                          {entry.profiles.first_name} {entry.profiles.last_name}
-                        </p>
-                        <p className="text-muted-foreground">
-                          {entry.teams.name}
-                        </p>
-                        {entry.notes && (
-                          <p className="text-muted-foreground text-xs">
-                            {entry.notes}
-                          </p>
+            <div key={weekIndex} className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">
+                Week {weekIndex + 1}: {format(weekStartDate, "MMM d")} - {format(addDays(weekStartDate, 6), "MMM d, yyyy")}
+              </h3>
+              
+              <div className="grid grid-cols-7 gap-4">
+                {weekDays.map((day, dayIndex) => {
+                  const dayEntries = getEntriesForDay(day);
+                  const isToday = isSameDay(day, new Date());
+                  
+                  return (
+                    <Card key={dayIndex} className={isToday ? "ring-2 ring-primary" : ""}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          {format(day, "EEE")}
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {format(day, "MMM d")}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2 max-h-64 overflow-y-auto">
+                        {dayEntries.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No entries</p>
+                        ) : (
+                          dayEntries.map((entry) => (
+                            <div key={entry.id} className="space-y-1 p-2 rounded border-l-2 border-l-primary/20">
+                              <div className="flex flex-col gap-1">
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-xs ${getShiftColor(entry.shift_type)}`}
+                                >
+                                  {entry.shift_type === "early" ? "Early" : 
+                                   entry.shift_type === "late" ? "Late" : "Normal"}
+                                </Badge>
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-xs ${getActivityColor(entry)}`}
+                                >
+                                  {getActivityDisplay(entry)}
+                                </Badge>
+                              </div>
+                              <div className="text-xs">
+                                <p className="font-medium">
+                                  {entry.profiles.first_name} {entry.profiles.last_name}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  {entry.teams.name}
+                                </p>
+                                {entry.notes && (
+                                  <p className="text-muted-foreground text-xs">
+                                    {entry.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))
                         )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
