@@ -144,8 +144,42 @@ const ScheduleView = () => {
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       case "hotline_support":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
+      case "out_of_office":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+      case "training":
+        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300";
+      case "flextime":
+        return "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300";
+      case "working_from_home":
+        return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+    }
+  };
+
+  const getShiftColor = (shiftType: string) => {
+    switch (shiftType) {
+      case "early":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "late":
+        return "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300";
+      case "normal":
+      default:
+        return "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300";
+    }
+  };
+
+  const getActivityDisplayName = (activityType: string) => {
+    switch (activityType) {
+      case "work": return "Work";
+      case "vacation": return "Vacation";
+      case "sick": return "Sick Leave";
+      case "hotline_support": return "Hotline Support";
+      case "out_of_office": return "Out of Office";
+      case "training": return "Training";
+      case "flextime": return "Flextime";
+      case "working_from_home": return "Working from Home";
+      default: return activityType;
     }
   };
 
@@ -213,12 +247,21 @@ const ScheduleView = () => {
                 ) : (
                   dayEntries.map((entry) => (
                     <div key={entry.id} className="space-y-1">
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs ${getActivityColor(entry)}`}
-                      >
-                        {getActivityDisplay(entry)}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs ${getShiftColor(entry.shift_type)}`}
+                        >
+                          {entry.shift_type === "early" ? "Early Shift" : 
+                           entry.shift_type === "late" ? "Late Shift" : "Normal Shift"}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs ${getActivityColor(entry)}`}
+                        >
+                          {getActivityDisplay(entry)}
+                        </Badge>
+                      </div>
                       <div className="text-xs">
                         <p className="font-medium">
                           {entry.profiles.first_name} {entry.profiles.last_name}
@@ -226,9 +269,9 @@ const ScheduleView = () => {
                         <p className="text-muted-foreground">
                           {entry.teams.name}
                         </p>
-                        {(isManager() || isPlanner()) && entry.shift_type !== "normal" && (
-                          <p className="text-muted-foreground">
-                            {entry.shift_type} shift
+                        {entry.notes && (
+                          <p className="text-muted-foreground text-xs">
+                            {entry.notes}
                           </p>
                         )}
                       </div>
@@ -247,46 +290,97 @@ const ScheduleView = () => {
             <Calendar className="w-5 h-5 mr-2" />
             Legend
           </CardTitle>
+          <CardDescription>
+            Color coding for schedule activities and shift types
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {!isTeamMember() || isManager() || isPlanner() ? (
-              <>
+          <div className="space-y-6">
+            {/* Activity Types Legend */}
+            <div>
+              <h4 className="font-medium mb-3">Activity Types</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {!isTeamMember() || isManager() || isPlanner() ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                        Work
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                        Vacation
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                        Sick Leave
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                        Hotline Support
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                        Out of Office
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
+                        Training
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+                        Flextime
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300">
+                        Working from Home
+                      </Badge>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                        Available
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                        Unavailable
+                      </Badge>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Shift Types Legend */}
+            <div>
+              <h4 className="font-medium mb-3">Shift Types</h4>
+              <div className="grid grid-cols-3 gap-3">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                    Work
+                  <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                    Early Shift
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
-                    Vacation
+                  <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                    Normal Shift
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                    Sick
+                  <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300">
+                    Late Shift
                   </Badge>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                    Hotline Support
-                  </Badge>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                    Available
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                    Unavailable
-                  </Badge>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

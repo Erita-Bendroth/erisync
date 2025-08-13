@@ -257,7 +257,15 @@ export type Database = {
       }
     }
     Enums: {
-      activity_type: "work" | "vacation" | "sick" | "hotline_support"
+      activity_type:
+        | "work"
+        | "vacation"
+        | "sick"
+        | "hotline_support"
+        | "out_of_office"
+        | "training"
+        | "flextime"
+        | "working_from_home"
       app_role: "manager" | "planner" | "teammember"
       availability_status: "available" | "unavailable"
       shift_type: "early" | "late" | "normal"
@@ -388,7 +396,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      activity_type: ["work", "vacation", "sick", "hotline_support"],
+      activity_type: [
+        "work",
+        "vacation",
+        "sick",
+        "hotline_support",
+        "out_of_office",
+        "training",
+        "flextime",
+        "working_from_home",
+      ],
       app_role: ["manager", "planner", "teammember"],
       availability_status: ["available", "unavailable"],
       shift_type: ["early", "late", "normal"],

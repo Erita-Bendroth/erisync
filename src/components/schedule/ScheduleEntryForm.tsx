@@ -322,6 +322,10 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                   <SelectItem value="vacation">Vacation</SelectItem>
                   <SelectItem value="sick">Sick Leave</SelectItem>
                   <SelectItem value="hotline_support">Hotline Support</SelectItem>
+                  <SelectItem value="out_of_office">Out of Office</SelectItem>
+                  <SelectItem value="training">Training</SelectItem>
+                  <SelectItem value="flextime">Flextime</SelectItem>
+                  <SelectItem value="working_from_home">Working from Home</SelectItem>
                 </SelectContent>
               </Select>
             </div>
