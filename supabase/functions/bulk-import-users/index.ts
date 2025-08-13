@@ -39,7 +39,9 @@ Deno.serve(async (req) => {
       teamMembers: { created: 0, errors: [] as string[] }
     }
 
-    // First, create/update teams
+    // First, create/update teams and track manager assignments
+    const teamManagerMap = new Map<string, string>() // teamName -> managerEmail
+    
     if (teams && teams.length > 0) {
       for (const team of teams) {
         try {
@@ -65,6 +67,11 @@ Deno.serve(async (req) => {
             }
           } else {
             results.teams.updated++
+          }
+
+          // Track manager assignment for later
+          if (team.managerEmail) {
+            teamManagerMap.set(team.teamName, team.managerEmail)
           }
         } catch (error) {
           results.teams.errors.push(`Team ${team.teamName}: ${error.message}`)
@@ -114,7 +121,7 @@ Deno.serve(async (req) => {
               }
 
               // Handle roles and team membership for existing user
-              await assignUserRole(supabaseAdmin, user.id, userData, results)
+              await assignUserRole(supabaseAdmin, user.id, userData, results, teamManagerMap)
             } else {
               results.users.errors.push(`Could not find existing user: ${userData.email}`)
             }
@@ -148,7 +155,7 @@ Deno.serve(async (req) => {
         }
 
         // Handle roles and team membership
-        await assignUserRole(supabaseAdmin, authUser.user.id, userData, results)
+        await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap)
 
       } catch (error) {
         results.users.errors.push(`${userData.email}: ${error.message}`)
@@ -188,7 +195,7 @@ Deno.serve(async (req) => {
   }
 })
 
-async function assignUserRole(supabaseAdmin: any, userId: string, userData: UserImportData, results: any) {
+async function assignUserRole(supabaseAdmin: any, userId: string, userData: UserImportData, results: any, teamManagerMap: Map<string, string>) {
   try {
     // Map role names to our enum values
     const roleMapping: Record<string, string> = {
@@ -229,7 +236,27 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
       }
 
       if (teamId) {
-        const isManager = role === 'manager'
+        // Determine if this user should be a manager of this team
+        let isManager = false
+        
+        // Method 1: Check if their role is 'manager' AND they're designated as manager for this team
+        if (role === 'manager') {
+          // Check if they're designated as manager for this specific team
+          const designatedManager = teamManagerMap.get(userData.teamName || '')
+          if (designatedManager === userData.email) {
+            isManager = true
+          }
+          // Also check if ManagerEmail field in user data matches current user
+          else if (userData.managerEmail === userData.email) {
+            isManager = true
+          }
+          // Fallback: if role is manager and no specific manager is designated, make them manager
+          else if (!designatedManager) {
+            isManager = true
+          }
+        }
+
+        console.log(`Assigning ${userData.email} to team ${userData.teamName}, isManager: ${isManager}`)
 
         const { error: teamMemberError } = await supabaseAdmin
           .from('team_members')
