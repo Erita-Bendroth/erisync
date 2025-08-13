@@ -28,14 +28,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!mounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        setIsInitialized(true);
         
         // Only check password change requirement on SIGNED_IN event, not all auth state changes
         if (event === 'SIGNED_IN' && session?.user) {
@@ -48,15 +54,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      setIsInitialized(true);
       
       // Don't check for password change on initial page load/refresh
       // Only check when user actually signs in
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkPasswordChangeRequired = async (userId: string) => {
@@ -134,6 +146,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signOut,
   };
+
+  // Don't render children until auth is initialized
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
+          <p className="text-muted-foreground">Initializing application</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
