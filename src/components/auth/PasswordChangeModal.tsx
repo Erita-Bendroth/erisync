@@ -82,7 +82,26 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
         return;
       }
       
-      // Verify the refreshed session works
+      // Explicitly set the session on the client
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: refreshData.session.access_token,
+        refresh_token: refreshData.session.refresh_token
+      });
+      
+      if (setSessionError) {
+        console.error('Failed to set session:', setSessionError);
+        toast({
+          title: "Error",
+          description: "Session error. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Add a small delay to ensure session is properly set
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Verify the session is working
       const { data: { user: sessionUser }, error: userError } = await supabase.auth.getUser();
       if (!sessionUser || userError) {
         console.error('Session verification failed:', userError);
@@ -94,7 +113,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
         return;
       }
       
-      console.log('Session refreshed and verified successfully');
+      console.log('Session refreshed, set, and verified successfully');
     } catch (error) {
       console.error('Session refresh error:', error);
       toast({
