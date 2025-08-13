@@ -17,7 +17,7 @@ interface PasswordChangeModalProps {
 
 const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPasswordChanged }) => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     currentPassword: "",
@@ -60,36 +60,30 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
     console.log('User found in context:', user.id, user.email);
 
-    // Check and refresh the Supabase session
+    // Use the session from auth context instead of refreshing
     try {
-      console.log('Checking current session...');
+      console.log('Checking auth context session...');
       
-      // Force refresh the session before password change
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      console.log('Session refresh result:', {
-        hasSession: !!refreshData.session,
-        hasUser: !!refreshData.user,
-        error: refreshError
-      });
-      
-      if (!refreshData.session || refreshError) {
-        console.error('Session refresh failed:', refreshError);
+      if (!session) {
+        console.error('No session in auth context');
         toast({
-          title: "Error", 
-          description: "Your session has expired. Please sign in again.",
+          title: "Error",
+          description: "Please sign in again to change your password.",
           variant: "destructive",
         });
         return;
       }
       
-      // Explicitly set the session on the client
+      console.log('Session found in context, setting it explicitly...');
+      
+      // Explicitly set the session from context
       const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: refreshData.session.access_token,
-        refresh_token: refreshData.session.refresh_token
+        access_token: session.access_token,
+        refresh_token: session.refresh_token
       });
       
       if (setSessionError) {
-        console.error('Failed to set session:', setSessionError);
+        console.error('Failed to set session from context:', setSessionError);
         toast({
           title: "Error",
           description: "Session error. Please sign in again.",
@@ -98,24 +92,12 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
         return;
       }
       
-      // Add a small delay to ensure session is properly set
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay to ensure session propagation
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Verify the session is working
-      const { data: { user: sessionUser }, error: userError } = await supabase.auth.getUser();
-      if (!sessionUser || userError) {
-        console.error('Session verification failed:', userError);
-        toast({
-          title: "Error",
-          description: "Authentication error. Please sign in again.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log('Session refreshed, set, and verified successfully');
+      console.log('Session set from context, attempting password update...');
     } catch (error) {
-      console.error('Session refresh error:', error);
+      console.error('Session setup error:', error);
       toast({
         title: "Error",
         description: "Authentication error. Please sign in again.",
