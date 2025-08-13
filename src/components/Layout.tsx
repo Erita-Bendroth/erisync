@@ -15,13 +15,15 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Company Scheduler</h1>
+            <h1 className="text-xl font-semibold">Employee Scheduler</h1>
           </div>
           
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-muted-foreground">
-              Welcome, {user?.email}
-            </span>
+            <div className="bg-primary/10 px-3 py-1 rounded-md border">
+              <span className="text-sm font-medium">
+                Logged in as: <strong className="text-primary">{user?.email || 'Not logged in'}</strong>
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"
