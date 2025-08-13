@@ -1,1 +1,19 @@
 project_id = "rdatyftacldjhgzsxzfw"
+
+[functions.bulk-import-users]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.import-holidays]
+verify_jwt = false
+
+[functions.verify-password]
+verify_jwt = false
+
+[functions.check-temp-password]
+verify_jwt = false

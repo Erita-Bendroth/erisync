@@ -111,6 +111,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
+    // First check if user has temporary password
+    try {
+      const { data: tempCheckData } = await supabase.functions.invoke('check-temp-password', {
+        body: { email, password }
+      });
+      
+      console.log('Temporary password check result:', tempCheckData);
+    } catch (error) {
+      console.error('Error checking temporary password:', error);
+      // Continue with normal login even if temp check fails
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,

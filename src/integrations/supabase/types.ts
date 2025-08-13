@@ -248,6 +248,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_temporary_password: {
+        Args: { _user_id: string; _password: string }
+        Returns: boolean
+      }
       create_default_schedule_with_holidays: {
         Args: {
           _user_id: string
