@@ -103,7 +103,7 @@ const TeamManagement = () => {
           team_id,
           is_manager,
           created_at,
-          profiles!team_members_user_id_fkey (first_name, last_name, email)
+          profiles!inner (first_name, last_name, email)
         `)
         .eq("team_id", teamId);
 
