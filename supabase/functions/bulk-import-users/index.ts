@@ -82,93 +82,92 @@ Deno.serve(async (req) => {
     // Create/update users
     for (const userData of users) {
       try {
-        // Use a standard password for all users
-        const standardPassword = "VestasTemp2025!"
+        console.log(`Processing user: ${userData.email}`)
         
-        // Create auth user without email confirmation
-        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: userData.email,
-          password: standardPassword,
-          email_confirm: true, // Skip email confirmation
-          user_metadata: {
-            employee_id: userData.employeeId,
-            bulk_imported: true,
-            requires_password_change: true // Flag for mandatory password change
-          }
-        })
+        // First, check if user already exists
+        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+        
+        if (listError) {
+          results.users.errors.push(`Error checking existing users: ${listError.message}`)
+          continue
+        }
 
-        if (authError) {
-          if (authError.message.includes('already registered')) {
-            // User exists, get their ID from auth
-            const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-            
-            if (!listError && existingUsers) {
-              const user = existingUsers.users.find(u => u.email === userData.email)
-              
-              if (user) {
-                console.log(`Found existing user: ${userData.email}, ID: ${user.id}`)
-                
-                // Update profile with password change flag
-                const { error: profileError } = await supabaseAdmin
-                  .from('profiles')
-                  .upsert({
-                    user_id: user.id,
-                    email: userData.email,
-                    first_name: userData.employeeId || userData.email.split('@')[0],
-                    last_name: '',
-                    country_code: 'US',
-                    requires_password_change: true
-                  }, { 
-                    onConflict: 'user_id' 
-                  })
+        const existingUser = existingUsers.users.find(u => u.email === userData.email)
+        
+        if (existingUser) {
+          // User already exists, update their profile and assignments
+          console.log(`Found existing user: ${userData.email}, ID: ${existingUser.id}`)
+          
+          // Update profile
+          const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .upsert({
+              user_id: existingUser.id,
+              email: userData.email,
+              first_name: userData.employeeId || userData.email.split('@')[0],
+              last_name: '',
+              country_code: 'US',
+              requires_password_change: true
+            }, { 
+              onConflict: 'user_id' 
+            })
 
-                if (profileError) {
-                  results.users.errors.push(`Profile update for ${userData.email}: ${profileError.message}`)
-                } else {
-                  results.users.updated++
-                  console.log(`Updated profile for: ${userData.email}`)
-                }
-
-                // Handle roles and team membership for existing user
-                await assignUserRole(supabaseAdmin, user.id, userData, results, teamManagerMap)
-              } else {
-                results.users.errors.push(`Could not find existing user: ${userData.email}`)
-              }
-            } else {
-              results.users.errors.push(`Error listing users for ${userData.email}: ${listError?.message}`)
-            }
+          if (profileError) {
+            results.users.errors.push(`Profile update for ${userData.email}: ${profileError.message}`)
           } else {
-            results.users.errors.push(`Auth error for ${userData.email}: ${authError.message}`)
+            results.users.updated++
+            console.log(`Updated profile for: ${userData.email}`)
           }
-          continue
-        }
 
-        if (!authUser.user) {
-          results.users.errors.push(`No user created for ${userData.email}`)
-          continue
-        }
-
-        // Create profile
-        const { error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .insert({
-            user_id: authUser.user.id,
+          // Handle roles and team membership for existing user
+          await assignUserRole(supabaseAdmin, existingUser.id, userData, results, teamManagerMap)
+        } else {
+          // Create new user
+          const standardPassword = "VestasTemp2025!"
+          
+          const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: userData.email,
-            first_name: userData.employeeId || userData.email.split('@')[0],
-            last_name: '',
-            country_code: 'US',
-            requires_password_change: true // Flag for mandatory password change
+            password: standardPassword,
+            email_confirm: true,
+            user_metadata: {
+              employee_id: userData.employeeId,
+              bulk_imported: true,
+              requires_password_change: true
+            }
           })
 
-        if (profileError) {
-          results.users.errors.push(`Profile for ${userData.email}: ${profileError.message}`)
-        } else {
-          results.users.created++
-          console.log(`Created user: ${userData.email}`)
-        }
+          if (authError) {
+            results.users.errors.push(`Auth error for ${userData.email}: ${authError.message}`)
+            continue
+          }
 
-        // Handle roles and team membership
-        await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap)
+          if (!authUser.user) {
+            results.users.errors.push(`No user created for ${userData.email}`)
+            continue
+          }
+
+          // Create profile
+          const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .insert({
+              user_id: authUser.user.id,
+              email: userData.email,
+              first_name: userData.employeeId || userData.email.split('@')[0],
+              last_name: '',
+              country_code: 'US',
+              requires_password_change: true
+            })
+
+          if (profileError) {
+            results.users.errors.push(`Profile for ${userData.email}: ${profileError.message}`)
+          } else {
+            results.users.created++
+            console.log(`Created user: ${userData.email}`)
+          }
+
+          // Handle roles and team membership
+          await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap)
+        }
 
       } catch (error) {
         results.users.errors.push(`${userData.email}: ${error.message}`)
