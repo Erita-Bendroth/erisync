@@ -14,36 +14,7 @@ interface UserImportData {
   isActive?: boolean;
 }
 
-// Create team code mappings
-const teamCodeMappings: { [key: string]: string } = {
-  'TSC': 'Turbine Support Central',
-  'TTCS': 'Turbine Troubleshooting Central - South',
-  'TTCE': 'Turbine Troubleshooting Central - East',
-  'TOpC': 'Technical Operations Central',
-  'PSCN': 'Plant Support Central - North',
-  'PSCS': 'Plant Support Central - South',
-  'PSC': 'Plant Troubleshooting Central',
-  'POC': 'Plant Operations Central',
-  'TON': 'Turbine Operations North',
-  'TSN': 'Turbine Support North',
-  'TTNW': 'Turbine Troubleshooting North - West',
-  'TTNC': 'Turbine Troubleshooting North - Central',
-  'TTNE': 'Turbine Troubleshooting North - East',
-  'PON': 'Plant Operations North',
-  'PSN': 'Plant Support North',
-  'PTN': 'Plant Troubleshooting North',
-  'PCI': 'Pre-Config & Installation - NCE',
-  'TOpN': 'Technical Operations North',
-  'TOpOfs': 'Technical Operations Offshore',
-  'TOOfs': 'Turbine Operations Offshore',
-  'TSOfs': 'Turbine Support Offshore',
-  'TTOfs': 'Turbine Troubleshooting Offshore',
-  'POOfs': 'Plant Operations Offshore',
-  'PSOfsC1': 'Plant Support Offshore - Cluster 1',
-  'PFOfsC2&3': 'Plant Support Offshore - Cluster 2 & 3',
-  'PTOfs': 'Plant Troubleshooting Offshore',
-  'TOC': 'Turbine Operations Central'
-};
+// No longer needed - team code mappings removed
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests

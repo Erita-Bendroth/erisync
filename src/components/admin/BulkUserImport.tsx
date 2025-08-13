@@ -155,10 +155,26 @@ const BulkUserImport = () => {
 
     setLoading(true);
     try {
+      // Extract unique teams from user data
+      const uniqueTeams = new Map<string, ParsedTeam>();
+      
+      parsedUsers.forEach(user => {
+        if (user.teamName && !uniqueTeams.has(user.teamName)) {
+          uniqueTeams.set(user.teamName, {
+            teamId: user.teamName, // Use teamName as teamId since we don't have separate IDs
+            teamName: user.teamName,
+            managerEmail: user.managerEmail
+          });
+        }
+      });
+
+      const teamsArray = Array.from(uniqueTeams.values());
+      console.log("Extracted teams:", teamsArray);
+
       const { data, error } = await supabase.functions.invoke('bulk-import-users', {
         body: {
           users: parsedUsers,
-          teams: parsedTeams
+          teams: teamsArray
         }
       });
 
