@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Lock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { validatePassword, sanitizeInput } from "@/lib/validation";
 
 interface PasswordChangeModalProps {
   isOpen: boolean;
@@ -37,8 +38,23 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
       });
       return;
     }
+
+    // Sanitize inputs
+    const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
+    const sanitizedNewPassword = sanitizeInput(formData.newPassword);
+    const sanitizedConfirmPassword = sanitizeInput(formData.confirmPassword);
+
+    // Validate current password is provided
+    if (!sanitizedCurrentPassword) {
+      toast({
+        title: "Error",
+        description: "Current password is required",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    if (formData.newPassword !== formData.confirmPassword) {
+    if (sanitizedNewPassword !== sanitizedConfirmPassword) {
       toast({
         title: "Error",
         description: "New passwords don't match",
@@ -47,26 +63,12 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
       return;
     }
 
-    // Enhanced password validation
-    if (formData.newPassword.length < 8) {
-      toast({
-        title: "Error", 
-        description: "Password must be at least 8 characters long",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check password complexity
-    const hasUpperCase = /[A-Z]/.test(formData.newPassword);
-    const hasLowerCase = /[a-z]/.test(formData.newPassword);
-    const hasNumbers = /\d/.test(formData.newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+    // Validate new password strength
+    const { isValid, errors } = validatePassword(sanitizedNewPassword);
+    if (!isValid) {
       toast({
         title: "Error",
-        description: "Password must contain uppercase, lowercase, numbers, and special characters",
+        description: errors.join(', '),
         variant: "destructive",
       });
       return;
@@ -74,26 +76,39 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
     setLoading(true);
     try {
+      // Verify current password
+      const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
+        body: {
+          email: user.email,
+          currentPassword: sanitizedCurrentPassword
+        }
+      });
+
+      if (verificationError || !verificationData?.valid) {
+        toast({
+          title: "Error",
+          description: "Current password is incorrect",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Update password using Supabase auth
       const { error: passwordError } = await supabase.auth.updateUser({
-        password: formData.newPassword
+        password: sanitizedNewPassword
       });
 
       if (passwordError) throw passwordError;
 
       // Update profile to remove password change requirement
-      const { data: user } = await supabase.auth.getUser();
-      if (user.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ requires_password_change: false })
-          .eq('user_id', user.user.id);
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ requires_password_change: false })
+        .eq('user_id', user.id);
 
-        if (profileError) {
-          console.error('Profile update error:', profileError);
-          throw profileError;
-        }
-        console.log('Successfully updated requires_password_change to false for user:', user.user.id);
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        throw profileError;
       }
 
       toast({

@@ -299,6 +299,10 @@ export type Database = {
         Args: { _manager_id: string; _target_user_id: string }
         Returns: boolean
       }
+      verify_user_password: {
+        Args: { _email: string; _password: string }
+        Returns: boolean
+      }
     }
     Enums: {
       activity_type:

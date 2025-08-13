@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { validatePassword, sanitizeInput } from "@/lib/validation";
 
 const PasswordSettings = () => {
   const { toast } = useToast();
@@ -21,7 +22,22 @@ const PasswordSettings = () => {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.newPassword !== formData.confirmPassword) {
+    // Sanitize inputs
+    const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
+    const sanitizedNewPassword = sanitizeInput(formData.newPassword);
+    const sanitizedConfirmPassword = sanitizeInput(formData.confirmPassword);
+
+    // Validate current password is provided
+    if (!sanitizedCurrentPassword) {
+      toast({
+        title: "Error",
+        description: "Current password is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (sanitizedNewPassword !== sanitizedConfirmPassword) {
       toast({
         title: "Error",
         description: "New passwords don't match",
@@ -30,26 +46,12 @@ const PasswordSettings = () => {
       return;
     }
 
-    // Enhanced password validation
-    if (formData.newPassword.length < 8) {
-      toast({
-        title: "Error", 
-        description: "Password must be at least 8 characters long",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check password complexity
-    const hasUpperCase = /[A-Z]/.test(formData.newPassword);
-    const hasLowerCase = /[a-z]/.test(formData.newPassword);
-    const hasNumbers = /\d/.test(formData.newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword);
-
-    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+    // Validate new password strength
+    const { isValid, errors } = validatePassword(sanitizedNewPassword);
+    if (!isValid) {
       toast({
         title: "Error",
-        description: "Password must contain uppercase, lowercase, numbers, and special characters",
+        description: errors.join(', '),
         variant: "destructive",
       });
       return;
@@ -57,9 +59,32 @@ const PasswordSettings = () => {
 
     setLoading(true);
     try {
+      // Get current user
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.email) {
+        throw new Error('Unable to verify user');
+      }
+
+      // Verify current password
+      const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
+        body: {
+          email: userData.user.email,
+          currentPassword: sanitizedCurrentPassword
+        }
+      });
+
+      if (verificationError || !verificationData?.valid) {
+        toast({
+          title: "Error",
+          description: "Current password is incorrect",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Update password using Supabase auth
       const { error: passwordError } = await supabase.auth.updateUser({
-        password: formData.newPassword
+        password: sanitizedNewPassword
       });
 
       if (passwordError) throw passwordError;
