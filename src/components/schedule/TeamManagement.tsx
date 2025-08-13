@@ -429,6 +429,7 @@ const TeamManagement = () => {
                 </div>
                 <Badge variant="secondary">
                   {teamMembers[team.id]?.length || 0} members
+                  {/* Debug: {JSON.stringify(teamMembers[team.id]?.slice(0,1) || [])} */}
                 </Badge>
               </div>
             </CardHeader>
