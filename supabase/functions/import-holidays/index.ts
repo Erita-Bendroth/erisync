@@ -1,0 +1,104 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface Holiday {
+  date: string;
+  localName: string;
+  name: string;
+  countryCode: string;
+  fixed: boolean;
+  global: boolean;
+  counties?: string[];
+  launchYear?: number;
+  types: string[];
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Create Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { country_code, year } = await req.json()
+
+    if (!country_code || !year) {
+      return new Response(
+        JSON.stringify({ error: 'Country code and year are required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    console.log(`Fetching holidays for ${country_code} in ${year}`)
+
+    // Fetch holidays from public API (nager.date is free and reliable)
+    const holidaysResponse = await fetch(
+      `https://date.nager.at/api/v3/publicholidays/${year}/${country_code}`
+    )
+
+    if (!holidaysResponse.ok) {
+      throw new Error(`Failed to fetch holidays: ${holidaysResponse.statusText}`)
+    }
+
+    const holidays: Holiday[] = await holidaysResponse.json()
+    console.log(`Found ${holidays.length} holidays`)
+
+    // Insert holidays into database
+    const holidayData = holidays.map(holiday => ({
+      name: holiday.localName || holiday.name,
+      date: holiday.date,
+      country_code: holiday.countryCode,
+      year: parseInt(year),
+      is_public: holiday.global || holiday.types.includes('Public')
+    }))
+
+    // Use upsert to avoid duplicate entries
+    const { data, error } = await supabaseClient
+      .from('holidays')
+      .upsert(holidayData, { 
+        onConflict: 'date,country_code',
+        ignoreDuplicates: false 
+      })
+
+    if (error) {
+      console.error('Database error:', error)
+      throw error
+    }
+
+    console.log(`Successfully imported ${holidayData.length} holidays`)
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        imported: holidayData.length,
+        holidays: holidayData 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+
+  } catch (error) {
+    console.error('Error importing holidays:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+})

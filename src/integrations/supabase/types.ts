@@ -14,8 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      holidays: {
+        Row: {
+          country_code: string
+          created_at: string
+          date: string
+          id: string
+          is_public: boolean | null
+          name: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          country_code: string
+          created_at?: string
+          date: string
+          id?: string
+          is_public?: boolean | null
+          name: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          date?: string
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          country_code: string | null
           created_at: string
           email: string
           first_name: string
@@ -25,6 +59,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string
           email: string
           first_name: string
@@ -34,6 +69,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string
           email?: string
           first_name?: string
@@ -186,6 +222,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      import_holidays_for_year: {
+        Args: { _country_code: string; _year: number }
+        Returns: undefined
       }
       is_manager_of_team: {
         Args: { _user_id: string; _team_id: string }

@@ -8,6 +8,8 @@ import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import TeamManagement from "@/components/schedule/TeamManagement";
 import AdminSetup from "@/components/admin/AdminSetup";
+import HolidayManager from "@/components/holidays/HolidayManager";
+import CountrySelector from "@/components/profile/CountrySelector";
 
 const Schedule = () => {
   const { signOut } = useAuth();
@@ -33,7 +35,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="admin" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -45,6 +47,10 @@ const Schedule = () => {
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
               Teams
+            </TabsTrigger>
+            <TabsTrigger value="holidays" className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              Holidays
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center">
               <Settings className="w-4 h-4 mr-2" />
@@ -78,27 +84,32 @@ const Schedule = () => {
             <TeamManagement />
           </TabsContent>
 
+          <TabsContent value="holidays" className="space-y-6">
+            <HolidayManager />
+          </TabsContent>
+
           <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Settings</CardTitle>
-                <CardDescription>
-                  Configure your scheduling preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Settings panel coming soon. Here you'll be able to configure:
-                </p>
-                <ul className="list-disc list-inside mt-4 space-y-2 text-muted-foreground">
-                  <li>Default work hours</li>
-                  <li>Holiday calendars</li>
-                  <li>Notification preferences</li>
-                  <li>User role management</li>
-                  <li>Time zone settings</li>
-                </ul>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <CountrySelector />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Other Settings</CardTitle>
+                  <CardDescription>
+                    Additional scheduling preferences and configurations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    More settings coming soon:
+                  </p>
+                  <ul className="list-disc list-inside mt-4 space-y-2 text-muted-foreground">
+                    <li>Default work hours</li>
+                    <li>Notification preferences</li>
+                    <li>Time zone settings</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
