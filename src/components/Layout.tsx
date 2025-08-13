@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { LogOut, Calendar, Users, Settings } from "lucide-react";
 
 interface LayoutProps {
