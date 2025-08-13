@@ -146,9 +146,16 @@ const ScheduleView = () => {
 
       const { data, error } = await query;
 
-      console.log('Schedule entries query result:', { data: data?.length, error });
-
-      if (error) throw error;
+      if (error) {
+        console.error('Detailed schedule query error:', {
+          error: error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
       
       // Transform the data to ensure proper typing
       const transformedData = data?.map(item => ({
