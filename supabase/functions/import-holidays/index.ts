@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Insert holidays into database
+    // Prepare holiday data for database
     const holidayData = holidays.map(holiday => ({
       name: holiday.localName || holiday.name,
       date: holiday.date,
@@ -96,10 +96,47 @@ Deno.serve(async (req) => {
 
     console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
 
-    // First try a simple insert without upsert to test RLS
+    // Check for existing holidays first
+    console.log('Checking for existing holidays...')
+    const { data: existingHolidays, error: checkError } = await supabaseClient
+      .from('holidays')
+      .select('date')
+      .eq('country_code', country_code)
+      .eq('year', year)
+      .eq('user_id', user_id)
+
+    if (checkError) {
+      console.error('Error checking existing holidays:', checkError)
+      throw new Error(`Database error: ${checkError.message}`)
+    }
+
+    const existingDates = new Set(existingHolidays?.map(h => h.date) || [])
+    const newHolidays = holidayData.filter(holiday => !existingDates.has(holiday.date))
+
+    console.log(`Found ${existingHolidays?.length || 0} existing holidays, ${newHolidays.length} new holidays to insert`)
+
+    if (newHolidays.length === 0) {
+      console.log('All holidays already exist')
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `All holidays for ${country_code} ${year} already exist`,
+          imported: 0,
+          existing: existingHolidays?.length || 0,
+          total: holidayData.length
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+
+    // Insert only new holidays
+    console.log('Inserting new holidays into database...')
     const { data, error } = await supabaseClient
       .from('holidays')
-      .insert(holidayData)
+      .insert(newHolidays)
 
     console.log('Insert result:', { 
       success: !error, 
@@ -117,13 +154,15 @@ Deno.serve(async (req) => {
       throw new Error(`Database error: ${error.message} (${error.code})`)
     }
 
-    console.log(`Successfully imported ${holidayData.length} holidays`)
+    console.log(`Successfully imported ${newHolidays.length} holidays`)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        imported: holidayData.length,
-        holidays: holidayData 
+        imported: newHolidays.length,
+        existing: existingHolidays?.length || 0,
+        total: holidayData.length,
+        holidays: newHolidays 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
