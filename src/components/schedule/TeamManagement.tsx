@@ -95,6 +95,7 @@ const TeamManagement = () => {
 
   const fetchTeamMembers = async (teamId: string) => {
     try {
+      console.log(`Fetching team members for team: ${teamId}`);
       const { data, error } = await supabase
         .from("team_members")
         .select(`
@@ -107,7 +108,12 @@ const TeamManagement = () => {
         `)
         .eq("team_id", teamId);
 
-      if (error) throw error;
+      console.log(`Query result for team ${teamId}:`, { data, error });
+
+      if (error) {
+        console.error(`Error fetching team members for ${teamId}:`, error);
+        throw error;
+      }
       
       // Transform the data to match our interface
       const transformedData = data?.map(item => ({
@@ -115,6 +121,7 @@ const TeamManagement = () => {
         profiles: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
       })) || [];
       
+      console.log(`Transformed data for team ${teamId}:`, transformedData);
       setTeamMembers(prev => ({ ...prev, [teamId]: transformedData }));
     } catch (error) {
       console.error("Error fetching team members:", error);
