@@ -36,10 +36,26 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
       return;
     }
 
+    // Enhanced password validation
     if (formData.newPassword.length < 8) {
       toast({
         title: "Error", 
         description: "Password must be at least 8 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check password complexity
+    const hasUpperCase = /[A-Z]/.test(formData.newPassword);
+    const hasLowerCase = /[a-z]/.test(formData.newPassword);
+    const hasNumbers = /\d/.test(formData.newPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+      toast({
+        title: "Error",
+        description: "Password must contain uppercase, lowercase, numbers, and special characters",
         variant: "destructive",
       });
       return;
@@ -104,9 +120,9 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
           <Alert className="mb-4">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Your current password is:</strong> VestasTemp2025!
+              You are required to change your password before continuing.
               <br />
-              Please change it to something secure and memorable.
+              Please choose a secure password with at least 8 characters.
             </AlertDescription>
           </Alert>
 
@@ -118,7 +134,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
                 type="password"
                 value={formData.currentPassword}
                 onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                placeholder="VestasTemp2025!"
+                placeholder="Enter your current password"
                 required
               />
             </div>
@@ -135,7 +151,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
                 minLength={8}
               />
               <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters long
+                Must be at least 8 characters with uppercase, lowercase, numbers, and special characters
               </p>
             </div>
 

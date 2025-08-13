@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, Users, FileText, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { sanitizeCSVInput, validateEmail, sanitizeInput } from "@/lib/validation";
 
 interface ParsedUser {
   employeeId?: string;
@@ -283,7 +284,7 @@ const BulkUserImport = () => {
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Standard Password:</strong> All users will be created with password: <code className="bg-muted px-1 rounded">VestasTemp2025!</code>
+              <strong>Security:</strong> All users will be created with a secure temporary password.
               <br />
               <strong>First Login:</strong> Users will be required to change their password immediately after first login.
               <br />

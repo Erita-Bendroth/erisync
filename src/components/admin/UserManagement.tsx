@@ -139,6 +139,26 @@ const UserManagement = () => {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
+      // SECURITY: Prevent users from modifying their own roles
+      if (user?.id === userId) {
+        toast({
+          title: "Error",
+          description: "You cannot modify your own role",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // SECURITY: Additional authorization check
+      if (!hasPermission) {
+        toast({
+          title: "Error", 
+          description: "Insufficient permissions to modify user roles",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // First, remove all existing roles for this user
       const { error: deleteError } = await supabase
         .from('user_roles')
@@ -157,6 +177,9 @@ const UserManagement = () => {
 
       if (insertError) throw insertError;
 
+      // Log the role change for audit purposes
+      console.log(`Role updated by ${user?.email}: User ${userId} role changed to ${newRole}`);
+
       toast({
         title: "Success",
         description: "User role updated successfully",
@@ -168,7 +191,7 @@ const UserManagement = () => {
       console.error('Error updating role:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update user role",
+        description: "Failed to update user role. Please try again.",
         variant: "destructive",
       });
     }
@@ -255,6 +278,7 @@ const UserManagement = () => {
                       <Select 
                         value={userData.roles[0] || ''} 
                         onValueChange={(value) => updateUserRole(userData.user_id, value)}
+                        disabled={userData.user_id === user?.id} // Prevent self-role modification
                       >
                         <SelectTrigger className="w-32">
                           <SelectValue placeholder="Role" />
