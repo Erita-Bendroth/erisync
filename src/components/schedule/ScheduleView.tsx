@@ -405,9 +405,19 @@ const ScheduleView = () => {
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    return scheduleEntries.filter(entry => 
+    const entries = scheduleEntries.filter(entry => 
       entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
     );
+    
+    // Debug logging for Friday entries
+    if (date.getDay() === 5) { // Friday
+      console.log(`Friday entries for ${employeeId} on ${format(date, 'yyyy-MM-dd')}:`, entries.length);
+      console.log('All Friday entries in scheduleEntries:', 
+        scheduleEntries.filter(entry => new Date(entry.date).getDay() === 5).length
+      );
+    }
+    
+    return entries;
   };
 
   const isPlanner = () => userRoles.some(role => role.role === "planner");
