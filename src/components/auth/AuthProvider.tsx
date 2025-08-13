@@ -176,22 +176,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={value}>
-      {/* Show loading state while initializing but still provide context */}
-      {!isInitialized ? (
-        <div className="min-h-screen flex items-center justify-center bg-background">
+      {children}
+      <PasswordChangeModal 
+        isOpen={showPasswordModal}
+        onPasswordChanged={handlePasswordChanged}
+      />
+      {/* Show loading overlay while initializing */}
+      {!isInitialized && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="text-center">
             <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
             <p className="text-muted-foreground">Initializing application</p>
           </div>
         </div>
-      ) : (
-        <>
-          {children}
-          <PasswordChangeModal 
-            isOpen={showPasswordModal}
-            onPasswordChanged={handlePasswordChanged}
-          />
-        </>
       )}
     </AuthContext.Provider>
   );
