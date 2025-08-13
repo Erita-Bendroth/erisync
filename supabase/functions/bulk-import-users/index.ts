@@ -46,57 +46,71 @@ Deno.serve(async (req) => {
       teamMembers: { created: 0, errors: [] as string[] }
     }
 
-    // First, create/update teams and track manager assignments
+    // First, extract and create teams from user data if no separate teams array provided
+    const uniqueTeamsFromUsers = new Map<string, any>()
     const teamManagerMap = new Map<string, string>() // teamName -> managerEmail
     
-    if (teams && teams.length > 0) {
-      for (const team of teams) {
-        try {
-          const { data: existingTeam, error: existingError } = await supabaseAdmin
+    // Extract unique teams from user data
+    for (const userData of users) {
+      if (userData.teamName && !uniqueTeamsFromUsers.has(userData.teamName)) {
+        uniqueTeamsFromUsers.set(userData.teamName, {
+          teamName: userData.teamName,
+          managerEmail: userData.managerEmail
+        })
+      }
+    }
+    
+    // Process teams - either from provided teams array or extracted from users
+    const teamsToProcess = teams && teams.length > 0 ? teams : Array.from(uniqueTeamsFromUsers.values())
+    
+    console.log(`Processing ${teamsToProcess.length} teams:`, teamsToProcess.map(t => t.teamName))
+    
+    for (const team of teamsToProcess) {
+      try {
+        const { data: existingTeam, error: existingError } = await supabaseAdmin
+          .from('teams')
+          .select('id')
+          .eq('name', team.teamName)
+          .single()
+
+        let teamUuid = null
+        
+        if (existingError && existingError.code === 'PGRST116') {
+          // Team doesn't exist, create it
+          const { data: newTeam, error: createError } = await supabaseAdmin
             .from('teams')
+            .insert({
+              name: team.teamName,
+              description: `Auto-imported team: ${team.teamName}`
+            })
             .select('id')
-            .eq('name', team.teamName)
             .single()
 
-          let teamUuid = null
-          
-          if (existingError && existingError.code === 'PGRST116') {
-            // Team doesn't exist, create it
-            const { data: newTeam, error: createError } = await supabaseAdmin
-              .from('teams')
-              .insert({
-                name: team.teamName,
-                description: `Auto-imported team: ${team.teamName}`
-              })
-              .select('id')
-              .single()
-
-            if (createError) {
-              results.teams.errors.push(`Team ${team.teamName}: ${createError.message}`)
-              continue
-            } else {
-              teamUuid = newTeam.id
-              results.teams.created++
-              console.log(`Created team: ${team.teamName} with UUID: ${teamUuid}`)
-            }
-          } else if (!existingError) {
-            // Team exists
-            teamUuid = existingTeam.id
-            results.teams.updated++
-            console.log(`Found existing team: ${team.teamName} with UUID: ${teamUuid}`)
-          } else {
-            results.teams.errors.push(`Team lookup error for ${team.teamName}: ${existingError.message}`)
+          if (createError) {
+            results.teams.errors.push(`Team ${team.teamName}: ${createError.message}`)
             continue
+          } else {
+            teamUuid = newTeam.id
+            results.teams.created++
+            console.log(`Created team: ${team.teamName} with UUID: ${teamUuid}`)
           }
-
-          // Track manager assignments for later use
-          if (team.managerEmail) {
-            teamManagerMap.set(team.teamName, team.managerEmail)
-            console.log(`Mapped manager ${team.managerEmail} -> team ${team.teamName}`)
-          }
-        } catch (error) {
-          results.teams.errors.push(`Team ${team.teamName}: ${error.message}`)
+        } else if (!existingError) {
+          // Team exists
+          teamUuid = existingTeam.id
+          results.teams.updated++
+          console.log(`Found existing team: ${team.teamName} with UUID: ${teamUuid}`)
+        } else {
+          results.teams.errors.push(`Team lookup error for ${team.teamName}: ${existingError.message}`)
+          continue
         }
+
+        // Track manager assignments for later use
+        if (team.managerEmail) {
+          teamManagerMap.set(team.teamName, team.managerEmail)
+          console.log(`Mapped manager ${team.managerEmail} -> team ${team.teamName}`)
+        }
+      } catch (error) {
+        results.teams.errors.push(`Team ${team.teamName}: ${error.message}`)
       }
     }
 
