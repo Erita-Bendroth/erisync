@@ -486,7 +486,7 @@ const ScheduleView = () => {
                                       </span>
                                     </div>
                                   </Badge>
-                                  {entry.notes && (
+                                  {entry.notes && !entry.notes.includes("Auto-generated") && (
                                     <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
                                       {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
                                     </p>
