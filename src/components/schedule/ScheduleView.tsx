@@ -108,7 +108,25 @@ const ScheduleView = () => {
         userRoles: userRoles.map(r => r.role)
       });
       
-      // Build query based on user roles
+      // First test basic access without joins
+      console.log('Testing basic query access...');
+      
+      let basicQuery = supabase
+        .from("schedule_entries")
+        .select("id, user_id, team_id, date, activity_type")
+        .gte("date", format(weekStart, "yyyy-MM-dd"))
+        .lte("date", format(fourWeeksEnd, "yyyy-MM-dd"))
+        .limit(5);
+
+      const { data: basicTest, error: basicError } = await basicQuery;
+      console.log('Basic query test result:', { data: basicTest?.length, error: basicError });
+
+      if (basicError) {
+        console.error('Basic query failed:', basicError);
+        throw new Error(`Database access failed: ${basicError.message}`);
+      }
+
+      // If basic query works, try the full query
       let query = supabase
         .from("schedule_entries")
         .select(`
@@ -122,9 +140,7 @@ const ScheduleView = () => {
           notes,
           created_by,
           created_at,
-          updated_at,
-          profiles:user_id (first_name, last_name),
-          teams:team_id (name)
+          updated_at
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(fourWeeksEnd, "yyyy-MM-dd"))
@@ -157,11 +173,12 @@ const ScheduleView = () => {
         throw error;
       }
       
-      // Transform the data to ensure proper typing
+      // For now, create placeholder data without joins
+      // We'll fetch user/team names separately once basic query works
       const transformedData = data?.map(item => ({
         ...item,
-        profiles: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles || { first_name: "Unknown", last_name: "User" },
-        teams: Array.isArray(item.teams) ? item.teams[0] : item.teams || { name: "Unknown Team" }
+        profiles: { first_name: item.user_id.substring(0, 8), last_name: "" },
+        teams: { name: `Team ${item.team_id.substring(0, 8)}` }
       })) || [];
       
       console.log('Transformed schedule data:', transformedData.length, 'entries');
