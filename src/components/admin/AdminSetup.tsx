@@ -165,7 +165,7 @@ const AdminSetup = () => {
 
   return (
     <div className="space-y-6">
-      <UserCreation onUserCreated={fetchProfiles} />
+      <UserCreation onUserCreated={() => { fetchProfiles(); fetchUserRoles(); }} />
       <UserManagement />
       
       <Card>
