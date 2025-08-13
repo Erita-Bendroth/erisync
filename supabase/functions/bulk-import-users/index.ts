@@ -145,7 +145,8 @@ Deno.serve(async (req) => {
             email: userData.email,
             first_name: userData.employeeId || userData.email.split('@')[0],
             last_name: '',
-            country_code: 'US'
+            country_code: 'US',
+            requires_password_change: true // Flag for mandatory password change
           })
 
         if (profileError) {

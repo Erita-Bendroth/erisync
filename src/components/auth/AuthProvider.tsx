@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import PasswordChangeModal from "./PasswordChangeModal";
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener
@@ -33,6 +36,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Check if user needs to change password
+        if (session?.user) {
+          setTimeout(() => {
+            checkPasswordChangeRequired(session.user.id);
+          }, 0);
+        }
       }
     );
 
@@ -41,10 +51,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Check if user needs to change password on initial load
+      if (session?.user) {
+        setTimeout(() => {
+          checkPasswordChangeRequired(session.user.id);
+        }, 0);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkPasswordChangeRequired = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('requires_password_change')
+        .eq('user_id', userId)
+        .single();
+
+      if (profile?.requires_password_change) {
+        setRequiresPasswordChange(true);
+        setShowPasswordModal(true);
+      }
+    } catch (error) {
+      console.error('Error checking password change requirement:', error);
+    }
+  };
+
+  const handlePasswordChanged = () => {
+    setRequiresPasswordChange(false);
+    setShowPasswordModal(false);
+  };
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     const redirectUrl = `${window.location.origin}/`;
@@ -84,5 +123,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <PasswordChangeModal 
+        isOpen={showPasswordModal}
+        onPasswordChanged={handlePasswordChanged}
+      />
+    </AuthContext.Provider>
+  );
 };

@@ -267,8 +267,11 @@ const BulkUserImport = () => {
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Important:</strong> Users will be created with temporary passwords and NO email confirmations will be sent. 
-              You'll need to provide login credentials to users separately.
+              <strong>Standard Password:</strong> All users will be created with password: <code className="bg-muted px-1 rounded">VestasTemp2025!</code>
+              <br />
+              <strong>First Login:</strong> Users will be required to change their password immediately after first login.
+              <br />
+              <strong>No Emails:</strong> No email confirmations will be sent during import.
             </AlertDescription>
           </Alert>
 
