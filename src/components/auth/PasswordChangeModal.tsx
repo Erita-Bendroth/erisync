@@ -60,6 +60,35 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
     console.log('User found in context:', user.id, user.email);
 
+    // Check and refresh the Supabase session
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Current session:', session ? 'exists' : 'missing', sessionError);
+      
+      if (!session || sessionError) {
+        console.log('Session missing or invalid, attempting refresh...');
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        console.log('Refresh result:', refreshData.session ? 'success' : 'failed', refreshError);
+        
+        if (!refreshData.session || refreshError) {
+          toast({
+            title: "Error", 
+            description: "Your session has expired. Please sign in again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Session check/refresh error:', error);
+      toast({
+        title: "Error",
+        description: "Authentication error. Please sign in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Sanitize inputs
     const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
     const sanitizedNewPassword = sanitizeInput(formData.newPassword);
