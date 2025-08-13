@@ -81,7 +81,7 @@ const BulkScheduleGenerator = () => {
   };
 
   const generateSchedulesForTeam = async () => {
-    if (!selectedTeam || !startDate || !endDate || !user) {
+    if (!selectedTeam || selectedTeam === "" || !startDate || !endDate || !user) {
       toast({
         title: "Error",
         description: "Please select a team and date range",
@@ -129,6 +129,12 @@ const BulkScheduleGenerator = () => {
     setEndDate(endOfMonth(targetMonth));
   };
 
+  const quickSetDateRange = (monthsCount: number) => {
+    const now = new Date();
+    setStartDate(startOfMonth(now));
+    setEndDate(endOfMonth(addMonths(now, monthsCount - 1)));
+  };
+
   // Don't render if user doesn't have permission
   if (!hasPermission) {
     return (
@@ -161,12 +167,18 @@ const BulkScheduleGenerator = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Quick date selection */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => quickSetMonth(0)}>
             This Month
           </Button>
           <Button variant="outline" size="sm" onClick={() => quickSetMonth(1)}>
             Next Month
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => quickSetDateRange(3)}>
+            Next 3 Months
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => quickSetDateRange(6)}>
+            Next 6 Months
           </Button>
         </div>
         
@@ -193,6 +205,7 @@ const BulkScheduleGenerator = () => {
                   selected={startDate}
                   onSelect={setStartDate}
                   initialFocus
+                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -219,6 +232,7 @@ const BulkScheduleGenerator = () => {
                   selected={endDate}
                   onSelect={setEndDate}
                   initialFocus
+                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
@@ -244,7 +258,7 @@ const BulkScheduleGenerator = () => {
         
         <Button 
           onClick={generateSchedulesForTeam} 
-          disabled={loading || !selectedTeam}
+          disabled={loading || !selectedTeam || selectedTeam === "" || !startDate || !endDate}
           className="w-full"
         >
           <Zap className="w-4 h-4 mr-2" />
