@@ -123,8 +123,8 @@ const ScheduleView = () => {
           created_by,
           created_at,
           updated_at,
-          profiles!schedule_entries_user_id_fkey (first_name, last_name),
-          teams (name)
+          profiles:user_id (first_name, last_name),
+          teams:team_id (name)
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(fourWeeksEnd, "yyyy-MM-dd"))
