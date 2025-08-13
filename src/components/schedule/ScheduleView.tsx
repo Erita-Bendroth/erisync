@@ -284,6 +284,16 @@ const ScheduleView = () => {
         .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
         .order("date");
 
+      console.log('Full query details:', {
+        queryDateStart: format(weekStart, "yyyy-MM-dd"),
+        queryDateEnd: format(addDays(weekStart, 4), "yyyy-MM-dd"),
+        actualWeekStart: weekStart.toString(),
+        actualWeekEnd: addDays(weekStart, 4).toString(),
+        isManager: isManager(),
+        isPlanner: isPlanner(),
+        selectedTeam: selectedTeam
+      });
+
       // Apply filtering based on user roles and view mode
       if (isTeamMember() && !isManager() && !isPlanner()) {
         if (viewMode === "my-schedule") {
