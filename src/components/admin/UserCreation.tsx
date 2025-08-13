@@ -1,0 +1,199 @@
+import React, { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { UserPlus, Users, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { validateEmail, validatePassword, sanitizeInput } from "@/lib/validation";
+
+interface UserCreationProps {
+  onUserCreated: () => void;
+}
+
+const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    role: "",
+    countryCode: "US",
+  });
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate input
+    if (!validateEmail(formData.email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.firstName || !formData.lastName || !formData.role) {
+      toast({
+        title: "Error", 
+        description: "All fields are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate a temporary password that meets requirements
+      const tempPassword = `TempPass${Math.random().toString(36).slice(-4)}!`;
+      
+      // Create user account via admin function
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: sanitizeInput(formData.email),
+          password: tempPassword,
+          firstName: sanitizeInput(formData.firstName),
+          lastName: sanitizeInput(formData.lastName),
+          role: formData.role,
+          countryCode: formData.countryCode,
+          requiresPasswordChange: true
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `User created successfully. They will need to change their password on first login.`,
+      });
+
+      // Reset form
+      setFormData({
+        email: "",
+        firstName: "",
+        lastName: "",
+        role: "",
+        countryCode: "US",
+      });
+      
+      onUserCreated();
+      
+    } catch (error: any) {
+      console.error('User creation error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <UserPlus className="w-5 h-5 mr-2" />
+          Create New User
+        </CardTitle>
+        <CardDescription>
+          Add a new user to the system. They will receive a temporary password.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Alert className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            New users will be required to change their password on first login for security.
+          </AlertDescription>
+        </Alert>
+
+        <form onSubmit={handleCreateUser} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                placeholder="Enter first name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                placeholder="Enter last name"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="Enter email address"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="role">Role</Label>
+            <Select onValueChange={(value) => setFormData({ ...formData, role: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select user role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="teammember">Team Member</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="planner">Planner</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Select onValueChange={(value) => setFormData({ ...formData, countryCode: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="US">United States</SelectItem>
+                <SelectItem value="CA">Canada</SelectItem>
+                <SelectItem value="GB">United Kingdom</SelectItem>
+                <SelectItem value="AU">Australia</SelectItem>
+                <SelectItem value="DE">Germany</SelectItem>
+                <SelectItem value="FR">France</SelectItem>
+                <SelectItem value="NL">Netherlands</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Creating User..." : "Create User"}
+            <Users className="w-4 h-4 ml-2" />
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default UserCreation;

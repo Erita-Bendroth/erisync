@@ -27,6 +27,17 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Auth session missing! Please sign in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (formData.newPassword !== formData.confirmPassword) {
       toast({
         title: "Error",

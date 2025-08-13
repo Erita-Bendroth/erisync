@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import BulkUserImport from "./BulkUserImport";
 import UserManagement from "./UserManagement";
+import UserCreation from "./UserCreation";
 
 interface Profile {
   user_id: string;
@@ -29,11 +30,29 @@ const AdminSetup = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentUserRoles, setCurrentUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
     fetchProfiles();
     fetchUserRoles();
-  }, []);
+    fetchCurrentUserRoles();
+  }, [user]);
+
+  const fetchCurrentUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      setCurrentUserRoles(data?.map(r => r.role) || []);
+    } catch (error) {
+      console.error("Error fetching current user roles:", error);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -126,8 +145,27 @@ const AdminSetup = () => {
     }
   };
 
+  // Check if current user has admin privileges
+  const hasAdminAccess = currentUserRoles.some(role => 
+    ['admin', 'planner', 'manager'].includes(role)
+  );
+
+  // Only show admin setup to users who are not just team members
+  const isOnlyTeamMember = currentUserRoles.length === 1 && currentUserRoles.includes('teammember');
+  
+  if (isOnlyTeamMember) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">
+          Admin access required. Contact your administrator for access.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <UserCreation onUserCreated={fetchProfiles} />
       <UserManagement />
       
       <Card>
