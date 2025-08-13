@@ -13,14 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
-
     const { email, currentPassword } = await req.json();
 
-    // Validate input
     if (!email || !currentPassword) {
       return new Response(
         JSON.stringify({ error: 'Email and current password are required' }),
@@ -31,15 +25,22 @@ serve(async (req) => {
       );
     }
 
-    // Verify the current password by attempting to sign in
+    // Create a temporary Supabase client to verify credentials
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    // Attempt to sign in with the provided credentials
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      password: currentPassword,
+      password: currentPassword
     });
 
-    if (error) {
+    if (error || !data.user) {
+      console.log('Password verification failed:', error?.message);
       return new Response(
-        JSON.stringify({ valid: false, error: 'Invalid current password' }),
+        JSON.stringify({ valid: false }),
         { 
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -47,9 +48,12 @@ serve(async (req) => {
       );
     }
 
-    // Sign out immediately after verification
-    await supabase.auth.signOut();
+    // Sign out immediately after verification to avoid interfering with existing session
+    if (data.session) {
+      await supabase.auth.signOut();
+    }
 
+    console.log('Password verification successful for user:', email);
     return new Response(
       JSON.stringify({ valid: true }),
       { 
