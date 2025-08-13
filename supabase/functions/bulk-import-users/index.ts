@@ -82,12 +82,13 @@ Deno.serve(async (req) => {
     // Create/update users
     for (const userData of users) {
       try {
-        console.log(`Processing user: ${userData.email}`)
+        console.log(`Processing user: ${userData.email}, teamName: ${userData.teamName}, role: ${userData.role}`)
         
         // First, check if user already exists
         const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
         
         if (listError) {
+          console.error(`Error checking existing users: ${listError.message}`)
           results.users.errors.push(`Error checking existing users: ${listError.message}`)
           continue
         }
@@ -113,6 +114,7 @@ Deno.serve(async (req) => {
             })
 
           if (profileError) {
+            console.error(`Profile update error for ${userData.email}: ${profileError.message}`)
             results.users.errors.push(`Profile update for ${userData.email}: ${profileError.message}`)
           } else {
             results.users.updated++
@@ -120,6 +122,7 @@ Deno.serve(async (req) => {
           }
 
           // Handle roles and team membership for existing user
+          console.log(`Calling assignUserRole for existing user: ${userData.email}`)
           await assignUserRole(supabaseAdmin, existingUser.id, userData, results, teamManagerMap)
         } else {
           // Create new user
@@ -166,10 +169,12 @@ Deno.serve(async (req) => {
           }
 
           // Handle roles and team membership
+          console.log(`Calling assignUserRole for new user: ${userData.email}`)
           await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap)
         }
 
       } catch (error) {
+        console.error(`Error processing user ${userData.email}:`, error)
         results.users.errors.push(`${userData.email}: ${error.message}`)
       }
     }
@@ -209,6 +214,7 @@ Deno.serve(async (req) => {
 
 async function assignUserRole(supabaseAdmin: any, userId: string, userData: UserImportData, results: any, teamManagerMap: Map<string, string>) {
   try {
+    console.log(`assignUserRole called for ${userData.email}, userId: ${userId}, teamName: ${userData.teamName}, role: ${userData.role}`)
     // Map role names to our enum values
     const roleMapping: Record<string, string> = {
       'Planner': 'planner',
@@ -242,13 +248,21 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
 
       // If we have teamName but no teamId, look up the team
       if (!teamId && userData.teamName) {
-        const { data: team } = await supabaseAdmin
+        console.log(`Looking up team by name: ${userData.teamName}`)
+        const { data: team, error: teamLookupError } = await supabaseAdmin
           .from('teams')
           .select('id')
           .eq('name', userData.teamName)
           .single()
         
+        if (teamLookupError) {
+          console.error(`Error looking up team ${userData.teamName}: ${teamLookupError.message}`)
+          results.teamMembers.errors.push(`Team lookup for ${userData.teamName}: ${teamLookupError.message}`)
+          return
+        }
+        
         teamId = team?.id
+        console.log(`Found team ${userData.teamName} with ID: ${teamId}`)
       }
 
       if (teamId) {
