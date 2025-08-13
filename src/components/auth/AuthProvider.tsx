@@ -37,8 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Check if user needs to change password
-        if (session?.user) {
+        // Only check password change requirement on SIGNED_IN event, not all auth state changes
+        if (event === 'SIGNED_IN' && session?.user) {
           setTimeout(() => {
             checkPasswordChangeRequired(session.user.id);
           }, 0);
