@@ -476,13 +476,15 @@ const ScheduleView = () => {
   const navigateMonth = (direction: "prev" | "next") => {
     setCurrentWeek(prev => {
       const newMonth = direction === "next" ? addMonths(prev, 1) : subMonths(prev, 1);
-      return startOfWeek(startOfMonth(newMonth), { weekStartsOn: 1 });
+      return startOfWeek(newMonth, { weekStartsOn: 1 });
     });
   };
 
   const goToMonth = (monthOffset: number) => {
-    const targetMonth = addMonths(new Date(), monthOffset);
-    setCurrentWeek(startOfWeek(startOfMonth(targetMonth), { weekStartsOn: 1 }));
+    const now = new Date();
+    const targetMonth = addMonths(now, monthOffset);
+    const firstOfMonth = startOfMonth(targetMonth);
+    setCurrentWeek(startOfWeek(firstOfMonth, { weekStartsOn: 1 }));
   };
 
   if (loading) {
@@ -553,16 +555,36 @@ const ScheduleView = () => {
                 if (value === "current") goToMonth(0);
                 else if (value === "next") goToMonth(1);
                 else if (value === "next2") goToMonth(2);
+                else if (value === "next3") goToMonth(3);
+                else if (value === "next4") goToMonth(4);
+                else if (value === "next5") goToMonth(5);
+                else if (value === "next6") goToMonth(6);
+                else if (value === "next7") goToMonth(7);
+                else if (value === "next8") goToMonth(8);
+                else if (value === "next9") goToMonth(9);
+                else if (value === "next10") goToMonth(10);
+                else if (value === "next11") goToMonth(11);
                 else if (value === "prev") goToMonth(-1);
+                else if (value === "prev2") goToMonth(-2);
               }}>
                 <SelectTrigger className="w-32 border-0 bg-transparent">
                   <SelectValue placeholder={format(currentWeek, "MMM yyyy")} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="prev2">{format(subMonths(new Date(), 2), "MMM yyyy")}</SelectItem>
                   <SelectItem value="prev">{format(subMonths(new Date(), 1), "MMM yyyy")}</SelectItem>
                   <SelectItem value="current">{format(new Date(), "MMM yyyy")}</SelectItem>
                   <SelectItem value="next">{format(addMonths(new Date(), 1), "MMM yyyy")}</SelectItem>
                   <SelectItem value="next2">{format(addMonths(new Date(), 2), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next3">{format(addMonths(new Date(), 3), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next4">{format(addMonths(new Date(), 4), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next5">{format(addMonths(new Date(), 5), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next6">{format(addMonths(new Date(), 6), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next7">{format(addMonths(new Date(), 7), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next8">{format(addMonths(new Date(), 8), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next9">{format(addMonths(new Date(), 9), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next10">{format(addMonths(new Date(), 10), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next11">{format(addMonths(new Date(), 11), "MMM yyyy")}</SelectItem>
                 </SelectContent>
               </Select>
               <Button variant="ghost" size="sm" onClick={() => navigateMonth("next")}>

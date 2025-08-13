@@ -98,6 +98,32 @@ const HolidayManager = () => {
 
   const importHolidays = async () => {
     if (!user) return;
+    
+    // Check if user has a country selected
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('country_code')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError) {
+      toast({
+        title: "Error",
+        description: "Could not fetch user profile",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!profileData?.country_code || profileData.country_code === 'US') {
+      toast({
+        title: "Country Required",
+        description: "Please set your country in Settings before importing holidays",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('import-holidays', {
@@ -112,7 +138,9 @@ const HolidayManager = () => {
 
       toast({
         title: "Success",
-        description: `Imported ${data.imported} holidays for ${selectedYear}`,
+        description: data.imported > 0 
+          ? `Imported ${data.imported} holidays for ${selectedYear}`
+          : `All holidays for ${selectedYear} already exist (${data.existing} holidays)`,
       });
 
       fetchHolidays();
