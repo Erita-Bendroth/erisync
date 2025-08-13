@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import BulkUserImport from "./BulkUserImport";
+import UserManagement from "./UserManagement";
 
 interface Profile {
   user_id: string;
@@ -127,6 +128,8 @@ const AdminSetup = () => {
 
   return (
     <div className="space-y-6">
+      <UserManagement />
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
