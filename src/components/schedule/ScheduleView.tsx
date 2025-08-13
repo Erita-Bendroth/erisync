@@ -327,8 +327,17 @@ const ScheduleView = () => {
       console.log('Raw query result:', {
         totalEntries: data?.length || 0,
         fridayEntries: data?.filter(entry => entry.date === '2025-08-15').length || 0,
-        sampleDates: data?.slice(0, 10).map(entry => entry.date) || []
+        sampleDates: data?.slice(0, 10).map(entry => entry.date) || [],
+        allDates: [...new Set(data?.map(entry => entry.date) || [])].sort()
       });
+
+      if (data) {
+        const fridayEntries = data.filter(entry => entry.date === '2025-08-15');
+        console.log('FOUND FRIDAY ENTRIES:', fridayEntries.length);
+        if (fridayEntries.length > 0) {
+          console.log('Sample Friday entries:', fridayEntries.slice(0, 3));
+        }
+      }
 
       if (error) {
         console.error('Detailed schedule query error:', {
@@ -429,10 +438,16 @@ const ScheduleView = () => {
     
     // Debug logging for Friday entries
     if (date.getDay() === 5) { // Friday
-      console.log(`Friday entries for ${employeeId} on ${format(date, 'yyyy-MM-dd')}:`, entries.length);
-      console.log('All Friday entries in scheduleEntries:', 
-        scheduleEntries.filter(entry => new Date(entry.date).getDay() === 5).length
-      );
+      const dateStr = format(date, 'yyyy-MM-dd');
+      console.log(`🔍 Looking for Friday entries: ${employeeId} on ${dateStr}`);
+      console.log(`Found ${entries.length} entries for this employee`);
+      
+      const allFridayInSchedule = scheduleEntries.filter(entry => entry.date === dateStr);
+      console.log(`📊 Total Friday entries (${dateStr}) in scheduleEntries:`, allFridayInSchedule.length);
+      
+      if (allFridayInSchedule.length > 0) {
+        console.log('Sample Friday entries:', allFridayInSchedule.slice(0, 3));
+      }
     }
     
     return entries;
