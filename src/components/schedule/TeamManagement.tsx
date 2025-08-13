@@ -105,33 +105,49 @@ const TeamManagement = () => {
   const fetchTeamMembers = async (teamId: string) => {
     try {
       console.log(`Fetching team members for team: ${teamId}`);
-      const { data, error } = await supabase
+      
+      // First get team members
+      const { data: membersData, error: membersError } = await supabase
         .from("team_members")
-        .select(`
-          id,
-          user_id,
-          team_id,
-          is_manager,
-          created_at,
-          profiles!inner (first_name, last_name, email)
-        `)
+        .select("id, user_id, team_id, is_manager, created_at")
         .eq("team_id", teamId);
 
-      console.log(`Query result for team ${teamId}:`, { data, error });
-
-      if (error) {
-        console.error(`Error fetching team members for ${teamId}:`, error);
-        throw error;
+      if (membersError) {
+        console.error(`Error fetching team members for ${teamId}:`, membersError);
+        throw membersError;
       }
-      
-      // Transform the data to match our interface
-      const transformedData = data?.map(item => ({
-        ...item,
-        profiles: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
-      })) || [];
-      
-      console.log(`Transformed data for team ${teamId}:`, transformedData);
-      setTeamMembers(prev => ({ ...prev, [teamId]: transformedData }));
+
+      console.log(`Raw team members for ${teamId}:`, membersData);
+
+      // Then get profiles for those users
+      if (membersData && membersData.length > 0) {
+        const userIds = membersData.map(member => member.user_id);
+        
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name, email")
+          .in("user_id", userIds);
+
+        if (profilesError) {
+          console.error(`Error fetching profiles:`, profilesError);
+          throw profilesError;
+        }
+
+        // Combine the data
+        const transformedData = membersData.map(member => {
+          const profile = profilesData?.find(p => p.user_id === member.user_id);
+          return {
+            ...member,
+            profiles: profile || { first_name: '', last_name: '', email: '' }
+          };
+        });
+
+        console.log(`Transformed data for team ${teamId}:`, transformedData);
+        setTeamMembers(prev => ({ ...prev, [teamId]: transformedData }));
+      } else {
+        console.log(`No members found for team ${teamId}`);
+        setTeamMembers(prev => ({ ...prev, [teamId]: [] }));
+      }
     } catch (error) {
       console.error("Error fetching team members:", error);
     }
