@@ -157,7 +157,16 @@ const ScheduleView = () => {
             if (teamMembers && teamMembers.length > 0) {
               const userIds = teamMembers.map(tm => tm.user_id);
               query = query.in('user_id', userIds);
+              console.log('Team member viewing team - showing users:', userIds);
+            } else {
+              // Fallback to show only current user if no team members found
+              query = query.eq('user_id', user!.id);
+              console.log('No team members found, showing only current user');
             }
+          } else {
+            // Fallback to show only current user if not in any teams
+            query = query.eq('user_id', user!.id);
+            console.log('User not in any teams, showing only current user');
           }
         }
       } else if (selectedTeam !== "all") {
