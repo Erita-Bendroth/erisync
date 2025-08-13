@@ -240,6 +240,8 @@ const ScheduleView = () => {
       console.log('Fetching schedule entries for work week:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
         weekEnd: format(weekEnd, "yyyy-MM-dd"),
+        weekStartDay: weekStart.getDay(),
+        weekEndDay: weekEnd.getDay(),
         userId: user?.id,
         userRoles: userRoles.map(r => r.role)
       });
@@ -311,6 +313,12 @@ const ScheduleView = () => {
       }
 
       const { data, error } = await query;
+
+      console.log('Raw query result:', {
+        totalEntries: data?.length || 0,
+        fridayEntries: data?.filter(entry => entry.date === '2025-08-15').length || 0,
+        sampleDates: data?.slice(0, 10).map(entry => entry.date) || []
+      });
 
       if (error) {
         console.error('Detailed schedule query error:', {
