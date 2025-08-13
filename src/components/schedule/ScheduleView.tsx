@@ -67,6 +67,7 @@ const ScheduleView = () => {
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
   // Show only Monday-Friday for work days
@@ -500,6 +501,22 @@ const ScheduleView = () => {
     const targetMonth = addMonths(now, monthOffset);
     const firstOfMonth = startOfMonth(targetMonth);
     setCurrentWeek(startOfWeek(firstOfMonth, { weekStartsOn: 1 }));
+    
+    // Update the selected month value for the dropdown
+    if (monthOffset === 0) setSelectedMonthValue("current");
+    else if (monthOffset === 1) setSelectedMonthValue("next");
+    else if (monthOffset === 2) setSelectedMonthValue("next2");
+    else if (monthOffset === 3) setSelectedMonthValue("next3");
+    else if (monthOffset === 4) setSelectedMonthValue("next4");
+    else if (monthOffset === 5) setSelectedMonthValue("next5");
+    else if (monthOffset === 6) setSelectedMonthValue("next6");
+    else if (monthOffset === 7) setSelectedMonthValue("next7");
+    else if (monthOffset === 8) setSelectedMonthValue("next8");
+    else if (monthOffset === 9) setSelectedMonthValue("next9");
+    else if (monthOffset === 10) setSelectedMonthValue("next10");
+    else if (monthOffset === 11) setSelectedMonthValue("next11");
+    else if (monthOffset === -1) setSelectedMonthValue("prev");
+    else if (monthOffset === -2) setSelectedMonthValue("prev2");
   };
 
   if (loading) {
@@ -566,7 +583,7 @@ const ScheduleView = () => {
               <Button variant="ghost" size="sm" onClick={() => navigateMonth("prev")}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Select value="current" onValueChange={(value) => {
+              <Select value={selectedMonthValue} onValueChange={(value) => {
                 if (value === "current") goToMonth(0);
                 else if (value === "next") goToMonth(1);
                 else if (value === "next2") goToMonth(2);
