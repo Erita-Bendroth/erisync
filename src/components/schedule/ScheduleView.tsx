@@ -43,9 +43,14 @@ const ScheduleView = () => {
   useEffect(() => {
     if (user) {
       fetchUserRoles();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && userRoles.length > 0) {
       fetchScheduleEntries();
     }
-  }, [user, currentWeek]);
+  }, [user, currentWeek, userRoles]);
 
   const fetchUserRoles = async () => {
     try {
@@ -65,7 +70,15 @@ const ScheduleView = () => {
       setLoading(true);
       const weekEnd = addDays(weekStart, 6);
       
-      const { data, error } = await supabase
+      console.log('Fetching schedule entries for:', {
+        weekStart: format(weekStart, "yyyy-MM-dd"),
+        weekEnd: format(weekEnd, "yyyy-MM-dd"),
+        userId: user?.id,
+        userRoles: userRoles.map(r => r.role)
+      });
+      
+      // Build query based on user roles
+      let query = supabase
         .from("schedule_entries")
         .select(`
           id,
@@ -86,6 +99,18 @@ const ScheduleView = () => {
         .lte("date", format(weekEnd, "yyyy-MM-dd"))
         .order("date");
 
+      // If user is just a team member (not manager or planner), only show their own entries
+      if (isTeamMember() && !isManager() && !isPlanner()) {
+        query = query.eq("user_id", user!.id);
+        console.log('Filtering to only show user\'s own entries');
+      } else {
+        console.log('Showing all entries (manager/planner view)');
+      }
+
+      const { data, error } = await query;
+
+      console.log('Schedule entries query result:', { data: data?.length, error });
+
       if (error) throw error;
       
       // Transform the data to ensure proper typing
@@ -95,6 +120,7 @@ const ScheduleView = () => {
         teams: Array.isArray(item.teams) ? item.teams[0] : item.teams || { name: "Unknown Team" }
       })) || [];
       
+      console.log('Transformed schedule data:', transformedData.length, 'entries');
       setScheduleEntries(transformedData);
     } catch (error) {
       console.error("Error fetching schedule entries:", error);
