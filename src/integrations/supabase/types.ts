@@ -269,7 +269,7 @@ export type Database = {
         | "training"
         | "flextime"
         | "working_from_home"
-      app_role: "manager" | "planner" | "teammember"
+      app_role: "manager" | "planner" | "teammember" | "admin"
       availability_status: "available" | "unavailable"
       shift_type: "early" | "late" | "normal"
     }
@@ -409,7 +409,7 @@ export const Constants = {
         "flextime",
         "working_from_home",
       ],
-      app_role: ["manager", "planner", "teammember"],
+      app_role: ["manager", "planner", "teammember", "admin"],
       availability_status: ["available", "unavailable"],
       shift_type: ["early", "late", "normal"],
     },
