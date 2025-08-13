@@ -30,11 +30,11 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { country_code, year } = await req.json()
+    const { country_code, year, user_id } = await req.json()
 
-    if (!country_code || !year) {
+    if (!country_code || !year || !user_id) {
       return new Response(
-        JSON.stringify({ error: 'Country code and year are required' }),
+        JSON.stringify({ error: 'Country code, year, and user_id are required' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -62,14 +62,15 @@ Deno.serve(async (req) => {
       date: holiday.date,
       country_code: holiday.countryCode,
       year: parseInt(year),
-      is_public: holiday.global || holiday.types.includes('Public')
+      is_public: holiday.global || holiday.types.includes('Public'),
+      user_id: user_id
     }))
 
-    // Use upsert to avoid duplicate entries
+    // Use upsert to avoid duplicate entries - now include user_id in conflict
     const { data, error } = await supabaseClient
       .from('holidays')
       .upsert(holidayData, { 
-        onConflict: 'date,country_code',
+        onConflict: 'date,country_code,user_id',
         ignoreDuplicates: false 
       })
 

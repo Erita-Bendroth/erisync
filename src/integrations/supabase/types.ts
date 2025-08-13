@@ -23,6 +23,7 @@ export type Database = {
           is_public: boolean | null
           name: string
           updated_at: string
+          user_id: string | null
           year: number
         }
         Insert: {
@@ -33,6 +34,7 @@ export type Database = {
           is_public?: boolean | null
           name: string
           updated_at?: string
+          user_id?: string | null
           year: number
         }
         Update: {
@@ -43,6 +45,7 @@ export type Database = {
           is_public?: boolean | null
           name?: string
           updated_at?: string
+          user_id?: string | null
           year?: number
         }
         Relationships: []

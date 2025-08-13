@@ -49,6 +49,7 @@ const TeamManagement = () => {
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [userRole, setUserRole] = useState<string>("");
 
   const [teamForm, setTeamForm] = useState({
     name: "",
@@ -64,7 +65,8 @@ const TeamManagement = () => {
   useEffect(() => {
     fetchTeams();
     fetchProfiles();
-  }, []);
+    fetchUserRole();
+  }, [user]);
 
   useEffect(() => {
     console.log("Teams effect triggered, teams:", teams);
@@ -174,6 +176,22 @@ const TeamManagement = () => {
       setProfiles(data || []);
     } catch (error) {
       console.error("Error fetching profiles:", error);
+    }
+  };
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) throw error;
+      setUserRole(data?.role || "");
+    } catch (error) {
+      console.error("Error fetching user role:", error);
     }
   };
 
@@ -295,13 +313,14 @@ const TeamManagement = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Users className="w-4 h-4 mr-2" />
-                Add Member
-              </Button>
-            </DialogTrigger>
+          {(userRole === 'admin' || userRole === 'planner') && (
+            <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Users className="w-4 h-4 mr-2" />
+                  Add Member
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Team Member</DialogTitle>
@@ -372,14 +391,16 @@ const TeamManagement = () => {
               </form>
             </DialogContent>
           </Dialog>
+          )}
 
-          <Dialog open={createTeamOpen} onOpenChange={setCreateTeamOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Team
-              </Button>
-            </DialogTrigger>
+          {(userRole === 'admin' || userRole === 'planner') && (
+            <Dialog open={createTeamOpen} onOpenChange={setCreateTeamOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Team
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Team</DialogTitle>
@@ -417,6 +438,7 @@ const TeamManagement = () => {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -464,13 +486,15 @@ const TeamManagement = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveMember(member.id, team.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {(userRole === 'admin' || userRole === 'planner') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveMember(member.id, team.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

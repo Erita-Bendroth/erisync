@@ -71,7 +71,7 @@ serve(async (req) => {
         last_name: lastName,
         email: email,
         country_code: countryCode || 'US',
-        requires_password_change: requiresPasswordChange || true
+        requires_password_change: true // Always require password change for new users
       });
 
     if (profileError) {

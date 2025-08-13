@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Download, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -37,6 +38,7 @@ const countries = [
 ];
 
 const HolidayManager = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,10 +50,12 @@ const HolidayManager = () => {
   }, []);
 
   const fetchHolidays = async () => {
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('holidays')
         .select('*')
+        .eq('user_id', user.id)
         .order('date', { ascending: true });
 
       if (error) throw error;
@@ -62,12 +66,14 @@ const HolidayManager = () => {
   };
 
   const importHolidays = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('import-holidays', {
         body: {
           country_code: selectedCountry,
-          year: selectedYear
+          year: selectedYear,
+          user_id: user.id
         }
       });
 
@@ -92,12 +98,14 @@ const HolidayManager = () => {
   };
 
   const deleteHolidays = async (countryCode: string, year: number) => {
+    if (!user) return;
     try {
       const { error } = await supabase
         .from('holidays')
         .delete()
         .eq('country_code', countryCode)
-        .eq('year', year);
+        .eq('year', year)
+        .eq('user_id', user.id);
 
       if (error) throw error;
 

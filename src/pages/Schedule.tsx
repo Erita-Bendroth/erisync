@@ -10,6 +10,7 @@ import TeamManagement from "@/components/schedule/TeamManagement";
 import AdminSetup from "@/components/admin/AdminSetup";
 import HolidayManager from "@/components/holidays/HolidayManager";
 import CountrySelector from "@/components/profile/CountrySelector";
+import PasswordSettings from "@/components/settings/PasswordSettings";
 import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
 
 const Schedule = () => {
@@ -95,24 +96,7 @@ const Schedule = () => {
           <TabsContent value="settings" className="space-y-6">
             <div className="space-y-6">
               <CountrySelector />
-              <Card>
-                <CardHeader>
-                  <CardTitle>Other Settings</CardTitle>
-                  <CardDescription>
-                    Additional scheduling preferences and configurations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    More settings coming soon:
-                  </p>
-                  <ul className="list-disc list-inside mt-4 space-y-2 text-muted-foreground">
-                    <li>Default work hours</li>
-                    <li>Notification preferences</li>
-                    <li>Time zone settings</li>
-                  </ul>
-                </CardContent>
-              </Card>
+              <PasswordSettings />
             </div>
           </TabsContent>
         </Tabs>
