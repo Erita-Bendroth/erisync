@@ -139,16 +139,20 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing user: ${userData.email}, teamName: ${userData.teamName}, role: ${userData.role}`)
         
-        // First, check if user already exists
-        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+        // Check if user exists in the profiles table
+        const { data: existingProfile, error: profileLookupError } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id, email')
+          .eq('email', userData.email)
+          .single()
         
-        if (listError) {
-          console.error(`Error checking existing users: ${listError.message}`)
-          results.users.errors.push(`Error checking existing users: ${listError.message}`)
+        if (profileLookupError && profileLookupError.code !== 'PGRST116') {
+          console.error(`Error checking existing profile: ${profileLookupError.message}`)
+          results.users.errors.push(`Error checking existing profile: ${profileLookupError.message}`)
           continue
         }
 
-        const existingUser = existingUsers.users.find(u => u.email === userData.email)
+        const existingUser = existingProfile ? { id: existingProfile.user_id, email: existingProfile.email } : null
         
         if (existingUser) {
           // User already exists, update their profile and assignments
