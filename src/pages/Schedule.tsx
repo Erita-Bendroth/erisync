@@ -3,10 +3,11 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, Settings, LogOut, Plus } from "lucide-react";
+import { Calendar, Users, Settings, LogOut, Plus, Shield } from "lucide-react";
 import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import TeamManagement from "@/components/schedule/TeamManagement";
+import AdminSetup from "@/components/admin/AdminSetup";
 
 const Schedule = () => {
   const { signOut } = useAuth();
@@ -31,8 +32,12 @@ const Schedule = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="schedule" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="admin" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="admin" className="flex items-center">
+              <Shield className="w-4 h-4 mr-2" />
+              Admin Setup
+            </TabsTrigger>
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
@@ -46,6 +51,10 @@ const Schedule = () => {
               Settings
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="admin" className="space-y-6">
+            <AdminSetup />
+          </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
             <div className="flex items-center justify-between">
