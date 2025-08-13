@@ -37,10 +37,13 @@ serve(async (req) => {
       );
     }
 
+    // Use standardized temporary password for easier transition
+    const tempPassword = 'VestasTemp2025!';
+    
     // Create user
     const { data: user, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password,
+      password: tempPassword,
       email_confirm: true,
       user_metadata: {
         first_name: firstName,
