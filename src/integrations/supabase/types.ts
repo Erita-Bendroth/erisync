@@ -212,6 +212,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_default_schedule_with_holidays: {
+        Args: {
+          _user_id: string
+          _team_id: string
+          _start_date: string
+          _end_date: string
+          _created_by: string
+          _country_code?: string
+        }
+        Returns: number
+      }
+      create_team_default_schedules_with_holidays: {
+        Args: {
+          _team_id: string
+          _start_date: string
+          _end_date: string
+          _created_by: string
+        }
+        Returns: {
+          user_id: string
+          shifts_created: number
+          country_code: string
+        }[]
+      }
       get_user_teams: {
         Args: { _user_id: string }
         Returns: string[]

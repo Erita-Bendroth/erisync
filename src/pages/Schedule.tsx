@@ -10,6 +10,7 @@ import TeamManagement from "@/components/schedule/TeamManagement";
 import AdminSetup from "@/components/admin/AdminSetup";
 import HolidayManager from "@/components/holidays/HolidayManager";
 import CountrySelector from "@/components/profile/CountrySelector";
+import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
 
 const Schedule = () => {
   const { signOut } = useAuth();
@@ -63,19 +64,22 @@ const Schedule = () => {
           </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Schedule Overview</h2>
-                <p className="text-muted-foreground">
-                  View and manage team schedules
-                </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Schedule Overview</h2>
+                  <p className="text-muted-foreground">
+                    View and manage team schedules
+                  </p>
+                </div>
+                <ScheduleEntryForm>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Entry
+                  </Button>
+                </ScheduleEntryForm>
               </div>
-              <ScheduleEntryForm>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Schedule Entry
-                </Button>
-              </ScheduleEntryForm>
+              <BulkScheduleGenerator />
             </div>
             <ScheduleView />
           </TabsContent>
