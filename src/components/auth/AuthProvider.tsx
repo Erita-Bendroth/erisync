@@ -122,32 +122,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('Starting sign out process...');
       
-      // Clear any local state first
-      setUser(null);
-      setSession(null);
-      setRequiresPasswordChange(false);
-      setShowPasswordModal(false);
-      
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase sign out error:', error);
-      }
-      
-      // Clear all auth-related localStorage items
+      // Clear all auth-related localStorage items first
       Object.keys(localStorage).forEach((key) => {
         if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
           localStorage.removeItem(key);
         }
       });
       
+      // Clear any local state
+      setUser(null);
+      setSession(null);
+      setRequiresPasswordChange(false);
+      setShowPasswordModal(false);
+      
+      // Sign out from Supabase with global scope to clear all sessions
+      await supabase.auth.signOut({ scope: 'global' });
+      
       console.log('Sign out completed, redirecting...');
-      // Force redirect to auth page
-      window.location.href = '/auth';
+      // Force a complete page reload to ensure clean state
+      window.location.replace('/auth');
     } catch (error) {
       console.error('Sign out error:', error);
-      // Force redirect even if sign out fails
-      window.location.href = '/auth';
+      // Clear storage and force redirect even if sign out fails
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+      window.location.replace('/auth');
     }
   };
 
