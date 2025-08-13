@@ -176,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={value}>
-      {/* Don't render children until auth is initialized */}
+      {/* Show loading state while initializing but still provide context */}
       {!isInitialized ? (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center">
