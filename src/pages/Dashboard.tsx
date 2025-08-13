@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ interface Profile {
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
@@ -200,7 +202,11 @@ const Dashboard = () => {
               <CardDescription>Common scheduling tasks</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full justify-start" variant="outline">
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/schedule")}
+              >
                 <Calendar className="w-4 h-4 mr-2" />
                 View Schedule
               </Button>
