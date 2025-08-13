@@ -149,52 +149,10 @@ Deno.serve(async (req) => {
           console.log(`Calling assignUserRole for existing user: ${userData.email}`)
           await assignUserRole(supabaseAdmin, existingUser.id, userData, results, teamManagerMap, teamIdToUuidMap)
         } else {
-          // Create new user
-          const standardPassword = "VestasTemp2025!"
-          
-          const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: userData.email,
-            password: standardPassword,
-            email_confirm: true,
-            user_metadata: {
-              employee_id: userData.employeeId,
-              bulk_imported: true,
-              requires_password_change: true
-            }
-          })
-
-          if (authError) {
-            results.users.errors.push(`Auth error for ${userData.email}: ${authError.message}`)
-            continue
-          }
-
-          if (!authUser.user) {
-            results.users.errors.push(`No user created for ${userData.email}`)
-            continue
-          }
-
-          // Create profile
-          const { error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .insert({
-              user_id: authUser.user.id,
-              email: userData.email,
-              first_name: userData.employeeId || userData.email.split('@')[0],
-              last_name: '',
-              country_code: 'US',
-              requires_password_change: true
-            })
-
-          if (profileError) {
-            results.users.errors.push(`Profile for ${userData.email}: ${profileError.message}`)
-          } else {
-            results.users.created++
-            console.log(`Created user: ${userData.email}`)
-          }
-
-          // Handle roles and team membership
-          console.log(`Calling assignUserRole for new user: ${userData.email}`)
-          await assignUserRole(supabaseAdmin, authUser.user.id, userData, results, teamManagerMap, teamIdToUuidMap)
+          // Skip creating new users - only update existing ones
+          console.log(`Skipping user creation for ${userData.email} - user does not exist`)
+          results.users.errors.push(`User ${userData.email} does not exist in the system - skipping`)
+          continue
         }
 
       } catch (error) {
