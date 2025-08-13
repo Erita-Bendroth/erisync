@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
+import { EditScheduleModal } from "./EditScheduleModal";
 
 interface ScheduleEntry {
   id: string;
@@ -55,6 +56,7 @@ const ScheduleView = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
   // Show only Monday-Friday for work days
@@ -63,12 +65,18 @@ const ScheduleView = () => {
   const handleEditShift = (entry: ScheduleEntry) => {
     if (isManager() || isPlanner()) {
       setEditingEntry(entry);
-      // TODO: Open edit modal/form
-      toast({
-        title: "Edit Shift",
-        description: `Editing ${entry.profiles.first_name}'s ${entry.activity_type} shift on ${format(new Date(entry.date), "MMM d")}`,
-      });
+      setShowEditModal(true);
     }
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingEntry(null);
+  };
+
+  const handleSaveEditModal = () => {
+    // Refresh the schedule data after saving
+    fetchScheduleEntries();
   };
 
   useEffect(() => {
@@ -605,6 +613,14 @@ const ScheduleView = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Modal */}
+      <EditScheduleModal
+        entry={editingEntry}
+        isOpen={showEditModal}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveEditModal}
+      />
     </div>
   );
 };
