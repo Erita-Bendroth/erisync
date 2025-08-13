@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -26,6 +27,14 @@ interface ScheduleEntry {
   };
 }
 
+interface Employee {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+}
+
 interface Team {
   id: string;
   name: string;
@@ -43,11 +52,12 @@ const ScheduleView = () => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
-  const totalDays = 28; // 4 weeks = 28 days
-  const allDays = Array.from({ length: totalDays }, (_, i) => addDays(weekStart, i));
+  // Show only Monday-Friday for work days
+  const workDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
 
   useEffect(() => {
     if (user) {
@@ -58,6 +68,7 @@ const ScheduleView = () => {
   useEffect(() => {
     if (user && userRoles.length > 0) {
       fetchTeams();
+      fetchEmployees();
       fetchScheduleEntries();
     }
   }, [user, currentWeek, userRoles]);
@@ -65,6 +76,7 @@ const ScheduleView = () => {
   useEffect(() => {
     // Refetch entries when team selection changes
     if (user && userRoles.length > 0) {
+      fetchEmployees();
       fetchScheduleEntries();
     }
   }, [selectedTeam]);
@@ -96,14 +108,49 @@ const ScheduleView = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      let query = supabase
+        .from('profiles')
+        .select('id, user_id, first_name, last_name');
+
+      // If a specific team is selected, only get employees from that team
+      if (selectedTeam !== "all") {
+        const { data: teamMembers } = await supabase
+          .from('team_members')
+          .select('user_id')
+          .eq('team_id', selectedTeam);
+        
+        if (teamMembers && teamMembers.length > 0) {
+          const userIds = teamMembers.map(tm => tm.user_id);
+          query = query.in('user_id', userIds);
+        }
+      }
+
+      const { data, error } = await query.order('first_name');
+      
+      if (error) throw error;
+      
+      const transformedEmployees = data?.map(emp => ({
+        ...emp,
+        initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+      })) || [];
+      
+      setEmployees(transformedEmployees);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
   const fetchScheduleEntries = async () => {
     try {
       setLoading(true);
-      const fourWeeksEnd = addDays(weekStart, totalDays - 1); // 4 weeks total
+      // Only fetch Monday-Friday entries
+      const weekEnd = addDays(weekStart, 4); // Friday
       
-      console.log('Fetching schedule entries for 4 weeks:', {
+      console.log('Fetching schedule entries for work week:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
-        fourWeeksEnd: format(fourWeeksEnd, "yyyy-MM-dd"),
+        weekEnd: format(weekEnd, "yyyy-MM-dd"),
         userId: user?.id,
         userRoles: userRoles.map(r => r.role)
       });
@@ -115,7 +162,7 @@ const ScheduleView = () => {
         .from("schedule_entries")
         .select("id, user_id, team_id, date, activity_type")
         .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(fourWeeksEnd, "yyyy-MM-dd"))
+        .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
         .limit(5);
 
       const { data: basicTest, error: basicError } = await basicQuery;
@@ -143,7 +190,7 @@ const ScheduleView = () => {
           updated_at
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(fourWeeksEnd, "yyyy-MM-dd"))
+        .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
         .order("date");
 
       // Apply filtering based on user roles and team selection
@@ -173,13 +220,28 @@ const ScheduleView = () => {
         throw error;
       }
       
-      // For now, create placeholder data without joins
-      // We'll fetch user/team names separately once basic query works
-      const transformedData = data?.map(item => ({
-        ...item,
-        profiles: { first_name: item.user_id.substring(0, 8), last_name: "" },
-        teams: { name: `Team ${item.team_id.substring(0, 8)}` }
-      })) || [];
+      // Fetch user profiles for the entries
+      const userIds = [...new Set(data?.map(entry => entry.user_id) || [])];
+      const teamIds = [...new Set(data?.map(entry => entry.team_id) || [])];
+      
+      const [profilesResult, teamsResult] = await Promise.all([
+        supabase.from('profiles').select('user_id, first_name, last_name').in('user_id', userIds),
+        supabase.from('teams').select('id, name').in('id', teamIds)
+      ]);
+      
+      const profilesMap = new Map((profilesResult.data || []).map(p => [p.user_id, p]));
+      const teamsMap = new Map((teamsResult.data || []).map(t => [t.id, t]));
+      
+      const transformedData = data?.map(item => {
+        const profile = profilesMap.get(item.user_id) || { first_name: 'Unknown', last_name: 'User' };
+        const team = teamsMap.get(item.team_id) || { name: 'Unknown Team' };
+        
+        return {
+          ...item,
+          profiles: profile,
+          teams: team
+        };
+      }) || [];
       
       console.log('Transformed schedule data:', transformedData.length, 'entries');
       setScheduleEntries(transformedData);
@@ -198,6 +260,12 @@ const ScheduleView = () => {
   const getEntriesForDay = (date: Date) => {
     return scheduleEntries.filter(entry => 
       isSameDay(new Date(entry.date), date)
+    );
+  };
+
+  const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
+    return scheduleEntries.filter(entry => 
+      entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
     );
   };
 
@@ -289,9 +357,9 @@ const ScheduleView = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">4-Week Schedule Overview</h2>
+          <h2 className="text-2xl font-bold">Weekly Schedule</h2>
           <p className="text-muted-foreground">
-            {format(weekStart, "MMM d")} - {format(addDays(weekStart, totalDays - 1), "MMM d, yyyy")}
+            {format(weekStart, "MMM d")} - {format(addDays(weekStart, 4), "MMM d, yyyy")} (Monday - Friday)
           </p>
         </div>
         
@@ -336,78 +404,93 @@ const ScheduleView = () => {
         </div>
       </div>
 
-      {/* 4 Weeks Grid with Week Headers */}
-      <div className="space-y-6">
-        {Array.from({ length: 4 }, (_, weekIndex) => {
-          const weekStartDate = addDays(weekStart, weekIndex * 7);
-          const weekDays = Array.from({ length: 7 }, (_, dayIndex) => addDays(weekStartDate, dayIndex));
-          
-          return (
-            <div key={weekIndex} className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">
-                Week {weekIndex + 1}: {format(weekStartDate, "MMM d")} - {format(addDays(weekStartDate, 6), "MMM d, yyyy")}
-              </h3>
-              
-              <div className="grid grid-cols-7 gap-4">
-                {weekDays.map((day, dayIndex) => {
-                  const dayEntries = getEntriesForDay(day);
-                  const isToday = isSameDay(day, new Date());
-                  
-                  return (
-                    <Card key={dayIndex} className={isToday ? "ring-2 ring-primary" : ""}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          {format(day, "EEE")}
-                        </CardTitle>
-                        <CardDescription className="text-xs">
+      {/* Table-based Schedule View */}
+      <div className="space-y-4">
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-48 font-semibold">Employee</TableHead>
+                  {workDays.map((day, index) => (
+                    <TableHead key={index} className="text-center font-semibold">
+                      <div className="flex flex-col">
+                        <span>{format(day, "EEE")}</span>
+                        <span className="text-xs font-normal text-muted-foreground">
                           {format(day, "MMM d")}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-2 max-h-64 overflow-y-auto">
-                        {dayEntries.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">No entries</p>
-                        ) : (
-                          dayEntries.map((entry) => (
-                            <div key={entry.id} className="space-y-1 p-2 rounded border-l-2 border-l-primary/20">
-                              <div className="flex flex-col gap-1">
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-xs ${getShiftColor(entry.shift_type)}`}
-                                >
-                                  {entry.shift_type === "early" ? "Early" : 
-                                   entry.shift_type === "late" ? "Late" : "Normal"}
-                                </Badge>
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-xs ${getActivityColor(entry)}`}
-                                >
-                                  {getActivityDisplay(entry)}
-                                </Badge>
-                              </div>
-                              <div className="text-xs">
-                                <p className="font-medium">
-                                  {entry.profiles.first_name} {entry.profiles.last_name}
-                                </p>
-                                <p className="text-muted-foreground">
-                                  {entry.teams.name}
-                                </p>
-                                {entry.notes && (
-                                  <p className="text-muted-foreground text-xs">
-                                    {entry.notes}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+                        </span>
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {employees.map((employee) => (
+                  <TableRow key={employee.user_id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
+                          {employee.initials}
+                        </div>
+                        <div>
+                          <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+                          <p className="text-xs text-muted-foreground">{employee.initials}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    {workDays.map((day, dayIndex) => {
+                      const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
+                      const isToday = isSameDay(day, new Date());
+                      
+                      return (
+                        <TableCell key={dayIndex} className={`text-center ${isToday ? 'bg-primary/5' : ''}`}>
+                          <div className="space-y-1 min-h-16 flex flex-col justify-center">
+                            {dayEntries.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            ) : (
+                              dayEntries.map((entry) => (
+                                <div key={entry.id} className="space-y-1">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs ${getActivityColor(entry)} block`}
+                                    title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift`}
+                                  >
+                                    <div className="flex flex-col items-center">
+                                      <span className="font-semibold">{employee.initials}</span>
+                                      <span className="text-xs">
+                                        {entry.shift_type === "early" ? "Early" : 
+                                         entry.shift_type === "late" ? "Late" : "Normal"}
+                                      </span>
+                                      <span className="text-xs">
+                                        {getActivityDisplayName(entry.activity_type)}
+                                      </span>
+                                    </div>
+                                  </Badge>
+                                  {entry.notes && (
+                                    <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
+                                      {entry.notes.substring(0, 20)}...
+                                    </p>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+                {employees.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No employees found for the selected team
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
