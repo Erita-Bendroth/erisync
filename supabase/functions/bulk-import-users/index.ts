@@ -82,17 +82,18 @@ Deno.serve(async (req) => {
     // Create/update users
     for (const userData of users) {
       try {
-        // Generate a temporary password
-        const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`
+        // Use a standard password for all users
+        const standardPassword = "VestasTemp2025!"
         
         // Create auth user without email confirmation
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email: userData.email,
-          password: tempPassword,
+          password: standardPassword,
           email_confirm: true, // Skip email confirmation
           user_metadata: {
             employee_id: userData.employeeId,
-            bulk_imported: true
+            bulk_imported: true,
+            requires_password_change: true // Flag for mandatory password change
           }
         })
 
