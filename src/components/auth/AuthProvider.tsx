@@ -162,25 +162,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
   };
 
-  // Don't render children until auth is initialized
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
-          <p className="text-muted-foreground">Initializing application</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <AuthContext.Provider value={value}>
-      {children}
-      <PasswordChangeModal 
-        isOpen={showPasswordModal}
-        onPasswordChanged={handlePasswordChanged}
-      />
+      {/* Don't render children until auth is initialized */}
+      {!isInitialized ? (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
+            <p className="text-muted-foreground">Initializing application</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {children}
+          <PasswordChangeModal 
+            isOpen={showPasswordModal}
+            onPasswordChanged={handlePasswordChanged}
+          />
+        </>
+      )}
     </AuthContext.Provider>
   );
 };
