@@ -83,14 +83,21 @@ const TeamManagement = () => {
   const fetchTeams = async () => {
     try {
       console.log("Fetching teams...");
+      console.log("Current user:", user);
+      console.log("Supabase session:", await supabase.auth.getSession());
+      
       const { data, error } = await supabase
         .from("teams")
         .select("*")
         .order("name");
 
       console.log("Teams query result:", { data, error });
+      console.log("Data length:", data?.length);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Teams query error:", error);
+        throw error;
+      }
       setTeams(data || []);
       console.log("Teams set:", data);
     } catch (error) {
