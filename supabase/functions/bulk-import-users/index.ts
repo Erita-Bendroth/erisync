@@ -263,24 +263,10 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
       // Determine if this user should be a manager of this team
       let isManager = false
       
-      // Check if their role is 'manager' AND they're designated as manager for this team
+      // If their role is 'manager', they should be a manager of their team
       if (role === 'manager') {
-        // Check if they're designated as manager for this specific team
-        const designatedManager = teamManagerMap.get(userData.teamName)
-        if (designatedManager === userData.email) {
-          isManager = true
-          console.log(`${userData.email} is designated manager for team ${userData.teamName}`)
-        }
-        // Also check if ManagerEmail field in user data matches current user
-        else if (userData.managerEmail === userData.email) {
-          isManager = true
-          console.log(`${userData.email} is self-designated manager`)
-        }
-        // Fallback: if role is manager and no specific manager is designated, make them manager
-        else if (!designatedManager) {
-          isManager = true
-          console.log(`${userData.email} is default manager (no designated manager)`)
-        }
+        isManager = true
+        console.log(`${userData.email} is a manager for team ${userData.teamName}`)
       }
 
       console.log(`Assigning ${userData.email} to team UUID ${actualTeamUuid}, isManager: ${isManager}`)
