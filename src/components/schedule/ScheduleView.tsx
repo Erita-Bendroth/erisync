@@ -369,10 +369,24 @@ const ScheduleView = () => {
     try {
       const weekEnd = addDays(weekStart, 4); // Friday
       
+      // First get the user's country
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('country_code')
+        .eq('user_id', user!.id)
+        .single();
+
+      if (profileError || !profileData?.country_code) {
+        console.log('No country set for user, not fetching holidays');
+        setHolidays([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('holidays')
         .select('*')
         .eq('user_id', user!.id)
+        .eq('country_code', profileData.country_code)
         .gte('date', format(weekStart, "yyyy-MM-dd"))
         .lte('date', format(weekEnd, "yyyy-MM-dd"))
         .eq('is_public', true);
@@ -382,6 +396,7 @@ const ScheduleView = () => {
         return;
       }
       
+      console.log(`Fetched ${data?.length || 0} holidays for country ${profileData.country_code}`);
       setHolidays(data || []);
     } catch (error) {
       console.error('Error fetching holidays:', error);
@@ -668,35 +683,37 @@ const ScheduleView = () => {
                               </Badge>
                             ))}
                             
-                            {/* Show work entries if no holidays */}
-                            {dayHolidays.length === 0 && dayEntries.length === 0 ? (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            ) : (
-                              dayEntries.map((entry) => (
-                                <div key={entry.id} className="space-y-1">
-                                  <Badge
-                                    variant="secondary"
-                                    className={`text-xs ${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity`}
-                                    title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift - Click to edit`}
-                                    onClick={() => (isManager() || isPlanner()) && handleEditShift(entry)}
-                                  >
-                                    <div className="flex flex-col items-center py-1">
-                                      <span className="text-xs font-medium">
-                                        {entry.shift_type === "early" ? "Early" : 
-                                         entry.shift_type === "late" ? "Late" : "Normal"}
-                                      </span>
-                                      <span className="text-xs">
-                                        {getActivityDisplayName(entry.activity_type)}
-                                      </span>
-                                    </div>
-                                  </Badge>
-                                  {entry.notes && !entry.notes.includes("Auto-generated") && (
-                                    <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
-                                      {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
-                                    </p>
-                                  )}
-                                </div>
-                              ))
+                            {/* Show work entries only if no holidays */}
+                            {dayHolidays.length === 0 && (
+                              dayEntries.length === 0 ? (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              ) : (
+                                dayEntries.map((entry) => (
+                                  <div key={entry.id} className="space-y-1">
+                                    <Badge
+                                      variant="secondary"
+                                      className={`text-xs ${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity`}
+                                      title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift - Click to edit`}
+                                      onClick={() => (isManager() || isPlanner()) && handleEditShift(entry)}
+                                    >
+                                      <div className="flex flex-col items-center py-1">
+                                        <span className="text-xs font-medium">
+                                          {entry.shift_type === "early" ? "Early" : 
+                                           entry.shift_type === "late" ? "Late" : "Normal"}
+                                        </span>
+                                        <span className="text-xs">
+                                          {getActivityDisplayName(entry.activity_type)}
+                                        </span>
+                                      </div>
+                                    </Badge>
+                                    {entry.notes && !entry.notes.includes("Auto-generated") && (
+                                      <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
+                                        {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))
+                              )
                             )}
                           </div>
                         </TableCell>
