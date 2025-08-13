@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Trash2, MoreHorizontal, Edit, Shield } from "lucide-react";
+import { Users, Trash2, MoreHorizontal, Edit, Shield, Key } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -229,6 +229,39 @@ const UserManagement = () => {
     }
   };
 
+  const sendRandomPassword = async (userId: string, email: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('send-random-password', {
+        body: { 
+          userId,
+          userEmail: email
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: data?.emailSent 
+          ? `Random password generated and sent to ${email}`
+          : "Random password generated successfully",
+      });
+
+      // Refresh the users list
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error sending random password:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate random password",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEditUser = (user: User) => {
     setEditingUser(user);
     setShowEditModal(true);
@@ -329,11 +362,9 @@ const UserManagement = () => {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {userData.requires_password_change && (
-                        <Badge variant="destructive">Password Change Required</Badge>
-                      )}
-                    </TableCell>
+                     <TableCell>
+                       <span className="text-muted-foreground text-sm">Active</span>
+                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -343,13 +374,20 @@ const UserManagement = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-popover border border-border shadow-md z-50">
-                          <DropdownMenuItem
-                            onClick={() => handleEditUser(userData)}
-                            className="cursor-pointer"
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit User
-                          </DropdownMenuItem>
+                           <DropdownMenuItem
+                             onClick={() => handleEditUser(userData)}
+                             className="cursor-pointer"
+                           >
+                             <Edit className="mr-2 h-4 w-4" />
+                             Edit User
+                           </DropdownMenuItem>
+                           <DropdownMenuItem
+                             onClick={() => sendRandomPassword(userData.user_id, userData.email)}
+                             className="cursor-pointer"
+                           >
+                             <Key className="mr-2 h-4 w-4" />
+                             Generate Random Password
+                           </DropdownMenuItem>
                           {userData.user_id !== user?.id && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>

@@ -47,11 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         setIsInitialized(true);
         
-        // Only check password change requirement on SIGNED_IN event, not all auth state changes
         if (event === 'SIGNED_IN' && session?.user) {
-          setTimeout(() => {
-            checkPasswordChangeRequired(session.user.id);
-          }, 0);
+          console.log('User signed in:', session.user.id, session.user.email);
         }
       }
     );
@@ -75,22 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const checkPasswordChangeRequired = async (userId: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('requires_password_change')
-        .eq('user_id', userId)
-        .single();
-
-      if (profile?.requires_password_change) {
-        setRequiresPasswordChange(true);
-        setShowPasswordModal(true);
-      }
-    } catch (error) {
-      console.error('Error checking password change requirement:', error);
-    }
-  };
+  // Removed password change requirement check
 
   const handlePasswordChanged = () => {
     setRequiresPasswordChange(false);
@@ -181,10 +163,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={value}>
       {children}
-      <PasswordChangeModal 
-        isOpen={showPasswordModal}
-        onPasswordChanged={handlePasswordChanged}
-      />
       {/* Show loading overlay while initializing */}
       {!isInitialized && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
