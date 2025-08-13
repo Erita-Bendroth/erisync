@@ -8,7 +8,7 @@ import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
+import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { EditScheduleModal } from "./EditScheduleModal";
 
 interface ScheduleEntry {
@@ -45,6 +45,14 @@ interface UserRole {
   role: string;
 }
 
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  country_code: string;
+  is_public: boolean;
+}
+
 const ScheduleView = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -55,6 +63,7 @@ const ScheduleView = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [viewMode, setViewMode] = useState<string>("my-schedule"); // New state for team members
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -91,6 +100,7 @@ const ScheduleView = () => {
       fetchTeams();
       fetchEmployees();
       fetchScheduleEntries();
+      fetchHolidays();
     }
   }, [user, currentWeek, userRoles]);
 
@@ -99,6 +109,7 @@ const ScheduleView = () => {
     if (user && userRoles.length > 0) {
       fetchEmployees();
       fetchScheduleEntries();
+      fetchHolidays();
     }
   }, [selectedTeam, viewMode]);
 
@@ -354,6 +365,29 @@ const ScheduleView = () => {
     );
   };
 
+  const fetchHolidays = async () => {
+    try {
+      const weekEnd = addDays(weekStart, 4); // Friday
+      
+      const { data, error } = await supabase
+        .from('holidays')
+        .select('*')
+        .eq('user_id', user!.id)
+        .gte('date', format(weekStart, "yyyy-MM-dd"))
+        .lte('date', format(weekEnd, "yyyy-MM-dd"))
+        .eq('is_public', true);
+
+      if (error) {
+        console.error('Error fetching holidays:', error);
+        return;
+      }
+      
+      setHolidays(data || []);
+    } catch (error) {
+      console.error('Error fetching holidays:', error);
+    }
+  };
+
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
     return scheduleEntries.filter(entry => 
       entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
@@ -372,6 +406,12 @@ const ScheduleView = () => {
     
     // Managers and planners see full details
     return entry.activity_type.replace("_", " ");
+  };
+
+  const getHolidaysForDay = (date: Date) => {
+    return holidays.filter(holiday => 
+      isSameDay(new Date(holiday.date), date)
+    );
   };
 
   const getActivityColor = (entry: ScheduleEntry) => {
@@ -433,6 +473,18 @@ const ScheduleView = () => {
     setCurrentWeek(prev => direction === "next" ? addWeeks(prev, 1) : subWeeks(prev, 1));
   };
 
+  const navigateMonth = (direction: "prev" | "next") => {
+    setCurrentWeek(prev => {
+      const newMonth = direction === "next" ? addMonths(prev, 1) : subMonths(prev, 1);
+      return startOfWeek(startOfMonth(newMonth), { weekStartsOn: 1 });
+    });
+  };
+
+  const goToMonth = (monthOffset: number) => {
+    const targetMonth = addMonths(new Date(), monthOffset);
+    setCurrentWeek(startOfWeek(startOfMonth(targetMonth), { weekStartsOn: 1 }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -492,21 +544,50 @@ const ScheduleView = () => {
           )}
           
           <div className="flex items-center gap-2">
-            {(isManager() || isPlanner()) && (
-              <Button size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Entry
+            {/* Month Navigation */}
+            <div className="flex items-center gap-1 border rounded-md">
+              <Button variant="ghost" size="sm" onClick={() => navigateMonth("prev")}>
+                <ChevronLeft className="w-4 h-4" />
               </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())}>
-              Today
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigateWeek("next")}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+              <Select value="current" onValueChange={(value) => {
+                if (value === "current") goToMonth(0);
+                else if (value === "next") goToMonth(1);
+                else if (value === "next2") goToMonth(2);
+                else if (value === "prev") goToMonth(-1);
+              }}>
+                <SelectTrigger className="w-32 border-0 bg-transparent">
+                  <SelectValue placeholder={format(currentWeek, "MMM yyyy")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prev">{format(subMonths(new Date(), 1), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="current">{format(new Date(), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next">{format(addMonths(new Date(), 1), "MMM yyyy")}</SelectItem>
+                  <SelectItem value="next2">{format(addMonths(new Date(), 2), "MMM yyyy")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="sm" onClick={() => navigateMonth("next")}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            {/* Week Navigation */}
+            <div className="flex items-center gap-1">
+              {(isManager() || isPlanner()) && (
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Entry
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())}>
+                Today
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigateWeek("next")}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -547,12 +628,26 @@ const ScheduleView = () => {
                     </TableCell>
                     {workDays.map((day, dayIndex) => {
                       const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
+                      const dayHolidays = getHolidaysForDay(day);
                       const isToday = isSameDay(day, new Date());
                       
                       return (
                         <TableCell key={dayIndex} className={`text-center ${isToday ? 'bg-primary/5' : ''}`}>
                           <div className="space-y-1 min-h-16 flex flex-col justify-center">
-                            {dayEntries.length === 0 ? (
+                            {/* Show holidays first */}
+                            {dayHolidays.map((holiday) => (
+                              <Badge
+                                key={holiday.id}
+                                variant="outline"
+                                className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800"
+                                title={`Public Holiday: ${holiday.name}`}
+                              >
+                                🎉 {holiday.name}
+                              </Badge>
+                            ))}
+                            
+                            {/* Show work entries if no holidays */}
+                            {dayHolidays.length === 0 && dayEntries.length === 0 ? (
                               <span className="text-xs text-muted-foreground">-</span>
                             ) : (
                               dayEntries.map((entry) => (
