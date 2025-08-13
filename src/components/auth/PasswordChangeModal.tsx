@@ -62,7 +62,11 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
           .update({ requires_password_change: false })
           .eq('user_id', user.user.id);
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+          throw profileError;
+        }
+        console.log('Successfully updated requires_password_change to false for user:', user.user.id);
       }
 
       toast({
