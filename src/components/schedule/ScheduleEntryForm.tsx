@@ -43,6 +43,8 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
   const [teams, setTeams] = useState<Team[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>();
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [hasPermission, setHasPermission] = useState(false);
   
   const [formData, setFormData] = useState({
     user_id: "",
@@ -55,7 +57,11 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
   });
 
   useEffect(() => {
-    if (open) {
+    fetchUserRoles();
+  }, [user]);
+
+  useEffect(() => {
+    if (open && hasPermission) {
       fetchTeams();
       fetchProfiles();
       
@@ -73,7 +79,30 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
         setSelectedDate(new Date(editEntry.date));
       }
     }
-  }, [open, editEntry]);
+  }, [open, editEntry, hasPermission]);
+
+  const fetchUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      
+      const roles = data?.map(r => r.role) || [];
+      setUserRoles(roles);
+      
+      // Check if user has permission (planner or manager)
+      const canSchedule = roles.includes('planner') || roles.includes('manager');
+      setHasPermission(canSchedule);
+      
+    } catch (error) {
+      console.error("Error fetching user roles:", error);
+    }
+  };
 
   const fetchTeams = async () => {
     try {
@@ -171,6 +200,11 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
       setLoading(false);
     }
   };
+
+  // Don't render if user doesn't have permission
+  if (!hasPermission) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

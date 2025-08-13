@@ -26,14 +26,45 @@ const BulkScheduleGenerator = () => {
   const [endDate, setEndDate] = useState<Date>();
   const [loading, setLoading] = useState(false);
   const [generationResults, setGenerationResults] = useState<any[]>([]);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [hasPermission, setHasPermission] = useState(false);
 
   useEffect(() => {
-    fetchTeams();
-    // Set default dates to current month
-    const now = new Date();
-    setStartDate(startOfMonth(now));
-    setEndDate(endOfMonth(addMonths(now, 1)));
-  }, []);
+    fetchUserRoles();
+  }, [user]);
+
+  useEffect(() => {
+    if (hasPermission) {
+      fetchTeams();
+      // Set default dates to current month
+      const now = new Date();
+      setStartDate(startOfMonth(now));
+      setEndDate(endOfMonth(addMonths(now, 1)));
+    }
+  }, [hasPermission]);
+
+  const fetchUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      
+      const roles = data?.map(r => r.role) || [];
+      setUserRoles(roles);
+      
+      // Check if user has permission (planner or manager)
+      const canSchedule = roles.includes('planner') || roles.includes('manager');
+      setHasPermission(canSchedule);
+      
+    } catch (error) {
+      console.error("Error fetching user roles:", error);
+    }
+  };
 
   const fetchTeams = async () => {
     try {
@@ -97,6 +128,25 @@ const BulkScheduleGenerator = () => {
     setStartDate(startOfMonth(targetMonth));
     setEndDate(endOfMonth(targetMonth));
   };
+
+  // Don't render if user doesn't have permission
+  if (!hasPermission) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Zap className="w-5 h-5 mr-2" />
+            Bulk Schedule Generator
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            Only planners and managers can generate bulk schedules.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
