@@ -53,6 +53,7 @@ const ScheduleView = () => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<string>("my-schedule"); // New state for team members
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
@@ -94,12 +95,12 @@ const ScheduleView = () => {
   }, [user, currentWeek, userRoles]);
 
   useEffect(() => {
-    // Refetch entries when team selection changes
+    // Refetch entries when team selection or view mode changes
     if (user && userRoles.length > 0) {
       fetchEmployees();
       fetchScheduleEntries();
     }
-  }, [selectedTeam]);
+  }, [selectedTeam, viewMode]);
 
   const fetchUserRoles = async () => {
     try {
@@ -134,8 +135,33 @@ const ScheduleView = () => {
         .from('profiles')
         .select('id, user_id, first_name, last_name');
 
-      // If a specific team is selected, only get employees from that team
-      if (selectedTeam !== "all") {
+      // Apply filtering based on user role and view mode
+      if (isTeamMember() && !isManager() && !isPlanner()) {
+        if (viewMode === "my-schedule") {
+          // Show only the current user
+          query = query.eq('user_id', user!.id);
+        } else if (viewMode === "my-team") {
+          // Show users from the current user's team(s)
+          const { data: userTeams } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', user!.id);
+          
+          if (userTeams && userTeams.length > 0) {
+            const teamIds = userTeams.map(ut => ut.team_id);
+            const { data: teamMembers } = await supabase
+              .from('team_members')
+              .select('user_id')
+              .in('team_id', teamIds);
+            
+            if (teamMembers && teamMembers.length > 0) {
+              const userIds = teamMembers.map(tm => tm.user_id);
+              query = query.in('user_id', userIds);
+            }
+          }
+        }
+      } else if (selectedTeam !== "all") {
+        // For planners/managers, apply team filter if specific team is selected
         const { data: teamMembers } = await supabase
           .from('team_members')
           .select('user_id')
@@ -213,11 +239,25 @@ const ScheduleView = () => {
         .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
         .order("date");
 
-      // Apply filtering based on user roles and team selection
+      // Apply filtering based on user roles and view mode
       if (isTeamMember() && !isManager() && !isPlanner()) {
-        // Team members only see their own entries
-        query = query.eq("user_id", user!.id);
-        console.log('Filtering to only show user\'s own entries');
+        if (viewMode === "my-schedule") {
+          // Team members only see their own entries
+          query = query.eq("user_id", user!.id);
+          console.log('Filtering to only show user\'s own entries');
+        } else if (viewMode === "my-team") {
+          // Team members see their team's entries
+          const { data: userTeams } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', user!.id);
+          
+          if (userTeams && userTeams.length > 0) {
+            const teamIds = userTeams.map(ut => ut.team_id);
+            query = query.in("team_id", teamIds);
+            console.log('Filtering to show team entries for teams:', teamIds);
+          }
+        }
       } else if (selectedTeam !== "all") {
         // For planners/managers, apply team filter if specific team is selected
         query = query.eq("team_id", selectedTeam);
@@ -384,6 +424,22 @@ const ScheduleView = () => {
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          {/* View Mode Filter - For team members */}
+          {isTeamMember() && !isManager() && !isPlanner() && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium whitespace-nowrap">View:</label>
+              <Select value={viewMode} onValueChange={setViewMode}>
+                <SelectTrigger className="w-48 bg-background">
+                  <SelectValue placeholder="Select view" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border z-50">
+                  <SelectItem value="my-schedule">My Schedule</SelectItem>
+                  <SelectItem value="my-team">My Team Schedule</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          
           {/* Team Filter - Only show for planners and managers */}
           {(isManager() || isPlanner()) && (
             <div className="flex items-center gap-2">
