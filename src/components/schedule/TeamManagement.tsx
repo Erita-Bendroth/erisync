@@ -68,12 +68,15 @@ const TeamManagement = () => {
 
   useEffect(() => {
     console.log("Teams effect triggered, teams:", teams);
+    console.log("Teams array length:", teams.length);
     if (teams.length > 0) {
-      console.log("Fetching members for teams:", teams.map(t => t.name));
+      console.log("Fetching members for teams:", teams.map(t => ({ name: t.name, id: t.id })));
       teams.forEach(team => {
         console.log(`About to fetch members for team: ${team.name} (${team.id})`);
         fetchTeamMembers(team.id);
       });
+    } else {
+      console.log("No teams to process");
     }
   }, [teams]);
 
