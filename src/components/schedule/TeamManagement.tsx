@@ -63,9 +63,10 @@ const TeamManagement = () => {
   });
 
   useEffect(() => {
-    fetchTeams();
-    fetchProfiles();
-    fetchUserRole();
+    fetchUserRole().then(() => {
+      fetchTeams();
+      fetchProfiles();
+    });
   }, [user]);
 
   useEffect(() => {
@@ -86,12 +87,32 @@ const TeamManagement = () => {
     try {
       console.log("Fetching teams...");
       console.log("Current user:", user);
+      console.log("User role:", userRole);
       console.log("Supabase session:", await supabase.auth.getSession());
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("teams")
         .select("*")
         .order("name");
+
+      // For team members, only show teams they are part of
+      if (userRole === 'teammember') {
+        const { data: userTeamMemberships } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", user!.id);
+        
+        if (userTeamMemberships && userTeamMemberships.length > 0) {
+          const teamIds = userTeamMemberships.map(tm => tm.team_id);
+          query = query.in("id", teamIds);
+        } else {
+          // User is not part of any teams, return empty array
+          setTeams([]);
+          return;
+        }
+      }
+
+      const { data, error } = await query;
 
       console.log("Teams query result:", { data, error });
       console.log("Data length:", data?.length);
@@ -185,11 +206,20 @@ const TeamManagement = () => {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
-        .single();
+        .eq("user_id", user.id);
 
       if (error) throw error;
-      setUserRole(data?.role || "");
+      
+      // Get the most relevant role (prioritize admin/planner over teammember)
+      const roles = data || [];
+      let role = "";
+      if (roles.some(r => r.role === "admin")) role = "admin";
+      else if (roles.some(r => r.role === "planner")) role = "planner";
+      else if (roles.some(r => r.role === "manager")) role = "manager";
+      else if (roles.some(r => r.role === "teammember")) role = "teammember";
+      
+      setUserRole(role);
+      console.log("User role set to:", role);
     } catch (error) {
       console.error("Error fetching user role:", error);
     }
@@ -474,10 +504,13 @@ const TeamManagement = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {teamMembers[team.id].map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-medium">
-                          {member.profiles.first_name} {member.profiles.last_name}
+                     {teamMembers[team.id].map((member) => (
+                       <TableRow key={member.id}>
+                         <TableCell className="font-medium">
+                           {userRole === 'teammember' 
+                             ? `${member.profiles.first_name.charAt(0)}${member.profiles.last_name.charAt(0)}`.toUpperCase()
+                             : `${member.profiles.first_name} ${member.profiles.last_name}`
+                           }
                         </TableCell>
                         <TableCell>{member.profiles.email}</TableCell>
                         <TableCell>
