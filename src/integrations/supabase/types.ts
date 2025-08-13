@@ -47,6 +47,36 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_access_log: {
+        Row: {
+          access_time: string
+          access_type: string
+          accessed_by: string
+          id: string
+          ip_address: unknown | null
+          profile_user_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          access_time?: string
+          access_type?: string
+          accessed_by: string
+          id?: string
+          ip_address?: unknown | null
+          profile_user_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          access_time?: string
+          access_type?: string
+          accessed_by?: string
+          id?: string
+          ip_address?: unknown | null
+          profile_user_id?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           country_code: string | null
@@ -256,6 +286,14 @@ export type Database = {
       }
       is_manager_of_team: {
         Args: { _user_id: string; _team_id: string }
+        Returns: boolean
+      }
+      log_profile_access: {
+        Args: { _profile_user_id: string; _access_type?: string }
+        Returns: undefined
+      }
+      validate_manager_team_access: {
+        Args: { _manager_id: string; _target_user_id: string }
         Returns: boolean
       }
     }
