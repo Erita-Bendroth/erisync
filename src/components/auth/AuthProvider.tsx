@@ -52,12 +52,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Check if user needs to change password on initial load
-      if (session?.user) {
-        setTimeout(() => {
-          checkPasswordChangeRequired(session.user.id);
-        }, 0);
-      }
+      // Don't check for password change on initial page load/refresh
+      // Only check when user actually signs in
     });
 
     return () => subscription.unsubscribe();
