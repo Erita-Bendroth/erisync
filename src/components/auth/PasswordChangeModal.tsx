@@ -8,6 +8,7 @@ import { Lock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validatePassword, sanitizeInput } from "@/lib/validation";
+import { useAuth } from "./AuthProvider";
 
 interface PasswordChangeModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface PasswordChangeModalProps {
 
 const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPasswordChanged }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     currentPassword: "",
@@ -28,31 +30,18 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if user is authenticated with retries
-    let user = null;
-    let attempts = 0;
-    const maxAttempts = 3;
-    
-    while (!user && attempts < maxAttempts) {
-      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
-      if (currentUser && !error) {
-        user = currentUser;
-        break;
-      }
-      attempts++;
-      if (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-      }
-    }
-    
+    // Check if user is available from context
     if (!user) {
+      console.error('No user found in auth context');
       toast({
         title: "Error",
-        description: "Authentication session expired. Please sign in again.",
+        description: "Please sign in again to change your password.",
         variant: "destructive",
       });
       return;
     }
+
+    console.log('User found in context:', user.id, user.email);
 
     // Sanitize inputs
     const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
