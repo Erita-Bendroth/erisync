@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Fetching holidays for ${country_code} in ${year}`)
+    console.log(`API URL: https://date.nager.at/api/v3/publicholidays/${year}/${country_code}`)
 
     // Fetch holidays from public API (nager.date is free and reliable)
     const holidaysResponse = await fetch(
@@ -66,6 +67,22 @@ Deno.serve(async (req) => {
 
     const holidays: Holiday[] = await holidaysResponse.json()
     console.log(`Found ${holidays.length} holidays`)
+    console.log(`Sample holidays:`, holidays.slice(0, 2))
+
+    if (holidays.length === 0) {
+      console.log(`No holidays found for ${country_code} in ${year}`)
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          imported: 0,
+          message: `No holidays available for ${country_code} in ${year}. This might be normal - some countries don't have all years available in the API.`,
+          holidays: [] 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
 
     // Insert holidays into database
     const holidayData = holidays.map(holiday => ({
