@@ -7,6 +7,7 @@ import { Shield, UserPlus, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import BulkUserImport from "./BulkUserImport";
 
 interface Profile {
   user_id: string;
@@ -195,6 +196,18 @@ const AdminSetup = () => {
               })}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Bulk User Import</CardTitle>
+          <CardDescription>
+            Import multiple users from CSV files
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BulkUserImport />
         </CardContent>
       </Card>
 
