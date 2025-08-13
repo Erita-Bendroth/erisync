@@ -15,6 +15,37 @@ interface UserImportData {
   isActive?: boolean;
 }
 
+// Create team code mappings
+const teamCodeMappings: { [key: string]: string } = {
+  'TSC': 'Turbine Support Central',
+  'TTCS': 'Turbine Troubleshooting Central - South',
+  'TTCE': 'Turbine Troubleshooting Central - East',
+  'TOpC': 'Technical Operations Central',
+  'PSCN': 'Plant Support Central - North',
+  'PSCS': 'Plant Support Central - South',
+  'PSC': 'Plant Troubleshooting Central',
+  'POC': 'Plant Operations Central',
+  'TON': 'Turbine Operations North',
+  'TSN': 'Turbine Support North',
+  'TTNW': 'Turbine Troubleshooting North - West',
+  'TTNC': 'Turbine Troubleshooting North - Central',
+  'TTNE': 'Turbine Troubleshooting North - East',
+  'PON': 'Plant Operations North',
+  'PSN': 'Plant Support North',
+  'PTN': 'Plant Troubleshooting North',
+  'PCI': 'Pre-Config & Installation - NCE',
+  'TOpN': 'Technical Operations North',
+  'TOpOfs': 'Technical Operations Offshore',
+  'TOOfs': 'Turbine Operations Offshore',
+  'TSOfs': 'Turbine Support Offshore',
+  'TTOfs': 'Turbine Troubleshooting Offshore',
+  'POOfs': 'Plant Operations Offshore',
+  'PSOfsC1': 'Plant Support Offshore - Cluster 1',
+  'PFOfsC2&3': 'Plant Support Offshore - Cluster 2 & 3',
+  'PTOfs': 'Plant Troubleshooting Offshore',
+  'TOC': 'Turbine Operations Central'
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -227,16 +258,25 @@ async function assignUserRole(supabaseAdmin: any, userId: string, userData: User
 
     // Assign to team if provided
     if (userData.teamId) {
-      // Look up the actual team UUID using the TeamID
-      const actualTeamUuid = teamIdToUuidMap.get(userData.teamId)
+      // First, try to map team code to team name
+      const fullTeamName = teamCodeMappings[userData.teamId] || userData.teamId;
+      console.log(`Mapping team code ${userData.teamId} -> ${fullTeamName}`);
       
-      if (!actualTeamUuid) {
-        console.error(`Could not find team UUID for TeamID: ${userData.teamId}`)
-        results.teamMembers.errors.push(`Team UUID not found for ${userData.email}: TeamID=${userData.teamId}`)
-        return
+      // Look up the team by full name to get its UUID
+      const { data: teamData, error: teamLookupError } = await supabaseAdmin
+        .from('teams')
+        .select('id')
+        .eq('name', fullTeamName)
+        .single();
+      
+      if (teamLookupError || !teamData) {
+        console.error(`Could not find team with name: ${fullTeamName} (from code: ${userData.teamId})`);
+        results.teamMembers.errors.push(`Team not found for ${userData.email}: ${fullTeamName} (code: ${userData.teamId})`);
+        return;
       }
 
-      console.log(`Found team UUID ${actualTeamUuid} for TeamID ${userData.teamId}`)
+      const actualTeamUuid = teamData.id;
+      console.log(`Found team UUID ${actualTeamUuid} for team name ${fullTeamName} (code: ${userData.teamId})`);
 
       // Determine if this user should be a manager of this team
       let isManager = false
