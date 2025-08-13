@@ -39,9 +39,9 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
   if (!isOpen) return null;
 
-  // Add debugging for modal render
-  console.log('PasswordChangeModal rendered, isOpen:', isOpen);
-  console.log('User from context:', user ? { id: user.id, email: user.email } : 'null');
+  // Remove the constant re-render debugging
+  // console.log('PasswordChangeModal rendered, isOpen:', isOpen);
+  // console.log('User from context:', user ? { id: user.id, email: user.email } : 'null');
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,25 +62,41 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
     // Check and refresh the Supabase session
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('Current session:', session ? 'exists' : 'missing', sessionError);
+      console.log('Checking current session...');
       
-      if (!session || sessionError) {
-        console.log('Session missing or invalid, attempting refresh...');
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        console.log('Refresh result:', refreshData.session ? 'success' : 'failed', refreshError);
-        
-        if (!refreshData.session || refreshError) {
-          toast({
-            title: "Error", 
-            description: "Your session has expired. Please sign in again.",
-            variant: "destructive",
-          });
-          return;
-        }
+      // Force refresh the session before password change
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      console.log('Session refresh result:', {
+        hasSession: !!refreshData.session,
+        hasUser: !!refreshData.user,
+        error: refreshError
+      });
+      
+      if (!refreshData.session || refreshError) {
+        console.error('Session refresh failed:', refreshError);
+        toast({
+          title: "Error", 
+          description: "Your session has expired. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
       }
+      
+      // Verify the refreshed session works
+      const { data: { user: sessionUser }, error: userError } = await supabase.auth.getUser();
+      if (!sessionUser || userError) {
+        console.error('Session verification failed:', userError);
+        toast({
+          title: "Error",
+          description: "Authentication error. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('Session refreshed and verified successfully');
     } catch (error) {
-      console.error('Session check/refresh error:', error);
+      console.error('Session refresh error:', error);
       toast({
         title: "Error",
         description: "Authentication error. Please sign in again.",
