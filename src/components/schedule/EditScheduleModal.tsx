@@ -138,18 +138,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const handleSave = async () => {
     if (!entry) return;
 
-    // Validate hours if using hour split
-    if (useHourSplit) {
-      const totalHours = getTotalHours();
-      if (totalHours !== 8) {
-        toast({
-          title: "Error",
-          description: "Total hours must equal 8",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
+    // No validation for total hours - allow flexible scheduling
 
     try {
       setLoading(true);
@@ -245,7 +234,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             <div className="space-y-0.5">
               <Label>Split Hours</Label>
               <div className="text-sm text-muted-foreground">
-                Divide the 8-hour workday into different activities
+                Divide the workday into different activities (flexible hours)
               </div>
             </div>
             <Switch
@@ -259,7 +248,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <div className="flex items-center justify-between">
                 <Label className="flex items-center">
                   <Clock className="w-4 h-4 mr-2" />
-                  Hour Breakdown (Total: {getTotalHours()}h / 8h)
+                  Hour Breakdown (Total: {getTotalHours()}h)
                 </Label>
                 <Button
                   type="button"
@@ -318,11 +307,6 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                 </div>
               ))}
               
-              {getTotalHours() !== 8 && (
-                <div className="text-sm text-destructive">
-                  Hours must total exactly 8
-                </div>
-              )}
             </div>
           ) : (
             <div className="grid gap-2">
