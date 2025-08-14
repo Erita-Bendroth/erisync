@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Clock, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -24,6 +26,11 @@ interface ScheduleEntry {
   teams: {
     name: string;
   };
+}
+
+interface WorkBlock {
+  activity_type: string;
+  hours: number;
 }
 
 interface EditScheduleModalProps {
@@ -63,6 +70,10 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [useHourSplit, setUseHourSplit] = useState(false);
+  const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([
+    { activity_type: "work", hours: 8 }
+  ]);
   const [formData, setFormData] = useState<{
     shift_type: "normal" | "early" | "late";
     activity_type: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
@@ -83,22 +94,88 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         availability_status: (entry.availability_status as "available" | "unavailable") || "available",
         notes: entry.notes || ""
       });
+      
+      // Check if entry has hour split information in notes
+      const hourSplitPattern = /Hours:\s*(.+)/;
+      const match = entry.notes?.match(hourSplitPattern);
+      if (match) {
+        setUseHourSplit(true);
+        try {
+          const hoursData = JSON.parse(match[1]);
+          if (Array.isArray(hoursData)) {
+            setWorkBlocks(hoursData);
+          }
+        } catch (e) {
+          console.error("Failed to parse hour split data");
+        }
+      } else {
+        setUseHourSplit(false);
+        setWorkBlocks([{ activity_type: "work", hours: 8 }]);
+      }
     }
   }, [entry]);
+
+  const addWorkBlock = () => {
+    setWorkBlocks([...workBlocks, { activity_type: "work", hours: 1 }]);
+  };
+
+  const removeWorkBlock = (index: number) => {
+    if (workBlocks.length > 1) {
+      setWorkBlocks(workBlocks.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateWorkBlock = (index: number, field: keyof WorkBlock, value: string | number) => {
+    const updated = [...workBlocks];
+    updated[index] = { ...updated[index], [field]: value };
+    setWorkBlocks(updated);
+  };
+
+  const getTotalHours = () => {
+    return workBlocks.reduce((sum, block) => sum + block.hours, 0);
+  };
 
   const handleSave = async () => {
     if (!entry) return;
 
+    // Validate hours if using hour split
+    if (useHourSplit) {
+      const totalHours = getTotalHours();
+      if (totalHours !== 8) {
+        toast({
+          title: "Error",
+          description: "Total hours must equal 8",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       setLoading(true);
+      
+      let notes = formData.notes.trim();
+      let primaryActivityType = formData.activity_type;
+      
+      if (useHourSplit) {
+        // Store hour split in notes
+        const hoursData = JSON.stringify(workBlocks);
+        notes = `Hours: ${hoursData}${notes ? '\n' + notes : ''}`;
+        
+        // Set primary activity to the one with most hours
+        const primaryActivity = workBlocks.reduce((prev, current) => 
+          current.hours > prev.hours ? current : prev
+        );
+        primaryActivityType = primaryActivity.activity_type as any;
+      }
       
       const { error } = await supabase
         .from("schedule_entries")
         .update({
           shift_type: formData.shift_type,
-          activity_type: formData.activity_type,
+          activity_type: primaryActivityType,
           availability_status: formData.availability_status,
-          notes: formData.notes.trim() || null,
+          notes: notes || null,
           updated_at: new Date().toISOString()
         })
         .eq("id", entry.id);
@@ -163,24 +240,110 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             </Select>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="activity_type">Activity Type</Label>
-            <Select
-              value={formData.activity_type}
-              onValueChange={(value: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => setFormData({ ...formData, activity_type: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select activity type" />
-              </SelectTrigger>
-              <SelectContent>
-                {activityTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Hour split toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Split Hours</Label>
+              <div className="text-sm text-muted-foreground">
+                Divide the 8-hour workday into different activities
+              </div>
+            </div>
+            <Switch
+              checked={useHourSplit}
+              onCheckedChange={setUseHourSplit}
+            />
           </div>
+
+          {useHourSplit ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Hour Breakdown (Total: {getTotalHours()}h / 8h)
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addWorkBlock}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Block
+                </Button>
+              </div>
+              
+              {workBlocks.map((block, index) => (
+                <div key={index} className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Label className="text-xs">Activity</Label>
+                    <Select
+                      value={block.activity_type}
+                      onValueChange={(value) => updateWorkBlock(index, 'activity_type', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activityTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-20">
+                    <Label className="text-xs">Hours</Label>
+                    <Input
+                      type="number"
+                      min="0.5"
+                      max="8"
+                      step="0.5"
+                      value={block.hours}
+                      onChange={(e) => updateWorkBlock(index, 'hours', parseFloat(e.target.value) || 0)}
+                      className="h-8"
+                    />
+                  </div>
+                  {workBlocks.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeWorkBlock(index)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              
+              {getTotalHours() !== 8 && (
+                <div className="text-sm text-destructive">
+                  Hours must total exactly 8
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <Label htmlFor="activity_type">Activity Type</Label>
+              <Select
+                value={formData.activity_type}
+                onValueChange={(value: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => setFormData({ ...formData, activity_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select activity type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activityTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid gap-2">
             <Label htmlFor="availability_status">Availability Status</Label>
