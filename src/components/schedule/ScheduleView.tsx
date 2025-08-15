@@ -60,6 +60,7 @@ const ScheduleView = () => {
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [viewMode, setViewMode] = useState<string>("my-schedule"); // New state for team members
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -93,6 +94,7 @@ const ScheduleView = () => {
   useEffect(() => {
     if (user) {
       fetchUserRoles();
+      fetchUserTeams();
     }
   }, [user]);
 
@@ -138,6 +140,28 @@ const ScheduleView = () => {
       setTeams(data || []);
     } catch (error) {
       console.error('Error fetching teams:', error);
+    }
+  };
+
+  const fetchUserTeams = async () => {
+    try {
+      const { data: teamsData } = await supabase
+        .from("team_members")
+        .select(`
+          teams (
+            id,
+            name,
+            description
+          )
+        `)
+        .eq("user_id", user!.id);
+
+      if (teamsData) {
+        const teams = teamsData.map((item: any) => item.teams).filter(Boolean);
+        setUserTeams(teams);
+      }
+    } catch (error) {
+      console.error("Error fetching user teams:", error);
     }
   };
 
@@ -581,6 +605,11 @@ const ScheduleView = () => {
           <p className="text-muted-foreground">
             {format(weekStart, "MMM d")} - {format(addDays(weekStart, 4), "MMM d, yyyy")} (Monday - Friday)
           </p>
+          {userTeams.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Your teams: {userTeams.map(team => team.name).join(", ")}
+            </p>
+          )}
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">

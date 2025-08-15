@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Users, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 
 interface UserRole {
   role: string;
@@ -32,6 +33,7 @@ const Dashboard = () => {
   const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -77,6 +79,24 @@ const Dashboard = () => {
       if (teamsData) {
         const teams = teamsData.map((item: any) => item.teams).filter(Boolean);
         setUserTeams(teams);
+      }
+
+      // Fetch today's schedule
+      const today = new Date().toISOString().split('T')[0];
+      const { data: scheduleData } = await supabase
+        .from("schedule_entries")
+        .select(`
+          *,
+          profiles!inner (
+            first_name,
+            last_name
+          )
+        `)
+        .eq("user_id", user!.id)
+        .eq("date", today);
+
+      if (scheduleData) {
+        setTodaySchedule(scheduleData);
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -190,7 +210,20 @@ const Dashboard = () => {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">No schedule entries for today</p>
+              {todaySchedule.length > 0 ? (
+                <div className="space-y-2">
+                  {todaySchedule.map((entry, index) => (
+                    <div key={index} className="text-sm">
+                      <p className="font-medium">{entry.activity}</p>
+                      <p className="text-muted-foreground">
+                        {entry.start_time || 'All day'} - {entry.end_time || ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No schedule entries for today</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -210,11 +243,28 @@ const Dashboard = () => {
                 <Calendar className="w-4 h-4 mr-2" />
                 View Schedule
               </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Clock className="w-4 h-4 mr-2" />
-                Add Schedule Entry
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
+              {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
+                <ScheduleEntryForm onSuccess={() => {
+                  fetchUserData(); // Refresh today's schedule after adding entry
+                  toast({
+                    title: "Success",
+                    description: "Schedule entry added successfully",
+                  });
+                }}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    Add Schedule Entry
+                  </Button>
+                </ScheduleEntryForm>
+              )}
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/schedule")}
+              >
                 <Users className="w-4 h-4 mr-2" />
                 View Team Availability
               </Button>
