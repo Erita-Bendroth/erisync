@@ -30,7 +30,8 @@ interface ScheduleEntry {
 
 interface WorkBlock {
   activity_type: string;
-  hours: number;
+  start_time: string;
+  end_time: string;
 }
 
 interface EditScheduleModalProps {
@@ -72,7 +73,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [useHourSplit, setUseHourSplit] = useState(false);
   const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([
-    { activity_type: "work", hours: 8 }
+    { activity_type: "work", start_time: "09:00", end_time: "17:00" }
   ]);
   const [formData, setFormData] = useState<{
     shift_type: "normal" | "early" | "late";
@@ -95,28 +96,28 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         notes: entry.notes || ""
       });
       
-      // Check if entry has hour split information in notes
-      const hourSplitPattern = /Hours:\s*(.+)/;
-      const match = entry.notes?.match(hourSplitPattern);
+      // Check if entry has time split information in notes
+      const timeSplitPattern = /Times:\s*(.+)/;
+      const match = entry.notes?.match(timeSplitPattern);
       if (match) {
         setUseHourSplit(true);
         try {
-          const hoursData = JSON.parse(match[1]);
-          if (Array.isArray(hoursData)) {
-            setWorkBlocks(hoursData);
+          const timesData = JSON.parse(match[1]);
+          if (Array.isArray(timesData)) {
+            setWorkBlocks(timesData);
           }
         } catch (e) {
-          console.error("Failed to parse hour split data");
+          console.error("Failed to parse time split data");
         }
       } else {
         setUseHourSplit(false);
-        setWorkBlocks([{ activity_type: "work", hours: 8 }]);
+        setWorkBlocks([{ activity_type: "work", start_time: "09:00", end_time: "17:00" }]);
       }
     }
   }, [entry]);
 
   const addWorkBlock = () => {
-    setWorkBlocks([...workBlocks, { activity_type: "work", hours: 1 }]);
+    setWorkBlocks([...workBlocks, { activity_type: "work", start_time: "09:00", end_time: "10:00" }]);
   };
 
   const removeWorkBlock = (index: number) => {
@@ -132,7 +133,12 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   };
 
   const getTotalHours = () => {
-    return workBlocks.reduce((sum, block) => sum + block.hours, 0);
+    return workBlocks.reduce((sum, block) => {
+      const start = new Date(`2000-01-01T${block.start_time}:00`);
+      const end = new Date(`2000-01-01T${block.end_time}:00`);
+      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      return sum + hours;
+    }, 0);
   };
 
   const handleSave = async () => {
@@ -147,14 +153,22 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
       let primaryActivityType = formData.activity_type;
       
       if (useHourSplit) {
-        // Store hour split in notes
-        const hoursData = JSON.stringify(workBlocks);
-        notes = `Hours: ${hoursData}${notes ? '\n' + notes : ''}`;
+        // Store time split in notes
+        const timesData = JSON.stringify(workBlocks);
+        notes = `Times: ${timesData}${notes ? '\n' + notes : ''}`;
         
         // Set primary activity to the one with most hours
-        const primaryActivity = workBlocks.reduce((prev, current) => 
-          current.hours > prev.hours ? current : prev
-        );
+        const primaryActivity = workBlocks.reduce((prev, current) => {
+          const prevStart = new Date(`2000-01-01T${prev.start_time}:00`);
+          const prevEnd = new Date(`2000-01-01T${prev.end_time}:00`);
+          const prevHours = (prevEnd.getTime() - prevStart.getTime()) / (1000 * 60 * 60);
+          
+          const currentStart = new Date(`2000-01-01T${current.start_time}:00`);
+          const currentEnd = new Date(`2000-01-01T${current.end_time}:00`);
+          const currentHours = (currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60);
+          
+          return currentHours > prevHours ? current : prev;
+        });
         primaryActivityType = primaryActivity.activity_type as any;
       }
       
@@ -232,9 +246,9 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           {/* Hour split toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>Split Hours</Label>
+              <Label>Split Time Schedule</Label>
               <div className="text-sm text-muted-foreground">
-                Divide the workday into different activities (flexible hours)
+                Schedule exact times for different activities (e.g., 7:30-14:30)
               </div>
             </div>
             <Switch
@@ -248,7 +262,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <div className="flex items-center justify-between">
                 <Label className="flex items-center">
                   <Clock className="w-4 h-4 mr-2" />
-                  Hour Breakdown (Total: {getTotalHours()}h)
+                  Time Schedule (Total: {getTotalHours().toFixed(1)}h)
                 </Label>
                 <Button
                   type="button"
@@ -257,7 +271,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                   onClick={addWorkBlock}
                 >
                   <Plus className="w-4 h-4 mr-1" />
-                  Add Block
+                  Add Time Block
                 </Button>
               </div>
               
@@ -281,15 +295,21 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="w-20">
-                    <Label className="text-xs">Hours</Label>
+                  <div className="w-24">
+                    <Label className="text-xs">Start Time</Label>
                     <Input
-                      type="number"
-                      min="0.5"
-                      max="8"
-                      step="0.5"
-                      value={block.hours}
-                      onChange={(e) => updateWorkBlock(index, 'hours', parseFloat(e.target.value) || 0)}
+                      type="time"
+                      value={block.start_time}
+                      onChange={(e) => updateWorkBlock(index, 'start_time', e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Label className="text-xs">End Time</Label>
+                    <Input
+                      type="time"
+                      value={block.end_time}
+                      onChange={(e) => updateWorkBlock(index, 'end_time', e.target.value)}
                       className="h-8"
                     />
                   </div>

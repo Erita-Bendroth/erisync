@@ -28,10 +28,20 @@ const Schedule = () => {
             <h1 className="text-2xl font-bold">Employee Scheduler</h1>
             <p className="text-muted-foreground">Manage your team's schedule</p>
           </div>
-          <Button onClick={handleSignOut} variant="outline" size="sm">
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex items-center space-x-3">
+            <Button 
+              onClick={() => window.location.href = '/dashboard'} 
+              variant="outline" 
+              size="sm"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <Button onClick={handleSignOut} variant="outline" size="sm">
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 
