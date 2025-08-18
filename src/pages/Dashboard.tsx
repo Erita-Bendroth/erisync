@@ -238,7 +238,7 @@ const Dashboard = () => {
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
-                onClick={() => navigate("/schedule")}
+                onClick={() => navigate("/schedule?tab=schedule")}
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 View Schedule
@@ -263,7 +263,7 @@ const Dashboard = () => {
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
-                onClick={() => navigate("/schedule")}
+                onClick={() => navigate("/schedule?tab=schedule")}
               >
                 <Users className="w-4 h-4 mr-2" />
                 View Team Availability

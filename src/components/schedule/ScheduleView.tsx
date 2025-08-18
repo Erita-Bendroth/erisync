@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { EditScheduleModal } from "./EditScheduleModal";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface ScheduleEntry {
   id: string;
@@ -89,6 +90,70 @@ const ScheduleView = () => {
   const handleSaveEditModal = () => {
     // Refresh the schedule data after saving
     fetchScheduleEntries();
+  };
+
+  const handleDateClick = async (userId: string, date: Date) => {
+    if (!isManager() && !isPlanner()) return;
+    
+    try {
+      // Check if entry already exists for this user and date
+      const existingEntry = scheduleEntries.find(entry => 
+        entry.user_id === userId && isSameDay(new Date(entry.date), date)
+      );
+      
+      if (existingEntry) {
+        // Edit existing entry
+        handleEditShift(existingEntry);
+        return;
+      }
+
+      // Create new entry
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: userTeamData, error: teamError } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .single();
+
+      if (teamError || !userTeamData?.team_id) {
+        toast({
+          title: "Error",
+          description: "User is not assigned to any team",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('schedule_entries')
+        .insert({
+          user_id: userId,
+          team_id: userTeamData.team_id,
+          date: format(date, 'yyyy-MM-dd'),
+          shift_type: 'normal',
+          activity_type: 'work',
+          availability_status: 'available',
+          notes: 'Manually added entry',
+          created_by: userData.user?.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Schedule entry created successfully",
+      });
+
+      fetchScheduleEntries();
+    } catch (error) {
+      console.error('Error creating schedule entry:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create schedule entry",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -650,51 +715,16 @@ const ScheduleView = () => {
           )}
           
           <div className="flex items-center gap-2">
-            {/* Month Navigation */}
-            <div className="flex items-center gap-1 border rounded-md">
-              <Button variant="ghost" size="sm" onClick={() => navigateMonth("prev")}>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Select value={selectedMonthValue} onValueChange={(value) => {
-                if (value === "current") goToMonth(0);
-                else if (value === "next") goToMonth(1);
-                else if (value === "next2") goToMonth(2);
-                else if (value === "next3") goToMonth(3);
-                else if (value === "next4") goToMonth(4);
-                else if (value === "next5") goToMonth(5);
-                else if (value === "next6") goToMonth(6);
-                else if (value === "next7") goToMonth(7);
-                else if (value === "next8") goToMonth(8);
-                else if (value === "next9") goToMonth(9);
-                else if (value === "next10") goToMonth(10);
-                else if (value === "next11") goToMonth(11);
-                else if (value === "prev") goToMonth(-1);
-                else if (value === "prev2") goToMonth(-2);
-              }}>
-                <SelectTrigger className="w-32 border-0 bg-transparent">
-                  <SelectValue placeholder={format(currentWeek, "MMM yyyy")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="prev2">{format(subMonths(new Date(), 2), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="prev">{format(subMonths(new Date(), 1), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="current">{format(new Date(), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next">{format(addMonths(new Date(), 1), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next2">{format(addMonths(new Date(), 2), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next3">{format(addMonths(new Date(), 3), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next4">{format(addMonths(new Date(), 4), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next5">{format(addMonths(new Date(), 5), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next6">{format(addMonths(new Date(), 6), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next7">{format(addMonths(new Date(), 7), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next8">{format(addMonths(new Date(), 8), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next9">{format(addMonths(new Date(), 9), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next10">{format(addMonths(new Date(), 10), "MMM yyyy")}</SelectItem>
-                  <SelectItem value="next11">{format(addMonths(new Date(), 11), "MMM yyyy")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="ghost" size="sm" onClick={() => navigateMonth("next")}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
+            {/* Date Picker for easy navigation */}
+            <DatePicker 
+              date={currentWeek}
+              onDateChange={(date) => {
+                if (date) {
+                  setCurrentWeek(startOfWeek(date, { weekStartsOn: 1 }));
+                }
+              }}
+              placeholder="Select date"
+            />
             
             {/* Week Navigation */}
             <div className="flex items-center gap-1">
@@ -758,7 +788,12 @@ const ScheduleView = () => {
                       const isToday = isSameDay(day, new Date());
                       
                       return (
-                        <TableCell key={dayIndex} className={`text-center ${isToday ? 'bg-primary/5' : ''}`}>
+                        <TableCell 
+                          key={dayIndex} 
+                          className={`text-center ${isToday ? 'bg-primary/5' : ''} cursor-pointer hover:bg-muted/50 transition-colors`}
+                          onClick={() => (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
+                          title={dayEntries.length === 0 && dayHolidays.length === 0 ? "Click to add entry" : ""}
+                        >
                           <div className="space-y-1 min-h-16 flex flex-col justify-center">
                             {/* Show holidays first */}
                             {dayHolidays.map((holiday) => (
@@ -772,37 +807,40 @@ const ScheduleView = () => {
                               </Badge>
                             ))}
                             
-                            {/* Show work entries only if no holidays */}
-                            {dayHolidays.length === 0 && (
-                              dayEntries.length === 0 ? (
-                                <span className="text-xs text-muted-foreground">-</span>
-                              ) : (
-                                dayEntries.map((entry) => (
-                                  <div key={entry.id} className="space-y-1">
-                                    <Badge
-                                      variant="secondary"
-                                      className={`text-xs ${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity`}
-                                      title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift - Click to edit`}
-                                      onClick={() => (isManager() || isPlanner()) && handleEditShift(entry)}
-                                    >
-                                      <div className="flex flex-col items-center py-1">
-                                        <span className="text-xs font-medium">
-                                          {entry.shift_type === "early" ? "Early" : 
-                                           entry.shift_type === "late" ? "Late" : "Normal"}
-                                        </span>
-                                        <span className="text-xs">
-                                          {getActivityDisplayName(entry.activity_type)}
-                                        </span>
-                                      </div>
-                                    </Badge>
-                                    {entry.notes && !entry.notes.includes("Auto-generated") && (
-                                      <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
-                                        {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                ))
-                              )
+                            {/* Show work entries */}
+                            {dayEntries.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                {(isManager() || isPlanner()) && dayHolidays.length === 0 ? "+" : "-"}
+                              </span>
+                            ) : (
+                              dayEntries.map((entry) => (
+                                <div key={entry.id} className="space-y-1">
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs ${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity`}
+                                    title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift - Click to edit`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      (isManager() || isPlanner()) && handleEditShift(entry);
+                                    }}
+                                  >
+                                    <div className="flex flex-col items-center py-1">
+                                      <span className="text-xs font-medium">
+                                        {entry.shift_type === "early" ? "Early" : 
+                                         entry.shift_type === "late" ? "Late" : "Normal"}
+                                      </span>
+                                      <span className="text-xs">
+                                        {getActivityDisplayName(entry.activity_type)}
+                                      </span>
+                                    </div>
+                                  </Badge>
+                                  {entry.notes && !entry.notes.includes("Auto-generated") && (
+                                    <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
+                                      {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              ))
                             )}
                           </div>
                         </TableCell>

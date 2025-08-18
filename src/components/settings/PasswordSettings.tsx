@@ -59,16 +59,23 @@ const PasswordSettings = () => {
 
     setLoading(true);
     try {
-      // Get current user
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user?.email) {
-        throw new Error('Unable to verify user');
+      // Get current user and session
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!user?.email || !session) {
+        toast({
+          title: "Error",
+          description: "Authentication session missing. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
       }
 
       // Verify current password
       const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
         body: {
-          email: userData.user.email,
+          email: user.email,
           currentPassword: sanitizedCurrentPassword
         }
       });

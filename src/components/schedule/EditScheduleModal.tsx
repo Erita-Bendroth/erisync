@@ -72,6 +72,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [useHourSplit, setUseHourSplit] = useState(false);
+  const [sendNotification, setSendNotification] = useState(false);
   const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([
     { activity_type: "work", start_time: "09:00", end_time: "17:00" }
   ]);
@@ -189,6 +190,41 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         title: "Success",
         description: "Schedule entry updated successfully",
       });
+
+      // Send notification if requested
+      if (sendNotification && entry) {
+        try {
+          // Get user profile for email
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name')
+            .eq('user_id', entry.user_id)
+            .single();
+
+          // Get current user profile for "changed by"
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: currentUserProfile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('user_id', user?.id)
+            .single();
+
+          if (profileData?.email) {
+            await supabase.functions.invoke('send-schedule-notification', {
+              body: {
+                userEmail: profileData.email,
+                userName: `${profileData.first_name} ${profileData.last_name}`,
+                scheduleDate: format(new Date(entry.date), 'PPP'),
+                changeDetails: `Shift: ${formData.shift_type}, Activity: ${formData.activity_type}, Status: ${formData.availability_status}`,
+                changedBy: currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'System'
+              }
+            });
+          }
+        } catch (notificationError) {
+          console.error('Failed to send notification:', notificationError);
+          // Don't fail the whole operation for notification errors
+        }
+      }
 
       onSave();
       onClose();
@@ -377,6 +413,19 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="sendNotification"
+              checked={sendNotification}
+              onChange={(e) => setSendNotification(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <Label htmlFor="sendNotification" className="text-sm cursor-pointer">
+              Send email notification to user about this change
+            </Label>
           </div>
         </div>
 
