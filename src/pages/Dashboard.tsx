@@ -85,13 +85,7 @@ const Dashboard = () => {
       const today = new Date().toISOString().split('T')[0];
       const { data: scheduleData } = await supabase
         .from("schedule_entries")
-        .select(`
-          *,
-          profiles!inner (
-            first_name,
-            last_name
-          )
-        `)
+        .select("*")
         .eq("user_id", user!.id)
         .eq("date", today);
 

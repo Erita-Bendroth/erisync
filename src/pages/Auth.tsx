@@ -9,6 +9,7 @@ import { Clock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import ForgotPassword from "@/components/auth/ForgotPassword";
+import ResetPassword from "@/components/auth/ResetPassword";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const Auth = () => {
   const { user, signIn, signUp } = useAuth();
   const { toast } = useToast();
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [signInLoading, setSignInLoading] = useState(false);
@@ -34,20 +36,13 @@ const Auth = () => {
     lastName: "",
   });
 
-  // Check for password reset mode
+  // Handle Supabase password recovery redirect (hash contains type=recovery)
   useEffect(() => {
-    const mode = searchParams.get('mode');
-    if (mode === 'reset') {
-      // Handle password reset
-      const accessToken = searchParams.get('access_token');
-      const refreshToken = searchParams.get('refresh_token');
-      
-      if (accessToken && refreshToken) {
-        // Set the session and redirect to dashboard
-        navigate('/dashboard');
-      }
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setShowResetPassword(true);
     }
-  }, [searchParams, navigate]);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -130,6 +125,14 @@ const Auth = () => {
       setSignUpLoading(false);
     }
   };
+
+  if (showResetPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <ResetPassword />
+      </div>
+    );
+  }
 
   if (showForgotPassword) {
     return (

@@ -59,14 +59,13 @@ const PasswordSettings = () => {
 
     setLoading(true);
     try {
-      // Get current user and session
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!user?.email || !session) {
+      if (!user?.email) {
         toast({
           title: "Error",
-          description: "Authentication session missing. Please sign in again.",
+          description: "Not signed in. Please sign in again.",
           variant: "destructive",
         });
         return;
