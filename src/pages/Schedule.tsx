@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 const Schedule = () => {
   const { signOut, user } = useAuth();
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState("admin");
+  const [activeTab, setActiveTab] = useState("schedule");
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -106,53 +106,25 @@ const Schedule = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="admin" className="space-y-6">
+          <TabsContent value="admin">
             <AdminSetup />
           </TabsContent>
-
-          <TabsContent value="schedule" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold">Schedule Overview</h2>
-                  <p className="text-muted-foreground">
-                    View and manage team schedules
-                  </p>
-                </div>
-                <ScheduleEntryForm>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Entry
-                  </Button>
-                </ScheduleEntryForm>
-              </div>
-              <BulkScheduleGenerator />
-            </div>
+          <TabsContent value="schedule">
             <ScheduleView />
+            <ScheduleEntryForm />
+            <BulkScheduleGenerator />
           </TabsContent>
-
-          <TabsContent value="teams" className="space-y-6">
+          <TabsContent value="teams">
             <TeamManagement />
           </TabsContent>
-
-          <TabsContent value="holidays" className="space-y-6">
+          <TabsContent value="holidays">
             <HolidayManager />
           </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <div className="space-y-6">
-              <CountrySelector />
-              <PasswordSettings />
-              <OutlookIntegration />
-              
-              {/* Profile Overview - Only for planners and managers */}
-              {(isPlanner() || isManager()) && user && (
-                <UserProfileOverview 
-                  userId={user.id} 
-                  canView={isPlanner() || isManager()} 
-                />
-              )}
-            </div>
+          <TabsContent value="settings">
+            <UserProfileOverview />
+            <CountrySelector />
+            <PasswordSettings />
+            <OutlookIntegration />
           </TabsContent>
         </Tabs>
       </main>
