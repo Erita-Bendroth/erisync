@@ -15,6 +15,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 interface ScheduleEntry {
   id: string;
   user_id: string;
+  team_id: string;
   date: string;
   shift_type: string;
   activity_type: string;
@@ -96,63 +97,59 @@ const ScheduleView = () => {
     if (!isManager() && !isPlanner()) return;
     
     try {
-      // Check if entry already exists for this user and date
       const existingEntry = scheduleEntries.find(entry => 
         entry.user_id === userId && isSameDay(new Date(entry.date), date)
       );
-      
       if (existingEntry) {
-        // Edit existing entry
         handleEditShift(existingEntry);
         return;
       }
 
-      // Create new entry
-      const { data: userData } = await supabase.auth.getUser();
+      // Resolve the target user's team for this entry
       const { data: userTeamData, error: teamError } = await supabase
         .from('team_members')
         .select('team_id')
         .eq('user_id', userId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (teamError || !userTeamData?.team_id) {
-        toast({
-          title: "Error",
-          description: "User is not assigned to any team",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "User is not assigned to any team", variant: "destructive" });
         return;
       }
 
-      const { error } = await supabase
-        .from('schedule_entries')
-        .insert({
-          user_id: userId,
-          team_id: userTeamData.team_id,
-          date: format(date, 'yyyy-MM-dd'),
-          shift_type: 'normal',
-          activity_type: 'work',
-          availability_status: 'available',
-          notes: 'Manually added entry',
-          created_by: userData.user?.id
-        });
+      // Get team name for UI context
+      const { data: teamInfo } = await supabase
+        .from('teams')
+        .select('name')
+        .eq('id', userTeamData.team_id)
+        .maybeSingle();
 
-      if (error) throw error;
+      // Get employee name for UI context
+      const emp = employees.find(e => e.user_id === userId);
 
-      toast({
-        title: "Success",
-        description: "Schedule entry created successfully",
-      });
+      // Open the editor in create mode (no immediate DB write)
+      const tempEntry: ScheduleEntry = {
+        id: `temp-${Date.now()}`,
+        user_id: userId,
+        team_id: userTeamData.team_id,
+        date: format(date, 'yyyy-MM-dd'),
+        shift_type: 'normal',
+        activity_type: 'work',
+        availability_status: 'available',
+        notes: '',
+        profiles: {
+          first_name: emp?.first_name || 'User',
+          last_name: emp?.last_name || ''
+        },
+        teams: { name: teamInfo?.name || 'Team' }
+      };
 
-      fetchScheduleEntries();
+      setEditingEntry(tempEntry);
+      setShowEditModal(true);
     } catch (error) {
-      console.error('Error creating schedule entry:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create schedule entry",
-        variant: "destructive",
-      });
+      console.error('Error preparing schedule entry creation:', error);
+      toast({ title: "Error", description: "Could not open create entry dialog", variant: "destructive" });
     }
   };
 
@@ -502,7 +499,6 @@ const ScheduleView = () => {
       const { data, error } = await supabase
         .from('holidays')
         .select('*')
-        .eq('user_id', user!.id)
         .eq('country_code', profileData.country_code)
         .gte('date', format(weekStart, "yyyy-MM-dd"))
         .lte('date', format(weekEnd, "yyyy-MM-dd"))
@@ -808,11 +804,11 @@ const ScheduleView = () => {
                             ))}
                             
                             {/* Show work entries */}
-                            {dayEntries.length === 0 ? (
-                              <span className="text-xs text-muted-foreground">
-                                {(isManager() || isPlanner()) && dayHolidays.length === 0 ? "+" : "-"}
-                              </span>
-                            ) : (
+                              {dayEntries.length === 0 ? (
+                                <span className="text-xs text-muted-foreground">
+                                  {(isManager() || isPlanner()) ? "+" : "-"}
+                                </span>
+                              ) : (
                               dayEntries.map((entry) => (
                                 <div key={entry.id} className="space-y-1">
                                   <Badge

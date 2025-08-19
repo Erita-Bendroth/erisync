@@ -10,6 +10,7 @@ import { Clock, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { TimeSelect } from "@/components/ui/time-select";
 
 interface ScheduleEntry {
   id: string;
@@ -145,69 +146,72 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const handleSave = async () => {
     if (!entry) return;
 
-    // No validation for total hours - allow flexible scheduling
-
     try {
       setLoading(true);
-      
+
       let notes = formData.notes.trim();
       let primaryActivityType = formData.activity_type;
-      
+
       if (useHourSplit) {
-        // Store time split in notes
         const timesData = JSON.stringify(workBlocks);
         notes = `Times: ${timesData}${notes ? '\n' + notes : ''}`;
-        
-        // Set primary activity to the one with most hours
         const primaryActivity = workBlocks.reduce((prev, current) => {
           const prevStart = new Date(`2000-01-01T${prev.start_time}:00`);
           const prevEnd = new Date(`2000-01-01T${prev.end_time}:00`);
           const prevHours = (prevEnd.getTime() - prevStart.getTime()) / (1000 * 60 * 60);
-          
           const currentStart = new Date(`2000-01-01T${current.start_time}:00`);
           const currentEnd = new Date(`2000-01-01T${current.end_time}:00`);
           const currentHours = (currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60);
-          
           return currentHours > prevHours ? current : prev;
         });
         primaryActivityType = primaryActivity.activity_type as any;
       }
-      
-      const { error } = await supabase
-        .from("schedule_entries")
-        .update({
+
+      // Create if temp entry, otherwise update
+      if (entry.id.startsWith('temp-')) {
+        const { data: authData } = await supabase.auth.getUser();
+        const insertPayload = {
+          user_id: entry.user_id,
+          team_id: entry.team_id as any,
+          date: format(new Date(entry.date), 'yyyy-MM-dd'),
           shift_type: formData.shift_type,
           activity_type: primaryActivityType,
           availability_status: formData.availability_status,
           notes: notes || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", entry.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Schedule entry updated successfully",
-      });
+          created_by: authData.user?.id,
+        };
+        const { error } = await supabase.from('schedule_entries').insert(insertPayload);
+        if (error) throw error;
+        toast({ title: 'Success', description: 'Schedule entry created successfully' });
+      } else {
+        const { error } = await supabase
+          .from('schedule_entries')
+          .update({
+            shift_type: formData.shift_type,
+            activity_type: primaryActivityType,
+            availability_status: formData.availability_status,
+            notes: notes || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', entry.id);
+        if (error) throw error;
+        toast({ title: 'Success', description: 'Schedule entry updated successfully' });
+      }
 
       // Send notification if requested
-      if (sendNotification && entry) {
+      if (sendNotification) {
         try {
-          // Get user profile for email
           const { data: profileData } = await supabase
             .from('profiles')
             .select('email, first_name, last_name')
             .eq('user_id', entry.user_id)
-            .single();
-
-          // Get current user profile for "changed by"
-          const { data: { user } } = await supabase.auth.getUser();
+            .maybeSingle();
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
           const { data: currentUserProfile } = await supabase
             .from('profiles')
             .select('first_name, last_name')
-            .eq('user_id', user?.id)
-            .single();
+            .eq('user_id', currentUser?.id)
+            .maybeSingle();
 
           if (profileData?.email) {
             await supabase.functions.invoke('send-schedule-notification', {
@@ -216,25 +220,20 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                 userName: `${profileData.first_name} ${profileData.last_name}`,
                 scheduleDate: format(new Date(entry.date), 'PPP'),
                 changeDetails: `Shift: ${formData.shift_type}, Activity: ${formData.activity_type}, Status: ${formData.availability_status}`,
-                changedBy: currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'System'
-              }
+                changedBy: currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'System',
+              },
             });
           }
         } catch (notificationError) {
           console.error('Failed to send notification:', notificationError);
-          // Don't fail the whole operation for notification errors
         }
       }
 
       onSave();
       onClose();
     } catch (error) {
-      console.error("Error updating schedule entry:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update schedule entry",
-        variant: "destructive",
-      });
+      console.error('Error saving schedule entry:', error);
+      toast({ title: 'Error', description: 'Failed to save schedule entry', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -333,19 +332,17 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                   </div>
                   <div className="w-24">
                     <Label className="text-xs">Start Time</Label>
-                    <Input
-                      type="time"
+                    <TimeSelect
                       value={block.start_time}
-                      onChange={(e) => updateWorkBlock(index, 'start_time', e.target.value)}
+                      onChange={(val) => updateWorkBlock(index, 'start_time', val)}
                       className="h-8"
                     />
                   </div>
                   <div className="w-24">
                     <Label className="text-xs">End Time</Label>
-                    <Input
-                      type="time"
+                    <TimeSelect
                       value={block.end_time}
-                      onChange={(e) => updateWorkBlock(index, 'end_time', e.target.value)}
+                      onChange={(val) => updateWorkBlock(index, 'end_time', val)}
                       className="h-8"
                     />
                   </div>
