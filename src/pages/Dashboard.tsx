@@ -34,37 +34,32 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
+  const [allUserSchedules, setAllUserSchedules] = useState<any[]>([]); // 👈 New state
 
   useEffect(() => {
     if (user) {
       fetchUserData();
+      fetchAllUserSchedules(); // 👈 Fetch team schedule
     }
   }, [user]);
 
   const fetchUserData = async () => {
     try {
-      // Fetch user profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("first_name, last_name, email")
         .eq("user_id", user!.id)
         .single();
 
-      if (profileData) {
-        setProfile(profileData);
-      }
+      if (profileData) setProfile(profileData);
 
-      // Fetch user roles
       const { data: rolesData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user!.id);
 
-      if (rolesData) {
-        setUserRoles(rolesData);
-      }
+      if (rolesData) setUserRoles(rolesData);
 
-      // Fetch user teams
       const { data: teamsData } = await supabase
         .from("team_members")
         .select(`
@@ -81,7 +76,6 @@ const Dashboard = () => {
         setUserTeams(teams);
       }
 
-      // Fetch today's schedule
       const today = new Date().toISOString().split('T')[0];
       const { data: scheduleData } = await supabase
         .from("schedule_entries")
@@ -89,9 +83,7 @@ const Dashboard = () => {
         .eq("user_id", user!.id)
         .eq("date", today);
 
-      if (scheduleData) {
-        setTodaySchedule(scheduleData);
-      }
+      if (scheduleData) setTodaySchedule(scheduleData);
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast({
@@ -101,6 +93,36 @@ const Dashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllUserSchedules = async () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from("schedule_entries")
+      .select(`
+        activity,
+        start_time,
+        end_time,
+        date,
+        user_id,
+        profiles (
+          first_name,
+          last_name
+        )
+      `)
+      .eq("date", today);
+
+    if (error) {
+      console.error("Error fetching all user schedules:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load team schedules",
+        variant: "destructive",
+      });
+    } else {
+      setAllUserSchedules(data);
     }
   };
 
@@ -151,6 +173,7 @@ const Dashboard = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Your Roles */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Your Roles</CardTitle>
@@ -175,6 +198,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Your Teams */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Your Teams</CardTitle>
@@ -198,6 +222,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Your Schedule */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Schedule</CardTitle>
@@ -220,8 +245,35 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Team Schedule */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Team Schedule Today</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {allUserSchedules.length > 0 ? (
+                <div className="space-y-4">
+                  {allUserSchedules.map((entry, index) => (
+                    <div key={index} className="text-sm">
+                      <p className="font-medium">
+                        {entry.profiles?.first_name} {entry.profiles?.last_name}: {entry.activity}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {entry.start_time || 'All day'} - {entry.end_time || ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No team schedule entries for today</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
+        {/* Quick Actions & Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -239,7 +291,8 @@ const Dashboard = () => {
               </Button>
               {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
                 <ScheduleEntryForm onSuccess={() => {
-                  fetchUserData(); // Refresh today's schedule after adding entry
+                  fetchUserData();
+                  fetchAllUserSchedules();
                   toast({
                     title: "Success",
                     description: "Schedule entry added successfully",
