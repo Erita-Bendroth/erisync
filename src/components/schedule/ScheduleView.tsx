@@ -284,7 +284,7 @@ const ScheduleView = () => {
         }
       } else {
         console.log('User has elevated role, applying manager/planner filtering');
-        if (selectedTeam !== "all") {
+        if (selectedTeam !== "all" && selectedTeam !== undefined) {
           console.log('Applying team filter for elevated user, selectedTeam:', selectedTeam);
           // For planners/managers, apply team filter if specific team is selected
           const { data: teamMembers } = await supabase
@@ -339,7 +339,7 @@ const ScheduleView = () => {
         .from("schedule_entries")
         .select("id, user_id, team_id, date, activity_type")
         .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(addDays(weekStart, 5), "yyyy-MM-dd"))
+        .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
         .limit(5);
 
       const { data: basicTest, error: basicError } = await basicQuery;
@@ -367,14 +367,14 @@ const ScheduleView = () => {
           updated_at
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(addDays(weekStart, 5), "yyyy-MM-dd"))
+        .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
         .order("date");
 
       console.log('Full query details:', {
         queryDateStart: format(weekStart, "yyyy-MM-dd"),
-        queryDateEnd: format(addDays(weekStart, 5), "yyyy-MM-dd"),
+        queryDateEnd: format(addDays(weekStart, 4), "yyyy-MM-dd"),
         actualWeekStart: weekStart.toString(),
-        actualWeekEnd: addDays(weekStart, 5).toString(),
+        actualWeekEnd: addDays(weekStart, 4).toString(),
         isManager: isManager(),
         isPlanner: isPlanner(),
         selectedTeam: selectedTeam
@@ -399,7 +399,7 @@ const ScheduleView = () => {
             console.log('Filtering to show team entries for teams:', teamIds);
           }
         }
-      } else if (selectedTeam !== "all") {
+      } else if (selectedTeam !== "all" && selectedTeam !== undefined) {
         // For planners/managers, apply team filter if specific team is selected
         query = query.eq("team_id", selectedTeam);
         console.log('Filtering by team:', selectedTeam);
@@ -664,7 +664,7 @@ const ScheduleView = () => {
         <div>
           <h2 className="text-2xl font-bold">Weekly Schedule</h2>
           <p className="text-muted-foreground">
-            {format(weekStart, "MMM d")} - {format(addDays(weekStart, 5), "MMM d, yyyy")} (Monday - Friday)
+            {format(weekStart, "MMM d")} - {format(addDays(weekStart, 4), "MMM d, yyyy")} (Monday - Friday)
           </p>
           {userTeams.length > 0 && (
             <p className="text-sm text-muted-foreground">
