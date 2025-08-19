@@ -299,10 +299,6 @@ const ScheduleView = () => {
           }
         } else {
           console.log('Showing all employees for elevated user');
-          
-query = supabase
-    .from('profiles')
-    .select('id, user_id, first_name, last_name');
         }
       }
 
