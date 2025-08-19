@@ -1,13 +1,9 @@
 import React, { useState } from "react";
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -25,35 +21,69 @@ const PasswordSettings = () => {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
+    // Sanitize inputs
     const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
     const sanitizedNewPassword = sanitizeInput(formData.newPassword);
     const sanitizedConfirmPassword = sanitizeInput(formData.confirmPassword);
 
+    // Validate current password is provided
     if (!sanitizedCurrentPassword) {
-      toast({ title: "Error", description: "Current password is required", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Current password is required",
+        variant: "destructive",
+      });
       return;
     }
-
+    
     if (sanitizedNewPassword !== sanitizedConfirmPassword) {
-      toast({ title: "Error", description: "New passwords don't match", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "New passwords don't match",
+        variant: "destructive",
+      });
       return;
     }
 
+    // Validate new password strength
     const { isValid, errors } = validatePassword(sanitizedNewPassword);
     if (!isValid) {
-      toast({ title: "Error", description: errors.join(', '), variant: "destructive" });
+      toast({
+        title: "Error",
+        description: errors.join(', '),
+        variant: "destructive",
+      });
       return;
     }
 
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        toast({ title: "Error", description: "Not signed in. Please sign in again.", variant: "destructive" });
+      // Get current session to ensure user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: "Error",
+          description: "Your session has expired. Please sign in again.",
+          variant: "destructive",
+        });
         return;
       }
 
+      // Also get current user as backup
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user?.email) {
+        toast({
+          title: "Error",
+          description: "Not signed in. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Verify current password
       const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
         body: {
           email: user.email,
@@ -62,45 +92,36 @@ const PasswordSettings = () => {
       });
 
       if (verificationError || !verificationData?.valid) {
-        toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: "Current password is incorrect",
+          variant: "destructive",
+        });
         return;
       }
 
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        await supabase.auth.refreshSession();
-        const refreshed = await supabase.auth.getSession();
-        session = refreshed.data.session;
-
-        if (!session) {
-          toast({ title: "Error", description: "Session expired. Please sign in again.", variant: "destructive" });
-          return;
-        }
-      }
-
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: sanitizedCurrentPassword
-      });
-
-      if (signInError || !signInData.session) {
-        toast({ title: "Error", description: "Re-authentication failed. Please try again.", variant: "destructive" });
-        return;
-      }
-
+      // Update password using Supabase auth
       const { error: passwordError } = await supabase.auth.updateUser({
         password: sanitizedNewPassword
       });
 
       if (passwordError) throw passwordError;
 
-      toast({ title: "Success", description: "Password changed successfully" });
+      toast({
+        title: "Success",
+        description: "Password changed successfully",
+      });
+
       setOpen(false);
       setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-
+      
     } catch (error: any) {
       console.error('Password change error:', error);
-      toast({ title: "Error", description: error.message || "Failed to change password", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -120,7 +141,9 @@ const PasswordSettings = () => {
       <CardContent>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline">Change Password</Button>
+            <Button variant="outline">
+              Change Password
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
