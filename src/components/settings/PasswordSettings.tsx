@@ -59,7 +59,19 @@ const PasswordSettings = () => {
 
     setLoading(true);
     try {
-      // Get current user
+      // Get current session to ensure user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: "Error",
+          description: "Your session has expired. Please sign in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Also get current user as backup
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user?.email) {

@@ -64,7 +64,7 @@ const ScheduleView = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<string>("my-schedule"); // New state for team members
+  const [viewMode, setViewMode] = useState<string>("my-schedule");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -674,7 +674,7 @@ const ScheduleView = () => {
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          {/* View Mode Filter - For team members */}
+          {/* View Mode Filter - For team members - Removed problematic My Team Schedule option */}
           {isTeamMember() && !isManager() && !isPlanner() && (
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium whitespace-nowrap">View:</label>
@@ -684,7 +684,6 @@ const ScheduleView = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-background border z-50">
                   <SelectItem value="my-schedule">My Schedule</SelectItem>
-                  <SelectItem value="my-team">My Team Schedule</SelectItem>
                 </SelectContent>
               </Select>
             </div>

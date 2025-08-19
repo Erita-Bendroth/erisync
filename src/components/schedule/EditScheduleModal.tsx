@@ -15,6 +15,7 @@ import { TimeSelect } from "@/components/ui/time-select";
 interface ScheduleEntry {
   id: string;
   user_id: string;
+  team_id: string;
   date: string;
   shift_type: string;
   activity_type: string;

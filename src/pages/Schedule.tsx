@@ -13,11 +13,15 @@ import HolidayManager from "@/components/holidays/HolidayManager";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
 import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
+import UserProfileOverview from "@/components/profile/UserProfileOverview";
+import OutlookIntegration from "@/components/integrations/OutlookIntegration";
+import { supabase } from "@/integrations/supabase/client";
 
 const Schedule = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("admin");
+  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -25,6 +29,28 @@ const Schedule = () => {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserRoles();
+    }
+  }, [user]);
+
+  const fetchUserRoles = async () => {
+    try {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user!.id);
+      
+      setUserRoles(data?.map(r => r.role) || []);
+    } catch (error) {
+      console.error("Error fetching user roles:", error);
+    }
+  };
+
+  const isPlanner = () => userRoles.includes('planner');
+  const isManager = () => userRoles.includes('manager');
 
   const handleSignOut = async () => {
     await signOut();
@@ -117,6 +143,15 @@ const Schedule = () => {
             <div className="space-y-6">
               <CountrySelector />
               <PasswordSettings />
+              <OutlookIntegration />
+              
+              {/* Profile Overview - Only for planners and managers */}
+              {(isPlanner() || isManager()) && user && (
+                <UserProfileOverview 
+                  userId={user.id} 
+                  canView={isPlanner() || isManager()} 
+                />
+              )}
             </div>
           </TabsContent>
         </Tabs>
