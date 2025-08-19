@@ -1,189 +1,74 @@
-import React, { useState } from "react";
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger
-} from "@/components/ui/dialog";
-import { Lock } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { validatePassword, sanitizeInput } from "@/lib/validation";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-const PasswordSettings = () => {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-    const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
-    const sanitizedNewPassword = sanitizeInput(formData.newPassword);
-    const sanitizedConfirmPassword = sanitizeInput(formData.confirmPassword);
+  try {
+    const { email, currentPassword } = await req.json();
 
-    if (!sanitizedCurrentPassword) {
-      toast({ title: "Error", description: "Current password is required", variant: "destructive" });
-      return;
-    }
-
-    if (sanitizedNewPassword !== sanitizedConfirmPassword) {
-      toast({ title: "Error", description: "New passwords don't match", variant: "destructive" });
-      return;
-    }
-
-    const { isValid, errors } = validatePassword(sanitizedNewPassword);
-    if (!isValid) {
-      toast({ title: "Error", description: errors.join(', '), variant: "destructive" });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        toast({ title: "Error", description: "Not signed in. Please sign in again.", variant: "destructive" });
-        return;
-      }
-
-      const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
-        body: {
-          email: user.email,
-          currentPassword: sanitizedCurrentPassword
+    if (!email || !currentPassword) {
+      return new Response(
+        JSON.stringify({ error: 'Email and current password are required' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
-
-      if (verificationError || !verificationData?.valid) {
-        toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
-        return;
-      }
-
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        await supabase.auth.refreshSession();
-        const refreshed = await supabase.auth.getSession();
-        session = refreshed.data.session;
-
-        if (!session) {
-          toast({ title: "Error", description: "Session expired. Please sign in again.", variant: "destructive" });
-          return;
-        }
-      }
-
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: sanitizedCurrentPassword
-      });
-
-      if (signInError || !signInData.session) {
-        toast({ title: "Error", description: "Re-authentication failed. Please try again.", variant: "destructive" });
-        return;
-      }
-
-      const { error: passwordError } = await supabase.auth.updateUser({
-        password: sanitizedNewPassword
-      });
-
-      if (passwordError) throw passwordError;
-
-      toast({ title: "Success", description: "Password changed successfully" });
-      setOpen(false);
-      setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-
-    } catch (error: any) {
-      console.error('Password change error:', error);
-      toast({ title: "Error", description: error.message || "Failed to change password", variant: "destructive" });
-    } finally {
-      setLoading(false);
+      );
     }
-  };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Lock className="w-5 h-5 mr-2" />
-          Password Settings
-        </CardTitle>
-        <CardDescription>
-          Change your password to keep your account secure
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline">Change Password</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Change Password</DialogTitle>
-              <DialogDescription>
-                Enter your current password and choose a new secure password
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  value={formData.currentPassword}
-                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                  placeholder="Enter your current password"
-                  required
-                />
-              </div>
+    // Create a temporary Supabase client to verify credentials
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
 
-              <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={formData.newPassword}
-                  onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                  placeholder="Enter new password"
-                  required
-                  minLength={8}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 8 characters with uppercase, lowercase, numbers, and special characters
-                </p>
-              </div>
+    // Attempt to sign in with the provided credentials
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password: currentPassword
+    });
 
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  placeholder="Confirm new password"
-                  required
-                />
-              </div>
+    if (error || !data.user) {
+      console.log('Password verification failed:', error?.message);
+      return new Response(
+        JSON.stringify({ valid: false }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Changing..." : "Change Password"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardContent>
-    </Card>
-  );
-};
+    // Sign out immediately after verification to avoid interfering with existing session
+    if (data.session) {
+      await supabase.auth.signOut();
+    }
 
-export default PasswordSettings;
+    console.log('Password verification successful for user:', email);
+    return new Response(
+      JSON.stringify({ valid: true }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('Password verification error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+})

@@ -74,7 +74,7 @@ const ScheduleView = () => {
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
   // Show only Monday-Friday for work days
-  const workDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
+  const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (isManager() || isPlanner()) {
@@ -284,7 +284,7 @@ const ScheduleView = () => {
         }
       } else {
         console.log('User has elevated role, applying manager/planner filtering');
-        if (selectedTeam !== "all") {
+        if (selectedTeam !== "all" && selectedTeam !== undefined) {
           console.log('Applying team filter for elevated user, selectedTeam:', selectedTeam);
           // For planners/managers, apply team filter if specific team is selected
           const { data: teamMembers } = await supabase
@@ -321,7 +321,7 @@ const ScheduleView = () => {
     try {
       setLoading(true);
       // Only fetch Monday-Friday entries
-      const weekEnd = addDays(weekStart, 4); // Friday
+      const weekEnd = addDays(weekStart, 6); // Friday
       
       console.log('Fetching schedule entries for work week:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
@@ -399,7 +399,7 @@ const ScheduleView = () => {
             console.log('Filtering to show team entries for teams:', teamIds);
           }
         }
-      } else if (selectedTeam !== "all") {
+      } else if (selectedTeam !== "all" && selectedTeam !== undefined) {
         // For planners/managers, apply team filter if specific team is selected
         query = query.eq("team_id", selectedTeam);
         console.log('Filtering by team:', selectedTeam);
@@ -481,7 +481,7 @@ const ScheduleView = () => {
 
   const fetchHolidays = async () => {
     try {
-      const weekEnd = addDays(weekStart, 4); // Friday
+      const weekEnd = addDays(weekStart, 6); // Friday
       
       // First get the user's country
       const { data: profileData, error: profileError } = await supabase
