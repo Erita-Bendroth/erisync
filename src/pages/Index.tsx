@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { EditScheduleModal } from "@/components/schedule/EditScheduleModal";
+import { EditScheduleModal } from "./EditScheduleModal";
 import { DatePicker } from "@/components/ui/date-picker";
 
 interface ScheduleEntry {
