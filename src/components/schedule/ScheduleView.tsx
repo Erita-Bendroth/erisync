@@ -74,7 +74,7 @@ const ScheduleView = () => {
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
   // Show only Monday-Friday for work days
-  const workDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
+  const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (isManager() || isPlanner()) {
@@ -321,7 +321,7 @@ const ScheduleView = () => {
     try {
       setLoading(true);
       // Only fetch Monday-Friday entries
-      const weekEnd = addDays(weekStart, 4); // Friday
+      const weekEnd = addDays(weekStart, 6); // Friday
       
       console.log('Fetching schedule entries for work week:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
@@ -481,7 +481,7 @@ const ScheduleView = () => {
 
   const fetchHolidays = async () => {
     try {
-      const weekEnd = addDays(weekStart, 4); // Friday
+      const weekEnd = addDays(weekStart, 6); // Friday
       
       // First get the user's country
       const { data: profileData, error: profileError } = await supabase
