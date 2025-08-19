@@ -284,7 +284,7 @@ const ScheduleView = () => {
         }
       } else {
         console.log('User has elevated role, applying manager/planner filtering');
-        if (selectedTeam !== "all") {
+        if (selectedTeam !== "all" && selectedTeam !== undefined) {
           console.log('Applying team filter for elevated user, selectedTeam:', selectedTeam);
           // For planners/managers, apply team filter if specific team is selected
           const { data: teamMembers } = await supabase
@@ -399,7 +399,7 @@ const ScheduleView = () => {
             console.log('Filtering to show team entries for teams:', teamIds);
           }
         }
-      } else if (selectedTeam !== "all") {
+      } else if (selectedTeam !== "all" && selectedTeam !== undefined) {
         // For planners/managers, apply team filter if specific team is selected
         query = query.eq("team_id", selectedTeam);
         console.log('Filtering by team:', selectedTeam);
