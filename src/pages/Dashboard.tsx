@@ -8,6 +8,7 @@ import { Calendar, Clock, Users, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
+import UserSchedulesToday from "@/components/dashboard/UserSchedulesToday"; // 👈 Import component
 
 interface UserRole {
   role: string;
@@ -34,37 +35,32 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
+  const [teamMemberSchedules, setTeamMemberSchedules] = useState<any[]>([]); // 👈 New state
 
   useEffect(() => {
     if (user) {
       fetchUserData();
+      fetchTeamMemberSchedules(); // 👈 Fetch team member schedules
     }
   }, [user]);
 
   const fetchUserData = async () => {
     try {
-      // Fetch user profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("first_name, last_name, email")
         .eq("user_id", user!.id)
         .single();
 
-      if (profileData) {
-        setProfile(profileData);
-      }
+      if (profileData) setProfile(profileData);
 
-      // Fetch user roles
       const { data: rolesData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user!.id);
 
-      if (rolesData) {
-        setUserRoles(rolesData);
-      }
+      if (rolesData) setUserRoles(rolesData);
 
-      // Fetch user teams
       const { data: teamsData } = await supabase
         .from("team_members")
         .select(`
@@ -81,7 +77,6 @@ const Dashboard = () => {
         setUserTeams(teams);
       }
 
-      // Fetch today's schedule
       const today = new Date().toISOString().split('T')[0];
       const { data: scheduleData } = await supabase
         .from("schedule_entries")
@@ -89,9 +84,7 @@ const Dashboard = () => {
         .eq("user_id", user!.id)
         .eq("date", today);
 
-      if (scheduleData) {
-        setTodaySchedule(scheduleData);
-      }
+      if (scheduleData) setTodaySchedule(scheduleData);
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast({
@@ -101,6 +94,36 @@ const Dashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTeamMemberSchedules = async () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from("schedule_entries")
+      .select(`
+        activity,
+        start_time,
+        end_time,
+        date,
+        user_id,
+        profiles (
+          first_name,
+          last_name
+        )
+      `)
+      .eq("date", today);
+
+    if (error) {
+      console.error("Error fetching team member schedules:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load team member schedules",
+        variant: "destructive",
+      });
+    } else {
+      setTeamMemberSchedules(data);
     }
   };
 
@@ -151,6 +174,7 @@ const Dashboard = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Your Roles */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Your Roles</CardTitle>
@@ -175,6 +199,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Your Teams */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Your Teams</CardTitle>
@@ -198,9 +223,10 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
+          {/* Your Schedule */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Schedule</CardTitle>
+              <CardTitle className="text-sm font-medium">Your Schedule Today</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -220,8 +246,12 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Users' Schedule Today */}
+          <UserSchedulesToday schedules={teamMemberSchedules} />
         </div>
 
+        {/* Quick Actions & Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -230,54 +260,3 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={() => navigate("/schedule?tab=schedule")}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                View Schedule
-              </Button>
-              {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
-                <ScheduleEntryForm onSuccess={() => {
-                  fetchUserData(); // Refresh today's schedule after adding entry
-                  toast({
-                    title: "Success",
-                    description: "Schedule entry added successfully",
-                  });
-                }}>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Add Schedule Entry
-                  </Button>
-                </ScheduleEntryForm>
-              )}
-              <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={() => navigate("/schedule?tab=schedule")}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                View Team Availability
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Latest schedule updates</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">No recent activity</p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default Dashboard;
