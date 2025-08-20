@@ -1,5 +1,11 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useEffect, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,41 +21,33 @@ interface PasswordChangeModalProps {
   onPasswordChanged: () => void;
 }
 
-const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPasswordChanged }) => {
+const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
+  isOpen,
+  onPasswordChanged,
+}) => {
   const { toast } = useToast();
   const { user, session } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
 
-  // Clear form when modal opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       setFormData({
-        currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
-      console.log('Modal opened, form cleared');
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Remove the constant re-render debugging
-  // console.log('PasswordChangeModal rendered, isOpen:', isOpen);
-  // console.log('User from context:', user ? { id: user.id, email: user.email } : 'null');
-
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Password change form submitted');
-    
-    // Check if user is available from context
-    if (!user) {
-      console.error('No user found in auth context during password change');
+
+    if (!user || !session) {
       toast({
         title: "Error",
         description: "Please sign in again to change your password.",
@@ -58,70 +56,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
       return;
     }
 
-    console.log('User found in context:', user.id, user.email);
-
-    // Use the session from auth context instead of refreshing
-    try {
-      console.log('Checking auth context session...');
-      
-      if (!session) {
-        console.error('No session in auth context');
-        toast({
-          title: "Error",
-          description: "Please sign in again to change your password.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log('Session found in context, setting it explicitly...');
-      
-      // Explicitly set the session from context
-      const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
-      });
-      
-      if (setSessionError) {
-        console.error('Failed to set session from context:', setSessionError);
-        toast({
-          title: "Error",
-          description: "Session error. Please sign in again.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Small delay to ensure session propagation
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      console.log('Session set from context, attempting password update...');
-    } catch (error) {
-      console.error('Session setup error:', error);
-      toast({
-        title: "Error",
-        description: "Authentication error. Please sign in again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Sanitize inputs
-    const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
-    const sanitizedNewPassword = sanitizeInput(formData.newPassword);
-    const sanitizedConfirmPassword = sanitizeInput(formData.confirmPassword);
-
-    // Validate current password is provided
-    if (!sanitizedCurrentPassword) {
-      toast({
-        title: "Error",
-        description: "Current password is required",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (sanitizedNewPassword !== sanitizedConfirmPassword) {
+    if (formData.newPassword !== formData.confirmPassword) {
       toast({
         title: "Error",
         description: "New passwords don't match",
@@ -130,12 +65,11 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
       return;
     }
 
-    // Validate new password strength
-    const { isValid, errors } = validatePassword(sanitizedNewPassword);
+    const { isValid, errors } = validatePassword(formData.newPassword);
     if (!isValid) {
       toast({
         title: "Error",
-        description: errors.join(', '),
+        description: errors.join(", "),
         variant: "destructive",
       });
       return;
@@ -143,40 +77,23 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
     setLoading(true);
     try {
-      // Verify current password
-      const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
-        body: {
-          email: user.email,
-          currentPassword: sanitizedCurrentPassword
-        }
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
       });
 
-      if (verificationError || !verificationData?.valid) {
-        toast({
-          title: "Error",
-          description: "Current password is incorrect",
-          variant: "destructive",
-        });
-        return;
-      }
+      const sanitizedNewPassword = sanitizeInput(formData.newPassword);
 
-      // Update password using Supabase auth
       const { error: passwordError } = await supabase.auth.updateUser({
-        password: sanitizedNewPassword
+        password: sanitizedNewPassword,
       });
 
       if (passwordError) throw passwordError;
 
-      // Update profile to remove password change requirement
-      const { error: profileError } = await supabase
-        .from('profiles')
+      await supabase
+        .from("profiles")
         .update({ requires_password_change: false })
-        .eq('user_id', user.id);
-
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-        throw profileError;
-      }
+        .eq("user_id", user.id);
 
       toast({
         title: "Success",
@@ -184,9 +101,7 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
       });
 
       onPasswordChanged();
-      
     } catch (error: any) {
-      console.error('Password change error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to change password",
@@ -221,24 +136,14 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
 
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                value={formData.currentPassword}
-                onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                placeholder="Enter your current password"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
                 id="new-password"
                 type="password"
                 value={formData.newPassword}
-                onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, newPassword: e.target.value })
+                }
                 placeholder="Enter new password"
                 required
                 minLength={8}
@@ -254,7 +159,9 @@ const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onPas
                 id="confirm-password"
                 type="password"
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, confirmPassword: e.target.value })
+                }
                 placeholder="Confirm new password"
                 required
               />
