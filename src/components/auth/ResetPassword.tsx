@@ -21,7 +21,6 @@ const ResetPassword: React.FC = () => {
   const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
   const [sessionRestored, setSessionRestored] = useState(false);
 
-  // Restore session from access_token in URL
   useEffect(() => {
     const hash = window.location.hash;
     const accessToken = new URLSearchParams(hash.substring(1)).get("access_token");
@@ -30,14 +29,13 @@ const ResetPassword: React.FC = () => {
       supabase.auth
         .setSession({
           access_token: accessToken,
-          refresh_token: "", // Not needed for recovery
+          refresh_token: "",
         })
         .then(({ error }) => {
           if (error) {
-            console.error("Session restore failed:", error.message);
             toast({
               title: "Error",
-              description: "Failed to restore session. Please try the reset link again.",
+              description: "Failed to restore session. Try the reset link again.",
               variant: "destructive",
             });
           } else {
@@ -47,7 +45,7 @@ const ResetPassword: React.FC = () => {
     } else {
       toast({
         title: "Missing token",
-        description: "No access token found in URL. Please use the link from your email.",
+        description: "No access token found. Use the link from your email.",
         variant: "destructive",
       });
     }
@@ -83,7 +81,6 @@ const ResetPassword: React.FC = () => {
       });
       navigate("/login");
     } catch (err: any) {
-      console.error("Reset password error:", err);
       toast({
         title: "Error",
         description: err.message || "Failed to update password",
@@ -98,4 +95,48 @@ const ResetPassword: React.FC = () => {
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <CardTitle>Set New Password</CardTitle>
-       
+        <CardDescription>Enter and confirm your new password</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {sessionRestored ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={form.newPassword}
+                onChange={(e) =>
+                  setForm({ ...form, newPassword: e.target.value })
+                }
+                required
+                minLength={8}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={form.confirmPassword}
+                onChange={(e) =>
+                  setForm({ ...form, confirmPassword: e.target.value })
+                }
+                required
+              />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? "Updating..." : "Update Password"}
+            </Button>
+          </form>
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">
+            Restoring session... Please wait or try the reset link again.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ResetPassword;
