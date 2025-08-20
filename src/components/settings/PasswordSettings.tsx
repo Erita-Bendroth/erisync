@@ -18,7 +18,6 @@ const PasswordSettings = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
-    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
@@ -26,14 +25,8 @@ const PasswordSettings = () => {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const sanitizedCurrentPassword = sanitizeInput(formData.currentPassword);
     const sanitizedNewPassword = sanitizeInput(formData.newPassword);
     const sanitizedConfirmPassword = sanitizeInput(formData.confirmPassword);
-
-    if (!sanitizedCurrentPassword) {
-      toast({ title: "Error", description: "Current password is required", variant: "destructive" });
-      return;
-    }
 
     if (sanitizedNewPassword !== sanitizedConfirmPassword) {
       toast({ title: "Error", description: "New passwords don't match", variant: "destructive" });
@@ -48,44 +41,9 @@ const PasswordSettings = () => {
 
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) {
-        toast({ title: "Error", description: "Not signed in. Please sign in again.", variant: "destructive" });
-        return;
-      }
-
-      const { data: verificationData, error: verificationError } = await supabase.functions.invoke('verify-password', {
-        body: {
-          email: user.email,
-          currentPassword: sanitizedCurrentPassword
-        }
-      });
-
-      if (verificationError || !verificationData?.valid) {
-        toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
-        return;
-      }
-
-      let { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         await supabase.auth.refreshSession();
-        const refreshed = await supabase.auth.getSession();
-        session = refreshed.data.session;
-
-        if (!session) {
-          toast({ title: "Error", description: "Session expired. Please sign in again.", variant: "destructive" });
-          return;
-        }
-      }
-
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: sanitizedCurrentPassword
-      });
-
-      if (signInError || !signInData.session) {
-        toast({ title: "Error", description: "Re-authentication failed. Please try again.", variant: "destructive" });
-        return;
       }
 
       const { error: passwordError } = await supabase.auth.updateUser({
@@ -96,7 +54,7 @@ const PasswordSettings = () => {
 
       toast({ title: "Success", description: "Password changed successfully" });
       setOpen(false);
-      setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setFormData({ newPassword: "", confirmPassword: "" });
 
     } catch (error: any) {
       console.error('Password change error:', error);
@@ -126,22 +84,10 @@ const PasswordSettings = () => {
             <DialogHeader>
               <DialogTitle>Change Password</DialogTitle>
               <DialogDescription>
-                Enter your current password and choose a new secure password
+                Choose a new secure password
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  value={formData.currentPassword}
-                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                  placeholder="Enter your current password"
-                  required
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
                 <Input
