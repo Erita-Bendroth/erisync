@@ -1,12 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,37 +13,6 @@ const ResetPassword: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
-  const [sessionRestored, setSessionRestored] = useState(false);
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    const accessToken = new URLSearchParams(hash.substring(1)).get("access_token");
-
-    if (accessToken) {
-      supabase.auth
-        .setSession({
-          access_token: accessToken,
-          refresh_token: "",
-        })
-        .then(({ error }) => {
-          if (error) {
-            toast({
-              title: "Error",
-              description: "Failed to restore session. Try the reset link again.",
-              variant: "destructive",
-            });
-          } else {
-            setSessionRestored(true);
-          }
-        });
-    } else {
-      toast({
-        title: "Missing token",
-        description: "No access token found. Use the link from your email.",
-        variant: "destructive",
-      });
-    }
-  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,11 +24,7 @@ const ResetPassword: React.FC = () => {
 
     const { isValid, errors } = validatePassword(form.newPassword);
     if (!isValid) {
-      toast({
-        title: "Invalid password",
-        description: errors.join(", "),
-        variant: "destructive",
-      });
+      toast({ title: "Invalid password", description: errors.join(", "), variant: "destructive" });
       return;
     }
 
@@ -75,17 +34,11 @@ const ResetPassword: React.FC = () => {
       const { error } = await supabase.auth.updateUser({ password: sanitized });
       if (error) throw error;
 
-      toast({
-        title: "Password updated",
-        description: "You can now sign in with your new password.",
-      });
-      navigate("/login");
+      toast({ title: "Password updated", description: "You can now sign in with your new password." });
+      navigate("/dashboard");
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to update password",
-        variant: "destructive",
-      });
+      console.error("Reset password error:", err);
+      toast({ title: "Error", description: err.message || "Failed to update password", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -98,42 +51,32 @@ const ResetPassword: React.FC = () => {
         <CardDescription>Enter and confirm your new password</CardDescription>
       </CardHeader>
       <CardContent>
-        {sessionRestored ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={form.newPassword}
-                onChange={(e) =>
-                  setForm({ ...form, newPassword: e.target.value })
-                }
-                required
-                minLength={8}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) =>
-                  setForm({ ...form, confirmPassword: e.target.value })
-                }
-                required
-              />
-            </div>
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Updating..." : "Update Password"}
-            </Button>
-          </form>
-        ) : (
-          <p className="text-center text-sm text-muted-foreground">
-            Restoring session... Please wait or try the reset link again.
-          </p>
-        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={form.newPassword}
+              onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+              required
+              minLength={8}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              required
+            />
+          </div>
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Updating..." : "Update Password"}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );
