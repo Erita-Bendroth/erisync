@@ -98,9 +98,4 @@ const ResetPassword: React.FC = () => {
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <CardTitle>Set New Password</CardTitle>
-        <CardDescription>Enter and confirm your new password</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {sessionRestored ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div class
+       
