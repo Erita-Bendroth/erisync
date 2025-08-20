@@ -1,138 +1,136 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Typography,
-  Button,
-  TextField,
-} from '@material-ui/core';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { validatePassword, sanitizeInput } from '@/lib/validation';
+import React, { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Mail, ArrowLeft } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { validateEmail, sanitizeInput } from "@/lib/validation";
 
-const ResetPassword: React.FC = () => {
-  const navigate = useNavigate();
+interface ForgotPasswordProps {
+  onBack: () => void;
+}
+
+const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
   const { toast } = useToast();
-  const [searchParams] = useSearchParams();
-  const [form, setForm] = useState({ newPassword: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
-  const [tokenValid, setTokenValid] = useState(false);
-  const token = searchParams.get('access_token');
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      setTokenValid(true);
-    } else {
-      toast({
-        title: 'Invalid link',
-        description: 'Missing recovery token',
-        variant: 'destructive',
-      });
-      navigate('/login');
-    }
-  }, [token]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (form.newPassword !== form.confirmPassword) {
-      toast({ title: 'Passwords do not match', variant: 'destructive' });
-      return;
-    }
-
-    const { isValid, errors } = validatePassword(form.newPassword);
-    if (!isValid) {
+    
+    if (!validateEmail(email)) {
       toast({
-        title: 'Invalid password',
-        description: errors.join(', '),
-        variant: 'destructive',
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
     try {
-      const sanitized = sanitizeInput(form.newPassword);
-      const { error } = await supabase.auth.verifyOtp({
-        type: 'recovery',
-        token: token!,
-        password: sanitized,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        sanitizeInput(email),
+        {
+          redirectTo: `${window.location.origin}/auth#type=recovery`,
+        }
+      );
 
       if (error) throw error;
 
+      setSent(true);
       toast({
-        title: 'Password updated',
-        description: 'You can now log in with your new password.',
+        title: "Reset email sent",
+        description: "Check your email for password reset instructions",
       });
-      navigate('/login');
-    } catch (err: any) {
+      
+    } catch (error: any) {
+      console.error('Password reset error:', error);
       toast({
-        title: 'Error',
-        description: err.message || 'Failed to update password',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "Failed to send reset email",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
 
+  if (sent) {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <Mail className="w-12 h-12 mx-auto mb-4 text-primary" />
+          <CardTitle>Check Your Email</CardTitle>
+          <CardDescription>
+            We've sent password reset instructions to {email}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert className="mb-4">
+            <Mail className="h-4 w-4" />
+            <AlertDescription>
+              If you don't see the email, check your spam folder. The link will expire in 1 hour.
+            </AlertDescription>
+          </Alert>
+          
+          <Button 
+            onClick={onBack} 
+            variant="outline" 
+            className="w-full"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Sign In
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card style={{ maxWidth: 400, margin: '0 auto', marginTop: '2rem' }}>
-      <CardHeader
-        title={<Typography variant="h6">Set New Password</Typography>}
-        subheader={
-          <Typography variant="body2">
-            Enter and confirm your new password
-          </Typography>
-        }
-      />
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <CardTitle>Reset Password</CardTitle>
+        <CardDescription>
+          Enter your email address and we'll send you a link to reset your password
+        </CardDescription>
+      </CardHeader>
       <CardContent>
-        {tokenValid ? (
-          <form onSubmit={handleSubmit}>
-            <TextField
-              label="New Password"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={form.newPassword}
-              onChange={(e) =>
-                setForm({ ...form, newPassword: e.target.value })
-              }
+        <form onSubmit={handleSendResetEmail} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email address"
               required
             />
-            <TextField
-              label="Confirm Password"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={form.confirmPassword}
-              onChange={(e) =>
-                setForm({ ...form, confirmPassword: e.target.value })
-              }
-              required
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              fullWidth
-              disabled={loading}
-              style={{ marginTop: '1rem' }}
-            >
-              {loading ? 'Updating...' : 'Update Password'}
-            </Button>
-          </form>
-        ) : (
-          <Typography color="error" align="center">
-            Invalid or expired reset link.
-          </Typography>
-        )}
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Sending..." : "Send Reset Email"}
+            <Mail className="w-4 h-4 ml-2" />
+          </Button>
+
+          <Button 
+            type="button"
+            onClick={onBack} 
+            variant="ghost" 
+            className="w-full"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Sign In
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );
 };
 
-export default ResetPassword;
+export default ForgotPassword;
