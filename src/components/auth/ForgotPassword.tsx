@@ -1,131 +1,92 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Mail, ArrowLeft } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+  Button, Input, Label
+} from "@/components/ui";
 import { useToast } from "@/hooks/use-toast";
-import { validateEmail, sanitizeInput } from "@/lib/validation";
+import { validatePassword, sanitizeInput } from "@/lib/validation";
+import { supabase } from "@/integrations/supabase/client";
 
-interface ForgotPasswordProps {
-  onBack: () => void;
-}
-
-const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
+const ResetPassword: React.FC = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const token = searchParams.get("access_token");
 
-  const handleSendResetEmail = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateEmail(email)) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
+
+    if (!token) {
+      toast({ title: "Error", description: "Missing recovery token", variant: "destructive" });
+      return;
+    }
+
+    if (form.newPassword !== form.confirmPassword) {
+      toast({ title: "Passwords do not match", variant: "destructive" });
+      return;
+    }
+
+    const { isValid, errors } = validatePassword(form.newPassword);
+    if (!isValid) {
+      toast({ title: "Invalid password", description: errors.join(", "), variant: "destructive" });
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        sanitizeInput(email),
-        {
-          redirectTo: `${window.location.origin}/auth#type=recovery`,
-        }
-      );
+      const sanitized = sanitizeInput(form.newPassword);
+      const { error } = await supabase.auth.verifyOtp({
+        type: "recovery",
+        token,
+        password: sanitized,
+      });
 
       if (error) throw error;
 
-      setSent(true);
-      toast({
-        title: "Reset email sent",
-        description: "Check your email for password reset instructions",
-      });
-      
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send reset email",
-        variant: "destructive",
-      });
+      toast({ title: "Password updated", description: "You can now sign in with your new password." });
+      navigate("/login");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      toast({ title: "Error", description: err.message || "Failed to update password", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  if (sent) {
-    return (
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <Mail className="w-12 h-12 mx-auto mb-4 text-primary" />
-          <CardTitle>Check Your Email</CardTitle>
-          <CardDescription>
-            We've sent password reset instructions to {email}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert className="mb-4">
-            <Mail className="h-4 w-4" />
-            <AlertDescription>
-              If you don't see the email, check your spam folder. The link will expire in 1 hour.
-            </AlertDescription>
-          </Alert>
-          
-          <Button 
-            onClick={onBack} 
-            variant="outline" 
-            className="w-full"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Sign In
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle>Reset Password</CardTitle>
-        <CardDescription>
-          Enter your email address and we'll send you a link to reset your password
-        </CardDescription>
+        <CardTitle>Set New Password</CardTitle>
+        <CardDescription>Enter and confirm your new password</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSendResetEmail} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
+            <Label htmlFor="new-password">New Password</Label>
             <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email address"
+              id="new-password"
+              type="password"
+              value={form.newPassword}
+              onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+              required
+              minLength={8}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               required
             />
           </div>
-
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Sending..." : "Send Reset Email"}
-            <Mail className="w-4 h-4 ml-2" />
-          </Button>
-
-          <Button 
-            type="button"
-            onClick={onBack} 
-            variant="ghost" 
-            className="w-full"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Sign In
+            {loading ? "Updating..." : "Update Password"}
           </Button>
         </form>
       </CardContent>
@@ -133,4 +94,4 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
   );
 };
 
-export default ForgotPassword;
+export default ResetPassword;
