@@ -335,16 +335,14 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                     <Label className="text-xs">Start Time</Label>
                     <TimeSelect
                       value={block.start_time}
-                      onChange={(val) => updateWorkBlock(index, 'start_time', val)}
-                      className="h-8"
+                      onValueChange={(val) => updateWorkBlock(index, 'start_time', val)}
                     />
                   </div>
                   <div className="w-24">
                     <Label className="text-xs">End Time</Label>
                     <TimeSelect
                       value={block.end_time}
-                      onChange={(val) => updateWorkBlock(index, 'end_time', val)}
-                      className="h-8"
+                      onValueChange={(val) => updateWorkBlock(index, 'end_time', val)}
                     />
                   </div>
                   {workBlocks.length > 1 && (

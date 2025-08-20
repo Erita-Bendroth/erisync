@@ -8,6 +8,7 @@ import { Calendar, Clock, Users, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
+import { format } from "date-fns";
 
 interface UserRole {
   role: string;
@@ -198,28 +199,103 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Schedule</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {todaySchedule.length > 0 ? (
-                <div className="space-y-2">
-                  {todaySchedule.map((entry, index) => (
-                    <div key={index} className="text-sm">
-                      <p className="font-medium">{entry.activity}</p>
-                      <p className="text-muted-foreground">
-                        {entry.start_time || 'All day'} - {entry.end_time || ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No schedule entries for today</p>
-              )}
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today's Schedule</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {todaySchedule.length > 0 ? (
+                  <div className="space-y-3">
+                    {todaySchedule.map((entry, index) => {
+                      // Parse time data from entry notes
+                      const timeSplitPattern = /Times:\s*(.+)/;
+                      const match = entry.notes?.match(timeSplitPattern);
+                      let timeBlocks = [];
+                      
+                      if (match) {
+                        try {
+                          timeBlocks = JSON.parse(match[1]);
+                        } catch (e) {
+                          // Fallback to default times
+                          timeBlocks = [{
+                            start_time: entry.shift_type === 'early' ? '06:00' : entry.shift_type === 'late' ? '13:00' : '08:00',
+                            end_time: entry.shift_type === 'early' ? '14:30' : entry.shift_type === 'late' ? '21:30' : '16:30',
+                            activity: entry.activity_type
+                          }];
+                        }
+                      } else {
+                        // Default time blocks
+                        timeBlocks = [{
+                          start_time: entry.shift_type === 'early' ? '06:00' : entry.shift_type === 'late' ? '13:00' : '08:00',
+                          end_time: entry.shift_type === 'early' ? '14:30' : entry.shift_type === 'late' ? '21:30' : '16:30',
+                          activity: entry.activity_type
+                        }];
+                      }
+
+                      return (
+                        <div key={index} className="space-y-2 p-3 border rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <Badge variant={
+                              entry.activity_type === 'work' ? 'default' :
+                              entry.activity_type === 'vacation' ? 'secondary' :
+                              entry.activity_type === 'sick' ? 'destructive' :
+                              entry.activity_type === 'training' ? 'outline' :
+                              'default'
+                            }>
+                              {entry.activity_type.replace('_', ' ').toUpperCase()}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {entry.shift_type} shift
+                            </span>
+                          </div>
+                          
+                          {/* Time blocks */}
+                          <div className="space-y-1">
+                            {timeBlocks.map((block, blockIndex) => (
+                              <div key={blockIndex} className="flex items-center justify-between text-sm">
+                                <span className="font-medium">
+                                  {block.activity ? block.activity.replace('_', ' ') : entry.activity_type.replace('_', ' ')}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {block.start_time} – {block.end_time}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Current/upcoming indicator */}
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={`px-2 py-1 rounded ${
+                              new Date().getHours() >= parseInt(timeBlocks[0]?.start_time?.split(':')[0] || '8') &&
+                              new Date().getHours() < parseInt(timeBlocks[timeBlocks.length - 1]?.end_time?.split(':')[0] || '17')
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                            }`}>
+                              {new Date().getHours() >= parseInt(timeBlocks[0]?.start_time?.split(':')[0] || '8') &&
+                               new Date().getHours() < parseInt(timeBlocks[timeBlocks.length - 1]?.end_time?.split(':')[0] || '17')
+                                ? '● Active Now'
+                                : 'Scheduled'
+                              }
+                            </span>
+                            {entry.updated_at && (
+                              <span className="text-muted-foreground">
+                                Updated: {format(new Date(entry.updated_at), 'HH:mm')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Calendar className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No schedule entries for today</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

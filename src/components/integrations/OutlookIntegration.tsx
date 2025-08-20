@@ -25,6 +25,7 @@ const OutlookIntegration = () => {
   const [syncing, setSyncing] = useState(false);
   const [events, setEvents] = useState<OutlookEvent[]>([]);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnectionStatus();
@@ -34,7 +35,10 @@ const OutlookIntegration = () => {
     // This would typically check if user has authorized Outlook integration
     // For demo purposes, we'll simulate the check
     const hasToken = localStorage.getItem('outlook_access_token');
+    const accountEmail = localStorage.getItem('outlook_account_email');
+    
     setIsConnected(!!hasToken);
+    setConnectedAccount(accountEmail);
     
     if (hasToken) {
       const lastSyncStr = localStorage.getItem('outlook_last_sync');
@@ -67,12 +71,15 @@ const OutlookIntegration = () => {
 
       // Simulate successful connection
       setTimeout(() => {
+        const demoEmail = user?.email || 'user@example.com';
         localStorage.setItem('outlook_access_token', 'demo-token');
         localStorage.setItem('outlook_refresh_token', 'demo-refresh-token');
+        localStorage.setItem('outlook_account_email', demoEmail);
+        setConnectedAccount(demoEmail);
         setIsConnected(true);
         toast({
           title: "Connected!",
-          description: "Successfully connected to Outlook calendar",
+          description: `Successfully connected to Outlook calendar (${demoEmail})`,
         });
         setLoading(false);
       }, 2000);
@@ -196,8 +203,10 @@ const OutlookIntegration = () => {
     localStorage.removeItem('outlook_access_token');
     localStorage.removeItem('outlook_refresh_token');
     localStorage.removeItem('outlook_last_sync');
+    localStorage.removeItem('outlook_account_email');
     setIsConnected(false);
     setLastSync(null);
+    setConnectedAccount(null);
     setEvents([]);
     
     toast({
@@ -247,6 +256,14 @@ const OutlookIntegration = () => {
               </Button>
             )}
           </div>
+
+          {/* Show connected account info */}
+          {isConnected && connectedAccount && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Connected Account:</span>
+              <Badge variant="outline">{connectedAccount}</Badge>
+            </div>
+          )}
 
           {!isConnected ? (
             <div className="space-y-4">

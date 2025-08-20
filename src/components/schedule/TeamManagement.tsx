@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Users, Settings, Trash2 } from "lucide-react";
+import { Plus, Users, Settings, Trash2, Download, BarChart3 } from "lucide-react";
+import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { format, addDays, startOfWeek, startOfYear, endOfYear } from "date-fns";
 
 interface Team {
   id: string;
@@ -329,6 +331,128 @@ const TeamManagement = () => {
     }
   };
 
+  const downloadTeamData = async (teamId: string, teamName: string) => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const yearStart = format(startOfYear(new Date()), 'yyyy-MM-dd');
+      const yearEnd = format(endOfYear(new Date()), 'yyyy-MM-dd');
+
+      // Get all team members
+      const members = teamMembers[teamId] || [];
+      if (members.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No team members found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const userIds = members.map(m => m.user_id);
+
+      // Fetch schedule data for all team members
+      const { data, error } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .in('user_id', userIds)
+        .eq('team_id', teamId)
+        .gte('date', yearStart)
+        .lte('date', yearEnd)
+        .order('date');
+
+      if (error) throw error;
+
+      // Create CSV content
+      const csvHeaders = [
+        'Employee Name',
+        'Email',
+        'Date',
+        'Activity Type',
+        'Shift Type',
+        'Availability Status',
+        'Hours',
+        'Notes'
+      ];
+
+      const csvRows = data?.map(entry => {
+        const member = members.find(m => m.user_id === entry.user_id);
+        const hours = calculateHoursFromScheduleEntry(entry);
+        
+        return [
+          member ? `${member.profiles.first_name} ${member.profiles.last_name}` : 'Unknown',
+          member?.profiles.email || '',
+          entry.date,
+          entry.activity_type.replace('_', ' '),
+          entry.shift_type,
+          entry.availability_status,
+          hours.toString(),
+          entry.notes || ''
+        ];
+      }) || [];
+
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${teamName}_Team_Report_${currentYear}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "Team report downloaded successfully"
+      });
+    } catch (error) {
+      console.error('Error downloading team data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download team report",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const calculateHoursFromScheduleEntry = (entry: any): number => {
+    // Check if entry has time split information
+    const timeSplitPattern = /Times:\s*(.+)/;
+    const match = entry.notes?.match(timeSplitPattern);
+    
+    if (match) {
+      try {
+        const timesData = JSON.parse(match[1]);
+        if (Array.isArray(timesData)) {
+          return timesData.reduce((total, block) => {
+            const start = new Date(`2000-01-01T${block.start_time}:00`);
+            const end = new Date(`2000-01-01T${block.end_time}:00`);
+            const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+            return total + hours;
+          }, 0);
+        }
+      } catch (e) {
+        console.error('Failed to parse time split data');
+      }
+    }
+    
+    // Default hours based on shift type
+    switch (entry.shift_type) {
+      case 'early':
+        return 8; // Assume 8 hours for early shift
+      case 'late':
+        return 8; // Assume 8 hours for late shift
+      case 'normal':
+      default:
+        return 8; // Default 8 hours
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -544,6 +668,37 @@ const TeamManagement = () => {
                 <p className="text-muted-foreground text-center py-4">
                   No members in this team yet
                 </p>
+              )}
+              
+              {/* Team Summary Overview */}
+              {(userRole === 'admin' || userRole === 'planner' || userRole === 'manager') && teamMembers[team.id]?.length > 0 && (
+                <div className="mt-6 space-y-4">
+                  <h4 className="text-lg font-medium flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2" />
+                    Team Member Overview
+                  </h4>
+                  <div className="grid gap-4">
+                    {teamMembers[team.id]?.map((member) => (
+                      <UserProfileOverview
+                        key={member.user_id}
+                        userId={member.user_id}
+                        teamId={team.id}
+                        canView={true}
+                        showTeamContext={false}
+                      />
+                    ))}
+                  </div>
+                  <div className="pt-4 border-t">
+                    <Button
+                      onClick={() => downloadTeamData(team.id, team.name)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Team Report (CSV)
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

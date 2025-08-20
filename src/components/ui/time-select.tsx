@@ -1,41 +1,87 @@
-import React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import * as React from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface TimeSelectProps {
-  value: string;
-  onChange: (value: string) => void;
-  stepMinutes?: number;
-  label?: string;
-  className?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
 }
 
-// Generates 24h time options like 00:00, 00:30 ... 23:30
-const buildTimes = (step: number) => {
-  const options: string[] = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += step) {
-      const hh = String(h).padStart(2, "0");
-      const mm = String(m).padStart(2, "0");
-      options.push(`${hh}:${mm}`);
+// Generate 24-hour time options in 15-minute intervals
+const generateTimeOptions = () => {
+  const times: string[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let min = 0; min < 60; min += 15) {
+      const timeStr = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+      times.push(timeStr);
     }
   }
-  return options;
+  return times;
 };
 
-export const TimeSelect: React.FC<TimeSelectProps> = ({ value, onChange, stepMinutes = 30, className }) => {
-  const times = React.useMemo(() => buildTimes(stepMinutes), [stepMinutes]);
+const timeOptions = generateTimeOptions();
+
+export function TimeSelect({ value, onValueChange, placeholder = "Select time", disabled = false }: TimeSelectProps) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={className}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent className="bg-background border z-50 max-h-72">
-        {times.map((t) => (
-          <SelectItem key={t} value={t}>{t}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          disabled={disabled}
+        >
+          {value ? value : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0">
+        <Command>
+          <CommandInput placeholder="Search time..." />
+          <CommandList>
+            <CommandEmpty>No time found.</CommandEmpty>
+            <CommandGroup>
+              {timeOptions.map((time) => (
+                <CommandItem
+                  key={time}
+                  value={time}
+                  onSelect={(currentValue) => {
+                    onValueChange?.(currentValue === value ? "" : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === time ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {time}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
-};
-
-export default TimeSelect;
+}

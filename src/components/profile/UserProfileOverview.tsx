@@ -12,6 +12,8 @@ import { format, startOfYear, endOfYear, differenceInDays, parseISO } from "date
 interface UserProfileOverviewProps {
   userId: string;
   canView: boolean; // Only planners and managers can view
+  teamId?: string; // Optional team context for filtering
+  showTeamContext?: boolean; // Show which team this user belongs to
 }
 
 interface ProfileData {
@@ -31,10 +33,11 @@ interface WorkSummary {
   unavailableDays: number;
 }
 
-const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canView }) => {
+const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canView, teamId, showTeamContext = true }) => {
   const { toast } = useToast();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [workSummary, setWorkSummary] = useState<WorkSummary | null>(null);
+  const [userTeams, setUserTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [downloadingCSV, setDownloadingCSV] = useState(false);
@@ -43,8 +46,11 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
     if (canView && userId) {
       fetchProfileData();
       fetchWorkSummary();
+      if (showTeamContext) {
+        fetchUserTeams();
+      }
     }
-  }, [userId, canView]);
+  }, [userId, canView, showTeamContext]);
 
   const fetchProfileData = async () => {
     try {
@@ -61,24 +67,53 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
     }
   };
 
+  const fetchUserTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select(`
+          teams (
+            id,
+            name,
+            description
+          ),
+          is_manager
+        `)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      setUserTeams(data || []);
+    } catch (error) {
+      console.error('Error fetching user teams:', error);
+    }
+  };
+
   const fetchWorkSummary = async () => {
     try {
       const currentYear = new Date().getFullYear();
       const yearStart = format(startOfYear(new Date()), 'yyyy-MM-dd');
       const yearEnd = format(endOfYear(new Date()), 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('schedule_entries')
         .select(`
           date,
           activity_type,
           availability_status,
           shift_type,
-          notes
+          notes,
+          team_id
         `)
         .eq('user_id', userId)
         .gte('date', yearStart)
         .lte('date', yearEnd);
+
+      // Apply team filter if specified
+      if (teamId) {
+        query = query.eq('team_id', teamId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -340,13 +375,24 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <User className="w-5 h-5 mr-2" />
-            Profile Overview - {profile.first_name} {profile.last_name}
-          </CardTitle>
-          <CardDescription>
-            Work summary and time tracking for {new Date().getFullYear()}
-          </CardDescription>
+            <CardTitle className="flex items-center">
+              <User className="w-5 h-5 mr-2" />
+              Profile Overview - {profile.first_name} {profile.last_name}
+            </CardTitle>
+            <CardDescription>
+              Work summary and time tracking for {new Date().getFullYear()}
+              {showTeamContext && userTeams.length > 0 && (
+                <div className="mt-2">
+                  <span className="font-medium">Teams: </span>
+                  {userTeams.map((tm, index) => (
+                    <Badge key={tm.teams.id} variant="outline" className="ml-1">
+                      {tm.teams.name}
+                      {tm.is_manager && <span className="ml-1 text-xs">(Manager)</span>}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
