@@ -1,56 +1,43 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-  Button, Input, Label
-} from "@/components/ui";
-import { useToast } from "@/hooks/use-toast";
-import { validatePassword, sanitizeInput } from "@/lib/validation";
+// ForgotPassword.tsx
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { validateEmail, sanitizeInput } from "@/lib/validation";
 
-const ResetPassword: React.FC = () => {
-  const navigate = useNavigate();
+interface ForgotPasswordProps {
+  onBack: () => void;
+}
+
+const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
   const { toast } = useToast();
-  const [searchParams] = useSearchParams();
-  const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const token = searchParams.get("access_token");
+  const [sent, setSent] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!token) {
-      toast({ title: "Error", description: "Missing recovery token", variant: "destructive" });
-      return;
-    }
-
-    if (form.newPassword !== form.confirmPassword) {
-      toast({ title: "Passwords do not match", variant: "destructive" });
-      return;
-    }
-
-    const { isValid, errors } = validatePassword(form.newPassword);
-    if (!isValid) {
-      toast({ title: "Invalid password", description: errors.join(", "), variant: "destructive" });
+    if (!validateEmail(email)) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address", variant: "destructive" });
       return;
     }
 
     setLoading(true);
     try {
-      const sanitized = sanitizeInput(form.newPassword);
-      const { error } = await supabase.auth.verifyOtp({
-        type: "recovery",
-        token,
-        password: sanitized,
+      const { error } = await supabase.auth.resetPasswordForEmail(sanitizeInput(email), {
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
 
-      toast({ title: "Password updated", description: "You can now sign in with your new password." });
-      navigate("/login");
-    } catch (err: any) {
-      console.error("Reset password error:", err);
-      toast({ title: "Error", description: err.message || "Failed to update password", variant: "destructive" });
+      setSent(true);
+      toast({ title: "Reset email sent", description: "Check your inbox for instructions." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send reset email", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -59,39 +46,35 @@ const ResetPassword: React.FC = () => {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle>Set New Password</CardTitle>
-        <CardDescription>Enter and confirm your new password</CardDescription>
+        <CardTitle>Forgot Password</CardTitle>
+        <CardDescription>Enter your email to receive a reset link</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New Password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={form.newPassword}
-              onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-              required
-              minLength={8}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm Password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              value={form.confirmPassword}
-              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-              required
-            />
-          </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Updating..." : "Update Password"}
-          </Button>
-        </form>
+        {sent ? (
+          <p className="text-center">We've sent a reset link to {email}. Check your inbox.</p>
+        ) : (
+          <form onSubmit={handleSendResetEmail} className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? "Sending..." : "Send Reset Email"}
+            </Button>
+            <Button type="button" onClick={onBack} variant="ghost" className="w-full">
+              Back to Sign In
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
   );
 };
 
-export default ResetPassword;
+export default ForgotPassword;
