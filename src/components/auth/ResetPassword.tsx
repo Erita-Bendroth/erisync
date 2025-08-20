@@ -51,7 +51,7 @@ const ResetPassword: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, []);
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,4 +64,43 @@ const ResetPassword: React.FC = () => {
     const { isValid, errors } = validatePassword(form.newPassword);
     if (!isValid) {
       toast({
-       
+        title: "Invalid password",
+        description: errors.join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const sanitized = sanitizeInput(form.newPassword);
+      const { error } = await supabase.auth.updateUser({ password: sanitized });
+      if (error) throw error;
+
+      toast({
+        title: "Password updated",
+        description: "You can now sign in with your new password.",
+      });
+      navigate("/login");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update password",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <CardTitle>Set New Password</CardTitle>
+        <CardDescription>Enter and confirm your new password</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {sessionRestored ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div class
