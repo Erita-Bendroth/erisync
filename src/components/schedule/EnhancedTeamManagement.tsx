@@ -107,13 +107,7 @@ const EnhancedTeamManagement = () => {
       for (const team of teamsData || []) {
         const { data: members, error: membersError } = await supabase
           .from('team_members')
-          .select(`
-            id,
-            user_id,
-            team_id,
-            is_manager,
-            profiles(first_name, last_name, email)
-          `)
+          .select('id, user_id, team_id, is_manager')
           .eq('team_id', team.id);
 
         if (membersError) {
@@ -121,26 +115,39 @@ const EnhancedTeamManagement = () => {
           continue;
         }
 
-        // Get user roles separately
+        // Get user roles and profiles separately
         const userIds = members?.map(m => m.user_id) || [];
-        const { data: rolesData } = await supabase
-          .from('user_roles')
-          .select('user_id, role')
-          .in('user_id', userIds);
+        
+        const [rolesResponse, profilesResponse] = await Promise.all([
+          supabase
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', userIds),
+          supabase
+            .from('profiles')
+            .select('user_id, first_name, last_name, email')
+            .in('user_id', userIds)
+        ]);
 
-        const rolesMap = (rolesData || []).reduce((acc, role) => {
+        const rolesMap = (rolesResponse.data || []).reduce((acc, role) => {
           if (!acc[role.user_id]) acc[role.user_id] = [];
           acc[role.user_id].push({ role: role.role });
           return acc;
         }, {} as { [key: string]: Array<{role: string}> });
 
-        // Filter out members with incomplete profile data
+        const profilesMap = (profilesResponse.data || []).reduce((acc, profile) => {
+          acc[profile.user_id] = profile;
+          return acc;
+        }, {} as { [key: string]: { first_name: string; last_name: string; email: string } });
+
+        // Filter out members with incomplete profile data and map them properly
         const membersWithRoles = (members || [])
-          .filter(member => member.profiles && typeof member.profiles === 'object' && 'first_name' in member.profiles)
+          .filter(member => profilesMap[member.user_id])
           .map(member => ({
-          ...member,
-          user_roles: rolesMap[member.user_id] || []
-        }));
+            ...member,
+            profiles: profilesMap[member.user_id],
+            user_roles: rolesMap[member.user_id] || []
+          }));
 
         membersMap[team.id] = membersWithRoles;
       }

@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import EditUserModal from "./EditUserModal";
+import RoleManagement from "./RoleManagement";
 
 export interface Team {
   id: string;
@@ -24,7 +25,7 @@ export interface User {
   last_name: string;
   country_code: string;
   requires_password_change: boolean;
-  roles: string[];
+  roles: Array<{ id: string; role: string; }>;
   teams: Team[];
 }
 
@@ -110,7 +111,7 @@ const UserManagement = () => {
       // Fetch all user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role');
+        .select('id, user_id, role');
 
       if (rolesError) throw rolesError;
 
@@ -127,7 +128,7 @@ const UserManagement = () => {
       // Combine the data
       const usersWithDetails = profiles?.map(profile => ({
         ...profile,
-        roles: userRoles?.filter(ur => ur.user_id === profile.user_id).map(ur => ur.role) || [],
+        roles: userRoles?.filter(ur => ur.user_id === profile.user_id).map(ur => ({ id: ur.id, role: ur.role })) || [],
         teams: teamMemberships?.filter(tm => tm.user_id === profile.user_id).map(tm => tm.teams) || []
       })) || [];
 
@@ -340,13 +341,13 @@ const UserManagement = () => {
                     <TableCell>{userData.first_name} {userData.last_name}</TableCell>
                     <TableCell>{userData.country_code}</TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {userData.roles.map((role) => (
-                          <Badge key={role} className={getRoleColor(role)}>
-                            {role}
-                          </Badge>
-                        ))}
-                      </div>
+                      <RoleManagement
+                        userId={userData.user_id}
+                        userName={`${userData.first_name} ${userData.last_name}`}
+                        roles={userData.roles}
+                        onRoleRemoved={fetchUsers}
+                        canRemove={hasAdminAccess}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -430,7 +431,10 @@ const UserManagement = () => {
       </Card>
       
       <EditUserModal
-        user={editingUser}
+        user={editingUser ? {
+          ...editingUser,
+          roles: editingUser.roles.map(r => r.role)
+        } : null}
         teams={teams}
         isOpen={showEditModal}
         onClose={handleCloseEditModal}

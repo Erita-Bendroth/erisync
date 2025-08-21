@@ -51,46 +51,59 @@ const OutlookIntegration = () => {
   const connectToOutlook = async () => {
     setLoading(true);
     try {
-      // Microsoft Graph API OAuth2 flow
-      const clientId = 'your-outlook-client-id'; // This would be configured in your app
-      const redirectUri = `${window.location.origin}/auth/outlook/callback`;
-      const scopes = 'https://graph.microsoft.com/calendars.readwrite';
+      // Get access token from Supabase Auth session (Azure provider)
+      const { data: { session } } = await supabase.auth.getSession();
       
-      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
-        `client_id=${clientId}&` +
-        `response_type=code&` +
-        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `scope=${encodeURIComponent(scopes)}&` +
-        `response_mode=query`;
+      if (!session?.provider_token) {
+        // User needs to sign in with Azure/Microsoft first
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'azure',
+          options: {
+            scopes: 'https://graph.microsoft.com/calendars.readwrite offline_access',
+            redirectTo: `${window.location.origin}/auth`
+          }
+        });
+        
+        if (error) throw error;
+        return;
+      }
 
-      // For demo purposes, show how this would work
+      // Store the Microsoft access token
+      localStorage.setItem('outlook_access_token', session.provider_token);
+      if (session.provider_refresh_token) {
+        localStorage.setItem('outlook_refresh_token', session.provider_refresh_token);
+      }
+      
+      // Get user info from Microsoft Graph
+      const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: {
+          'Authorization': `Bearer ${session.provider_token}`,
+        },
+      });
+      
+      if (!userResponse.ok) {
+        throw new Error('Failed to fetch user info from Microsoft Graph');
+      }
+      
+      const userData = await userResponse.json();
+      localStorage.setItem('outlook_account_email', userData.mail || userData.userPrincipalName);
+      
+      setConnectedAccount(userData.mail || userData.userPrincipalName);
+      setIsConnected(true);
+      
       toast({
-        title: "Outlook Integration",
-        description: "In production, this would redirect to Microsoft OAuth. For demo, simulating connection...",
+        title: "Connected!",
+        description: `Successfully connected to Outlook calendar (${userData.mail || userData.userPrincipalName})`,
       });
 
-      // Simulate successful connection
-      setTimeout(() => {
-        const demoEmail = user?.email || 'user@example.com';
-        localStorage.setItem('outlook_access_token', 'demo-token');
-        localStorage.setItem('outlook_refresh_token', 'demo-refresh-token');
-        localStorage.setItem('outlook_account_email', demoEmail);
-        setConnectedAccount(demoEmail);
-        setIsConnected(true);
-        toast({
-          title: "Connected!",
-          description: `Successfully connected to Outlook calendar (${demoEmail})`,
-        });
-        setLoading(false);
-      }, 2000);
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error connecting to Outlook:', error);
       toast({
         title: "Error",
-        description: "Failed to connect to Outlook",
+        description: error.message || "Failed to connect to Outlook. Please ensure you're signed in with your Microsoft account.",
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -100,20 +113,42 @@ const OutlookIntegration = () => {
     
     setSyncing(true);
     try {
+      const accessToken = localStorage.getItem('outlook_access_token');
+      if (!accessToken) {
+        throw new Error('No access token available. Please reconnect to Outlook.');
+      }
+
+      // Get user's timezone from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('country_code')
+        .eq('user_id', user.id)
+        .single();
+
+      // Map country to timezone
+      const getTimezone = (countryCode: string) => {
+        const timezones: { [key: string]: string } = {
+          'US': 'America/New_York',
+          'SE': 'Europe/Stockholm', 
+          'DK': 'Europe/Copenhagen',
+          'NO': 'Europe/Oslo',
+          'FI': 'Europe/Helsinki',
+          'DE': 'Europe/Berlin',
+          'FR': 'Europe/Paris',
+          'GB': 'Europe/London',
+        };
+        return timezones[countryCode] || 'UTC';
+      };
+
+      const timezone = getTimezone(profile?.country_code || 'US');
+
       // Fetch user's schedule entries for the next 30 days
       const today = new Date();
       const endDate = addDays(today, 30);
       
       const { data: scheduleEntries, error } = await supabase
         .from('schedule_entries')
-        .select(`
-          id,
-          date,
-          shift_type,
-          activity_type,
-          availability_status,
-          notes
-        `)
+        .select('id, date, shift_type, activity_type, availability_status, notes')
         .eq('user_id', user.id)
         .gte('date', format(today, 'yyyy-MM-dd'))
         .lte('date', format(endDate, 'yyyy-MM-dd'))
@@ -121,11 +156,30 @@ const OutlookIntegration = () => {
 
       if (error) throw error;
 
-      // Convert schedule entries to Outlook calendar events
-      const calendarEvents = scheduleEntries?.map(entry => {
+      // Check for existing events to avoid duplicates
+      const existingEventsResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=categories/any(c:c eq 'Work Schedule')&$select=id,subject,start,end`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      let existingEvents = [];
+      if (existingEventsResponse.ok) {
+        const existingData = await existingEventsResponse.json();
+        existingEvents = existingData.value || [];
+      }
+
+      let createdCount = 0;
+      
+      // Create calendar events for each schedule entry
+      for (const entry of scheduleEntries || []) {
         const eventDate = new Date(entry.date);
-        let startTime = '09:00';
-        let endTime = '17:30';
+        let startTime = '08:00';
+        let endTime = '16:30';
         
         // Adjust times based on shift type
         switch (entry.shift_type) {
@@ -154,46 +208,79 @@ const OutlookIntegration = () => {
           }
         }
 
-        return {
-          subject: `${entry.activity_type.replace('_', ' ')} - ${entry.shift_type} shift`,
-          start: {
-            dateTime: `${format(eventDate, 'yyyy-MM-dd')}T${startTime}:00`,
-            timeZone: 'UTC'
-          },
-          end: {
-            dateTime: `${format(eventDate, 'yyyy-MM-dd')}T${endTime}:00`,
-            timeZone: 'UTC'
-          },
-          body: {
-            contentType: 'text',
-            content: entry.notes || `Scheduled ${entry.activity_type.replace('_', ' ')}`
-          },
-          categories: ['Work Schedule']
-        };
-      }) || [];
+        const eventSubject = `${entry.activity_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} - ${entry.shift_type} shift`;
+        
+        // Check if event already exists
+        const eventExists = existingEvents.some((existing: any) => 
+          existing.subject === eventSubject &&
+          existing.start.dateTime.includes(format(eventDate, 'yyyy-MM-dd'))
+        );
 
-      // In production, this would make actual Microsoft Graph API calls
-      // For demo, we'll simulate the sync
-      console.log('Would sync these events to Outlook:', calendarEvents);
-      
-      // Simulate API calls
-      await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!eventExists) {
+          const calendarEvent = {
+            subject: eventSubject,
+            start: {
+              dateTime: `${format(eventDate, 'yyyy-MM-dd')}T${startTime}:00`,
+              timeZone: timezone
+            },
+            end: {
+              dateTime: `${format(eventDate, 'yyyy-MM-dd')}T${endTime}:00`,
+              timeZone: timezone
+            },
+            body: {
+              contentType: 'text',
+              content: entry.notes || `Scheduled ${entry.activity_type.replace('_', ' ')}`
+            },
+            categories: ['Work Schedule']
+          };
+
+          // Create the event in Outlook
+          const response = await fetch('https://graph.microsoft.com/v1.0/me/calendar/events', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(calendarEvent),
+          });
+
+          if (response.ok) {
+            createdCount++;
+          } else {
+            const errorData = await response.json();
+            console.error('Failed to create event:', errorData);
+          }
+        }
+      }
       
       setLastSync(new Date());
       localStorage.setItem('outlook_last_sync', new Date().toISOString());
       
       toast({
         title: "Sync Complete",
-        description: `Synchronized ${calendarEvents.length} schedule entries to Outlook`,
+        description: `Created ${createdCount} new calendar events in Outlook`,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing to Outlook:', error);
-      toast({
-        title: "Sync Failed",
-        description: "Failed to sync schedule to Outlook",
-        variant: "destructive",
-      });
+      
+      // Handle token expiration
+      if (error.message?.includes('401') || error.message?.includes('token')) {
+        // Try to refresh token or ask user to reconnect
+        localStorage.removeItem('outlook_access_token');
+        setIsConnected(false);
+        toast({
+          title: "Token Expired",
+          description: "Please reconnect to Outlook to refresh your access token",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: error.message || "Failed to sync schedule to Outlook",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSyncing(false);
     }
