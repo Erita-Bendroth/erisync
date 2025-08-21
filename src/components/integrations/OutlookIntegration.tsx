@@ -116,9 +116,11 @@ const OutlookIntegration = () => {
     try {
       // Azure AD App Configuration - use Vestas tenant
       const clientId = '9c1e8b69-8746-4aaa-a968-7d3de62be7c9';
-      const tenantId = 'c07019407b3f4116a59f159078bc3c63'; // Vestas tenant ID from your email domain
-      const redirectUri = encodeURIComponent(`${window.location.origin}/auth`);
+      const tenantId = 'c07019407b3f4116a59f159078bc3c63'; // Vestas tenant ID
+      const redirectUri = `${window.location.origin}/auth`;
       const scopes = encodeURIComponent('https://graph.microsoft.com/Calendars.ReadWrite offline_access User.Read');
+      
+      console.log('Using redirect URI:', redirectUri);
       
       // Generate state parameter for security
       const state = Math.random().toString(36).substring(2, 15);
@@ -128,9 +130,18 @@ const OutlookIntegration = () => {
       const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
         `client_id=${clientId}` +
         `&response_type=code` +
-        `&redirect_uri=${redirectUri}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&scope=${scopes}` +
         `&state=${state}`;
+      
+      console.log('Redirecting to:', authUrl);
+      
+      // Show user the redirect URI they need to configure
+      toast({
+        title: "Azure AD Configuration Required",
+        description: `Please ensure ${redirectUri} is configured as a redirect URI in your Azure AD app registration`,
+        variant: "default",
+      });
       
       // Redirect to Azure AD for authentication
       window.location.href = authUrl;
