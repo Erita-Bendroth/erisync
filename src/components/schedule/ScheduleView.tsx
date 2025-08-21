@@ -291,31 +291,25 @@ useEffect(() => {
         if (selectedTeam !== "all") {
           console.log('Filtering to specific team (UI will handle visibility):', selectedTeam);
 
-          // Combine team_members (may be restricted by RLS) with schedule_entries (proven accessible)
-          const [teamMembersRes, entriesRes] = await Promise.all([
-            supabase
-              .from('team_members')
-              .select('user_id')
-              .eq('team_id', selectedTeam),
-            supabase
-              .from('schedule_entries')
-              .select('user_id')
-              .eq('team_id', selectedTeam)
-              .gte('date', format(weekStart, "yyyy-MM-dd"))
-              .lte('date', format(addDays(weekStart, 6), "yyyy-MM-dd"))
-          ]);
+          // Get team members directly (managers can now see all team_members)
+          const { data: teamMembersRes, error: teamMembersError } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', selectedTeam);
 
-          const idsSet = new Set<string>();
-          (teamMembersRes.data || []).forEach((tm: any) => idsSet.add(tm.user_id));
-          (entriesRes.data || []).forEach((e: any) => idsSet.add(e.user_id));
-          const userIds = Array.from(idsSet);
-          console.log('Resolved team userIds from members+entries:', userIds);
+          if (teamMembersError) {
+            console.error('Error fetching team members:', teamMembersError);
+            return;
+          }
+
+          const userIds = (teamMembersRes || []).map((tm: any) => tm.user_id);
+          console.log('Resolved team userIds from team_members:', userIds);
 
           if (userIds.length > 0) {
             query = query.in('user_id', userIds);
           } else {
-            // Force empty result rather than showing only self
-            query = query.eq('user_id', 'no-match');
+            // No members in this team - show empty result
+            query = query.eq('user_id', 'no-match-empty-team');
           }
         } else {
           console.log('All teams view: fetch by entries for the current period');
