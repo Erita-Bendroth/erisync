@@ -16,32 +16,88 @@ const ResetPasswordPage: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [form, setForm] = useState({ 
-    newPassword: "", 
-    confirmPassword: "" 
-  });
+  const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
+  const [sessionReady, setSessionReady] = useState(false);
+
+  // Parse tokens from either hash or query params
+  const parseTokens = () => {
+    const fromQuery = {
+      access_token: searchParams.get('access_token') || undefined,
+      refresh_token: searchParams.get('refresh_token') || undefined,
+      type: searchParams.get('type') || undefined,
+      code: searchParams.get('code') || undefined,
+    };
+
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+    const hashParams = new URLSearchParams(hash);
+    const fromHash = {
+      access_token: hashParams.get('access_token') || undefined,
+      refresh_token: hashParams.get('refresh_token') || undefined,
+      type: hashParams.get('type') || undefined,
+      code: hashParams.get('code') || undefined,
+    };
+
+    // Prefer hash (Supabase usually uses hash), fallback to query
+    return {
+      access_token: fromHash.access_token || fromQuery.access_token,
+      refresh_token: fromHash.refresh_token || fromQuery.refresh_token,
+      type: fromHash.type || fromQuery.type,
+      code: fromHash.code || fromQuery.code,
+    } as { access_token?: string; refresh_token?: string; type?: string; code?: string };
+  };
 
   useEffect(() => {
-    // Extract token from URL parameters or hash
-    const accessToken = searchParams.get('access_token') || 
-                       searchParams.get('token') ||
-                       window.location.hash.split('access_token=')[1]?.split('&')[0];
-    
-    if (accessToken) {
-      setToken(accessToken);
-      console.log('Found access token for password reset');
-    } else {
-      console.error('No access token found in URL');
-      setError("Invalid or missing reset token. Please request a new password reset link.");
-    }
+    const init = async () => {
+      setError(null);
+      const tokens = parseTokens();
+
+      try {
+        // If we have an OAuth code (rare for recovery), exchange it
+        if (tokens.code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(tokens.code);
+          if (error) throw error;
+          setSessionReady(!!data.session);
+          // Clean URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        // For recovery links we expect access and refresh tokens
+        if (tokens.access_token && tokens.refresh_token && (!tokens.type || tokens.type === 'recovery')) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+          });
+          if (error) throw error;
+          setSessionReady(!!data.session);
+          // Clean URL hash to avoid leaking tokens
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+          return;
+        }
+
+        // If no tokens found, see if a session already exists
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setSessionReady(true);
+          return;
+        }
+
+        setError("Invalid or expired reset link. Please request a new password reset email.");
+      } catch (err: any) {
+        console.error('Error initializing reset session:', err);
+        setError(err.message || 'Failed to initialize password reset session.');
+      }
+    };
+
+    // Defer to avoid potential auth deadlocks
+    setTimeout(init, 0);
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!token) {
+    if (!sessionReady) {
       setError("Invalid reset session. Please request a new password reset link.");
       return;
     }
@@ -105,10 +161,10 @@ const ResetPasswordPage: React.FC = () => {
             </Alert>
           )}
 
-          {!token ? (
+          {!sessionReady ? (
             <div className="text-center py-4">
               <p className="text-muted-foreground mb-4">
-                Invalid or missing reset token.
+                Invalid or missing reset session.
               </p>
               <Button onClick={() => navigate("/auth")}>
                 Back to Sign In
@@ -147,7 +203,7 @@ const ResetPasswordPage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Button type="submit" disabled={loading || !token} className="w-full">
+                <Button type="submit" disabled={loading || !sessionReady} className="w-full">
                   {loading ? "Updating Password..." : "Update Password"}
                 </Button>
                 
