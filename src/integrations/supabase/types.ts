@@ -312,6 +312,15 @@ export type Database = {
           schedule: string
         }[]
       }
+      get_schedule_availability: {
+        Args: { _end: string; _start: string }
+        Returns: {
+          availability_status: Database["public"]["Enums"]["availability_status"]
+          date: string
+          team_id: string
+          user_id: string
+        }[]
+      }
       get_user_teams: {
         Args: { _user_id: string }
         Returns: string[]
