@@ -40,22 +40,35 @@ const Auth = () => {
   useEffect(() => {
     // Check for recovery tokens in the URL hash
     const hash = window.location.hash.substring(1);
-    const hashParams = new URLSearchParams(hash);
+    console.log('RAW HASH:', hash);
+    console.log('FULL URL:', window.location.href);
     
-    console.log('Auth page loaded with hash:', hash);
-    console.log('All hash params:', Object.fromEntries(hashParams.entries()));
-
+    const hashParams = new URLSearchParams(hash);
+    console.log('HASH PARAMS ENTRIES:', Array.from(hashParams.entries()));
+    
     // Check if this is a recovery link
     const type = hashParams.get('type');
     const access_token = hashParams.get('access_token');
     const refresh_token = hashParams.get('refresh_token');
 
-    console.log('Recovery check:', { type, hasAccessToken: !!access_token, hasRefreshToken: !!refresh_token });
+    console.log('PARSED VALUES:', { 
+      type: type, 
+      hasAccessToken: !!access_token, 
+      hasRefreshToken: !!refresh_token,
+      accessTokenLength: access_token?.length || 0,
+      refreshTokenLength: refresh_token?.length || 0
+    });
 
     if (type === 'recovery' && access_token && refresh_token) {
-      console.log('Valid recovery link detected, redirecting to reset-password');
-      navigate(`/reset-password${window.location.hash}`, { replace: true });
+      console.log('✅ VALID RECOVERY LINK - REDIRECTING NOW');
+      console.log('REDIRECT TARGET:', `/reset-password${window.location.hash}`);
+      // Use a timeout to ensure the redirect happens
+      setTimeout(() => {
+        navigate(`/reset-password${window.location.hash}`, { replace: true });
+      }, 100);
       return;
+    } else {
+      console.log('❌ NOT A VALID RECOVERY LINK:', { type, hasTokens: !!(access_token && refresh_token) });
     }
   }, [navigate]);
 
