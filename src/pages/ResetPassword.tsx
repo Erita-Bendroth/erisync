@@ -22,89 +22,70 @@ const ResetPasswordPage: React.FC = () => {
   const [hasValidSession, setHasValidSession] = useState(false);
 
   useEffect(() => {
-    const initializeRecoverySession = async () => {
+    let unsubscribe: (() => void) | null = null;
+    let timeoutId: any;
+
+    const init = async () => {
       try {
         setSessionLoading(true);
         setError(null);
-        
-        console.log('Starting password recovery session initialization...');
-        
-        // Parse tokens from URL hash (Supabase default) or query params (fallback)
-        const extractTokensFromURL = () => {
-          const hash = window.location.hash.substring(1);
-          const hashParams = new URLSearchParams(hash);
-          
-          // Try hash first (most common with Supabase)
-          let access_token = hashParams.get('access_token');
-          let refresh_token = hashParams.get('refresh_token'); 
-          let type = hashParams.get('type');
-          
-          // Fallback to query params
-          if (!access_token) {
-            access_token = searchParams.get('access_token');
-            refresh_token = searchParams.get('refresh_token');
-            type = searchParams.get('type');
+
+        // Read params (hash preferred)
+        const hash = window.location.hash.substring(1);
+        const hashParams = new URLSearchParams(hash);
+        const queryParams = searchParams;
+        const type = hashParams.get('type') || queryParams.get('type');
+        const code = queryParams.get('code');
+
+        // If using code flow, exchange for session
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          if (data.session) {
+            setHasValidSession(true);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
           }
-          
-          console.log('Extracted tokens:', {
-            hasAccessToken: !!access_token,
-            hasRefreshToken: !!refresh_token,
-            type: type,
-            source: hashParams.get('access_token') ? 'hash' : 'query'
-          });
-          
-          return { access_token, refresh_token, type };
-        };
-        
-        const { access_token, refresh_token, type } = extractTokensFromURL();
-        
-        // Validate we have recovery tokens
-        if (!access_token || type !== 'recovery') {
-          throw new Error('Invalid password reset link. Missing recovery tokens or incorrect type.');
         }
-        
-        if (!refresh_token) {
-          console.warn('No refresh token found, attempting with access token only...');
-        }
-        
-        // Clear URL to prevent token exposure
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        console.log('Setting Supabase session with recovery tokens...');
-        
-        // Establish session using recovery tokens
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: access_token,
-          refresh_token: refresh_token || ''
+
+        // Subscribe for PASSWORD_RECOVERY or SIGNED_IN (recovery) events
+        const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+          if (session && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && type === 'recovery') {
+            setHasValidSession(true);
+            if (window.location.hash) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }
         });
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          throw new Error(`Failed to establish recovery session: ${sessionError.message}`);
+        unsubscribe = sub.subscription.unsubscribe;
+
+        // Also check for an already-present session
+        const { data } = await supabase.auth.getSession();
+        if (data.session && type === 'recovery') {
+          setHasValidSession(true);
+          setSessionLoading(false);
+          return;
         }
-        
-        if (!sessionData.session) {
-          throw new Error('No session created from recovery tokens. The link may be expired.');
-        }
-        
-        console.log('Recovery session established successfully:', {
-          userId: sessionData.session.user?.id,
-          expiresAt: sessionData.session.expires_at
-        });
-        
-        setHasValidSession(true);
-        
+
+        // Fallback: wait briefly for event to arrive
+        timeoutId = setTimeout(() => {
+          setSessionLoading(false);
+          if (!hasValidSession) {
+            setError('Invalid or expired password reset link. Please request a new reset email.');
+          }
+        }, 2000);
       } catch (err: any) {
-        console.error('Recovery session initialization failed:', err);
-        setError(err.message || 'Failed to initialize password recovery. Please request a new reset link.');
-        setHasValidSession(false);
-      } finally {
+        console.error('Recovery initialization error:', err);
+        setError(err.message || 'Failed to initialize password recovery.');
         setSessionLoading(false);
       }
     };
 
-    // Initialize recovery session
-    initializeRecoverySession();
+    init();
+    return () => {
+      if (unsubscribe) unsubscribe();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
