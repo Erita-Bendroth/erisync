@@ -3,8 +3,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, Settings, LogOut, Plus, Shield } from "lucide-react";
+import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail } from "lucide-react";
 import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import TeamManagement from "@/components/schedule/TeamManagement";
@@ -23,6 +25,14 @@ const Schedule = () => {
   const tabFromUrl = searchParams.get('tab') || 'admin';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  // Two-week notification state
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [recipients, setRecipients] = useState<{ id: string; name: string }[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -55,6 +65,64 @@ const Schedule = () => {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const getRange = () => {
+    const start = new Date();
+    start.setHours(0,0,0,0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 13);
+    const toStr = (d: Date) => d.toISOString().split('T')[0];
+    return { start_date: toStr(start), end_date: toStr(end) };
+  };
+
+  const openNotify = async () => {
+    if (!user) return;
+    setNotifyOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .order('first_name');
+      if (error) throw error;
+      setRecipients((data || []).map(p => ({ id: p.user_id, name: `${p.first_name} ${p.last_name}` })));
+    } catch (e) {
+      console.error('Failed to load users for notification', e);
+    }
+  };
+
+  const previewTwoWeekEmail = async () => {
+    if (!selectedUserId) return;
+    setLoadingPreview(true);
+    try {
+      const { start_date, end_date } = getRange();
+      const { data, error } = await supabase.functions.invoke('send-future-schedule', {
+        body: { user_id: selectedUserId, start_date, end_date, preview: true }
+      });
+      if (error) throw error;
+      setPreviewHtml(data?.html || '<p>No preview.</p>');
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const sendTwoWeekEmail = async () => {
+    if (!selectedUserId) return;
+    setSending(true);
+    try {
+      const { start_date, end_date } = getRange();
+      const { error } = await supabase.functions.invoke('send-future-schedule', {
+        body: { user_id: selectedUserId, start_date, end_date, preview: false }
+      });
+      if (error) throw error;
+      setNotifyOpen(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -120,12 +188,59 @@ const Schedule = () => {
                     View and manage team schedules
                   </p>
                 </div>
-                <ScheduleEntryForm>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Entry
-                  </Button>
-                </ScheduleEntryForm>
+                <div className="flex items-center gap-2">
+                  <ScheduleEntryForm>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Entry
+                    </Button>
+                  </ScheduleEntryForm>
+                  {(isPlanner() || isManager()) && (
+                    <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" onClick={openNotify}>
+                          <Mail className="w-4 h-4 mr-2" />
+                          2-week Summary
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Send 2-week schedule summary</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Recipient</label>
+                            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a user" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {recipients.map(r => (
+                                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="border rounded p-3 max-h-72 overflow-auto bg-card">
+                            {previewHtml ? (
+                              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Generate a preview to see the email content.</p>
+                            )}
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={previewTwoWeekEmail} disabled={!selectedUserId || loadingPreview}>
+                            {loadingPreview ? 'Preparing…' : 'Preview'}
+                          </Button>
+                          <Button onClick={sendTwoWeekEmail} disabled={!selectedUserId || sending}>
+                            {sending ? 'Sending…' : 'Send Email'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
               </div>
               <BulkScheduleGenerator />
             </div>

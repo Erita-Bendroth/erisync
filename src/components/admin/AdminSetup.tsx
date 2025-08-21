@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import BulkUserImport from "./BulkUserImport";
 import UserManagement from "./UserManagement";
 import UserCreation from "./UserCreation";
-import BulkPasswordReset from "./BulkPasswordReset";
 
 interface Profile {
   user_id: string;
@@ -167,7 +166,6 @@ const AdminSetup = () => {
   return (
     <div className="space-y-6">
       <UserCreation onUserCreated={() => { fetchProfiles(); fetchUserRoles(); }} />
-      <BulkPasswordReset />
       <UserManagement />
       
       <Card>

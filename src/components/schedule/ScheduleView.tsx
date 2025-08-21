@@ -522,22 +522,15 @@ query = supabase
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    const entries = scheduleEntries.filter(entry => 
+    // Base entries for that user/day
+    let entries = scheduleEntries.filter(entry => 
       entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
     );
-    
-    // Debug logging for Friday entries
-    if (date.getDay() === 5) { // Friday
-      const dateStr = format(date, 'yyyy-MM-dd');
-      console.log(`🔍 Looking for Friday entries: ${employeeId} on ${dateStr}`);
-      console.log(`Found ${entries.length} entries for this employee`);
-      
-      const allFridayInSchedule = scheduleEntries.filter(entry => entry.date === dateStr);
-      console.log(`📊 Total Friday entries (${dateStr}) in scheduleEntries:`, allFridayInSchedule.length);
-      
-      if (allFridayInSchedule.length > 0) {
-        console.log('Sample Friday entries:', allFridayInSchedule.slice(0, 3));
-      }
+
+    // Enforce policy: Mon–Fri only for auto-generated shifts; weekends must be manual
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6; // Sun or Sat
+    if (isWeekend) {
+      entries = entries.filter(e => !e.notes?.includes("Auto-generated"));
     }
     
     return entries;
