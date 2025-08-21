@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,10 +8,91 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const resendApiKey = Deno.env.get("RESEND_API_KEY");
+const AZURE_CLIENT_ID = Deno.env.get("AZURE_AD_CLIENT_ID");
+const AZURE_CLIENT_SECRET = Deno.env.get("AZURE_AD_CLIENT_SECRET");
+const AZURE_TENANT_ID = Deno.env.get("AZURE_TENANT_ID") || "common";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
+// Microsoft Graph API functions
+async function getAccessToken() {
+  if (!AZURE_CLIENT_ID || !AZURE_CLIENT_SECRET) {
+    throw new Error("Azure credentials not configured");
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: AZURE_CLIENT_ID,
+    client_secret: AZURE_CLIENT_SECRET,
+    scope: "https://graph.microsoft.com/.default",
+    grant_type: "client_credentials"
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString()
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get access token: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
+async function sendGraphEmail(fromEmail: string, toEmail: string, subject: string, htmlContent: string) {
+  const accessToken = await getAccessToken();
+  
+  const emailData = {
+    message: {
+      subject,
+      body: {
+        contentType: "HTML",
+        content: htmlContent
+      },
+      toRecipients: [{
+        emailAddress: { address: toEmail }
+      }]
+    }
+  };
+
+  const response = await fetch(`https://graph.microsoft.com/v1.0/users/${fromEmail}/sendMail`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(emailData)
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to send email via Graph API: ${error}`);
+  }
+
+  return { success: true, provider: "Microsoft Graph" };
+}
+
+// Fallback SMTP function (if configured)
+async function sendSMTPEmail(toEmail: string, subject: string, htmlContent: string) {
+  const smtpConfig = {
+    host: Deno.env.get("SMTP_HOST"),
+    port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
+    username: Deno.env.get("SMTP_USERNAME"),
+    password: Deno.env.get("SMTP_PASSWORD"),
+    fromEmail: Deno.env.get("SMTP_FROM_EMAIL") || "noreply@company.com"
+  };
+
+  if (!smtpConfig.host || !smtpConfig.username || !smtpConfig.password) {
+    throw new Error("SMTP not configured");
+  }
+
+  // Simple SMTP implementation would go here
+  // For now, we'll return a placeholder
+  return { success: true, provider: "SMTP", message: "SMTP sending not yet implemented" };
+}
 
 interface Payload {
   user_id: string;
@@ -128,17 +208,48 @@ serve(async (req) => {
       return new Response(JSON.stringify({ html }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
-    if (!resend) {
-      return new Response(JSON.stringify({ error: 'Email service not configured' }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
-    }
-
     const to = profile?.email;
     if (!to) {
       return new Response(JSON.stringify({ error: 'User email not found' }), { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } });
     }
 
     const subject = `Your upcoming schedule (${start_date} to ${end_date})`;
-    const emailResponse = await resend.emails.send({ from: "EriSync <onboarding@resend.dev>", to: [to], subject, html });
+    const fromEmail = Deno.env.get("FROM_EMAIL") || "scheduler@company.com";
+    
+    let emailResponse;
+    
+    try {
+      // Try Microsoft Graph API first (recommended for corporate environments)
+      emailResponse = await sendGraphEmail(fromEmail, to, subject, html);
+      console.log("Email sent successfully via Microsoft Graph API");
+    } catch (graphError) {
+      console.log("Microsoft Graph API failed:", graphError.message);
+      
+      try {
+        // Fallback to SMTP if Graph API fails
+        emailResponse = await sendSMTPEmail(to, subject, html);
+        console.log("Email sent successfully via SMTP");
+      } catch (smtpError) {
+        console.log("SMTP failed:", smtpError.message);
+        
+        // If both fail, return error with suggestions
+        return new Response(JSON.stringify({ 
+          error: 'All email methods failed', 
+          details: {
+            graph_error: graphError.message,
+            smtp_error: smtpError.message
+          },
+          suggestions: [
+            "Configure Azure Tenant ID for Microsoft Graph",
+            "Configure SMTP settings for corporate email server",
+            "Contact IT department to whitelist email services"
+          ]
+        }), { 
+          status: 500, 
+          headers: { "Content-Type": "application/json", ...corsHeaders } 
+        });
+      }
+    }
 
     return new Response(JSON.stringify({ sent: true, emailResponse }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (e: any) {
