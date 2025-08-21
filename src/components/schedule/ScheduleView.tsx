@@ -269,75 +269,55 @@ const ScheduleView = () => {
         .from('profiles')
         .select('id, user_id, first_name, last_name');
 
-      // Managers and Planners have broader access
+      // Managers and Planners can fetch broadly; UI will restrict what they see
       if (isManager() || isPlanner()) {
         console.log('User is manager or planner');
-        
+
         if (selectedTeam !== "all") {
-          console.log('Filtering to specific team:', selectedTeam);
-          
-          // Both managers and planners can see all team members
-          // The UI will handle visibility restrictions based on management rights
-          const { data: teamMembers } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .eq('team_id', selectedTeam);
-          
-          if (teamMembers && teamMembers.length > 0) {
-            const userIds = teamMembers.map(tm => tm.user_id);
-            console.log('Can see team members:', userIds);
+          console.log('Filtering to specific team (UI will handle visibility):', selectedTeam);
+
+          // Combine team_members (may be restricted by RLS) with schedule_entries (proven accessible)
+          const [teamMembersRes, entriesRes] = await Promise.all([
+            supabase
+              .from('team_members')
+              .select('user_id')
+              .eq('team_id', selectedTeam),
+            supabase
+              .from('schedule_entries')
+              .select('user_id')
+              .eq('team_id', selectedTeam)
+              .gte('date', format(weekStart, "yyyy-MM-dd"))
+              .lte('date', format(addDays(weekStart, 6), "yyyy-MM-dd"))
+          ]);
+
+          const idsSet = new Set<string>();
+          (teamMembersRes.data || []).forEach((tm: any) => idsSet.add(tm.user_id));
+          (entriesRes.data || []).forEach((e: any) => idsSet.add(e.user_id));
+          const userIds = Array.from(idsSet);
+          console.log('Resolved team userIds from members+entries:', userIds);
+
+          if (userIds.length > 0) {
             query = query.in('user_id', userIds);
           } else {
-            console.log('No team members found, showing empty result');
-            query = query.eq('user_id', 'no-match'); // Force empty result
+            // Force empty result rather than showing only self
+            query = query.eq('user_id', 'no-match');
           }
         } else {
-          console.log('Showing all teams view');
-          
-          if (isManager() && !isPlanner()) {
-            // For managers viewing "All Teams", show only users from teams they manage
-            const { data: managedTeams } = await supabase
-              .from('team_members')
-              .select('team_id')
-              .eq('user_id', user!.id)
-              .eq('is_manager', true);
-            
-            console.log('Manager\'s managed teams:', managedTeams);
-            
-            if (managedTeams && managedTeams.length > 0) {
-              const teamIds = managedTeams.map(tm => tm.team_id);
-              
-              const { data: teamMembers } = await supabase
-                .from('team_members')
-                .select('user_id')
-                .in('team_id', teamIds);
-              
-              if (teamMembers && teamMembers.length > 0) {
-                const userIds = [...new Set(teamMembers.map(tm => tm.user_id))];
-                console.log('Manager can see users from managed teams:', userIds);
-                query = query.in('user_id', userIds);
-              }
-            } else {
-              // Manager doesn't manage any teams, show only themselves
-              console.log('Manager has no managed teams, showing only self');
-              query = query.eq('user_id', user!.id);
-            }
-          } else {
-            // Planner can see all team members
-            const { data: allTeamMembers } = await supabase
-              .from('team_members')
-              .select('user_id');
-            
-            if (allTeamMembers && allTeamMembers.length > 0) {
-              const userIds = [...new Set(allTeamMembers.map(tm => tm.user_id))];
-              console.log('Planner can see all team members:', userIds);
-              query = query.in('user_id', userIds);
-            }
+          console.log('All teams view: fetch by entries for the current period');
+          // Fetch all users that have entries this week; UI will restrict details the manager sees
+          const { data: entriesAll } = await supabase
+            .from('schedule_entries')
+            .select('user_id')
+            .gte('date', format(weekStart, "yyyy-MM-dd"))
+            .lte('date', format(addDays(weekStart, 6), "yyyy-MM-dd"));
+          const userIds = [...new Set((entriesAll || []).map((e: any) => e.user_id))];
+          if (userIds.length > 0) {
+            query = query.in('user_id', userIds);
           }
         }
       } else if (isTeamMember()) {
         console.log('User is regular team member');
-        
+
         if (viewMode === "my-schedule") {
           console.log('Showing only current user');
           query = query.eq('user_id', user!.id);
@@ -348,17 +328,17 @@ const ScheduleView = () => {
             .from('team_members')
             .select('team_id')
             .eq('user_id', user!.id);
-          
+
           if (userTeams && userTeams.length > 0) {
-            const teamIds = userTeams.map(ut => ut.team_id);
-            
+            const teamIds = userTeams.map((ut: any) => ut.team_id);
+
             const { data: teamMembers, error: membersError } = await supabase
               .from('team_members')
               .select('user_id')
               .in('team_id', teamIds);
-            
+
             if (teamMembers && teamMembers.length > 0) {
-              const userIds = teamMembers.map(tm => tm.user_id);
+              const userIds = teamMembers.map((tm: any) => tm.user_id);
               query = query.in('user_id', userIds);
             } else {
               query = query.eq('user_id', user!.id);
@@ -373,14 +353,14 @@ const ScheduleView = () => {
       }
 
       const { data, error } = await query.order('first_name');
-      
+
       if (error) throw error;
-      
-      const transformedEmployees = data?.map(emp => ({
+
+      const transformedEmployees = data?.map((emp: any) => ({
         ...emp,
         initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
       })) || [];
-      
+
       setEmployees(transformedEmployees);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -433,28 +413,8 @@ const ScheduleView = () => {
           // UI will handle display restrictions based on management rights
           query = query.eq("team_id", selectedTeam);
         } else {
-          console.log('Showing all teams view');
-          
-          if (isManager() && !isPlanner()) {
-            // For managers viewing "All Teams", show entries from teams they manage
-            const { data: managedTeams } = await supabase
-              .from('team_members')
-              .select('team_id')
-              .eq('user_id', user!.id)
-              .eq('is_manager', true);
-            
-            if (managedTeams && managedTeams.length > 0) {
-              const teamIds = managedTeams.map(tm => tm.team_id);
-              console.log('Manager can see entries from managed teams:', teamIds);
-              query = query.in("team_id", teamIds);
-            } else {
-              console.log('Manager has no managed teams, showing only own entries');
-              query = query.eq("user_id", user!.id);
-            }
-          } else {
-            // Planners can see all entries
-            console.log('Planner can see all entries');
-          }
+          console.log('All teams view: managers/planners fetch all teams; UI will restrict visibility');
+          // No additional filtering here; fetch all teams' entries
         }
       } else if (isTeamMember()) {
         console.log('User is regular team member');
@@ -651,6 +611,41 @@ const ScheduleView = () => {
     return await isUserInManagedTeamCached(userId);
   };
 
+  // Synchronous helper using the populated cache
+  const canViewFullDetailsSync = (userId: string) => {
+    if (!isManager() || isPlanner()) return true;
+    const v = managedTeamCache[userId];
+    return v === true;
+  };
+
+  // Render employee name/initials based on access
+  const renderEmployeeName = (employee: Employee) => {
+    if (isManager() && !isPlanner()) {
+      const canViewFull = managedTeamCache[employee.user_id];
+      if (canViewFull === false) {
+        return (
+          <>
+            <p className="font-medium">{employee.initials}</p>
+            <p className="text-xs text-muted-foreground">Available/Unavailable</p>
+          </>
+        );
+      } else {
+        return (
+          <>
+            <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+            <p className="text-xs text-muted-foreground">{employee.initials}</p>
+          </>
+        );
+      }
+    }
+    return (
+      <>
+        <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+        <p className="text-xs text-muted-foreground">{employee.initials}</p>
+      </>
+    );
+  };
+
   const getActivityDisplay = (entry: ScheduleEntry) => {
     // Team members only see availability status
     if (isTeamMember() && !isManager() && !isPlanner()) {
@@ -784,11 +779,14 @@ const ScheduleView = () => {
     else if (monthOffset === -2) setSelectedMonthValue("prev2");
   };
 
-  if (loading) {
+  // Ensure managedTeamCache is ready before render for managers
+  const isCacheReady = !(isManager() && !isPlanner()) || employees.every(emp => Object.prototype.hasOwnProperty.call(managedTeamCache, emp.user_id));
+
+  if (loading || !isCacheReady) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Loading schedule...</h2>
+          <h2 className="text-xl font-semibold mb-2">{loading ? 'Loading schedule...' : 'Preparing schedule view...'}</h2>
           <p className="text-muted-foreground">Please wait</p>
         </div>
       </div>
@@ -910,34 +908,7 @@ const ScheduleView = () => {
                         </div>
                         <div>
                           {/* Show full name or initials based on management rights */}
-                          {isManager() && !isPlanner() ? (
-                            (() => {
-                              const canViewFull = managedTeamCache[employee.user_id];
-                              if (canViewFull === false) {
-                                // Manager doesn't manage this user's team - show initials only
-                                return (
-                                  <>
-                                    <p className="font-medium">{employee.initials}</p>
-                                    <p className="text-xs text-muted-foreground">Available/Unavailable</p>
-                                  </>
-                                );
-                              } else {
-                                // Manager manages this user's team - show full name
-                                return (
-                                  <>
-                                    <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-                                    <p className="text-xs text-muted-foreground">{employee.initials}</p>
-                                  </>
-                                );
-                              }
-                            })()
-                          ) : (
-                            // Planners and team members see full names
-                            <>
-                              <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-                              <p className="text-xs text-muted-foreground">{employee.initials}</p>
-                            </>
-                          )}
+                          {renderEmployeeName(employee)}
                         </div>
                       </div>
                     </TableCell>
@@ -974,14 +945,30 @@ const ScheduleView = () => {
                               ) : (
                               dayEntries.map((entry) => (
                                 <div key={entry.id} className="space-y-1">
-                                  <TimeBlockDisplay
-                                    entry={entry}
-                                    onClick={(e) => {
-                                      e?.stopPropagation();
-                                      (isManager() || isPlanner()) && handleEditShift(entry);
-                                    }}
-                                  />
-                                  {entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
+                                  {(!(isManager() && !isPlanner()) || managedTeamCache[entry.user_id] === true) ? (
+                                    <TimeBlockDisplay
+                                      entry={entry}
+                                      onClick={(e) => {
+                                        e?.stopPropagation();
+                                        (isManager() || isPlanner()) && handleEditShift(entry);
+                                      }}
+                                    />
+                                  ) : (
+                                    <Badge
+                                      variant="secondary"
+                                      className={`${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity text-xs`}
+                                      onClick={(e) => {
+                                        e?.stopPropagation();
+                                        (isManager() || isPlanner()) && handleEditShift(entry);
+                                      }}
+                                    >
+                                      <div className="flex flex-col items-center py-1">
+                                        <span className="font-medium">{getActivityDisplay(entry)}</span>
+                                      </div>
+                                    </Badge>
+                                  )}
+
+                                  {(!(isManager() && !isPlanner()) || managedTeamCache[entry.user_id] === true) && entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
                                     <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
                                       {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
                                     </p>
