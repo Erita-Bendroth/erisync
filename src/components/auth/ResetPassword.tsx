@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Lock, Loader2, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Lock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validatePassword, sanitizeInput } from "@/lib/validation";
@@ -22,41 +22,34 @@ const ResetPassword: React.FC = () => {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    const setupSession = async () => {
+    const verifyRecoveryToken = async () => {
       try {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const access_token = hashParams.get("access_token") || searchParams.get("access_token");
-        const refresh_token = hashParams.get("refresh_token") || searchParams.get("refresh_token");
-        const type = hashParams.get("type") || searchParams.get("type");
+        const token = searchParams.get("token");
+        const type = searchParams.get("type");
 
-        if (!access_token || !refresh_token || type !== "recovery") {
+        if (!token || type !== "recovery") {
           throw new Error("Invalid or expired password reset link.");
         }
 
-        window.history.replaceState({}, document.title, window.location.pathname);
-
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token,
-          refresh_token
+        const { error } = await supabase.auth.verifyOtp({
+          token,
+          type: "recovery"
         });
 
-        if (sessionError) throw new Error(`Session setup failed: ${sessionError.message}`);
-
-        const { data: sessionData, error: verifyError } = await supabase.auth.getSession();
-        if (verifyError || !sessionData.session) {
-          throw new Error("Session verification failed.");
+        if (error) {
+          throw new Error("Token verification failed: " + error.message);
         }
 
         setSessionReady(true);
       } catch (err: any) {
-        setError(err.message || "Failed to initialize password recovery.");
+        setError(err.message || "Failed to verify recovery token.");
         setSessionReady(false);
       } finally {
         setInitializing(false);
       }
     };
 
-    setupSession();
+    verifyRecoveryToken();
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,7 +78,9 @@ const ResetPassword: React.FC = () => {
         password: sanitizeInput(form.newPassword)
       });
 
-      if (updateError) throw new Error(`Password update failed: ${updateError.message}`);
+      if (updateError) {
+        throw new Error("Password update failed: " + updateError.message);
+      }
 
       await supabase.auth.signOut();
       setSuccess(true);
