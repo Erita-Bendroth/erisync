@@ -37,10 +37,6 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState<string>("");
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -184,54 +180,6 @@ const Dashboard = () => {
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
-    }
-  };
-
-  // Email preview/send helpers
-  const getRange = () => {
-    const start = new Date();
-    start.setHours(0,0,0,0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 13); // two weeks inclusive
-    const toDateStr = (d: Date) => d.toISOString().split('T')[0];
-    return { start_date: toDateStr(start), end_date: toDateStr(end) };
-  };
-
-  const previewTwoWeekEmail = async () => {
-    if (!user) return;
-    setLoadingPreview(true);
-    try {
-      const { start_date, end_date } = getRange();
-      const { data, error } = await supabase.functions.invoke('send-future-schedule', {
-        body: { user_id: user.id, start_date, end_date, preview: true },
-      });
-      if (error) throw error;
-      setPreviewHtml(data?.html || '<p>No preview available</p>');
-      setPreviewOpen(true);
-    } catch (e: any) {
-      console.error(e);
-      toast({ title: 'Preview failed', description: e.message || 'Could not generate preview', variant: 'destructive' });
-    } finally {
-      setLoadingPreview(false);
-    }
-  };
-
-  const sendTwoWeekEmail = async () => {
-    if (!user) return;
-    setSending(true);
-    try {
-      const { start_date, end_date } = getRange();
-      const { error } = await supabase.functions.invoke('send-future-schedule', {
-        body: { user_id: user.id, start_date, end_date, preview: false },
-      });
-      if (error) throw error;
-      toast({ title: 'Email sent', description: 'Your 2-week schedule summary was sent.' });
-      setPreviewOpen(false);
-    } catch (e: any) {
-      console.error(e);
-      toast({ title: 'Send failed', description: e.message || 'Could not send email', variant: 'destructive' });
-    } finally {
-      setSending(false);
     }
   };
 
@@ -431,17 +379,6 @@ const Dashboard = () => {
               >
                 <Calendar className="w-4 h-4 mr-2" />
                 Refresh Today's Schedule
-              </Button>
-
-              {/* Preview 2-week schedule email */}
-              <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={previewTwoWeekEmail}
-                disabled={loadingPreview}
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                {loadingPreview ? 'Preparing Preview…' : 'Preview 2-week Schedule Email'}
               </Button>
 
               <Button 
