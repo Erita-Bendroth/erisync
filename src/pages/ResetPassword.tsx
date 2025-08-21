@@ -5,10 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validatePassword, sanitizeInput } from "@/lib/validation";
+
+interface RecoveryTokens {
+  access_token: string | null;
+  refresh_token: string | null;
+  type: string | null;
+}
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,89 +22,61 @@ const ResetPasswordPage: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
-  const [sessionReady, setSessionReady] = useState(false);
-
-  // Parse tokens from either hash or query params
-  const parseTokens = () => {
-    const fromQuery = {
-      access_token: searchParams.get('access_token') || undefined,
-      refresh_token: searchParams.get('refresh_token') || undefined,
-      type: searchParams.get('type') || undefined,
-      code: searchParams.get('code') || undefined,
-    };
-
-    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
-    const hashParams = new URLSearchParams(hash);
-    const fromHash = {
-      access_token: hashParams.get('access_token') || undefined,
-      refresh_token: hashParams.get('refresh_token') || undefined,
-      type: hashParams.get('type') || undefined,
-      code: hashParams.get('code') || undefined,
-    };
-
-    // Prefer hash (Supabase usually uses hash), fallback to query
-    return {
-      access_token: fromHash.access_token || fromQuery.access_token,
-      refresh_token: fromHash.refresh_token || fromQuery.refresh_token,
-      type: fromHash.type || fromQuery.type,
-      code: fromHash.code || fromQuery.code,
-    } as { access_token?: string; refresh_token?: string; type?: string; code?: string };
-  };
+  const [recoveryTokens, setRecoveryTokens] = useState<RecoveryTokens>({ 
+    access_token: null, 
+    refresh_token: null, 
+    type: null 
+  });
+  const [validRecoveryLink, setValidRecoveryLink] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
-      setError(null);
-      const tokens = parseTokens();
+    // Parse recovery tokens from URL (hash and query parameters)
+    const parseRecoveryTokens = () => {
+      // Check URL hash first (Supabase typically uses hash)
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      
+      // Check query parameters as fallback
+      const queryParams = searchParams;
+      
+      const tokens: RecoveryTokens = {
+        access_token: hashParams.get('access_token') || queryParams.get('access_token'),
+        refresh_token: hashParams.get('refresh_token') || queryParams.get('refresh_token'),
+        type: hashParams.get('type') || queryParams.get('type')
+      };
 
-      try {
-        // If we have an OAuth code (rare for recovery), exchange it
-        if (tokens.code) {
-          const { data, error } = await supabase.auth.exchangeCodeForSession(tokens.code);
-          if (error) throw error;
-          setSessionReady(!!data.session);
-          // Clean URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-          return;
-        }
+      console.log('Parsed recovery tokens:', { 
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        type: tokens.type,
+        source: hashParams.get('access_token') ? 'hash' : 'query'
+      });
 
-        // For recovery links we expect access and refresh tokens
-        if (tokens.access_token && tokens.refresh_token && (!tokens.type || tokens.type === 'recovery')) {
-          const { data, error } = await supabase.auth.setSession({
-            access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
-          });
-          if (error) throw error;
-          setSessionReady(!!data.session);
-          // Clean URL hash to avoid leaking tokens
-          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-          return;
-        }
-
-        // If no tokens found, see if a session already exists
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          setSessionReady(true);
-          return;
-        }
-
-        setError("Invalid or expired reset link. Please request a new password reset email.");
-      } catch (err: any) {
-        console.error('Error initializing reset session:', err);
-        setError(err.message || 'Failed to initialize password reset session.');
-      }
+      return tokens;
     };
 
-    // Defer to avoid potential auth deadlocks
-    setTimeout(init, 0);
+    const tokens = parseRecoveryTokens();
+    setRecoveryTokens(tokens);
+
+    // Validate that this is a valid recovery link
+    if (tokens.access_token && tokens.type === 'recovery') {
+      setValidRecoveryLink(true);
+      // Clean the URL to avoid token leakage in browser history
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      setValidRecoveryLink(false);
+      setError("Invalid or expired password reset link. Please request a new password reset email.");
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!sessionReady) {
-      setError("Invalid reset session. Please request a new password reset link.");
+    if (!validRecoveryLink || !recoveryTokens.access_token) {
+      setError("Invalid recovery session. Please request a new password reset link.");
       return;
     }
 
@@ -114,8 +92,20 @@ const ResetPasswordPage: React.FC = () => {
     }
 
     setLoading(true);
+    
     try {
-      // Use updateUser directly for password recovery
+      // Create a temporary session using the recovery tokens for password update
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: recoveryTokens.access_token!,
+        refresh_token: recoveryTokens.refresh_token!,
+      });
+
+      if (sessionError) {
+        console.error('Session creation error:', sessionError);
+        throw new Error('Invalid or expired recovery link. Please request a new password reset.');
+      }
+
+      // Update the user's password
       const { error: updateError } = await supabase.auth.updateUser({
         password: sanitizeInput(form.newPassword)
       });
@@ -125,13 +115,19 @@ const ResetPasswordPage: React.FC = () => {
         throw updateError;
       }
 
+      // Sign out after successful password update to prevent automatic login
+      await supabase.auth.signOut();
+
+      setSuccess(true);
       toast({ 
-        title: "Password Updated", 
-        description: "Your password has been successfully updated. You can now sign in with your new password." 
+        title: "Password Reset Successful", 
+        description: "Your password has been updated. Please sign in with your new password." 
       });
 
-      // Redirect to auth page after successful password reset
-      navigate("/auth");
+      // Redirect to login page after a short delay
+      setTimeout(() => {
+        navigate("/auth");
+      }, 2000);
       
     } catch (err: any) {
       console.error("Password reset error:", err);
@@ -141,12 +137,38 @@ const ResetPasswordPage: React.FC = () => {
     }
   };
 
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="flex items-center justify-center gap-2 text-green-600">
+              <CheckCircle className="w-6 h-6" />
+              Password Reset Complete
+            </CardTitle>
+            <CardDescription>
+              Your password has been successfully updated
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-4">
+              You will be redirected to the login page shortly.
+            </p>
+            <Button onClick={() => navigate("/auth")} className="w-full">
+              Go to Login Now
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
-            <CheckCircle className="w-5 h-5 text-primary" />
+            <Lock className="w-5 h-5 text-primary" />
             Reset Your Password
           </CardTitle>
           <CardDescription>
@@ -161,14 +183,17 @@ const ResetPasswordPage: React.FC = () => {
             </Alert>
           )}
 
-          {!sessionReady ? (
+          {!validRecoveryLink ? (
             <div className="text-center py-4">
               <p className="text-muted-foreground mb-4">
-                Invalid or missing reset session.
+                This password reset link is invalid or has expired.
               </p>
-              <Button onClick={() => navigate("/auth")}>
-                Back to Sign In
+              <Button onClick={() => navigate("/auth")} variant="outline" className="w-full">
+                Go to Login Page
               </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                You can request a new password reset from the login page
+              </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -183,6 +208,7 @@ const ResetPasswordPage: React.FC = () => {
                   required
                   minLength={8}
                   disabled={loading}
+                  autoComplete="new-password"
                 />
                 <p className="text-xs text-muted-foreground">
                   Password must be at least 8 characters long
@@ -199,22 +225,23 @@ const ResetPasswordPage: React.FC = () => {
                   placeholder="Confirm your new password"
                   required
                   disabled={loading}
+                  autoComplete="new-password"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Button type="submit" disabled={loading || !sessionReady} className="w-full">
+              <div className="space-y-3">
+                <Button type="submit" disabled={loading} className="w-full">
                   {loading ? "Updating Password..." : "Update Password"}
                 </Button>
                 
                 <Button 
                   type="button"
-                  variant="outline" 
+                  variant="ghost" 
                   className="w-full"
                   onClick={() => navigate("/auth")}
                   disabled={loading}
                 >
-                  Back to Sign In
+                  Back to Login
                 </Button>
               </div>
             </form>
