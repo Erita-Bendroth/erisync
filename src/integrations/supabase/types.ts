@@ -312,6 +312,10 @@ export type Database = {
           schedule: string
         }[]
       }
+      get_managed_team_ids: {
+        Args: { _uid: string }
+        Returns: string[]
+      }
       get_schedule_availability: {
         Args: { _end: string; _start: string }
         Returns: {
