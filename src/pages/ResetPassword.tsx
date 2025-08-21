@@ -20,6 +20,7 @@ const ResetPasswordPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
   const [sessionReady, setSessionReady] = useState(false);
+  const [activeSession, setActiveSession] = useState<any>(null);
 
   useEffect(() => {
     const setupRecoverySession = async () => {
@@ -81,12 +82,14 @@ const ResetPasswordPage: React.FC = () => {
         }
 
         console.log('Session verified successfully');
+        setActiveSession(verifyData.session);
         setSessionReady(true);
 
       } catch (err: any) {
         console.error('Recovery setup failed:', err);
         setError(err.message || 'Failed to initialize password recovery');
         setSessionReady(false);
+        setActiveSession(null);
       } finally {
         setInitializing(false);
       }
@@ -120,26 +123,18 @@ const ResetPasswordPage: React.FC = () => {
     setLoading(true);
     
     try {
-      // Double-check session before update
-      console.log('Checking session before password update...');
-      const { data: currentSession, error: sessionCheckError } = await supabase.auth.getSession();
-      
-      if (sessionCheckError) {
-        console.error('Session check error:', sessionCheckError);
-        throw new Error(`Session check failed: ${sessionCheckError.message}`);
+      // Verify we still have the active session
+      if (!activeSession) {
+        console.error('No stored session found');
+        throw new Error('Session expired. Please request a new password reset link.');
       }
 
-      if (!currentSession.session) {
-        console.error('No active session found');
-        throw new Error('No active session. Please request a new password reset link.');
-      }
-
-      console.log('Active session confirmed:', {
-        userId: currentSession.session.user?.id,
-        expiresAt: currentSession.session.expires_at
+      console.log('Using stored session for password update:', {
+        userId: activeSession.user?.id,
+        expiresAt: activeSession.expires_at
       });
 
-      // Now update password with confirmed active session
+      // Update password using the stored session
       console.log('Updating password...');
       const { error: updateError } = await supabase.auth.updateUser({
         password: sanitizeInput(form.newPassword)
