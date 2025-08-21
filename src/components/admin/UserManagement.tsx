@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Trash2, MoreHorizontal, Edit, Shield, Key } from "lucide-react";
+import { Users, Trash2, MoreHorizontal, Edit, Shield, Key, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import EditUserModal from "./EditUserModal";
 import RoleManagement from "./RoleManagement";
+import SetTempPasswordModal from "./SetTempPasswordModal";
 
 export interface Team {
   id: string;
@@ -38,6 +39,8 @@ const UserManagement = () => {
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
+  const [tempPasswordUser, setTempPasswordUser] = useState<User | null>(null);
 
   useEffect(() => {
     checkPermissions();
@@ -273,6 +276,16 @@ const UserManagement = () => {
     setShowEditModal(false);
   };
 
+  const handleSetTempPassword = (user: User) => {
+    setTempPasswordUser(user);
+    setShowTempPasswordModal(true);
+  };
+
+  const handleCloseTempPasswordModal = () => {
+    setTempPasswordUser(null);
+    setShowTempPasswordModal(false);
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
@@ -382,13 +395,20 @@ const UserManagement = () => {
                              <Edit className="mr-2 h-4 w-4" />
                              Edit User
                            </DropdownMenuItem>
-                           <DropdownMenuItem
-                             onClick={() => sendRandomPassword(userData.user_id, userData.email)}
-                             className="cursor-pointer"
-                           >
-                             <Key className="mr-2 h-4 w-4" />
-                             Generate Random Password
-                           </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => sendRandomPassword(userData.user_id, userData.email)}
+                              className="cursor-pointer"
+                            >
+                              <Key className="mr-2 h-4 w-4" />
+                              Generate Random Password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleSetTempPassword(userData)}
+                              className="cursor-pointer"
+                            >
+                              <Lock className="mr-2 h-4 w-4" />
+                              Set Temporary Password
+                            </DropdownMenuItem>
                           {userData.user_id !== user?.id && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -440,6 +460,17 @@ const UserManagement = () => {
         onClose={handleCloseEditModal}
         onUserUpdated={fetchUsers}
       />
+
+      {tempPasswordUser && (
+        <SetTempPasswordModal
+          isOpen={showTempPasswordModal}
+          onClose={handleCloseTempPasswordModal}
+          userId={tempPasswordUser.user_id}
+          userName={`${tempPasswordUser.first_name} ${tempPasswordUser.last_name}`}
+          userEmail={tempPasswordUser.email}
+          onSuccess={fetchUsers}
+        />
+      )}
     </div>
   );
 };

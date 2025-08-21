@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.reset-all-passwords]
 verify_jwt = false
+
+[functions.set-temp-password]
+verify_jwt = false
