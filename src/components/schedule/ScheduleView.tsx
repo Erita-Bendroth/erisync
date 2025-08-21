@@ -280,18 +280,16 @@ useEffect(() => {
       console.log('isPlanner():', isPlanner());
       console.log('selectedTeam:', selectedTeam);
 
-      let query = supabase
-        .from('profiles')
-        .select('id, user_id, first_name, last_name');
-
-      // Managers and Planners can fetch broadly; UI will restrict what they see
+      // For managers/planners, directly fetch profiles for team members
       if (isManager() || isPlanner()) {
-        console.log('User is manager or planner');
+        console.log('Manager/planner: fetching team member profiles');
+
+        let targetUserIds: string[] = [];
 
         if (selectedTeam !== "all") {
-          console.log('Filtering to specific team (UI will handle visibility):', selectedTeam);
-
-          // Get team members directly (managers can now see all team_members)
+          console.log('Fetching profiles for specific team:', selectedTeam);
+          
+          // Get team members for this specific team
           const { data: teamMembersRes, error: teamMembersError } = await supabase
             .from('team_members')
             .select('user_id')
@@ -299,37 +297,59 @@ useEffect(() => {
 
           if (teamMembersError) {
             console.error('Error fetching team members:', teamMembersError);
+            setEmployees([]);
             return;
           }
 
-          const userIds = (teamMembersRes || []).map((tm: any) => tm.user_id);
-          console.log('Resolved team userIds from team_members:', userIds);
-
-          if (userIds.length > 0) {
-            query = query.in('user_id', userIds);
-          } else {
-            // No members in this team - show empty result
-            query = query.eq('user_id', 'no-match-empty-team');
-          }
+          targetUserIds = (teamMembersRes || []).map((tm: any) => tm.user_id);
+          console.log('Target user IDs for team:', targetUserIds);
         } else {
-          console.log('All teams view: fetch by entries for the current period');
-          // Fetch all users that have entries this week; UI will restrict details the manager sees
+          console.log('All teams: fetching from schedule entries');
+          // For "all" view, get user IDs from schedule entries
           const { data: entriesAll } = await supabase
             .from('schedule_entries')
             .select('user_id')
             .gte('date', format(weekStart, "yyyy-MM-dd"))
             .lte('date', format(addDays(weekStart, 6), "yyyy-MM-dd"));
-          const userIds = [...new Set((entriesAll || []).map((e: any) => e.user_id))];
-          if (userIds.length > 0) {
-            query = query.in('user_id', userIds);
-          }
+          targetUserIds = [...new Set((entriesAll || []).map((e: any) => e.user_id))];
         }
+
+        if (targetUserIds.length === 0) {
+          console.log('No target user IDs found');
+          setEmployees([]);
+          return;
+        }
+
+        // Fetch profiles directly using the user IDs
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, user_id, first_name, last_name')
+          .in('user_id', targetUserIds)
+          .order('first_name');
+
+        console.log('Profiles query result:', { profiles, error: profilesError });
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          setEmployees([]);
+          return;
+        }
+
+        const transformedEmployees = (profiles || []).map((emp: any) => ({
+          ...emp,
+          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+        }));
+
+        console.log('Transformed employees:', transformedEmployees);
+        setEmployees(transformedEmployees);
       } else if (isTeamMember()) {
         console.log('User is regular team member');
 
+        let targetUserIds: string[] = [];
+
         if (viewMode === "my-schedule") {
           console.log('Showing only current user');
-          query = query.eq('user_id', user!.id);
+          targetUserIds = [user!.id];
         } else {
           console.log('Showing team members from user teams');
           // Show users from the current user's team(s)
@@ -347,30 +367,56 @@ useEffect(() => {
               .in('team_id', teamIds);
 
             if (teamMembers && teamMembers.length > 0) {
-              const userIds = teamMembers.map((tm: any) => tm.user_id);
-              query = query.in('user_id', userIds);
+              targetUserIds = teamMembers.map((tm: any) => tm.user_id);
             } else {
-              query = query.eq('user_id', user!.id);
+              targetUserIds = [user!.id];
             }
           } else {
-            query = query.eq('user_id', user!.id);
+            targetUserIds = [user!.id];
           }
         }
+
+        // Fetch profiles for team members
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, user_id, first_name, last_name')
+          .in('user_id', targetUserIds)
+          .order('first_name');
+
+        if (profilesError) {
+          console.error('Error fetching team member profiles:', profilesError);
+          setEmployees([]);
+          return;
+        }
+
+        const transformedEmployees = (profiles || []).map((emp: any) => ({
+          ...emp,
+          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+        }));
+
+        setEmployees(transformedEmployees);
       } else {
         console.log('No specific role found, showing only current user');
-        query = query.eq('user_id', user!.id);
+        
+        // Fetch current user's profile
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, user_id, first_name, last_name')
+          .eq('user_id', user!.id);
+
+        if (profilesError) {
+          console.error('Error fetching user profile:', profilesError);
+          setEmployees([]);
+          return;
+        }
+
+        const transformedEmployees = (profiles || []).map((emp: any) => ({
+          ...emp,
+          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+        }));
+
+        setEmployees(transformedEmployees);
       }
-
-      const { data, error } = await query.order('first_name');
-
-      if (error) throw error;
-
-      const transformedEmployees = data?.map((emp: any) => ({
-        ...emp,
-        initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
-      })) || [];
-
-      setEmployees(transformedEmployees);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
