@@ -67,15 +67,18 @@ const ScheduleView = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [viewMode, setViewMode] = useState<string>("my-schedule");
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
+const [holidays, setHolidays] = useState<Holiday[]>([]);
+const [loading, setLoading] = useState(true);
+const [editingEntry, setEditingEntry] = useState<ScheduleEntry | null>(null);
+const [showEditModal, setShowEditModal] = useState(false);
+const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
+// Managed users visibility cache
+const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
+const [managedCacheLoading, setManagedCacheLoading] = useState(false);
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
-  // Show Monday through Sunday (full week)
-  const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
+const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
+// Show Monday through Sunday (full week)
+const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (isManager() || isPlanner()) {
@@ -179,34 +182,46 @@ const ScheduleView = () => {
     }
   }, [selectedTeam, viewMode]);
 
-  // Clear cache when team selection changes
-  useEffect(() => {
-    setManagedTeamCache({});
-  }, [selectedTeam, viewMode]);
+// Pre-populate managed users set for performance and deterministic rendering
+useEffect(() => {
+  const populateManagedUsersSet = async () => {
+    if (!(isManager() && !isPlanner()) || !user) return;
+    try {
+      setManagedCacheLoading(true);
+      // 1) Get teams current user manages
+      const { data: mgrTeams } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .eq('is_manager', true);
 
-  // Pre-populate managed team cache for performance
-  useEffect(() => {
-    const populateManagedTeamCache = async () => {
-      if (isManager() && !isPlanner() && employees.length > 0) {
-        console.log('Populating managed team cache for employees:', employees.length);
-        const cachePromises = employees.map(async (emp) => {
-          const result = await isUserInManagedTeam(emp.user_id);
-          return { userId: emp.user_id, isManaged: result };
-        });
-        
-        const results = await Promise.all(cachePromises);
-        const newCache = results.reduce((acc, { userId, isManaged }) => {
-          acc[userId] = isManaged;
-          return acc;
-        }, {} as { [userId: string]: boolean });
-        
-        console.log('Managed team cache populated:', newCache);
-        setManagedTeamCache(newCache);
+      const teamIds = (mgrTeams || []).map(t => t.team_id);
+      if (teamIds.length === 0) {
+        setManagedUsersSet(new Set([user.id]));
+        return;
       }
-    };
 
-    populateManagedTeamCache();
-  }, [employees, user]);
+      // 2) Get all users in those teams
+      const { data: teamUsers } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .in('team_id', teamIds);
+
+      const ids = new Set<string>((teamUsers || []).map(tu => tu.user_id));
+      // Always include self
+      ids.add(user.id);
+      setManagedUsersSet(ids);
+    } catch (e) {
+      console.error('Error populating managed users set:', e);
+      // Fallback: at least include self
+      setManagedUsersSet(new Set([user!.id]));
+    } finally {
+      setManagedCacheLoading(false);
+    }
+  };
+
+  populateManagedUsersSet();
+}, [user, userRoles, selectedTeam, viewMode]);
 
   const fetchUserRoles = async () => {
     try {
@@ -553,91 +568,32 @@ const ScheduleView = () => {
   const isManager = () => userRoles.some(role => role.role === "manager");
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
 
-  const isUserInManagedTeam = async (userId: string) => {
-    // For managers, check if they manage the teams this user belongs to
-    if (!isManager()) return true; // Non-managers see full details for users they can access
-    
-    try {
-      // Get the teams this user belongs to
-      const { data: userTeamMemberships } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', userId);
-      
-      if (!userTeamMemberships || userTeamMemberships.length === 0) {
-        return false;
-      }
-      
-      const userTeamIds = userTeamMemberships.map(tm => tm.team_id);
-      
-      // Check if current user is manager of any of those teams
-      const { data: managerTeams } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user!.id)
-        .eq('is_manager', true);
-      
-      if (!managerTeams || managerTeams.length === 0) {
-        return false;
-      }
-      
-      const managedTeamIds = managerTeams.map(tm => tm.team_id);
-      
-      // Check if there's any overlap
-      return userTeamIds.some(teamId => managedTeamIds.includes(teamId));
-    } catch (error) {
-      console.error('Error checking managed team relationship:', error);
-      return false;
-    }
-  };
-
-  const [managedTeamCache, setManagedTeamCache] = useState<{ [userId: string]: boolean }>({});
-
-  const isUserInManagedTeamCached = async (userId: string) => {
-    if (managedTeamCache[userId] !== undefined) {
-      return managedTeamCache[userId];
-    }
-    
-    const result = await isUserInManagedTeam(userId);
-    setManagedTeamCache(prev => ({ ...prev, [userId]: result }));
-    return result;
-  };
-
-  // Helper function to determine if manager can view full details for a user
-  const canViewFullDetails = async (userId: string) => {
-    if (!isManager() || isPlanner()) return true; // Planners see full details always
-    if (isTeamMember() && !isManager()) return false; // Regular team members see limited
-    
-    return await isUserInManagedTeamCached(userId);
-  };
-
-  // Synchronous helper using the populated cache
-  const canViewFullDetailsSync = (userId: string) => {
-    if (!isManager() || isPlanner()) return true;
-    const v = managedTeamCache[userId];
-    return v === true;
-  };
+// Helper: can manager view full details for a user synchronously
+const canViewFullDetailsSync = (userId: string) => {
+  if (!isManager() || isPlanner()) return true;
+  return managedUsersSet.has(userId);
+};
 
   // Render employee name/initials based on access
   const renderEmployeeName = (employee: Employee) => {
-    if (isManager() && !isPlanner()) {
-      const canViewFull = managedTeamCache[employee.user_id];
-      if (canViewFull === false) {
-        return (
-          <>
-            <p className="font-medium">{employee.initials}</p>
-            <p className="text-xs text-muted-foreground">Available/Unavailable</p>
-          </>
-        );
-      } else {
-        return (
-          <>
-            <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-            <p className="text-xs text-muted-foreground">{employee.initials}</p>
-          </>
-        );
-      }
-    }
+if (isManager() && !isPlanner()) {
+  const canViewFull = canViewFullDetailsSync(employee.user_id);
+  if (canViewFull === false) {
+    return (
+      <>
+        <p className="font-medium">{employee.initials}</p>
+        <p className="text-xs text-muted-foreground">Available/Unavailable</p>
+      </>
+    );
+  } else {
+    return (
+      <>
+        <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+        <p className="text-xs text-muted-foreground">{employee.initials}</p>
+      </>
+    );
+  }
+}
     return (
       <>
         <p className="font-medium">{employee.first_name} {employee.last_name}</p>
@@ -654,16 +610,13 @@ const ScheduleView = () => {
     
     // For managers, check if user is in a managed team
     if (isManager() && !isPlanner()) {
-      const canViewFull = managedTeamCache[entry.user_id];
+      const canViewFull = canViewFullDetailsSync(entry.user_id);
       if (canViewFull === false) {
         // Manager doesn't manage this user's team - show availability only
         return entry.activity_type === "work" ? "Available" : "Unavailable";
-      } else if (canViewFull === true) {
+      } else {
         // Manager manages this user's team - show full details
         return getActivityDisplayName(entry.activity_type);
-      } else {
-        // Cache not ready - show availability as fallback
-        return entry.activity_type === "work" ? "Available" : "Unavailable";
       }
     }
     
@@ -687,7 +640,7 @@ const ScheduleView = () => {
 
     // For managers, check if they can view full details
     if (isManager() && !isPlanner()) {
-      const canViewFull = managedTeamCache[entry.user_id];
+      const canViewFull = canViewFullDetailsSync(entry.user_id);
       if (canViewFull === false) {
         // Show availability colors only
         return entry.activity_type === "work" 
@@ -779,8 +732,7 @@ const ScheduleView = () => {
     else if (monthOffset === -2) setSelectedMonthValue("prev2");
   };
 
-  // Ensure managedTeamCache is ready before render for managers
-  const isCacheReady = !(isManager() && !isPlanner()) || employees.every(emp => Object.prototype.hasOwnProperty.call(managedTeamCache, emp.user_id));
+  const isCacheReady = !(isManager() && !isPlanner()) || !managedCacheLoading;
 
   if (loading || !isCacheReady) {
     return (
@@ -945,7 +897,7 @@ const ScheduleView = () => {
                               ) : (
                               dayEntries.map((entry) => (
                                 <div key={entry.id} className="space-y-1">
-                                  {(!(isManager() && !isPlanner()) || managedTeamCache[entry.user_id] === true) ? (
+                                  {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
                                     <TimeBlockDisplay
                                       entry={entry}
                                       onClick={(e) => {
@@ -968,7 +920,7 @@ const ScheduleView = () => {
                                     </Badge>
                                   )}
 
-                                  {(!(isManager() && !isPlanner()) || managedTeamCache[entry.user_id] === true) && entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
+                                  {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) && entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
                                     <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
                                       {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
                                     </p>
