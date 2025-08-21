@@ -276,45 +276,20 @@ const ScheduleView = () => {
         if (selectedTeam !== "all") {
           console.log('Filtering to specific team:', selectedTeam);
           
-          // For managers, check if they manage this specific team
-          if (isManager() && !isPlanner()) {
-            const { data: managerCheck } = await supabase
-              .from('team_members')
-              .select('team_id')
-              .eq('user_id', user!.id)
-              .eq('team_id', selectedTeam)
-              .eq('is_manager', true);
-            
-            console.log('Manager check for team:', selectedTeam, 'result:', managerCheck);
-            
-            if (!managerCheck || managerCheck.length === 0) {
-              console.log('Manager does not manage this team, showing empty list');
-              query = query.eq('user_id', 'no-match'); // Force empty result
-            } else {
-              // Manager manages this team, get all members
-              const { data: teamMembers } = await supabase
-                .from('team_members')
-                .select('user_id')
-                .eq('team_id', selectedTeam);
-              
-              if (teamMembers && teamMembers.length > 0) {
-                const userIds = teamMembers.map(tm => tm.user_id);
-                console.log('Manager can see team members:', userIds);
-                query = query.in('user_id', userIds);
-              }
-            }
+          // Both managers and planners can see all team members
+          // The UI will handle visibility restrictions based on management rights
+          const { data: teamMembers } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', selectedTeam);
+          
+          if (teamMembers && teamMembers.length > 0) {
+            const userIds = teamMembers.map(tm => tm.user_id);
+            console.log('Can see team members:', userIds);
+            query = query.in('user_id', userIds);
           } else {
-            // Planner can see any team
-            const { data: teamMembers } = await supabase
-              .from('team_members')
-              .select('user_id')
-              .eq('team_id', selectedTeam);
-            
-            if (teamMembers && teamMembers.length > 0) {
-              const userIds = teamMembers.map(tm => tm.user_id);
-              console.log('Planner can see team members:', userIds);
-              query = query.in('user_id', userIds);
-            }
+            console.log('No team members found, showing empty result');
+            query = query.eq('user_id', 'no-match'); // Force empty result
           }
         } else {
           console.log('Showing all teams view');
@@ -454,27 +429,9 @@ const ScheduleView = () => {
         
         if (selectedTeam !== "all") {
           console.log('Filtering by selected team:', selectedTeam);
-          
-          // For managers, verify they manage this team
-          if (isManager() && !isPlanner()) {
-            const { data: managerCheck } = await supabase
-              .from('team_members')
-              .select('team_id')
-              .eq('user_id', user!.id)
-              .eq('team_id', selectedTeam)
-              .eq('is_manager', true);
-            
-            if (!managerCheck || managerCheck.length === 0) {
-              console.log('Manager does not manage this team, restricting access');
-              query = query.eq('user_id', user!.id); // Only show own entries
-            } else {
-              console.log('Manager manages this team, showing all team entries');
-              query = query.eq("team_id", selectedTeam);
-            }
-          } else {
-            // Planner can see any team
-            query = query.eq("team_id", selectedTeam);
-          }
+          // Both managers and planners can fetch entries for any team
+          // UI will handle display restrictions based on management rights
+          query = query.eq("team_id", selectedTeam);
         } else {
           console.log('Showing all teams view');
           
@@ -686,6 +643,14 @@ const ScheduleView = () => {
     return result;
   };
 
+  // Helper function to determine if manager can view full details for a user
+  const canViewFullDetails = async (userId: string) => {
+    if (!isManager() || isPlanner()) return true; // Planners see full details always
+    if (isTeamMember() && !isManager()) return false; // Regular team members see limited
+    
+    return await isUserInManagedTeamCached(userId);
+  };
+
   const getActivityDisplay = (entry: ScheduleEntry) => {
     // Team members only see availability status
     if (isTeamMember() && !isManager() && !isPlanner()) {
@@ -694,12 +659,17 @@ const ScheduleView = () => {
     
     // For managers, check if user is in a managed team
     if (isManager() && !isPlanner()) {
-      // If viewing all teams or the user is not in a managed team, show availability
-      if (selectedTeam === "all" || managedTeamCache[entry.user_id] === false) {
+      const canViewFull = managedTeamCache[entry.user_id];
+      if (canViewFull === false) {
+        // Manager doesn't manage this user's team - show availability only
+        return entry.activity_type === "work" ? "Available" : "Unavailable";
+      } else if (canViewFull === true) {
+        // Manager manages this user's team - show full details
+        return getActivityDisplayName(entry.activity_type);
+      } else {
+        // Cache not ready - show availability as fallback
         return entry.activity_type === "work" ? "Available" : "Unavailable";
       }
-      // If user is in a managed team (or we haven't cached yet), show full details
-      return getActivityDisplayName(entry.activity_type);
     }
     
     // Planners and admins see full details
@@ -720,7 +690,18 @@ const ScheduleView = () => {
         : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
     }
 
-    // Full activity type colors for managers and planners
+    // For managers, check if they can view full details
+    if (isManager() && !isPlanner()) {
+      const canViewFull = managedTeamCache[entry.user_id];
+      if (canViewFull === false) {
+        // Show availability colors only
+        return entry.activity_type === "work" 
+          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      }
+    }
+
+    // Full activity type colors for managers (with full access) and planners
     switch (entry.activity_type) {
       case "work":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
@@ -928,8 +909,35 @@ const ScheduleView = () => {
                           {employee.initials}
                         </div>
                         <div>
-                          <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-                          <p className="text-xs text-muted-foreground">{employee.initials}</p>
+                          {/* Show full name or initials based on management rights */}
+                          {isManager() && !isPlanner() ? (
+                            (() => {
+                              const canViewFull = managedTeamCache[employee.user_id];
+                              if (canViewFull === false) {
+                                // Manager doesn't manage this user's team - show initials only
+                                return (
+                                  <>
+                                    <p className="font-medium">{employee.initials}</p>
+                                    <p className="text-xs text-muted-foreground">Available/Unavailable</p>
+                                  </>
+                                );
+                              } else {
+                                // Manager manages this user's team - show full name
+                                return (
+                                  <>
+                                    <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+                                    <p className="text-xs text-muted-foreground">{employee.initials}</p>
+                                  </>
+                                );
+                              }
+                            })()
+                          ) : (
+                            // Planners and team members see full names
+                            <>
+                              <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+                              <p className="text-xs text-muted-foreground">{employee.initials}</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     </TableCell>
