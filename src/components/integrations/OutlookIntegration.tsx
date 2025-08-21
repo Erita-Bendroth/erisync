@@ -114,8 +114,9 @@ const OutlookIntegration = () => {
   const connectToOutlook = async () => {
     setLoading(true);
     try {
-      // Azure AD App Configuration
+      // Azure AD App Configuration - use Vestas tenant
       const clientId = '9c1e8b69-8746-4aaa-a968-7d3de62be7c9';
+      const tenantId = 'c07019407b3f4116a59f159078bc3c63'; // Vestas tenant ID from your email domain
       const redirectUri = encodeURIComponent(`${window.location.origin}/auth`);
       const scopes = encodeURIComponent('https://graph.microsoft.com/Calendars.ReadWrite offline_access User.Read');
       
@@ -123,8 +124,8 @@ const OutlookIntegration = () => {
       const state = Math.random().toString(36).substring(2, 15);
       localStorage.setItem('oauth_state', state);
       
-      // Build Azure AD authorization URL
-      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+      // Build Azure AD authorization URL with tenant-specific endpoint
+      const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
         `client_id=${clientId}` +
         `&response_type=code` +
         `&redirect_uri=${redirectUri}` +

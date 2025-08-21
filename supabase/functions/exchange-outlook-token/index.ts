@@ -18,12 +18,19 @@ serve(async (req) => {
       throw new Error('Missing required parameters')
     }
 
-    // Azure AD app configuration
-    const clientId = '9c1e8b69-8746-4aaa-a968-7d3de62be7c9'
-    const clientSecret = 'KA_8Q~JTzeyVKsS09jN1gHgr~4Xwn823FRIyScgz'
+    // Get Azure AD app configuration from environment
+    const clientId = Deno.env.get('AZURE_AD_CLIENT_ID')
+    const clientSecret = Deno.env.get('AZURE_AD_CLIENT_SECRET')
+    const tenantId = 'c07019407b3f4116a59f159078bc3c63' // Vestas tenant ID
 
-    // Exchange authorization code for access token
-    const tokenUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token'
+    if (!clientId || !clientSecret) {
+      throw new Error('Azure AD client credentials not configured')
+    }
+
+    console.log('Exchanging code for tokens with tenant:', tenantId)
+
+    // Exchange authorization code for access token using tenant-specific endpoint
+    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`
     const tokenParams = new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
@@ -48,6 +55,7 @@ serve(async (req) => {
     }
 
     const tokenData = await tokenResponse.json()
+    console.log('Token exchange successful')
 
     return new Response(
       JSON.stringify({
