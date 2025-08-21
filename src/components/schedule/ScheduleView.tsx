@@ -179,6 +179,35 @@ const ScheduleView = () => {
     }
   }, [selectedTeam, viewMode]);
 
+  // Clear cache when team selection changes
+  useEffect(() => {
+    setManagedTeamCache({});
+  }, [selectedTeam, viewMode]);
+
+  // Pre-populate managed team cache for performance
+  useEffect(() => {
+    const populateManagedTeamCache = async () => {
+      if (isManager() && !isPlanner() && employees.length > 0) {
+        console.log('Populating managed team cache for employees:', employees.length);
+        const cachePromises = employees.map(async (emp) => {
+          const result = await isUserInManagedTeam(emp.user_id);
+          return { userId: emp.user_id, isManaged: result };
+        });
+        
+        const results = await Promise.all(cachePromises);
+        const newCache = results.reduce((acc, { userId, isManaged }) => {
+          acc[userId] = isManaged;
+          return acc;
+        }, {} as { [userId: string]: boolean });
+        
+        console.log('Managed team cache populated:', newCache);
+        setManagedTeamCache(newCache);
+      }
+    };
+
+    populateManagedTeamCache();
+  }, [employees, user]);
+
   const fetchUserRoles = async () => {
     try {
       const { data } = await supabase
@@ -234,9 +263,7 @@ const ScheduleView = () => {
       console.log('userRoles:', userRoles.map(r => r.role));
       console.log('isManager():', isManager());
       console.log('isPlanner():', isPlanner());
-      console.log('isTeamMember():', isTeamMember());
       console.log('selectedTeam:', selectedTeam);
-      console.log('viewMode:', viewMode);
 
       let query = supabase
         .from('profiles')
@@ -248,33 +275,89 @@ const ScheduleView = () => {
         
         if (selectedTeam !== "all") {
           console.log('Filtering to specific team:', selectedTeam);
-          // Get all members of the selected team
-          const { data: teamMembers, error } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .eq('team_id', selectedTeam);
           
-          console.log('Team members query result:', { teamMembers, error });
-          
-          if (teamMembers && teamMembers.length > 0) {
-            const userIds = teamMembers.map(tm => tm.user_id);
-            console.log('Filtering profiles to user IDs:', userIds);
-            query = query.in('user_id', userIds);
+          // For managers, check if they manage this specific team
+          if (isManager() && !isPlanner()) {
+            const { data: managerCheck } = await supabase
+              .from('team_members')
+              .select('team_id')
+              .eq('user_id', user!.id)
+              .eq('team_id', selectedTeam)
+              .eq('is_manager', true);
+            
+            console.log('Manager check for team:', selectedTeam, 'result:', managerCheck);
+            
+            if (!managerCheck || managerCheck.length === 0) {
+              console.log('Manager does not manage this team, showing empty list');
+              query = query.eq('user_id', 'no-match'); // Force empty result
+            } else {
+              // Manager manages this team, get all members
+              const { data: teamMembers } = await supabase
+                .from('team_members')
+                .select('user_id')
+                .eq('team_id', selectedTeam);
+              
+              if (teamMembers && teamMembers.length > 0) {
+                const userIds = teamMembers.map(tm => tm.user_id);
+                console.log('Manager can see team members:', userIds);
+                query = query.in('user_id', userIds);
+              }
+            }
           } else {
-            console.log('No team members found, showing empty list');
-            query = query.eq('user_id', 'no-match'); // Force empty result
+            // Planner can see any team
+            const { data: teamMembers } = await supabase
+              .from('team_members')
+              .select('user_id')
+              .eq('team_id', selectedTeam);
+            
+            if (teamMembers && teamMembers.length > 0) {
+              const userIds = teamMembers.map(tm => tm.user_id);
+              console.log('Planner can see team members:', userIds);
+              query = query.in('user_id', userIds);
+            }
           }
         } else {
-          console.log('Showing all users from all teams');
-          // Show all users who are part of any team
-          const { data: allTeamMembers, error } = await supabase
-            .from('team_members')
-            .select('user_id');
+          console.log('Showing all teams view');
           
-          if (allTeamMembers && allTeamMembers.length > 0) {
-            const userIds = [...new Set(allTeamMembers.map(tm => tm.user_id))];
-            console.log('All team member IDs:', userIds);
-            query = query.in('user_id', userIds);
+          if (isManager() && !isPlanner()) {
+            // For managers viewing "All Teams", show only users from teams they manage
+            const { data: managedTeams } = await supabase
+              .from('team_members')
+              .select('team_id')
+              .eq('user_id', user!.id)
+              .eq('is_manager', true);
+            
+            console.log('Manager\'s managed teams:', managedTeams);
+            
+            if (managedTeams && managedTeams.length > 0) {
+              const teamIds = managedTeams.map(tm => tm.team_id);
+              
+              const { data: teamMembers } = await supabase
+                .from('team_members')
+                .select('user_id')
+                .in('team_id', teamIds);
+              
+              if (teamMembers && teamMembers.length > 0) {
+                const userIds = [...new Set(teamMembers.map(tm => tm.user_id))];
+                console.log('Manager can see users from managed teams:', userIds);
+                query = query.in('user_id', userIds);
+              }
+            } else {
+              // Manager doesn't manage any teams, show only themselves
+              console.log('Manager has no managed teams, showing only self');
+              query = query.eq('user_id', user!.id);
+            }
+          } else {
+            // Planner can see all team members
+            const { data: allTeamMembers } = await supabase
+              .from('team_members')
+              .select('user_id');
+            
+            if (allTeamMembers && allTeamMembers.length > 0) {
+              const userIds = [...new Set(allTeamMembers.map(tm => tm.user_id))];
+              console.log('Planner can see all team members:', userIds);
+              query = query.in('user_id', userIds);
+            }
           }
         }
       } else if (isTeamMember()) {
@@ -335,34 +418,17 @@ const ScheduleView = () => {
       // Fetch entries for full week (Monday-Sunday)
       const weekEnd = addDays(weekStart, 6); // Sunday
       
+      console.log('=== fetchScheduleEntries START ===');
       console.log('Fetching schedule entries for work week:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
         weekEnd: format(weekEnd, "yyyy-MM-dd"),
-        weekStartDay: weekStart.getDay(),
-        weekEndDay: weekEnd.getDay(),
         userId: user?.id,
-        userRoles: userRoles.map(r => r.role)
+        userRoles: userRoles.map(r => r.role),
+        isManager: isManager(),
+        isPlanner: isPlanner(),
+        selectedTeam: selectedTeam
       });
-      
-      // First test basic access without joins
-      console.log('Testing basic query access...');
-      
-      let basicQuery = supabase
-        .from("schedule_entries")
-        .select("id, user_id, team_id, date, activity_type")
-        .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
-        .limit(5);
 
-      const { data: basicTest, error: basicError } = await basicQuery;
-      console.log('Basic query test result:', { data: basicTest?.length, error: basicError });
-
-      if (basicError) {
-        console.error('Basic query failed:', basicError);
-        throw new Error(`Database access failed: ${basicError.message}`);
-      }
-
-      // If basic query works, try the full query
       let query = supabase
         .from("schedule_entries")
         .select(`
@@ -382,18 +448,60 @@ const ScheduleView = () => {
         .lte("date", format(addDays(weekStart, 6), "yyyy-MM-dd"))
         .order("date");
 
-      console.log('Full query details:', {
-        queryDateStart: format(weekStart, "yyyy-MM-dd"),
-        queryDateEnd: format(addDays(weekStart, 4), "yyyy-MM-dd"),
-        actualWeekStart: weekStart.toString(),
-        actualWeekEnd: addDays(weekStart, 4).toString(),
-        isManager: isManager(),
-        isPlanner: isPlanner(),
-        selectedTeam: selectedTeam
-      });
-
-      // Apply filtering based on user roles and view mode
-      if (isTeamMember() && !isManager() && !isPlanner()) {
+      // Apply filtering based on user roles and permissions
+      if (isManager() || isPlanner()) {
+        console.log('User has manager/planner role');
+        
+        if (selectedTeam !== "all") {
+          console.log('Filtering by selected team:', selectedTeam);
+          
+          // For managers, verify they manage this team
+          if (isManager() && !isPlanner()) {
+            const { data: managerCheck } = await supabase
+              .from('team_members')
+              .select('team_id')
+              .eq('user_id', user!.id)
+              .eq('team_id', selectedTeam)
+              .eq('is_manager', true);
+            
+            if (!managerCheck || managerCheck.length === 0) {
+              console.log('Manager does not manage this team, restricting access');
+              query = query.eq('user_id', user!.id); // Only show own entries
+            } else {
+              console.log('Manager manages this team, showing all team entries');
+              query = query.eq("team_id", selectedTeam);
+            }
+          } else {
+            // Planner can see any team
+            query = query.eq("team_id", selectedTeam);
+          }
+        } else {
+          console.log('Showing all teams view');
+          
+          if (isManager() && !isPlanner()) {
+            // For managers viewing "All Teams", show entries from teams they manage
+            const { data: managedTeams } = await supabase
+              .from('team_members')
+              .select('team_id')
+              .eq('user_id', user!.id)
+              .eq('is_manager', true);
+            
+            if (managedTeams && managedTeams.length > 0) {
+              const teamIds = managedTeams.map(tm => tm.team_id);
+              console.log('Manager can see entries from managed teams:', teamIds);
+              query = query.in("team_id", teamIds);
+            } else {
+              console.log('Manager has no managed teams, showing only own entries');
+              query = query.eq("user_id", user!.id);
+            }
+          } else {
+            // Planners can see all entries
+            console.log('Planner can see all entries');
+          }
+        }
+      } else if (isTeamMember()) {
+        console.log('User is regular team member');
+        
         if (viewMode === "my-schedule") {
           // Team members only see their own entries
           query = query.eq("user_id", user!.id);
@@ -411,40 +519,21 @@ const ScheduleView = () => {
             console.log('Filtering to show team entries for teams:', teamIds);
           }
         }
-      } else if (selectedTeam !== "all") {
-        // For planners/managers, apply team filter if specific team is selected
-        query = query.eq("team_id", selectedTeam);
-        console.log('Filtering by team:', selectedTeam);
       } else {
-        // Planners/managers viewing "All Teams" - show all entries
-        console.log('Showing all entries for all teams (planners/managers view)');
+        // Default: show only own entries
+        query = query.eq("user_id", user!.id);
       }
 
       const { data, error } = await query;
 
       console.log('Raw query result:', {
         totalEntries: data?.length || 0,
-        fridayEntries: data?.filter(entry => entry.date === '2025-08-15').length || 0,
         sampleDates: data?.slice(0, 10).map(entry => entry.date) || [],
         allDates: [...new Set(data?.map(entry => entry.date) || [])].sort()
       });
 
-      if (data) {
-        const fridayEntries = data.filter(entry => entry.date === '2025-08-15');
-        console.log('FOUND FRIDAY ENTRIES:', fridayEntries.length);
-        if (fridayEntries.length > 0) {
-          console.log('Sample Friday entries:', fridayEntries.slice(0, 3));
-        }
-      }
-
       if (error) {
-        console.error('Detailed schedule query error:', {
-          error: error,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
+        console.error('Schedule query error:', error);
         throw error;
       }
       
@@ -549,7 +638,7 @@ const ScheduleView = () => {
 
   const isUserInManagedTeam = async (userId: string) => {
     // For managers, check if they manage the teams this user belongs to
-    if (!isManager()) return false;
+    if (!isManager()) return true; // Non-managers see full details for users they can access
     
     try {
       // Get the teams this user belongs to
@@ -585,22 +674,32 @@ const ScheduleView = () => {
     }
   };
 
+  const [managedTeamCache, setManagedTeamCache] = useState<{ [userId: string]: boolean }>({});
+
+  const isUserInManagedTeamCached = async (userId: string) => {
+    if (managedTeamCache[userId] !== undefined) {
+      return managedTeamCache[userId];
+    }
+    
+    const result = await isUserInManagedTeam(userId);
+    setManagedTeamCache(prev => ({ ...prev, [userId]: result }));
+    return result;
+  };
+
   const getActivityDisplay = (entry: ScheduleEntry) => {
     // Team members only see availability status
     if (isTeamMember() && !isManager() && !isPlanner()) {
       return entry.activity_type === "work" ? "Available" : "Unavailable";
     }
     
-    // Managers see full details for their managed teams
+    // For managers, check if user is in a managed team
     if (isManager() && !isPlanner()) {
-      // If viewing a specific team that they manage, show full details
-      if (selectedTeam !== "all") {
-        return getActivityDisplayName(entry.activity_type);
-      } else {
-        // When viewing all teams, show availability for non-managed teams
-        // For now, show full details since determining managed teams is complex
-        return getActivityDisplayName(entry.activity_type);
+      // If viewing all teams or the user is not in a managed team, show availability
+      if (selectedTeam === "all" || managedTeamCache[entry.user_id] === false) {
+        return entry.activity_type === "work" ? "Available" : "Unavailable";
       }
+      // If user is in a managed team (or we haven't cached yet), show full details
+      return getActivityDisplayName(entry.activity_type);
     }
     
     // Planners and admins see full details
