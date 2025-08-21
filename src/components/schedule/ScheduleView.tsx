@@ -230,90 +230,88 @@ const ScheduleView = () => {
 
   const fetchEmployees = async () => {
     try {
+      console.log('=== fetchEmployees START ===');
+      console.log('userRoles:', userRoles.map(r => r.role));
+      console.log('isManager():', isManager());
+      console.log('isPlanner():', isPlanner());
+      console.log('isTeamMember():', isTeamMember());
+      console.log('selectedTeam:', selectedTeam);
+      console.log('viewMode:', viewMode);
+
       let query = supabase
         .from('profiles')
         .select('id, user_id, first_name, last_name');
 
-      // Apply filtering based on user role and view mode
-      console.log('fetchEmployees - userRoles:', userRoles.map(r => r.role));
-      console.log('fetchEmployees - isTeamMember():', isTeamMember());
-      console.log('fetchEmployees - isManager():', isManager());
-      console.log('fetchEmployees - isPlanner():', isPlanner());
-      console.log('fetchEmployees - viewMode:', viewMode);
-      
-      if (isTeamMember() && !isManager() && !isPlanner()) {
-        console.log('User is pure team member, applying team member filtering');
+      // Managers and Planners have broader access
+      if (isManager() || isPlanner()) {
+        console.log('User is manager or planner');
+        
+        if (selectedTeam !== "all") {
+          console.log('Filtering to specific team:', selectedTeam);
+          // Get all members of the selected team
+          const { data: teamMembers, error } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', selectedTeam);
+          
+          console.log('Team members query result:', { teamMembers, error });
+          
+          if (teamMembers && teamMembers.length > 0) {
+            const userIds = teamMembers.map(tm => tm.user_id);
+            console.log('Filtering profiles to user IDs:', userIds);
+            query = query.in('user_id', userIds);
+          } else {
+            console.log('No team members found, showing empty list');
+            query = query.eq('user_id', 'no-match'); // Force empty result
+          }
+        } else {
+          console.log('Showing all users from all teams');
+          // Show all users who are part of any team
+          const { data: allTeamMembers, error } = await supabase
+            .from('team_members')
+            .select('user_id');
+          
+          if (allTeamMembers && allTeamMembers.length > 0) {
+            const userIds = [...new Set(allTeamMembers.map(tm => tm.user_id))];
+            console.log('All team member IDs:', userIds);
+            query = query.in('user_id', userIds);
+          }
+        }
+      } else if (isTeamMember()) {
+        console.log('User is regular team member');
+        
         if (viewMode === "my-schedule") {
-          // Show only the current user
-          console.log('Showing only current user for my-schedule view');
+          console.log('Showing only current user');
           query = query.eq('user_id', user!.id);
-        } else if (viewMode === "my-team") {
-          console.log('Fetching team members for my-team view');
+        } else {
+          console.log('Showing team members from user teams');
           // Show users from the current user's team(s)
           const { data: userTeams, error: teamsError } = await supabase
             .from('team_members')
             .select('team_id')
             .eq('user_id', user!.id);
           
-          console.log('User teams result:', { userTeams, teamsError });
-          
           if (userTeams && userTeams.length > 0) {
             const teamIds = userTeams.map(ut => ut.team_id);
-            console.log('User is in teams:', teamIds);
             
             const { data: teamMembers, error: membersError } = await supabase
               .from('team_members')
               .select('user_id')
               .in('team_id', teamIds);
             
-            console.log('Team members result:', { teamMembers, membersError });
-            
             if (teamMembers && teamMembers.length > 0) {
               const userIds = teamMembers.map(tm => tm.user_id);
-              console.log('Team member viewing team - showing users:', userIds);
               query = query.in('user_id', userIds);
             } else {
-              // Fallback to show only current user if no team members found
-              console.log('No team members found, showing only current user');
               query = query.eq('user_id', user!.id);
             }
           } else {
-            // Fallback to show only current user if not in any teams
-            console.log('User not in any teams, showing only current user');
             query = query.eq('user_id', user!.id);
           }
         }
       } else {
-        console.log('User has elevated role, applying manager/planner filtering');
-        if (selectedTeam !== "all") {
-          console.log('Applying team filter for elevated user, selectedTeam:', selectedTeam);
-          // For planners/managers, apply team filter if specific team is selected
-          const { data: teamMembers } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .eq('team_id', selectedTeam);
-          
-          if (teamMembers && teamMembers.length > 0) {
-            const userIds = teamMembers.map(tm => tm.user_id);
-            console.log('Filtering to team members:', userIds);
-            query = query.in('user_id', userIds);
-          }
-        } else {
-          console.log('Showing all employees for elevated user - fetching all team members');
-          // For managers and planners viewing "All Teams", show all users who are in any team
-          const { data: allTeamMembers } = await supabase
-            .from('team_members')
-            .select('user_id');
-          
-          if (allTeamMembers && allTeamMembers.length > 0) {
-            const userIds = [...new Set(allTeamMembers.map(tm => tm.user_id))];
-            console.log('Showing all team members:', userIds);
-            query = query.in('user_id', userIds);
-          } else {
-            // Fallback to showing all profiles if no team members found
-            console.log('No team members found, showing all profiles');
-          }
-        }
+        console.log('No specific role found, showing only current user');
+        query = query.eq('user_id', user!.id);
       }
 
       const { data, error } = await query.order('first_name');
@@ -549,35 +547,64 @@ const ScheduleView = () => {
   const isManager = () => userRoles.some(role => role.role === "manager");
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
 
-  const isUserInManagedTeam = (userId: string) => {
-    // Check if the user is in a team that the current user manages
-    const userEntries = scheduleEntries.filter(entry => entry.user_id === userId);
-    if (userEntries.length === 0) return false;
+  const isUserInManagedTeam = async (userId: string) => {
+    // For managers, check if they manage the teams this user belongs to
+    if (!isManager()) return false;
     
-    // Check if current user is manager of any team this user belongs to
-    const userTeamIds = [...new Set(userEntries.map(entry => entry.team_id))];
-    // This will be properly determined by the RLS policies and data access
-    return true; // For now, assume managers can see details for users they can access
+    try {
+      // Get the teams this user belongs to
+      const { data: userTeamMemberships } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId);
+      
+      if (!userTeamMemberships || userTeamMemberships.length === 0) {
+        return false;
+      }
+      
+      const userTeamIds = userTeamMemberships.map(tm => tm.team_id);
+      
+      // Check if current user is manager of any of those teams
+      const { data: managerTeams } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user!.id)
+        .eq('is_manager', true);
+      
+      if (!managerTeams || managerTeams.length === 0) {
+        return false;
+      }
+      
+      const managedTeamIds = managerTeams.map(tm => tm.team_id);
+      
+      // Check if there's any overlap
+      return userTeamIds.some(teamId => managedTeamIds.includes(teamId));
+    } catch (error) {
+      console.error('Error checking managed team relationship:', error);
+      return false;
+    }
   };
 
   const getActivityDisplay = (entry: ScheduleEntry) => {
-    // Team members only see availability status for users not in their direct teams
+    // Team members only see availability status
     if (isTeamMember() && !isManager() && !isPlanner()) {
-      return entry.availability_status === "available" ? "Available" : "Unavailable";
+      return entry.activity_type === "work" ? "Available" : "Unavailable";
     }
     
-    // Managers see full details for their teams, availability for others
+    // Managers see full details for their managed teams
     if (isManager() && !isPlanner()) {
-      if (isUserInManagedTeam(entry.user_id)) {
-        return entry.activity_type.replace("_", " ");
+      // If viewing a specific team that they manage, show full details
+      if (selectedTeam !== "all") {
+        return getActivityDisplayName(entry.activity_type);
       } else {
-        // For teams not managed by this manager, show only availability
-        return entry.activity_type === "work" ? "Available" : "Unavailable";
+        // When viewing all teams, show availability for non-managed teams
+        // For now, show full details since determining managed teams is complex
+        return getActivityDisplayName(entry.activity_type);
       }
     }
     
     // Planners and admins see full details
-    return entry.activity_type.replace("_", " ");
+    return getActivityDisplayName(entry.activity_type);
   };
 
   const getHolidaysForDay = (date: Date) => {
@@ -587,19 +614,14 @@ const ScheduleView = () => {
   };
 
   const getActivityColor = (entry: ScheduleEntry) => {
+    // Team members see availability colors only
     if (isTeamMember() && !isManager() && !isPlanner()) {
-      return entry.availability_status === "available" 
+      return entry.activity_type === "work" 
         ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
         : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
     }
 
-    // Managers see availability colors for non-managed teams
-    if (isManager() && !isPlanner() && !isUserInManagedTeam(entry.user_id)) {
-      return entry.activity_type === "work"
-        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-    }
-
+    // Full activity type colors for managers and planners
     switch (entry.activity_type) {
       case "work":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
