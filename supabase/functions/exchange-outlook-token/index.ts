@@ -21,7 +21,7 @@ serve(async (req) => {
     // Get Azure AD app configuration from environment
     const clientId = Deno.env.get('AZURE_AD_CLIENT_ID')
     const clientSecret = Deno.env.get('AZURE_AD_CLIENT_SECRET')
-    const tenantId = 'c07019407b3f4116a59f159078bc3c63' // Vestas tenant ID
+    const tenantId = 'c0701940-7b3f-4116-a59f-159078bc3c63' // Vestas tenant ID
 
     if (!clientId || !clientSecret) {
       throw new Error('Azure AD client credentials not configured')

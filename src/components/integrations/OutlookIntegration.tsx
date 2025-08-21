@@ -116,7 +116,7 @@ const OutlookIntegration = () => {
     try {
       // Azure AD App Configuration - use Vestas tenant
       const clientId = '9c1e8b69-8746-4aaa-a968-7d3de62be7c9';
-      const tenantId = 'c07019407b3f4116a59f159078bc3c63'; // Vestas tenant ID
+      const tenantId = 'c0701940-7b3f-4116-a59f-159078bc3c63'; // Vestas tenant ID
       const redirectUri = `${window.location.origin}/auth`;
       const scopes = encodeURIComponent('https://graph.microsoft.com/Calendars.ReadWrite offline_access User.Read');
       
