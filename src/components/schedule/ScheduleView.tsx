@@ -337,7 +337,8 @@ useEffect(() => {
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
           ...emp,
-          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
+          displayName: `${emp.first_name} ${emp.last_name}`.trim()
         }));
 
         console.log('Transformed employees:', transformedEmployees);
@@ -391,7 +392,8 @@ useEffect(() => {
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
           ...emp,
-          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
+          displayName: `${emp.first_name} ${emp.last_name}`.trim()
         }));
 
         setEmployees(transformedEmployees);
@@ -412,7 +414,8 @@ useEffect(() => {
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
           ...emp,
-          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase()
+          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
+          displayName: `${emp.first_name} ${emp.last_name}`.trim()
         }));
 
         setEmployees(transformedEmployees);
@@ -616,24 +619,24 @@ const canViewFullDetailsSync = (userId: string) => {
 
   // Render employee name/initials based on access
   const renderEmployeeName = (employee: Employee) => {
-if (isManager() && !isPlanner()) {
-  const canViewFull = canViewFullDetailsSync(employee.user_id);
-  if (!canViewFull) {
-    return (
-      <>
-        <p className="font-medium">{employee.initials}</p>
-        <p className="text-xs text-muted-foreground">Available/Not Available</p>
-      </>
-    );
-  } else {
-    return (
-      <>
-        <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-        <p className="text-xs text-muted-foreground">{employee.initials}</p>
-      </>
-    );
-  }
-}
+    if (isManager() && !isPlanner()) {
+      const canViewFull = canViewFullDetailsSync(employee.user_id);
+      if (!canViewFull) {
+        return (
+          <>
+            <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+            <p className="text-xs text-muted-foreground">Available/Not Available</p>
+          </>
+        );
+      } else {
+        return (
+          <>
+            <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+            <p className="text-xs text-muted-foreground">{employee.initials}</p>
+          </>
+        );
+      }
+    }
     return (
       <>
         <p className="font-medium">{employee.first_name} {employee.last_name}</p>
