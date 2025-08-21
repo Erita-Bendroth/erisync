@@ -14,7 +14,9 @@ import AdminSetup from "@/components/admin/AdminSetup";
 import HolidayManager from "@/components/holidays/HolidayManager";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
+import NotificationSettings from "@/components/settings/NotificationSettings";
 import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
+import ScheduleExport from "@/components/schedule/ScheduleExport";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import OutlookIntegration from "@/components/integrations/OutlookIntegration";
 import { supabase } from "@/integrations/supabase/client";
@@ -395,7 +397,9 @@ const Schedule = () => {
           <TabsContent value="settings" className="space-y-6">
             <div className="space-y-6">
               <CountrySelector />
+              <NotificationSettings />
               <PasswordSettings />
+              <ScheduleExport />
               <OutlookIntegration />
               
               {/* Profile Overview - Only for planners and managers */}

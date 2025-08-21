@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { TimeSelect } from "@/components/ui/time-select";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 
 interface ScheduleEntry {
   id: string;
@@ -72,6 +73,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   onSave
 }) => {
   const { toast } = useToast();
+  const { showScheduleChangeNotification } = useDesktopNotifications();
   const [loading, setLoading] = useState(false);
   const [useHourSplit, setUseHourSplit] = useState(false);
   const [sendNotification, setSendNotification] = useState(false);
@@ -225,8 +227,38 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               },
             });
           }
+          
+          // Show desktop notification if schedule change notifications are enabled
+          if (profileData) {
+            const changeType = entry.id.startsWith('temp-') ? 'created' : 'updated';
+            showScheduleChangeNotification({
+              employeeName: `${profileData.first_name} ${profileData.last_name}`,
+              date: format(new Date(entry.date), 'PPP'),
+              changeType: changeType
+            });
+          }
         } catch (notificationError) {
           console.error('Failed to send notification:', notificationError);
+        }
+      } else {
+        // Even if email notification is not requested, show desktop notification
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('user_id', entry.user_id)
+            .maybeSingle();
+            
+          if (profileData) {
+            const changeType = entry.id.startsWith('temp-') ? 'created' : 'updated';
+            showScheduleChangeNotification({
+              employeeName: `${profileData.first_name} ${profileData.last_name}`,
+              date: format(new Date(entry.date), 'PPP'),
+              changeType: changeType
+            });
+          }
+        } catch (error) {
+          console.error('Failed to show desktop notification:', error);
         }
       }
 
