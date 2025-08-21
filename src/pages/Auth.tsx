@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,19 +38,30 @@ const Auth = () => {
   });
 
   useEffect(() => {
+    // Check for recovery tokens in the URL hash
     const hash = window.location.hash.substring(1);
     const hashParams = new URLSearchParams(hash);
     const type = hashParams.get('type');
+
+    console.log('Auth page loaded with hash:', hash);
+    console.log('Type from hash:', type);
 
     if (type === 'recovery') {
       const access_token = hashParams.get('access_token');
       const refresh_token = hashParams.get('refresh_token');
 
+      console.log('Recovery tokens found:', {
+        hasAccessToken: !!access_token,
+        hasRefreshToken: !!refresh_token
+      });
+
       if (access_token && refresh_token) {
-        // Move to the dedicated reset route while preserving tokens in the hash
+        // Redirect to reset password page with the full hash
+        console.log('Redirecting to reset-password with hash:', window.location.hash);
         navigate(`/reset-password${window.location.hash}`, { replace: true });
+        return;
       } else {
-        // Show inline reset UI but it will report missing tokens
+        console.log('Missing tokens, showing inline reset form');
         setShowResetPassword(true);
       }
     }
