@@ -42,6 +42,32 @@ const Dashboard = () => {
     }
   }, [user]);
 
+  // Set up real-time updates for schedule entries
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('schedule-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedule_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          // Refresh today's schedule when any changes occur
+          fetchTodaySchedule();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const fetchUserData = async () => {
     try {
       // Fetch user profile
@@ -83,16 +109,7 @@ const Dashboard = () => {
       }
 
       // Fetch today's schedule
-      const today = new Date().toISOString().split('T')[0];
-      const { data: scheduleData } = await supabase
-        .from("schedule_entries")
-        .select("*")
-        .eq("user_id", user!.id)
-        .eq("date", today);
-
-      if (scheduleData) {
-        setTodaySchedule(scheduleData);
-      }
+      await fetchTodaySchedule();
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast({
@@ -105,8 +122,50 @@ const Dashboard = () => {
     }
   };
 
+  const fetchTodaySchedule = async () => {
+    if (!user) return;
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: scheduleData, error } = await supabase
+        .from("schedule_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("date", today)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching today's schedule:", error);
+        return;
+      }
+
+      setTodaySchedule(scheduleData || []);
+    } catch (error) {
+      console.error("Error fetching today's schedule:", error);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const getActivityDisplayName = (activityType: string) => {
+    switch (activityType) {
+      case 'work':
+        return 'Work';
+      case 'vacation':
+        return 'Vacation';
+      case 'sick':
+        return 'Sick Leave';
+      case 'training':
+        return 'Training';
+      case 'hotline_support':
+        return 'Hotline Support';
+      case 'meeting':
+        return 'Meeting';
+      default:
+        return activityType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
   };
 
   const getRoleColor = (role: string) => {
@@ -234,47 +293,49 @@ const Dashboard = () => {
                       }
 
                       return (
-                        <div key={index} className="space-y-2 p-3 border rounded-lg">
+                        <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
+                          {/* Header with main activity type */}
                           <div className="flex items-center justify-between">
                             <Badge variant={
                               entry.activity_type === 'work' ? 'default' :
-                              entry.activity_type === 'vacation' ? 'secondary' :
+                              entry.activity_type === 'hotline_support' ? 'secondary' :
+                              entry.activity_type === 'vacation' ? 'outline' :
                               entry.activity_type === 'sick' ? 'destructive' :
                               entry.activity_type === 'training' ? 'outline' :
                               'default'
-                            }>
-                              {entry.activity_type.replace('_', ' ').toUpperCase()}
+                            } className="font-semibold">
+                              {getActivityDisplayName(entry.activity_type)}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground capitalize">
                               {entry.shift_type} shift
                             </span>
                           </div>
                           
-                          {/* Time blocks */}
-                          <div className="space-y-1">
+                          {/* Time blocks with clear activity names */}
+                          <div className="space-y-2">
                             {timeBlocks.map((block, blockIndex) => (
-                              <div key={blockIndex} className="flex items-center justify-between text-sm">
-                                <span className="font-medium">
-                                  {block.activity ? block.activity.replace('_', ' ') : entry.activity_type.replace('_', ' ')}
+                              <div key={blockIndex} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                                <span className="font-medium text-sm">
+                                  {block.activity ? getActivityDisplayName(block.activity) : getActivityDisplayName(entry.activity_type)}
                                 </span>
-                                <span className="text-muted-foreground">
+                                <span className="text-sm font-mono text-muted-foreground">
                                   {block.start_time} – {block.end_time}
                                 </span>
                               </div>
                             ))}
                           </div>
                           
-                          {/* Current/upcoming indicator */}
+                          {/* Status and update time */}
                           <div className="flex items-center justify-between text-xs">
-                            <span className={`px-2 py-1 rounded ${
+                            <span className={`px-2 py-1 rounded-full font-medium ${
                               new Date().getHours() >= parseInt(timeBlocks[0]?.start_time?.split(':')[0] || '8') &&
                               new Date().getHours() < parseInt(timeBlocks[timeBlocks.length - 1]?.end_time?.split(':')[0] || '17')
                                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
                             }`}>
                               {new Date().getHours() >= parseInt(timeBlocks[0]?.start_time?.split(':')[0] || '8') &&
                                new Date().getHours() < parseInt(timeBlocks[timeBlocks.length - 1]?.end_time?.split(':')[0] || '17')
-                                ? '● Active Now'
+                                ? '● Currently Active'
                                 : 'Scheduled'
                               }
                             </span>
@@ -315,10 +376,10 @@ const Dashboard = () => {
               </Button>
               {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
                 <ScheduleEntryForm onSuccess={() => {
-                  fetchUserData(); // Refresh today's schedule after adding entry
+                  fetchTodaySchedule(); // Refresh only today's schedule after adding entry
                   toast({
                     title: "Success",
-                    description: "Schedule entry added successfully",
+                    description: "Schedule entry added successfully - dashboard updated",
                   });
                 }}>
                   <Button 
@@ -330,6 +391,16 @@ const Dashboard = () => {
                   </Button>
                 </ScheduleEntryForm>
               )}
+              
+              {/* Manual refresh button */}
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={fetchTodaySchedule}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Refresh Today's Schedule
+              </Button>
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
