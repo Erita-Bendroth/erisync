@@ -75,6 +75,18 @@ const Auth = () => {
     } else {
       console.log('❌ NOT A VALID RECOVERY LINK:', { type, hasTokens: !!(access_token && refresh_token) });
     }
+
+    // Check for Outlook OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    
+    if (code && state) {
+      // This is an Outlook OAuth callback, redirect to schedule page
+      // The OutlookIntegration component will handle the token exchange
+      navigate("/schedule?tab=settings", { replace: true });
+      return;
+    }
   }, [navigate]);
 
   useEffect(() => {

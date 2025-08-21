@@ -29,7 +29,70 @@ const OutlookIntegration = () => {
 
   useEffect(() => {
     checkConnectionStatus();
+    handleOAuthCallback();
   }, []);
+
+  const handleOAuthCallback = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const storedState = localStorage.getItem('oauth_state');
+
+    if (code && state && state === storedState) {
+      setLoading(true);
+      try {
+        // Exchange authorization code for tokens via edge function
+        const { data, error } = await supabase.functions.invoke('exchange-outlook-token', {
+          body: { 
+            code,
+            redirectUri: `${window.location.origin}/auth`
+          }
+        });
+
+        if (error) throw error;
+
+        // Store tokens
+        localStorage.setItem('outlook_access_token', data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem('outlook_refresh_token', data.refresh_token);
+        }
+
+        // Get user info
+        const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: {
+            'Authorization': `Bearer ${data.access_token}`,
+          },
+        });
+
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          localStorage.setItem('outlook_account_email', userData.mail || userData.userPrincipalName);
+          setConnectedAccount(userData.mail || userData.userPrincipalName);
+          setIsConnected(true);
+          
+          toast({
+            title: "Connected!",
+            description: `Successfully connected to Outlook calendar (${userData.mail || userData.userPrincipalName})`,
+          });
+        }
+
+        // Clean up
+        localStorage.removeItem('oauth_state');
+        // Remove query parameters from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+      } catch (error: any) {
+        console.error('OAuth callback error:', error);
+        toast({
+          title: "Connection Failed",
+          description: error.message || "Failed to complete Outlook connection",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const checkConnectionStatus = async () => {
     // This would typically check if user has authorized Outlook integration
@@ -51,56 +114,31 @@ const OutlookIntegration = () => {
   const connectToOutlook = async () => {
     setLoading(true);
     try {
-      // Get access token from Supabase Auth session (Azure provider)
-      const { data: { session } } = await supabase.auth.getSession();
+      // Azure AD App Configuration
+      const clientId = '9c1e8b69-8746-4aaa-a968-7d3de62be7c9';
+      const redirectUri = encodeURIComponent(`${window.location.origin}/auth`);
+      const scopes = encodeURIComponent('https://graph.microsoft.com/Calendars.ReadWrite offline_access User.Read');
       
-      if (!session?.provider_token) {
-        // User needs to sign in with Azure/Microsoft first
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'azure',
-          options: {
-            scopes: 'https://graph.microsoft.com/calendars.readwrite offline_access',
-            redirectTo: `${window.location.origin}/auth`
-          }
-        });
-        
-        if (error) throw error;
-        return;
-      }
-
-      // Store the Microsoft access token
-      localStorage.setItem('outlook_access_token', session.provider_token);
-      if (session.provider_refresh_token) {
-        localStorage.setItem('outlook_refresh_token', session.provider_refresh_token);
-      }
+      // Generate state parameter for security
+      const state = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('oauth_state', state);
       
-      // Get user info from Microsoft Graph
-      const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-        headers: {
-          'Authorization': `Bearer ${session.provider_token}`,
-        },
-      });
+      // Build Azure AD authorization URL
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+        `client_id=${clientId}` +
+        `&response_type=code` +
+        `&redirect_uri=${redirectUri}` +
+        `&scope=${scopes}` +
+        `&state=${state}`;
       
-      if (!userResponse.ok) {
-        throw new Error('Failed to fetch user info from Microsoft Graph');
-      }
-      
-      const userData = await userResponse.json();
-      localStorage.setItem('outlook_account_email', userData.mail || userData.userPrincipalName);
-      
-      setConnectedAccount(userData.mail || userData.userPrincipalName);
-      setIsConnected(true);
-      
-      toast({
-        title: "Connected!",
-        description: `Successfully connected to Outlook calendar (${userData.mail || userData.userPrincipalName})`,
-      });
+      // Redirect to Azure AD for authentication
+      window.location.href = authUrl;
 
     } catch (error: any) {
       console.error('Error connecting to Outlook:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to connect to Outlook. Please ensure you're signed in with your Microsoft account.",
+        description: error.message || "Failed to connect to Outlook.",
         variant: "destructive",
       });
     } finally {

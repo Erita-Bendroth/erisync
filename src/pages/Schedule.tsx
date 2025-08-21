@@ -20,7 +20,8 @@ import { supabase } from "@/integrations/supabase/client";
 const Schedule = () => {
   const { signOut, user } = useAuth();
   const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState("admin");
+  const tabFromUrl = searchParams.get('tab') || 'admin';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
