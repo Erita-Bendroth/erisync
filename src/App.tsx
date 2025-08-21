@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import TestReset from "./pages/TestReset";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/test-reset" element={<TestReset />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
