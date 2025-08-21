@@ -39,9 +39,15 @@ const Auth = () => {
 
   useEffect(() => {
     // Check for recovery tokens in the URL hash
-    const hash = window.location.hash.substring(1);
+    let hash = window.location.hash.substring(1);
     console.log('RAW HASH:', hash);
-    console.log('FULL URL:', window.location.href);
+    
+    // Fix malformed hash with double # symbols - replace # with & after the first one
+    if (hash.includes('#')) {
+      const parts = hash.split('#');
+      hash = parts[0] + '&' + parts.slice(1).join('&');
+      console.log('FIXED HASH:', hash);
+    }
     
     const hashParams = new URLSearchParams(hash);
     console.log('HASH PARAMS ENTRIES:', Array.from(hashParams.entries()));
@@ -61,11 +67,10 @@ const Auth = () => {
 
     if (type === 'recovery' && access_token && refresh_token) {
       console.log('✅ VALID RECOVERY LINK - REDIRECTING NOW');
-      console.log('REDIRECT TARGET:', `/reset-password${window.location.hash}`);
-      // Use a timeout to ensure the redirect happens
-      setTimeout(() => {
-        navigate(`/reset-password${window.location.hash}`, { replace: true });
-      }, 100);
+      // Create properly formatted hash for redirect
+      const properHash = `#${hash}`;
+      console.log('REDIRECT TARGET:', `/reset-password${properHash}`);
+      navigate(`/reset-password${properHash}`, { replace: true });
       return;
     } else {
       console.log('❌ NOT A VALID RECOVERY LINK:', { type, hasTokens: !!(access_token && refresh_token) });
