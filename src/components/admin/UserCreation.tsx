@@ -25,8 +25,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [formData, setFormData] = useState({
     email: "",
-    firstName: "",
-    lastName: "",
+    initials: "",
     role: "",
     countryCode: "US",
     teamId: "no-team",
@@ -63,7 +62,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
       return;
     }
 
-    if (!formData.firstName || !formData.lastName || !formData.role) {
+    if (!formData.initials || !formData.role) {
       toast({
         title: "Error", 
         description: "All fields are required",
@@ -82,8 +81,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
         body: {
           email: sanitizeInput(formData.email),
           password: tempPassword,
-          firstName: sanitizeInput(formData.firstName),
-          lastName: sanitizeInput(formData.lastName),
+          initials: sanitizeInput(formData.initials),
           role: formData.role,
           countryCode: formData.countryCode,
           teamId: formData.teamId,
@@ -101,8 +99,7 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
       // Reset form
       setFormData({
         email: "",
-        firstName: "",
-        lastName: "",
+        initials: "",
         role: "",
         countryCode: "US",
         teamId: "no-team",
@@ -142,30 +139,20 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
         </Alert>
 
         <form onSubmit={handleCreateUser} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                placeholder="Enter first name"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                placeholder="Enter last name"
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="initials">User Initials</Label>
+            <Input
+              id="initials"
+              type="text"
+              value={formData.initials}
+              onChange={(e) => setFormData({ ...formData, initials: e.target.value.toUpperCase() })}
+              placeholder="Enter user initials (e.g. JD)"
+              maxLength={4}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Short initials to identify the user (2-4 characters)
+            </p>
           </div>
 
           <div className="space-y-2">

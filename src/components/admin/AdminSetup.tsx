@@ -180,20 +180,16 @@ const AdminSetup = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-4 border rounded-lg bg-muted/50">
-            <h3 className="font-semibold mb-2">Step 1: Make yourself an admin</h3>
+            <h3 className="font-semibold mb-2">Admin Access</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              You need "planner" role to access all admin features and manage teams.
+              Only administrators and planners can manage roles and teams. Contact your administrator if you need elevated access.
             </p>
-            <Button onClick={makeCurrentUserAdmin} disabled={loading}>
-              <UserPlus className="w-4 h-4 mr-2" />
-              Make Me Admin (Planner)
-            </Button>
           </div>
 
           <div className="p-4 border rounded-lg">
-            <h3 className="font-semibold mb-2">Step 2: Assign roles to other users</h3>
+            <h3 className="font-semibold mb-2">User Role Management</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Once you have planner access, you can assign roles to other users.
+              Assign and manage roles for all users in the system.
             </p>
             
             <div className="space-y-3">
@@ -260,41 +256,41 @@ const AdminSetup = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-                3
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                  1
+                </div>
+                <div>
+                  <h4 className="font-medium">Create Teams</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Go to the Teams tab to create your organizational teams
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-medium">Create Teams</h4>
-                <p className="text-sm text-muted-foreground">
-                  Go to the Teams tab to create your organizational teams
-                </p>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                  2
+                </div>
+                <div>
+                  <h4 className="font-medium">Assign Team Members</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Add users to teams and designate team managers
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                  3
+                </div>
+                <div>
+                  <h4 className="font-medium">Start Scheduling</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Begin adding schedule entries for your team members
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-                4
-              </div>
-              <div>
-                <h4 className="font-medium">Assign Team Members</h4>
-                <p className="text-sm text-muted-foreground">
-                  Add users to teams and designate team managers
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-                5
-              </div>
-              <div>
-                <h4 className="font-medium">Start Scheduling</h4>
-                <p className="text-sm text-muted-foreground">
-                  Begin adding schedule entries for your team members
-                </p>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

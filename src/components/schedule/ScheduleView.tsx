@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 import { EditScheduleModal } from "./EditScheduleModal";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TimeBlockDisplay } from "./TimeBlockDisplay";
 
 interface ScheduleEntry {
   id: string;
@@ -73,8 +74,8 @@ const ScheduleView = () => {
   const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
-  // Show only Monday-Friday for work days
-  const workDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon-Fri only
+  // Show Monday through Sunday (full week)
+  const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (isManager() || isPlanner()) {
@@ -324,8 +325,8 @@ query = supabase
   const fetchScheduleEntries = async () => {
     try {
       setLoading(true);
-      // Only fetch Monday-Friday entries
-      const weekEnd = addDays(weekStart, 4); // Friday
+      // Fetch entries for full week (Monday-Sunday)
+      const weekEnd = addDays(weekStart, 6); // Sunday
       
       console.log('Fetching schedule entries for work week:', {
         weekStart: format(weekStart, "yyyy-MM-dd"),
@@ -371,7 +372,7 @@ query = supabase
           updated_at
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(addDays(weekStart, 4), "yyyy-MM-dd"))
+        .lte("date", format(addDays(weekStart, 6), "yyyy-MM-dd"))
         .order("date");
 
       console.log('Full query details:', {
@@ -668,7 +669,7 @@ query = supabase
         <div>
           <h2 className="text-2xl font-bold">Weekly Schedule</h2>
           <p className="text-muted-foreground">
-            {format(weekStart, "MMM d")} - {format(addDays(weekStart, 4), "MMM d, yyyy")} (Monday - Friday)
+            {format(weekStart, "MMM d")} - {format(addDays(weekStart, 6), "MMM d, yyyy")} (Full Week)
           </p>
           {userTeams.length > 0 && (
             <p className="text-sm text-muted-foreground">
@@ -814,26 +815,14 @@ query = supabase
                               ) : (
                               dayEntries.map((entry) => (
                                 <div key={entry.id} className="space-y-1">
-                                  <Badge
-                                    variant="secondary"
-                                    className={`text-xs ${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity`}
-                                    title={`${getActivityDisplayName(entry.activity_type)} - ${entry.shift_type} shift - Click to edit`}
+                                  <TimeBlockDisplay
+                                    entry={entry}
                                     onClick={(e) => {
-                                      e.stopPropagation();
+                                      e?.stopPropagation();
                                       (isManager() || isPlanner()) && handleEditShift(entry);
                                     }}
-                                  >
-                                    <div className="flex flex-col items-center py-1">
-                                      <span className="text-xs font-medium">
-                                        {entry.shift_type === "early" ? "Early" : 
-                                         entry.shift_type === "late" ? "Late" : "Normal"}
-                                      </span>
-                                      <span className="text-xs">
-                                        {getActivityDisplayName(entry.activity_type)}
-                                      </span>
-                                    </div>
-                                  </Badge>
-                                  {entry.notes && !entry.notes.includes("Auto-generated") && (
+                                  />
+                                  {entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
                                     <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
                                       {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
                                     </p>
