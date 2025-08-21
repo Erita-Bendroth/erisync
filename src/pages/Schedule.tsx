@@ -263,98 +263,98 @@ const Schedule = () => {
                           2-week Summary
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh]">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2">
-                            <Mail className="w-5 h-5" />
-                            Send 2-Week Schedule Summary
-                          </DialogTitle>
-                        </DialogHeader>
-                         <div className="space-y-6">
-                           <div className="space-y-3">
-                             <label className="text-sm font-medium">Send Mode</label>
-                             <Select value={sendMode} onValueChange={(value: "individual" | "team") => setSendMode(value)}>
-                               <SelectTrigger className="w-full">
-                                 <SelectValue />
-                               </SelectTrigger>
-                               <SelectContent>
-                                 <SelectItem value="individual">📧 Individual User</SelectItem>
-                                 {isPlanner() && (
-                                   <SelectItem value="team">👥 Entire Team</SelectItem>
-                                 )}
-                               </SelectContent>
-                             </Select>
-                           </div>
+                       <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+                         <DialogHeader className="flex-shrink-0">
+                           <DialogTitle className="flex items-center gap-2">
+                             <Mail className="w-5 h-5" />
+                             Send 2-Week Schedule Summary
+                           </DialogTitle>
+                         </DialogHeader>
+                          <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium">Send Mode</label>
+                              <Select value={sendMode} onValueChange={(value: "individual" | "team") => setSendMode(value)}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="individual">📧 Individual User</SelectItem>
+                                  {isPlanner() && (
+                                    <SelectItem value="team">👥 Entire Team</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
 
-                           {sendMode === "individual" ? (
-                             <div className="space-y-2">
-                               <label className="text-sm font-medium">Select Recipient</label>
-                               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                                 <SelectTrigger className="w-full">
-                                   <SelectValue placeholder="Choose a user to send the summary to..." />
-                                 </SelectTrigger>
-                                 <SelectContent>
-                                   {recipients.map(r => (
-                                     <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                   ))}
-                                 </SelectContent>
-                               </Select>
-                             </div>
-                           ) : (
-                             <div className="space-y-2">
-                               <label className="text-sm font-medium">Select Team</label>
-                               <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-                                 <SelectTrigger className="w-full">
-                                   <SelectValue placeholder="Choose a team to send summaries to all members..." />
-                                 </SelectTrigger>
-                                 <SelectContent>
-                                   {availableTeams.map(t => (
-                                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                                   ))}
-                                 </SelectContent>
-                               </Select>
-                             </div>
-                           )}
-                           
-                           <div className="space-y-3">
-                             <div className="flex items-center justify-between">
-                               <h4 className="text-sm font-medium">
-                                 {sendMode === "team" ? "Team Preview" : "Email Preview"}
-                               </h4>
-                               <Button 
-                                 variant="outline" 
-                                 size="sm"
-                                 onClick={previewTwoWeekEmail} 
-                                 disabled={
-                                   loadingPreview || 
-                                   (sendMode === "individual" && !selectedUserId) ||
-                                   (sendMode === "team" && !selectedTeamId)
-                                 }
-                               >
-                                 {loadingPreview ? 'Generating...' : 'Generate Preview'}
-                               </Button>
-                             </div>
-                             
-                             <div className="border rounded-lg bg-background max-h-96 overflow-auto">
-                               {previewHtml ? (
-                                 <div className="p-6 prose prose-sm max-w-none">
-                                   <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-                                 </div>
-                               ) : (
-                                 <div className="p-8 text-center text-muted-foreground">
-                                   <Mail className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                   <p className="font-medium">No preview available</p>
-                                   <p className="text-sm">
-                                     {sendMode === "individual" 
-                                       ? "Select a recipient and click 'Generate Preview' to see the email content."
-                                       : "Select a team and click 'Generate Preview' to see who will receive emails."
-                                     }
-                                   </p>
-                                 </div>
-                               )}
-                             </div>
-                           </div>
-                         </div>
+                            {sendMode === "individual" ? (
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Select Recipient</label>
+                                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Choose a user to send the summary to..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {recipients.map(r => (
+                                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Select Team</label>
+                                <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Choose a team to send summaries to all members..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableTeams.map(t => (
+                                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                            
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium">
+                                  {sendMode === "team" ? "Team Preview" : "Email Preview"}
+                                </h4>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={previewTwoWeekEmail} 
+                                  disabled={
+                                    loadingPreview || 
+                                    (sendMode === "individual" && !selectedUserId) ||
+                                    (sendMode === "team" && !selectedTeamId)
+                                  }
+                                >
+                                  {loadingPreview ? 'Generating...' : 'Generate Preview'}
+                                </Button>
+                              </div>
+                              
+                              <div className="border rounded-lg bg-background h-64 overflow-auto">
+                                {previewHtml ? (
+                                  <div className="p-4 prose prose-sm max-w-none">
+                                    <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                                  </div>
+                                ) : (
+                                  <div className="p-6 text-center text-muted-foreground h-full flex flex-col justify-center">
+                                    <Mail className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                                    <p className="font-medium text-sm">No preview available</p>
+                                    <p className="text-xs mt-1">
+                                      {sendMode === "individual" 
+                                        ? "Select a recipient and click 'Generate Preview' to see the email content."
+                                        : "Select a team and click 'Generate Preview' to see who will receive emails."
+                                      }
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         
                         <DialogFooter className="gap-2">
                           <Button variant="outline" onClick={() => setNotifyOpen(false)}>
