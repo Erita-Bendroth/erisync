@@ -578,11 +578,11 @@ const canViewFullDetailsSync = (userId: string) => {
   const renderEmployeeName = (employee: Employee) => {
 if (isManager() && !isPlanner()) {
   const canViewFull = canViewFullDetailsSync(employee.user_id);
-  if (canViewFull === false) {
+  if (!canViewFull) {
     return (
       <>
         <p className="font-medium">{employee.initials}</p>
-        <p className="text-xs text-muted-foreground">Available/Unavailable</p>
+        <p className="text-xs text-muted-foreground">Available/Not Available</p>
       </>
     );
   } else {
@@ -602,27 +602,34 @@ if (isManager() && !isPlanner()) {
     );
   };
 
-  const getActivityDisplay = (entry: ScheduleEntry) => {
-    // Team members only see availability status
-    if (isTeamMember() && !isManager() && !isPlanner()) {
-      return entry.activity_type === "work" ? "Available" : "Unavailable";
+const getActivityDisplay = (entry: ScheduleEntry) => {
+  // Team members only see availability status
+  if (isTeamMember() && !isManager() && !isPlanner()) {
+    return getAvailabilityStatus(entry.activity_type);
+  }
+  
+  // For managers, check if user is in a managed team
+  if (isManager() && !isPlanner()) {
+    const canViewFull = canViewFullDetailsSync(entry.user_id);
+    if (canViewFull === false) {
+      // Manager doesn't manage this user's team - show availability only
+      return getAvailabilityStatus(entry.activity_type);
+    } else {
+      // Manager manages this user's team - show full details
+      return getActivityDisplayName(entry.activity_type);
     }
-    
-    // For managers, check if user is in a managed team
-    if (isManager() && !isPlanner()) {
-      const canViewFull = canViewFullDetailsSync(entry.user_id);
-      if (canViewFull === false) {
-        // Manager doesn't manage this user's team - show availability only
-        return entry.activity_type === "work" ? "Available" : "Unavailable";
-      } else {
-        // Manager manages this user's team - show full details
-        return getActivityDisplayName(entry.activity_type);
-      }
-    }
-    
-    // Planners and admins see full details
-    return getActivityDisplayName(entry.activity_type);
-  };
+  }
+  
+  // Planners and admins see full details
+  return getActivityDisplayName(entry.activity_type);
+};
+
+const getAvailabilityStatus = (activityType: string) => {
+  // work, working_from_home, hotline_support = Available
+  // all others = Not Available
+  const availableTypes = ['work', 'working_from_home', 'hotline_support'];
+  return availableTypes.includes(activityType) ? "Available" : "Not Available";
+};
 
   const getHolidaysForDay = (date: Date) => {
     return holidays.filter(holiday => 
@@ -630,24 +637,26 @@ if (isManager() && !isPlanner()) {
     );
   };
 
-  const getActivityColor = (entry: ScheduleEntry) => {
-    // Team members see availability colors only
-    if (isTeamMember() && !isManager() && !isPlanner()) {
-      return entry.activity_type === "work" 
+const getActivityColor = (entry: ScheduleEntry) => {
+  // Team members see availability colors only
+  if (isTeamMember() && !isManager() && !isPlanner()) {
+    const availableTypes = ['work', 'working_from_home', 'hotline_support'];
+    return availableTypes.includes(entry.activity_type)
+      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+      : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+  }
+
+  // For managers, check if they can view full details
+  if (isManager() && !isPlanner()) {
+    const canViewFull = canViewFullDetailsSync(entry.user_id);
+    if (!canViewFull) {
+      // Show availability colors only
+      const availableTypes = ['work', 'working_from_home', 'hotline_support'];
+      return availableTypes.includes(entry.activity_type)
         ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
         : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
     }
-
-    // For managers, check if they can view full details
-    if (isManager() && !isPlanner()) {
-      const canViewFull = canViewFullDetailsSync(entry.user_id);
-      if (canViewFull === false) {
-        // Show availability colors only
-        return entry.activity_type === "work" 
-          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-      }
-    }
+  }
 
     // Full activity type colors for managers (with full access) and planners
     switch (entry.activity_type) {
