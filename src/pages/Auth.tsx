@@ -36,13 +36,24 @@ const Auth = () => {
     lastName: "",
   });
 
-  // Handle Supabase password recovery redirect (hash contains type=recovery)
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setShowResetPassword(true);
+    const hash = window.location.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
+    const type = hashParams.get('type');
+
+    if (type === 'recovery') {
+      const access_token = hashParams.get('access_token');
+      const refresh_token = hashParams.get('refresh_token');
+
+      if (access_token && refresh_token) {
+        // Move to the dedicated reset route while preserving tokens in the hash
+        navigate(`/reset-password${window.location.hash}`, { replace: true });
+      } else {
+        // Show inline reset UI but it will report missing tokens
+        setShowResetPassword(true);
+      }
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (user) {
