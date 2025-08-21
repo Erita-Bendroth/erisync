@@ -4,10 +4,12 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, LogOut } from "lucide-react";
+import { Calendar, Clock, Users, LogOut, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
+import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 
 interface UserRole {
@@ -35,6 +37,10 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -181,6 +187,54 @@ const Dashboard = () => {
     }
   };
 
+  // Email preview/send helpers
+  const getRange = () => {
+    const start = new Date();
+    start.setHours(0,0,0,0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 13); // two weeks inclusive
+    const toDateStr = (d: Date) => d.toISOString().split('T')[0];
+    return { start_date: toDateStr(start), end_date: toDateStr(end) };
+  };
+
+  const previewTwoWeekEmail = async () => {
+    if (!user) return;
+    setLoadingPreview(true);
+    try {
+      const { start_date, end_date } = getRange();
+      const { data, error } = await supabase.functions.invoke('send-future-schedule', {
+        body: { user_id: user.id, start_date, end_date, preview: true },
+      });
+      if (error) throw error;
+      setPreviewHtml(data?.html || '<p>No preview available</p>');
+      setPreviewOpen(true);
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Preview failed', description: e.message || 'Could not generate preview', variant: 'destructive' });
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const sendTwoWeekEmail = async () => {
+    if (!user) return;
+    setSending(true);
+    try {
+      const { start_date, end_date } = getRange();
+      const { error } = await supabase.functions.invoke('send-future-schedule', {
+        body: { user_id: user.id, start_date, end_date, preview: false },
+      });
+      if (error) throw error;
+      toast({ title: 'Email sent', description: 'Your 2-week schedule summary was sent.' });
+      setPreviewOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Send failed', description: e.message || 'Could not send email', variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -310,41 +364,18 @@ const Dashboard = () => {
                               {entry.shift_type} shift
                             </span>
                           </div>
-                          
-                          {/* Time blocks with clear activity names */}
-                          <div className="space-y-2">
-                            {timeBlocks.map((block, blockIndex) => (
-                              <div key={blockIndex} className="flex items-center justify-between p-2 bg-muted/30 rounded">
-                                <span className="font-medium text-sm">
-                                  {block.activity ? getActivityDisplayName(block.activity) : getActivityDisplayName(entry.activity_type)}
-                                </span>
-                                <span className="text-sm font-mono text-muted-foreground">
-                                  {block.start_time} – {block.end_time}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {/* Status and update time */}
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={`px-2 py-1 rounded-full font-medium ${
-                              new Date().getHours() >= parseInt(timeBlocks[0]?.start_time?.split(':')[0] || '8') &&
-                              new Date().getHours() < parseInt(timeBlocks[timeBlocks.length - 1]?.end_time?.split(':')[0] || '17')
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                            }`}>
-                              {new Date().getHours() >= parseInt(timeBlocks[0]?.start_time?.split(':')[0] || '8') &&
-                               new Date().getHours() < parseInt(timeBlocks[timeBlocks.length - 1]?.end_time?.split(':')[0] || '17')
-                                ? '● Currently Active'
-                                : 'Scheduled'
-                              }
-                            </span>
-                            {entry.updated_at && (
+
+                          {/* Reuse shared time-block renderer to match legends */}
+                          <TimeBlockDisplay entry={entry} />
+
+                          {/* Update time */}
+                          {entry.updated_at && (
+                            <div className="flex items-center justify-end text-xs">
                               <span className="text-muted-foreground">
                                 Updated: {format(new Date(entry.updated_at), 'HH:mm')}
                               </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -401,6 +432,18 @@ const Dashboard = () => {
                 <Calendar className="w-4 h-4 mr-2" />
                 Refresh Today's Schedule
               </Button>
+
+              {/* Preview 2-week schedule email */}
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={previewTwoWeekEmail}
+                disabled={loadingPreview}
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {loadingPreview ? 'Preparing Preview…' : 'Preview 2-week Schedule Email'}
+              </Button>
+
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
