@@ -49,15 +49,15 @@ const ResetPasswordPage: React.FC = () => {
           throw new Error('Invalid password reset link. Missing required tokens or type != recovery');
         }
 
-        // Step 2: Clear URL immediately to prevent token leakage
-        window.history.replaceState({}, document.title, window.location.pathname);
-
-        // Step 3: Set session using recovery tokens
+        // Step 2: Set session using recovery tokens
         console.log('Setting session with tokens...');
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: access_token,
           refresh_token: refresh_token
         });
+
+        // Clear URL after establishing session to prevent token leakage
+        window.history.replaceState({}, document.title, window.location.pathname);
 
         if (sessionError) {
           console.error('Session error:', sessionError);

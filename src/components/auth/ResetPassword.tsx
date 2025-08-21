@@ -22,34 +22,49 @@ const ResetPassword: React.FC = () => {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    const verifyRecoveryToken = async () => {
+    const setupRecoverySession = async () => {
       try {
-        const token = searchParams.get("token");
-        const type = searchParams.get("type");
+        setInitializing(true);
+        setError(null);
 
-        if (!token || type !== "recovery") {
-          throw new Error("Invalid or expired password reset link.");
+        // Extract tokens from URL hash or search params
+        const hash = window.location.hash.substring(1);
+        const hashParams = new URLSearchParams(hash);
+
+        const access_token = hashParams.get('access_token') || searchParams.get('access_token');
+        const refresh_token = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+        const type = hashParams.get('type') || searchParams.get('type');
+
+        if (!access_token || !refresh_token || type !== 'recovery') {
+          throw new Error('Invalid password reset link. Missing required tokens or type != recovery');
         }
 
-        const { error } = await supabase.auth.verifyOtp({
-          token,
-          type: "recovery"
+        // Establish session using the recovery tokens
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
         });
 
-        if (error) {
-          throw new Error("Token verification failed: " + error.message);
+        if (sessionError || !sessionData.session) {
+          throw new Error(sessionError?.message || 'Session setup failed');
+        }
+
+        // Verify session is active
+        const { data: verifyData, error: verifyError } = await supabase.auth.getSession();
+        if (verifyError || !verifyData.session) {
+          throw new Error('Session not properly established');
         }
 
         setSessionReady(true);
       } catch (err: any) {
-        setError(err.message || "Failed to verify recovery token.");
+        setError(err.message || 'Failed to initialize password recovery');
         setSessionReady(false);
       } finally {
         setInitializing(false);
       }
     };
 
-    verifyRecoveryToken();
+    setupRecoverySession();
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
