@@ -7,13 +7,40 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
+      cron_job_logs: {
+        Row: {
+          error_message: string | null
+          executed_at: string | null
+          id: string
+          job_name: string
+          response_data: Json | null
+          status: string | null
+        }
+        Insert: {
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          job_name: string
+          response_data?: Json | null
+          status?: string | null
+        }
+        Update: {
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          job_name?: string
+          response_data?: Json | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       holidays: {
         Row: {
           country_code: string
@@ -245,35 +272,55 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      cron_status: {
+        Row: {
+          active: boolean | null
+          jobid: number | null
+          jobname: string | null
+          schedule: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          jobid?: number | null
+          jobname?: string | null
+          schedule?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          jobid?: number | null
+          jobname?: string | null
+          schedule?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_temporary_password: {
-        Args: { _user_id: string; _password: string }
+        Args: { _password: string; _user_id: string }
         Returns: boolean
       }
       create_default_schedule_with_holidays: {
         Args: {
-          _user_id: string
-          _team_id: string
-          _start_date: string
-          _end_date: string
-          _created_by: string
           _country_code?: string
+          _created_by: string
+          _end_date: string
+          _start_date: string
+          _team_id: string
+          _user_id: string
         }
         Returns: number
       }
       create_team_default_schedules_with_holidays: {
         Args: {
-          _team_id: string
-          _start_date: string
-          _end_date: string
           _created_by: string
+          _end_date: string
+          _start_date: string
+          _team_id: string
         }
         Returns: {
-          user_id: string
-          shifts_created: number
           country_code: string
+          shifts_created: number
+          user_id: string
         }[]
       }
       get_user_teams: {
@@ -282,8 +329,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
@@ -292,12 +339,16 @@ export type Database = {
         Returns: undefined
       }
       is_manager_of_team: {
-        Args: { _user_id: string; _team_id: string }
+        Args: { _team_id: string; _user_id: string }
         Returns: boolean
       }
       log_profile_access: {
-        Args: { _profile_user_id: string; _access_type?: string }
+        Args: { _access_type?: string; _profile_user_id: string }
         Returns: undefined
+      }
+      trigger_weekly_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       validate_manager_team_access: {
         Args: { _manager_id: string; _target_user_id: string }
