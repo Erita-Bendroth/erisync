@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.weekly-schedule-notifications]
 verify_jwt = false
+
+[functions.send-random-password]
+verify_jwt = false
+
+[functions.reset-all-passwords]
+verify_jwt = false
