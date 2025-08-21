@@ -272,27 +272,7 @@ export type Database = {
       }
     }
     Views: {
-      cron_status: {
-        Row: {
-          active: boolean | null
-          jobid: number | null
-          jobname: string | null
-          schedule: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          jobid?: number | null
-          jobname?: string | null
-          schedule?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          jobid?: number | null
-          jobname?: string | null
-          schedule?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       check_temporary_password: {
@@ -321,6 +301,15 @@ export type Database = {
           country_code: string
           shifts_created: number
           user_id: string
+        }[]
+      }
+      get_cron_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          active: boolean
+          jobid: number
+          jobname: string
+          schedule: string
         }[]
       }
       get_user_teams: {
