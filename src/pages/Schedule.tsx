@@ -203,16 +203,19 @@ const Schedule = () => {
                           2-week Summary
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="max-w-4xl max-h-[80vh]">
                         <DialogHeader>
-                          <DialogTitle>Send 2-week schedule summary</DialogTitle>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Mail className="w-5 h-5" />
+                            Send 2-Week Schedule Summary
+                          </DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Recipient</label>
+                            <label className="text-sm font-medium">Select Recipient</label>
                             <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a user" />
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Choose a user to send the summary to..." />
                               </SelectTrigger>
                               <SelectContent>
                                 {recipients.map(r => (
@@ -221,20 +224,46 @@ const Schedule = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="border rounded p-3 max-h-72 overflow-auto bg-card">
-                            {previewHtml ? (
-                              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-                            ) : (
-                              <p className="text-sm text-muted-foreground">Generate a preview to see the email content.</p>
-                            )}
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-medium">Email Preview</h4>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={previewTwoWeekEmail} 
+                                disabled={!selectedUserId || loadingPreview}
+                              >
+                                {loadingPreview ? 'Generating...' : 'Generate Preview'}
+                              </Button>
+                            </div>
+                            
+                            <div className="border rounded-lg bg-background max-h-96 overflow-auto">
+                              {previewHtml ? (
+                                <div className="p-6 prose prose-sm max-w-none">
+                                  <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                                </div>
+                              ) : (
+                                <div className="p-8 text-center text-muted-foreground">
+                                  <Mail className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                  <p className="font-medium">No preview available</p>
+                                  <p className="text-sm">Select a recipient and click "Generate Preview" to see the email content.</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={previewTwoWeekEmail} disabled={!selectedUserId || loadingPreview}>
-                            {loadingPreview ? 'Preparing…' : 'Preview'}
+                        
+                        <DialogFooter className="gap-2">
+                          <Button variant="outline" onClick={() => setNotifyOpen(false)}>
+                            Cancel
                           </Button>
-                          <Button onClick={sendTwoWeekEmail} disabled={!selectedUserId || sending}>
-                            {sending ? 'Sending…' : 'Send Email'}
+                          <Button 
+                            onClick={sendTwoWeekEmail} 
+                            disabled={!selectedUserId || !previewHtml || sending}
+                            className="min-w-24"
+                          >
+                            {sending ? 'Sending...' : 'Send Email'}
                           </Button>
                         </DialogFooter>
                       </DialogContent>

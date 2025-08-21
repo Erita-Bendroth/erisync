@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.send-future-schedule]
 verify_jwt = false
+
+[functions.weekly-schedule-notifications]
+verify_jwt = false
