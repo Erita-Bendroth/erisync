@@ -41,29 +41,21 @@ const Auth = () => {
     // Check for recovery tokens in the URL hash
     const hash = window.location.hash.substring(1);
     const hashParams = new URLSearchParams(hash);
-    const type = hashParams.get('type');
-
+    
     console.log('Auth page loaded with hash:', hash);
-    console.log('Type from hash:', type);
+    console.log('All hash params:', Object.fromEntries(hashParams.entries()));
 
-    if (type === 'recovery') {
-      const access_token = hashParams.get('access_token');
-      const refresh_token = hashParams.get('refresh_token');
+    // Check if this is a recovery link
+    const type = hashParams.get('type');
+    const access_token = hashParams.get('access_token');
+    const refresh_token = hashParams.get('refresh_token');
 
-      console.log('Recovery tokens found:', {
-        hasAccessToken: !!access_token,
-        hasRefreshToken: !!refresh_token
-      });
+    console.log('Recovery check:', { type, hasAccessToken: !!access_token, hasRefreshToken: !!refresh_token });
 
-      if (access_token && refresh_token) {
-        // Redirect to reset password page with the full hash
-        console.log('Redirecting to reset-password with hash:', window.location.hash);
-        navigate(`/reset-password${window.location.hash}`, { replace: true });
-        return;
-      } else {
-        console.log('Missing tokens, showing inline reset form');
-        setShowResetPassword(true);
-      }
+    if (type === 'recovery' && access_token && refresh_token) {
+      console.log('Valid recovery link detected, redirecting to reset-password');
+      navigate(`/reset-password${window.location.hash}`, { replace: true });
+      return;
     }
   }, [navigate]);
 
