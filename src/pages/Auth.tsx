@@ -272,6 +272,25 @@ const Auth = () => {
             </Tabs>
           </CardContent>
         </Card>
+        
+        <div className="flex flex-col items-center space-y-2 text-sm text-muted-foreground">
+          <div className="flex space-x-4">
+            <Button 
+              variant="link" 
+              className="text-xs text-muted-foreground p-0 h-auto"
+              onClick={() => navigate("/privacy-policy")}
+            >
+              Privacy Policy
+            </Button>
+            <Button 
+              variant="link" 
+              className="text-xs text-muted-foreground p-0 h-auto"
+              onClick={() => navigate("/security-policy")}
+            >
+              Security Policy
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
