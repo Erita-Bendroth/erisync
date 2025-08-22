@@ -124,22 +124,40 @@ const Schedule = () => {
         if (error) throw error;
         setPreviewHtml(data?.html || '<p>No preview.</p>');
       } else {
-        // Team preview - show summary of who will receive emails
-        const { data: teamMembers, error: membersError } = await supabase
+        // Team preview - get team members first, then their profiles separately
+        const { data: teamMembersData, error: membersError } = await supabase
           .from('team_members')
-          .select(`
-            user_id,
-            profiles!team_members_user_id_fkey (
-              first_name,
-              last_name,
-              email
-            )
-          `)
+          .select('user_id')
           .eq('team_id', selectedTeamId);
         
-        if (membersError) throw membersError;
+        if (membersError) {
+          console.error('Error fetching team members:', membersError);
+          throw membersError;
+        }
         
-        const members = teamMembers?.map(tm => tm.profiles).filter(Boolean) || [];
+        if (!teamMembersData || teamMembersData.length === 0) {
+          setPreviewHtml(`
+            <div style="font-family:Inter,system-ui,sans-serif">
+              <h2>Team Email Preview</h2>
+              <p>No members found in the selected team.</p>
+            </div>
+          `);
+          return;
+        }
+        
+        // Get profiles for these users
+        const userIds = teamMembersData.map(tm => tm.user_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, email')
+          .in('user_id', userIds);
+        
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          throw profilesError;
+        }
+        
+        const members = profilesData || [];
         const teamName = availableTeams.find(t => t.id === selectedTeamId)?.name || 'Selected Team';
         
         setPreviewHtml(`
