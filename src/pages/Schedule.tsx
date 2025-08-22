@@ -21,6 +21,7 @@ import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import OutlookIntegration from "@/components/integrations/OutlookIntegration";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { escapeHtml } from "@/lib/validation";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -162,10 +163,10 @@ const Schedule = () => {
         
         setPreviewHtml(`
           <div style="font-family:Inter,system-ui,sans-serif">
-            <h2>Team Email Preview: ${teamName}</h2>
+            <h2>Team Email Preview: ${escapeHtml(teamName)}</h2>
             <p>2-week schedule summaries will be sent to <strong>${members.length}</strong> team members:</p>
             <ul style="margin:16px 0;padding-left:24px">
-              ${members.map((m: any) => `<li>${m.first_name} ${m.last_name} (${m.email})</li>`).join('')}
+              ${members.map((m: any) => `<li>${escapeHtml(m.first_name)} ${escapeHtml(m.last_name)} (${escapeHtml(m.email)})</li>`).join('')}
             </ul>
             <p><em>Each team member will receive their individual 2-week schedule summary.</em></p>
           </div>

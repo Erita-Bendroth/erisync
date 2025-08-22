@@ -10,6 +10,17 @@ export const sanitizeInput = (input: string): string => {
     .trim();
 };
 
+export const escapeHtml = (unsafe: string): string => {
+  if (!unsafe) return '';
+  
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email) && email.length <= 254;
