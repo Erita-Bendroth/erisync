@@ -20,9 +20,11 @@ import ScheduleExport from "@/components/schedule/ScheduleExport";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import OutlookIntegration from "@/components/integrations/OutlookIntegration";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'admin';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
@@ -93,8 +95,8 @@ const Schedule = () => {
       if (usersError) throw usersError;
       setRecipients((usersData || []).map(p => ({ id: p.user_id, name: `${p.first_name} ${p.last_name}` })));
 
-      // Fetch teams for planners
-      if (isPlanner()) {
+      // Fetch teams for planners and managers
+      if (isPlanner() || isManager()) {
         const { data: teamsData, error: teamsError } = await supabase
           .from('teams')
           .select('id, name')
@@ -154,6 +156,11 @@ const Schedule = () => {
     } catch (e: any) {
       console.error(e);
       setPreviewHtml('<p style="color:red">Error generating preview</p>');
+      toast({
+        title: "Preview Error",
+        description: e.message || "Failed to generate preview",
+        variant: "destructive",
+      });
     } finally {
       setLoadingPreview(false);
     }
@@ -168,20 +175,40 @@ const Schedule = () => {
       const { start_date, end_date } = getRange();
       
       if (sendMode === "individual") {
-        const { error } = await supabase.functions.invoke('send-future-schedule', {
+        const { data, error } = await supabase.functions.invoke('send-future-schedule', {
           body: { user_id: selectedUserId, start_date, end_date, preview: false }
         });
         if (error) throw error;
+        
+        toast({
+          title: "Email Sent!",
+          description: `2-week schedule summary sent successfully.`,
+        });
       } else {
-        const { error } = await supabase.functions.invoke('send-team-schedule-summary', {
+        const { data, error } = await supabase.functions.invoke('send-team-schedule-summary', {
           body: { team_id: selectedTeamId, start_date, end_date }
         });
         if (error) throw error;
+        
+        const teamName = availableTeams.find(t => t.id === selectedTeamId)?.name || 'Selected Team';
+        toast({
+          title: "Team Emails Sent!",
+          description: `2-week schedule summaries sent to all members of ${teamName}.`,
+        });
       }
       
       setNotifyOpen(false);
-    } catch (e) {
+      // Reset form state
+      setSelectedUserId("");
+      setSelectedTeamId("");
+      setPreviewHtml("");
+    } catch (e: any) {
       console.error(e);
+      toast({
+        title: "Email Error",
+        description: e.message || "Failed to send email. Please check your email configuration.",
+        variant: "destructive",
+      });
     } finally {
       setSending(false);
     }
@@ -280,10 +307,10 @@ const Schedule = () => {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="individual">📧 Individual User</SelectItem>
-                                  {isPlanner() && (
-                                    <SelectItem value="team">👥 Entire Team</SelectItem>
-                                  )}
+                                   <SelectItem value="individual">📧 Individual User</SelectItem>
+                                   {(isPlanner() || isManager()) && (
+                                     <SelectItem value="team">👥 Entire Team</SelectItem>
+                                   )}
                                 </SelectContent>
                               </Select>
                             </div>

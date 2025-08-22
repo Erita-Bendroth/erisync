@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,8 +12,10 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const AZURE_CLIENT_ID = Deno.env.get("AZURE_AD_CLIENT_ID");
 const AZURE_CLIENT_SECRET = Deno.env.get("AZURE_AD_CLIENT_SECRET");
 const AZURE_TENANT_ID = Deno.env.get("AZURE_TENANT_ID") || "common";
+const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 // Microsoft Graph API functions
 async function getAccessToken() {
@@ -214,44 +217,67 @@ serve(async (req) => {
     }
 
     const subject = `Your upcoming schedule (${start_date} to ${end_date})`;
-    const fromEmail = Deno.env.get("FROM_EMAIL") || "scheduler@company.com";
     
     let emailResponse;
+    let emailMethod = 'none';
     
     try {
-      // Try Microsoft Graph API first (recommended for corporate environments)
-      emailResponse = await sendGraphEmail(fromEmail, to, subject, html);
-      console.log("Email sent successfully via Microsoft Graph API");
-    } catch (graphError) {
-      console.log("Microsoft Graph API failed:", graphError.message);
+      // Try Resend first (recommended for modern apps)
+      if (resend) {
+        emailResponse = await resend.emails.send({
+          from: "EriSync <onboarding@resend.dev>",
+          to: [to],
+          subject,
+          html
+        });
+        emailMethod = 'Resend';
+        console.log("✅ Email sent successfully via Resend:", emailResponse.id);
+      } else {
+        throw new Error("Resend not configured");
+      }
+    } catch (resendError) {
+      console.log("❌ Resend failed:", resendError.message);
       
       try {
-        // Fallback to SMTP if Graph API fails
-        emailResponse = await sendSMTPEmail(to, subject, html);
-        console.log("Email sent successfully via SMTP");
-      } catch (smtpError) {
-        console.log("SMTP failed:", smtpError.message);
+        // Fallback to Microsoft Graph API
+        const fromEmail = Deno.env.get("FROM_EMAIL") || "scheduler@company.com";
+        emailResponse = await sendGraphEmail(fromEmail, to, subject, html);
+        emailMethod = 'Microsoft Graph';
+        console.log("✅ Email sent successfully via Microsoft Graph API");
+      } catch (graphError) {
+        console.log("❌ Microsoft Graph API failed:", graphError.message);
         
-        // If both fail, return error with suggestions
-        return new Response(JSON.stringify({ 
-          error: 'All email methods failed', 
-          details: {
-            graph_error: graphError.message,
-            smtp_error: smtpError.message
-          },
-          suggestions: [
-            "Configure Azure Tenant ID for Microsoft Graph",
-            "Configure SMTP settings for corporate email server",
-            "Contact IT department to whitelist email services"
-          ]
-        }), { 
-          status: 500, 
-          headers: { "Content-Type": "application/json", ...corsHeaders } 
-        });
+        try {
+          // Final fallback to SMTP
+          emailResponse = await sendSMTPEmail(to, subject, html);
+          emailMethod = 'SMTP';
+          console.log("✅ Email sent successfully via SMTP");
+        } catch (smtpError) {
+          console.log("❌ SMTP failed:", smtpError.message);
+          
+          // If all fail, return detailed error
+          return new Response(JSON.stringify({ 
+            error: 'All email methods failed', 
+            details: {
+              resend_error: resendError.message,
+              graph_error: graphError.message,
+              smtp_error: smtpError.message
+            },
+            suggestions: [
+              "Configure RESEND_API_KEY for reliable email delivery",
+              "Configure Azure Tenant ID for Microsoft Graph",
+              "Configure SMTP settings for corporate email server",
+              "Contact your administrator to set up email services"
+            ]
+          }), { 
+            status: 500, 
+            headers: { "Content-Type": "application/json", ...corsHeaders } 
+          });
+        }
       }
     }
 
-    return new Response(JSON.stringify({ sent: true, emailResponse }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+    return new Response(JSON.stringify({ sent: true, emailResponse, method: emailMethod }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
   } catch (e: any) {
     console.error('send-future-schedule error', e);
     return new Response(JSON.stringify({ error: e?.message || 'Unknown error' }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
