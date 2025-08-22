@@ -355,6 +355,10 @@ export type Database = {
         Args: { _access_type?: string; _profile_user_id: string }
         Returns: undefined
       }
+      manager_can_see_full_details: {
+        Args: { _manager_id: string; _target_user_id: string }
+        Returns: boolean
+      }
       trigger_weekly_notifications: {
         Args: Record<PropertyKey, never>
         Returns: Json
