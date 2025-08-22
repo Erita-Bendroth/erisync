@@ -400,63 +400,6 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common scheduling tasks</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={() => navigate("/schedule?tab=schedule")}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                View Schedule
-              </Button>
-              {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
-                <ScheduleEntryForm onSuccess={() => {
-                  fetchTodaySchedule();
-                  fetchWeeklySchedule();
-                  toast({
-                    title: "Success",
-                    description: "Schedule entry added successfully - dashboard updated",
-                  });
-                }}>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Add Schedule Entry
-                  </Button>
-                </ScheduleEntryForm>
-              )}
-              
-              {/* Manual refresh button */}
-              <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={() => {
-                  fetchTodaySchedule();
-                  fetchWeeklySchedule();
-                }}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                Refresh Schedule
-              </Button>
-
-              <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={() => navigate("/schedule?tab=schedule")}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                View Team Availability
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>This Week's Schedule</CardTitle>
               <CardDescription>Your schedule overview for the current week</CardDescription>
             </CardHeader>
@@ -515,6 +458,63 @@ const Dashboard = () => {
                   <p className="text-sm text-muted-foreground">No schedule entries this week</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Common scheduling tasks</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/schedule?tab=schedule")}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                View Schedule
+              </Button>
+              {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
+                <ScheduleEntryForm onSuccess={() => {
+                  fetchTodaySchedule();
+                  fetchWeeklySchedule();
+                  toast({
+                    title: "Success",
+                    description: "Schedule entry added successfully - dashboard updated",
+                  });
+                }}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    Add Schedule Entry
+                  </Button>
+                </ScheduleEntryForm>
+              )}
+              
+              {/* Manual refresh button */}
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => {
+                  fetchTodaySchedule();
+                  fetchWeeklySchedule();
+                }}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Refresh Schedule
+              </Button>
+
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/schedule?tab=schedule")}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                View Team Availability
+              </Button>
             </CardContent>
           </Card>
         </div>
