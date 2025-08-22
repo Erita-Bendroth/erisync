@@ -31,12 +31,21 @@ const AdminSetup = () => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUserRoles, setCurrentUserRoles] = useState<string[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [managedTeamIds, setManagedTeamIds] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchProfiles();
-    fetchUserRoles();
-    fetchCurrentUserRoles();
+    if (user) {
+      fetchCurrentUserRoles();
+    }
   }, [user]);
+
+  useEffect(() => {
+    if (user && (currentUserRole || currentUserRoles.length > 0)) {
+      fetchProfiles();
+      fetchUserRoles();
+    }
+  }, [user, currentUserRole, managedTeamIds]);
 
   const fetchCurrentUserRoles = async () => {
     if (!user) return;
@@ -48,7 +57,29 @@ const AdminSetup = () => {
         .eq("user_id", user.id);
       
       if (error) throw error;
-      setCurrentUserRoles(data?.map(r => r.role) || []);
+      
+      const roles = data?.map(r => r.role) || [];
+      setCurrentUserRoles(roles);
+      
+      // Determine user's highest role
+      let highestRole = "";
+      if (roles.includes('admin')) highestRole = "admin";
+      else if (roles.includes('planner')) highestRole = "planner";
+      else if (roles.includes('manager')) highestRole = "manager";
+      
+      setCurrentUserRole(highestRole);
+      
+      // If user is a manager (but not admin/planner), get their managed teams
+      if (roles.includes('manager') && !roles.includes('admin') && !roles.includes('planner')) {
+        const { data: managerTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+        
+        setManagedTeamIds(managerTeams?.map(t => t.team_id) || []);
+      }
+      
     } catch (error) {
       console.error("Error fetching current user roles:", error);
     }
@@ -56,13 +87,34 @@ const AdminSetup = () => {
 
   const fetchProfiles = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("profiles")
-        .select("*")
+        .select("user_id, first_name, last_name, email")
         .order("first_name");
-      
+
+      const { data, error } = await query;
       if (error) throw error;
-      setProfiles(data || []);
+
+      let filteredProfiles = data || [];
+
+      // Filter profiles based on current user's role and permissions
+      if (currentUserRole === 'manager' && managedTeamIds.length > 0) {
+        // Managers can only see users in their managed teams
+        const { data: teamMembers } = await supabase
+          .from('team_members')
+          .select('user_id')
+          .in('team_id', managedTeamIds);
+
+        const managedUserIds = teamMembers?.map(tm => tm.user_id) || [];
+        // Always include the current user
+        managedUserIds.push(user!.id);
+        
+        filteredProfiles = filteredProfiles.filter(profile => 
+          managedUserIds.includes(profile.user_id)
+        );
+      }
+
+      setProfiles(filteredProfiles);
     } catch (error) {
       console.error("Error fetching profiles:", error);
     }
@@ -83,6 +135,60 @@ const AdminSetup = () => {
 
   const assignRole = async (userId: string, role: string) => {
     try {
+      // SECURITY: Prevent users from modifying their own roles
+      if (user?.id === userId) {
+        toast({
+          title: "Error",
+          description: "You cannot modify your own role",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // SECURITY: Restrict role assignments based on user permissions
+      if (currentUserRole === 'manager') {
+        // Managers can only assign teammember or manager roles
+        if (!['teammember', 'manager'].includes(role)) {
+          toast({
+            title: "Error",
+            description: "Managers can only assign teammember or manager roles",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check if target user is in manager's team
+        if (managedTeamIds.length > 0) {
+          const { data: targetUserTeams } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', userId);
+
+          const hasCommonTeam = targetUserTeams?.some(t => managedTeamIds.includes(t.team_id));
+          if (!hasCommonTeam) {
+            toast({
+              title: "Error",
+              description: "You can only manage roles for users in your teams",
+              variant: "destructive",
+            });
+            return;
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: "You don't manage any teams",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (!currentUserRoles.includes('admin') && !currentUserRoles.includes('planner')) {
+        toast({
+          title: "Error", 
+          description: "Insufficient permissions to modify user roles",
+          variant: "destructive",
+        });
+        return;
+      }
       setLoading(true);
       
       // First check if user already has this role
@@ -130,6 +236,24 @@ const AdminSetup = () => {
 
   const getUserRoles = (userId: string) => {
     return userRoles.filter(ur => ur.user_id === userId).map(ur => ur.role);
+  };
+
+  // Get available roles based on current user's permissions
+  const getAvailableRoles = () => {
+    if (currentUserRole === 'admin' || currentUserRole === 'planner') {
+      return [
+        { value: 'admin', label: 'Admin' },
+        { value: 'planner', label: 'Planner' },
+        { value: 'manager', label: 'Manager' },
+        { value: 'teammember', label: 'Team Member' }
+      ];
+    } else if (currentUserRole === 'manager') {
+      return [
+        { value: 'manager', label: 'Manager' },
+        { value: 'teammember', label: 'Team Member' }
+      ];
+    }
+    return [];
   };
 
   const getRoleColor = (role: string) => {
@@ -222,9 +346,11 @@ const AdminSetup = () => {
                           <SelectValue placeholder="Add role" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="planner">Planner</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                          <SelectItem value="teammember">Team Member</SelectItem>
+                          {getAvailableRoles().map((roleOption) => (
+                            <SelectItem key={roleOption.value} value={roleOption.value}>
+                              {roleOption.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
