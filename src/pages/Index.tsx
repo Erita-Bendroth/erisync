@@ -34,14 +34,24 @@ const Index = () => {
           <p className="text-xl text-muted-foreground mb-8">
             Manage your team's shifts, vacation, and availability with ease
           </p>
-          <Button 
-            onClick={() => navigate("/auth")} 
-            size="lg"
-            className="px-8"
-          >
-            Get Started
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              onClick={() => navigate("/auth")} 
+              size="lg"
+              className="px-8"
+            >
+              Get Started
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            <Button 
+              onClick={() => navigate("/contact")} 
+              variant="outline"
+              size="lg"
+              className="px-8"
+            >
+              Contact Us
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
@@ -115,6 +125,25 @@ const Index = () => {
             </div>
           </CardContent>
         </Card>
+
+        <div className="text-center mt-16">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              onClick={() => navigate("/privacy-policy")} 
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Privacy Policy
+            </Button>
+            <Button 
+              onClick={() => navigate("/contact")} 
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Contact
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
