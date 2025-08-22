@@ -593,18 +593,10 @@ useEffect(() => {
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    // Base entries for that user/day
-    let entries = scheduleEntries.filter(entry => 
+    // Return all entries for that user/day since weekends no longer have auto-generated entries
+    return scheduleEntries.filter(entry => 
       entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
     );
-
-    // Enforce policy: Mon–Fri only for auto-generated shifts; weekends must be manual
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6; // Sun or Sat
-    if (isWeekend) {
-      entries = entries.filter(e => !e.notes?.includes("Auto-generated"));
-    }
-    
-    return entries;
   };
 
   const isPlanner = () => userRoles.some(role => role.role === "planner");
