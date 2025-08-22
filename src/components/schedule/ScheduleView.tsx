@@ -810,7 +810,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="schedule-view-container space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">Weekly Schedule</h2>
@@ -1076,7 +1076,6 @@ const getActivityColor = (entry: ScheduleEntry) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-    <div className="schedule-view-container">
             {/* Activity Types Legend */}
             <div>
               <h4 className="font-medium mb-3">Activity Types</h4>
@@ -1162,7 +1161,6 @@ const getActivityColor = (entry: ScheduleEntry) => {
                 </div>
               </div>
             </div>
-          </div>
         </CardContent>
       </Card>
 

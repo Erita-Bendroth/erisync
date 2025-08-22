@@ -447,7 +447,7 @@ const Schedule = () => {
               <CountrySelector />
               <NotificationSettings />
               <PasswordSettings />
-              <ScheduleExport />
+              <ScheduleExport scheduleData={[]} currentWeek={new Date()} />
               <OutlookIntegration />
             </div>
           </TabsContent>
