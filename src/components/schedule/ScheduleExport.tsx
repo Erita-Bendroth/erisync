@@ -43,10 +43,16 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('ScheduleExport: No user found');
+        return;
+      }
       setLoadingData(true);
       try {
         const { start, end } = getRange();
+        console.log('ScheduleExport: Fetching data for date range:', format(start, 'yyyy-MM-dd'), 'to', format(end, 'yyyy-MM-dd'));
+        console.log('ScheduleExport: User ID:', user.id);
+        
         const { data, error } = await supabase
           .from('schedule_entries')
           .select('date, shift_type, activity_type, availability_status, notes')
@@ -54,8 +60,12 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
           .gte('date', format(start, 'yyyy-MM-dd'))
           .lte('date', format(end, 'yyyy-MM-dd'))
           .order('date');
+          
+        console.log('ScheduleExport: Query result:', { data, error });
+        
         if (error) throw error;
         setEntries(data || []);
+        console.log('ScheduleExport: Entries set:', data?.length || 0, 'entries');
       } catch (e) {
         console.error('Failed to load schedule for export', e);
         toast({ title: 'Error', description: 'Could not load schedule data for export', variant: 'destructive' });
@@ -99,6 +109,10 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
       toast({ title: 'Error', description: 'Nothing to export yet. Try again in a moment.', variant: 'destructive' });
       return;
     }
+    
+    console.log('ScheduleExport: Starting PDF export with', entries.length, 'entries');
+    console.log('ScheduleExport: Entries data:', entries);
+    
     setExporting(true);
     try {
       const canvas = await html2canvas(scheduleRef.current, {
@@ -107,6 +121,9 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
         useCORS: true,
         allowTaint: false,
       });
+      
+      console.log('ScheduleExport: Canvas size:', canvas.width, 'x', canvas.height);
+      
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
       const imgWidth = pdf.internal.pageSize.getWidth();
@@ -216,10 +233,10 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-4">
           <Button 
             onClick={handleExport} 
-            disabled={exporting}
+            disabled={exporting || loadingData}
             className="flex items-center gap-2"
           >
             {exporting ? (
@@ -227,12 +244,12 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
             ) : (
               <Download className="w-4 h-4" />
             )}
-            Export as {exportFormat.toUpperCase()}
+            Export as PDF
           </Button>
 
           <Button 
             onClick={exportAsExcel} 
-            disabled={exporting}
+            disabled={exporting || loadingData}
             variant="outline"
             className="flex items-center gap-2"
           >
@@ -243,6 +260,12 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
             )}
             Export Excel
           </Button>
+          
+          {entries.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Ready to export {entries.length} schedule entries
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 pt-2">
@@ -272,7 +295,11 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
             </div>
             
             <div className="space-y-4">
-              {entries.length > 0 ? (
+              {loadingData ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 text-lg">Loading schedule data...</p>
+                </div>
+              ) : entries.length > 0 ? (
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr className="bg-gray-100">
@@ -293,9 +320,9 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
                         <td className="border border-gray-300 p-2">
                           {format(new Date(entry.date), 'EEEE')}
                         </td>
-                        <td className="border border-gray-300 p-2">{entry.shift_type}</td>
-                        <td className="border border-gray-300 p-2">{entry.activity_type}</td>
-                        <td className="border border-gray-300 p-2">{entry.availability_status}</td>
+                        <td className="border border-gray-300 p-2">{entry.shift_type || '-'}</td>
+                        <td className="border border-gray-300 p-2">{entry.activity_type || '-'}</td>
+                        <td className="border border-gray-300 p-2">{entry.availability_status || '-'}</td>
                         <td className="border border-gray-300 p-2">{entry.notes || '-'}</td>
                       </tr>
                     ))}
@@ -303,8 +330,8 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
                 </table>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 text-lg">No schedule entries for this period.</p>
-                  {loadingData && <p className="text-gray-500 mt-2">Loading schedule data...</p>}
+                  <p className="text-gray-600 text-lg">No schedule entries found for this period.</p>
+                  <p className="text-gray-500 text-sm mt-2">Date range: {format(getRange().start, 'MMM dd')} - {format(getRange().end, 'MMM dd, yyyy')}</p>
                 </div>
               )}
             </div>
