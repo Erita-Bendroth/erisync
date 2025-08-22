@@ -178,8 +178,11 @@ const Dashboard = () => {
         entries: scheduleData?.map(entry => ({
           date: entry.date,
           activity_type: entry.activity_type,
-          user_id: entry.user_id
-        })) || []
+          user_id: entry.user_id,
+          team_id: entry.team_id,
+          id: entry.id
+        })) || [],
+        fullEntries: scheduleData || []
       });
 
       if (error) {
