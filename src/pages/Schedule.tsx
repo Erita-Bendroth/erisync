@@ -302,6 +302,10 @@ const Schedule = () => {
                       Add Entry
                     </Button>
                   </ScheduleEntryForm>
+                  <Button variant="outline" onClick={() => setActiveTab('settings')}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Schedule
+                  </Button>
                   {(isPlanner() || isManager()) && (
                     <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
                       <DialogTrigger asChild>

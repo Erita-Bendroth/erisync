@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,11 +7,13 @@ import { Download, FileImage, FileText, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { format, addDays, startOfWeek } from 'date-fns';
+import { format, addDays, startOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import * as XLSX from 'xlsx';
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface ScheduleExportProps {
-  scheduleData?: any[];
+  scheduleData?: any[]; // deprecated; now fetched internally
   currentWeek?: Date;
 }
 
@@ -19,105 +21,102 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   scheduleData = [], 
   currentWeek = new Date() 
 }) => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const scheduleRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf'>('png');
   const [exportRange, setExportRange] = useState<'current' | 'month'>('current');
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
+
+  const getRange = () => {
+    if (exportRange === 'month') {
+      const start = startOfMonth(currentWeek);
+      const end = endOfMonth(currentWeek);
+      return { start, end };
+    }
+    const start = startOfWeek(currentWeek, { weekStartsOn: 1 });
+    const end = addDays(start, 6);
+    return { start, end };
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      setLoadingData(true);
+      try {
+        const { start, end } = getRange();
+        const { data, error } = await supabase
+          .from('schedule_entries')
+          .select('date, shift_type, activity_type, availability_status, notes')
+          .eq('user_id', user.id)
+          .gte('date', format(start, 'yyyy-MM-dd'))
+          .lte('date', format(end, 'yyyy-MM-dd'))
+          .order('date');
+        if (error) throw error;
+        setEntries(data || []);
+      } catch (e) {
+        console.error('Failed to load schedule for export', e);
+        toast({ title: 'Error', description: 'Could not load schedule data for export', variant: 'destructive' });
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, [user, exportRange, currentWeek]);
 
   const exportAsImage = async () => {
-    const scheduleContainer = document.querySelector('.schedule-view-container') as HTMLElement;
-    
-    if (!scheduleContainer) {
-      toast({
-        title: "Error",
-        description: "Schedule view not found. Please make sure the schedule is visible.",
-        variant: "destructive",
-      });
+    if (!scheduleRef.current) {
+      toast({ title: 'Error', description: 'Nothing to export yet. Try again in a moment.', variant: 'destructive' });
       return;
     }
-
     setExporting(true);
     try {
-      const canvas = await html2canvas(scheduleContainer, {
+      const canvas = await html2canvas(scheduleRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         allowTaint: false,
         scrollX: 0,
         scrollY: 0,
-        width: scheduleContainer.scrollWidth,
-        height: scheduleContainer.scrollHeight
       });
-
       const link = document.createElement('a');
       link.download = `schedule-${format(currentWeek, 'yyyy-MM-dd')}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
-
-      toast({
-        title: "Export Successful",
-        description: "Schedule exported as image successfully.",
-      });
+      toast({ title: 'Export Successful', description: 'Schedule exported as image successfully.' });
     } catch (error) {
       console.error('Error exporting as image:', error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to export schedule as image. Please ensure the schedule is fully loaded.",
-        variant: "destructive",
-      });
+      toast({ title: 'Export Failed', description: 'Failed to export schedule as image.', variant: 'destructive' });
     } finally {
       setExporting(false);
     }
   };
 
   const exportAsPDF = async () => {
-    const scheduleContainer = document.querySelector('.schedule-view-container') as HTMLElement;
-    
-    if (!scheduleContainer) {
-      toast({
-        title: "Error",
-        description: "Schedule view not found. Please make sure the schedule is visible.",
-        variant: "destructive",
-      });
+    if (!scheduleRef.current) {
+      toast({ title: 'Error', description: 'Nothing to export yet. Try again in a moment.', variant: 'destructive' });
       return;
     }
-
     setExporting(true);
     try {
-      const canvas = await html2canvas(scheduleContainer, {
+      const canvas = await html2canvas(scheduleRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         allowTaint: false,
-        width: scheduleContainer.scrollWidth,
-        height: scheduleContainer.scrollHeight
       });
-
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
+      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
       const imgWidth = pdf.internal.pageSize.getWidth();
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(`schedule-${format(currentWeek, 'yyyy-MM-dd')}.pdf`);
-
-      toast({
-        title: "Export Successful",
-        description: "Schedule exported as PDF successfully.",
-      });
+      toast({ title: 'Export Successful', description: 'Schedule exported as PDF successfully.' });
     } catch (error) {
       console.error('Error exporting as PDF:', error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to export schedule as PDF. Please ensure the schedule is fully loaded.",
-        variant: "destructive",
-      });
+      toast({ title: 'Export Failed', description: 'Failed to export schedule as PDF.', variant: 'destructive' });
     } finally {
       setExporting(false);
     }
@@ -126,19 +125,16 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   const exportAsExcel = () => {
     setExporting(true);
     try {
-      const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
-      const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-      
-      // Prepare worksheet data
+      const { start } = getRange();
+      // Prepare worksheet data for the current user
       const worksheetData = [
-        ['Weekly Schedule Export'],
-        [`Week of ${format(weekStart, 'MMM dd')} - ${format(addDays(weekStart, 6), 'MMM dd, yyyy')}`],
+        ['My Schedule Export'],
+        [`Week of ${format(start, 'MMM dd')} - ${exportRange === 'month' ? 'Full Month' : format(addDays(start, 6), 'MMM dd, yyyy')}`],
         [''],
-        ['Employee', 'Date', 'Day', 'Shift Type', 'Activity', 'Status', 'Notes'],
-        ...(scheduleData.map(entry => {
+        ['Date', 'Day', 'Shift Type', 'Activity', 'Status', 'Notes'],
+        ...entries.map((entry) => {
           const entryDate = new Date(entry.date);
           return [
-            `${entry.profiles?.first_name || 'Unknown'} ${entry.profiles?.last_name || 'User'}`,
             format(entryDate, 'yyyy-MM-dd'),
             format(entryDate, 'EEEE'),
             entry.shift_type || '',
@@ -146,41 +142,27 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
             entry.availability_status || '',
             entry.notes || ''
           ];
-        }))
+        })
       ];
 
-      // Create workbook and worksheet
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-      
-      // Set column widths
       ws['!cols'] = [
-        { width: 20 }, // Employee
         { width: 12 }, // Date
-        { width: 10 }, // Day
+        { width: 12 }, // Day
         { width: 12 }, // Shift Type
-        { width: 15 }, // Activity
+        { width: 16 }, // Activity
         { width: 12 }, // Status
-        { width: 30 }  // Notes
+        { width: 40 }  // Notes
       ];
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
-      
-      // Generate Excel file and download
-      const fileName = `schedule-${format(currentWeek, 'yyyy-MM-dd')}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, 'My Schedule');
+      const fileName = `my-schedule-${format(currentWeek, 'yyyy-MM-dd')}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
-      toast({
-        title: "Export Successful",
-        description: "Schedule exported as Excel successfully.",
-      });
+      toast({ title: 'Export Successful', description: 'Schedule exported as Excel successfully.' });
     } catch (error) {
       console.error('Error exporting as Excel:', error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to export schedule as Excel.",
-        variant: "destructive",
-      });
+      toast({ title: 'Export Failed', description: 'Failed to export schedule as Excel.', variant: 'destructive' });
     } finally {
       setExporting(false);
     }
