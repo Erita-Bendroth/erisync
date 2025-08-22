@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Users, Settings, Trash2, Download, BarChart3 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, Users, Settings, Trash2, Download, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -52,6 +53,7 @@ const TeamManagement = () => {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [userRole, setUserRole] = useState<string>("");
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
   const [teamForm, setTeamForm] = useState({
     name: "",
@@ -603,106 +605,146 @@ const TeamManagement = () => {
         </div>
       </div>
 
-      <div className="grid gap-6">
-        {teams.map((team) => (
-          <Card key={team.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center">
-                    <Users className="w-5 h-5 mr-2" />
-                    {team.name}
-                  </CardTitle>
-                  {team.description && (
-                    <CardDescription>{team.description}</CardDescription>
-                  )}
-                </div>
-                <Badge variant="secondary">
-                  {teamMembers[team.id]?.length || 0} members
-                  {/* Debug: {JSON.stringify(teamMembers[team.id]?.slice(0,1) || [])} */}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {teamMembers[team.id]?.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="w-[100px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                     {teamMembers[team.id].map((member) => (
-                       <TableRow key={member.id}>
-                         <TableCell className="font-medium">
-                           {userRole === 'teammember' 
-                             ? `${member.profiles.first_name.charAt(0)}${member.profiles.last_name.charAt(0)}`.toUpperCase()
-                             : `${member.profiles.first_name} ${member.profiles.last_name}`
-                           }
-                        </TableCell>
-                        <TableCell>{member.profiles.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={member.is_manager ? "default" : "secondary"}>
-                            {member.is_manager ? "Manager" : "Member"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {(userRole === 'admin' || userRole === 'planner') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveMember(member.id, team.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+      <div className="space-y-4">
+        {teams.map((team) => {
+          const isExpanded = expandedTeams.has(team.id);
+          const memberCount = teamMembers[team.id]?.length || 0;
+          
+          const toggleTeam = () => {
+            const newExpanded = new Set(expandedTeams);
+            if (isExpanded) {
+              newExpanded.delete(team.id);
+            } else {
+              newExpanded.add(team.id);
+            }
+            setExpandedTeams(newExpanded);
+          };
+
+          return (
+            <Card key={team.id} className="border border-border/50 hover:border-border transition-colors">
+              <Collapsible open={isExpanded} onOpenChange={toggleTeam}>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="transition-transform duration-200">
+                          {isExpanded ? (
+                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 text-muted-foreground" />
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="text-muted-foreground text-center py-4">
-                  No members in this team yet
-                </p>
-              )}
-              
-              {/* Team Summary Overview */}
-              {(userRole === 'admin' || userRole === 'planner' || userRole === 'manager') && teamMembers[team.id]?.length > 0 && (
-                <div className="mt-6 space-y-4">
-                  <h4 className="text-lg font-medium flex items-center">
-                    <BarChart3 className="w-5 h-5 mr-2" />
-                    Team Member Overview
-                  </h4>
-                  <div className="grid gap-4">
-                    {teamMembers[team.id]?.map((member) => (
-                      <UserProfileOverview
-                        key={member.user_id}
-                        userId={member.user_id}
-                        teamId={team.id}
-                        canView={true}
-                        showTeamContext={false}
-                      />
-                    ))}
-                  </div>
-                  <div className="pt-4 border-t">
-                    <Button
-                      onClick={() => downloadTeamData(team.id, team.name)}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Team Report (CSV)
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                        </div>
+                        <div>
+                          <CardTitle className="flex items-center text-lg">
+                            <Users className="w-5 h-5 mr-2 text-primary" />
+                            {team.name} ({memberCount})
+                          </CardTitle>
+                          {team.description && (
+                            <CardDescription className="mt-1">
+                              {team.description}
+                            </CardDescription>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="ml-4">
+                        {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent className="animate-accordion-down data-[state=closed]:animate-accordion-up">
+                  <CardContent className="pt-0">
+                    {memberCount > 0 ? (
+                      <div className="space-y-4">
+                        <div className="rounded-lg border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="font-semibold">Name</TableHead>
+                                <TableHead className="font-semibold">Email</TableHead>
+                                <TableHead className="font-semibold">Role</TableHead>
+                                <TableHead className="w-[100px] font-semibold">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {teamMembers[team.id].map((member) => (
+                                <TableRow key={member.id} className="hover:bg-muted/30">
+                                  <TableCell className="font-medium">
+                                    {userRole === 'teammember' 
+                                      ? `${member.profiles.first_name.charAt(0)}${member.profiles.last_name.charAt(0)}`.toUpperCase()
+                                      : `${member.profiles.first_name} ${member.profiles.last_name}`
+                                    }
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {member.profiles.email}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={member.is_manager ? "default" : "secondary"}>
+                                      {member.is_manager ? "Manager" : "Member"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {(userRole === 'admin' || userRole === 'planner') && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveMember(member.id, team.id)}
+                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        
+                        {/* Team Summary Overview */}
+                        {(userRole === 'admin' || userRole === 'planner' || userRole === 'manager') && (
+                          <div className="space-y-4 pt-4 border-t">
+                            <h4 className="text-lg font-medium flex items-center">
+                              <BarChart3 className="w-5 h-5 mr-2 text-primary" />
+                              Team Member Overview
+                            </h4>
+                            <div className="grid gap-4">
+                              {teamMembers[team.id]?.map((member) => (
+                                <UserProfileOverview
+                                  key={member.user_id}
+                                  userId={member.user_id}
+                                  teamId={team.id}
+                                  canView={true}
+                                  showTeamContext={false}
+                                />
+                              ))}
+                            </div>
+                            <div className="pt-4 border-t">
+                              <Button
+                                onClick={() => downloadTeamData(team.id, team.name)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download Team Report (CSV)
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">No members in this team yet</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          );
+        })}
 
         {teams.length === 0 && (
           <Card>
