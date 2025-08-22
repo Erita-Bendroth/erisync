@@ -339,7 +339,7 @@ useEffect(() => {
           return;
         }
 
-        // Fetch profiles for those user IDs (RLS allows managers to view names)
+        // Fetch profiles for those user IDs - managers can now see basic info from all users
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, user_id, first_name, last_name')
