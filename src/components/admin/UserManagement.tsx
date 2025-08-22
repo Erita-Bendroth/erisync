@@ -458,8 +458,9 @@ const UserManagement = () => {
                         userName={`${userData.first_name} ${userData.last_name}`}
                         roles={userData.roles}
                         onRoleRemoved={fetchUsers}
-        canRemove={hasAdminAccess || 
-                   (currentUserRole === 'manager' && managedTeamIds.length > 0)}
+                        canRemove={hasAdminAccess || 
+                                   (currentUserRole === 'manager' && managedTeamIds.length > 0)}
+                        manageableRoles={currentUserRole === 'manager' ? ['manager', 'teammember'] : []}
                       />
                     </TableCell>
                     <TableCell>

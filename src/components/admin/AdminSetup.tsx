@@ -133,6 +133,87 @@ const AdminSetup = () => {
     }
   };
 
+  const removeRole = async (userId: string, role: string) => {
+    try {
+      // SECURITY: Prevent users from modifying their own roles
+      if (user?.id === userId) {
+        toast({
+          title: "Error",
+          description: "You cannot modify your own role",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // SECURITY: Restrict role removal based on user permissions
+      if (currentUserRole === 'manager') {
+        // Managers can only remove teammember or manager roles
+        if (!['teammember', 'manager'].includes(role)) {
+          toast({
+            title: "Error",
+            description: "Managers can only manage teammember or manager roles",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check if target user is in manager's team
+        if (managedTeamIds.length > 0) {
+          const { data: targetUserTeams } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', userId);
+
+          const hasCommonTeam = targetUserTeams?.some(t => managedTeamIds.includes(t.team_id));
+          if (!hasCommonTeam) {
+            toast({
+              title: "Error",
+              description: "You can only manage roles for users in your teams",
+              variant: "destructive",
+            });
+            return;
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: "You don't manage any teams",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (!currentUserRoles.includes('admin') && !currentUserRoles.includes('planner')) {
+        toast({
+          title: "Error", 
+          description: "Insufficient permissions to modify user roles",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('role', role as "admin" | "planner" | "manager" | "teammember");
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${role} role removed successfully`,
+      });
+
+      fetchUserRoles();
+    } catch (error: any) {
+      console.error("Error removing role:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove role",
+        variant: "destructive",
+      });
+    }
+  };
+
   const assignRole = async (userId: string, role: string) => {
     try {
       // SECURITY: Prevent users from modifying their own roles
@@ -206,7 +287,7 @@ const AdminSetup = () => {
         .from("user_roles")
         .insert([{ 
           user_id: userId, 
-          role: role as "manager" | "planner" | "teammember" 
+          role: role as "admin" | "planner" | "manager" | "teammember" 
         }]);
 
       if (error) throw error;
@@ -258,6 +339,8 @@ const AdminSetup = () => {
 
   const getRoleColor = (role: string) => {
     switch (role) {
+      case "admin":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       case "planner":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "manager":
@@ -331,9 +414,22 @@ const AdminSetup = () => {
                       <p className="text-sm text-muted-foreground">{profile.email}</p>
                       <div className="flex gap-1 mt-1">
                         {roles.map((role) => (
-                          <Badge key={role} className={getRoleColor(role)}>
-                            {role}
-                          </Badge>
+                          <div key={role} className="flex items-center">
+                            <Badge className={getRoleColor(role)}>
+                              {role}
+                              {/* Show remove button only if user can manage this specific role */}
+                              {(currentUserRole === 'admin' || currentUserRole === 'planner' || 
+                                (currentUserRole === 'manager' && ['manager', 'teammember'].includes(role))) && (
+                                <button
+                                  onClick={() => removeRole(profile.user_id, role)}
+                                  className="ml-1 h-3 w-3 rounded-full bg-red-500 text-white text-xs hover:bg-red-600 flex items-center justify-center"
+                                  title={`Remove ${role} role`}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </Badge>
+                          </div>
                         ))}
                         {roles.length === 0 && (
                           <Badge variant="outline">No roles assigned</Badge>

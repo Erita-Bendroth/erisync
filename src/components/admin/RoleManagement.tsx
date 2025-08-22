@@ -17,6 +17,7 @@ interface RoleManagementProps {
   roles: Role[];
   onRoleRemoved: () => void;
   canRemove: boolean;
+  manageableRoles?: string[];
 }
 
 const RoleManagement: React.FC<RoleManagementProps> = ({
@@ -24,7 +25,8 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
   userName,
   roles,
   onRoleRemoved,
-  canRemove
+  canRemove,
+  manageableRoles = []
 }) => {
   const { toast } = useToast();
 
@@ -68,13 +70,21 @@ const RoleManagement: React.FC<RoleManagementProps> = ({
     }
   };
 
+  const canRemoveRole = (role: string) => {
+    if (!canRemove) return false;
+    // If manageableRoles is empty, user can manage all roles (admin/planner)
+    if (manageableRoles.length === 0) return true;
+    // Otherwise, only allow managing roles in the manageableRoles list
+    return manageableRoles.includes(role);
+  };
+
   return (
     <div className="flex flex-wrap gap-1">
       {roles.map((roleObj) => (
         <div key={roleObj.id} className="flex items-center gap-1">
           <Badge className={getRoleColor(roleObj.role)}>
             {roleObj.role}
-            {canRemove && (
+            {canRemoveRole(roleObj.role) && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
