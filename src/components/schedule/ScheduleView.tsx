@@ -81,10 +81,16 @@ const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
 
   const handleEditShift = (entry: ScheduleEntry) => {
-    if (isManager() || isPlanner()) {
-      setEditingEntry(entry);
-      setShowEditModal(true);
+    if (!isManager() && !isPlanner()) return;
+    
+    // Managers can only edit entries for users in their managed teams
+    if (isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id)) {
+      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you manage", variant: "destructive" });
+      return;
     }
+    
+    setEditingEntry(entry);
+    setShowEditModal(true);
   };
 
   const handleCloseEditModal = () => {
@@ -99,6 +105,12 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
 
   const handleDateClick = async (userId: string, date: Date) => {
     if (!isManager() && !isPlanner()) return;
+    
+    // Managers can only edit entries for users in their managed teams
+    if (isManager() && !isPlanner() && !canViewFullDetailsSync(userId)) {
+      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you manage", variant: "destructive" });
+      return;
+    }
     
     try {
       const existingEntry = scheduleEntries.find(entry => 
@@ -946,7 +958,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       entry={entry}
                                       onClick={(e) => {
                                         e?.stopPropagation();
-                                        (isManager() || isPlanner()) && handleEditShift(entry);
+                                        if (isManager() || isPlanner()) {
+                                          // Additional check for managers - they can only edit users in their managed teams
+                                          if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
+                                            handleEditShift(entry);
+                                          }
+                                        }
                                       }}
                                     />
                                   ) : (
@@ -955,7 +972,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       className={`${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity text-xs`}
                                       onClick={(e) => {
                                         e?.stopPropagation();
-                                        (isManager() || isPlanner()) && handleEditShift(entry);
+                                        if (isManager() || isPlanner()) {
+                                          // Additional check for managers - they can only edit users in their managed teams
+                                          if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
+                                            handleEditShift(entry);
+                                          }
+                                        }
                                       }}
                                     >
                                       <div className="flex flex-col items-center py-1">
