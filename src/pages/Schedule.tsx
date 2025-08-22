@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail } from "lucide-react";
+import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download } from "lucide-react";
 import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import TeamManagement from "@/components/schedule/TeamManagement";
