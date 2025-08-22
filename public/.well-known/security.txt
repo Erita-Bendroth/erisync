@@ -1,0 +1,12 @@
+Contact: security@erisync.xyz
+Expires: 2025-12-31T23:59:59.000Z
+Encryption: https://erisync.xyz/pgp-key.txt
+Preferred-Languages: en
+Canonical: https://erisync.xyz/.well-known/security.txt
+Policy: https://erisync.xyz/security-policy
+Hiring: https://erisync.xyz/careers
+
+# Security reporting guidelines
+# Please report security vulnerabilities responsibly
+# Include detailed reproduction steps and impact assessment
+# Allow reasonable time for response before public disclosure

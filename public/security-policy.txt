@@ -1,0 +1,28 @@
+# EriSync Security Policy
+
+## Overview
+EriSync is committed to maintaining the highest security standards for our employee scheduling platform.
+
+## Security Measures
+- End-to-end encryption for all data transmission
+- Regular security audits and vulnerability assessments
+- Strict access controls and authentication mechanisms
+- Compliance with industry security standards
+- Regular security updates and patches
+
+## Data Protection
+- All user data is encrypted at rest and in transit
+- Regular backups with secure storage
+- GDPR and privacy regulation compliance
+- Limited data retention policies
+
+## Incident Response
+- 24/7 security monitoring
+- Rapid response to security incidents
+- Transparent communication about security issues
+- Regular security training for all staff
+
+## Contact
+For security concerns, please contact: security@erisync.xyz
+
+Last updated: August 22, 2025

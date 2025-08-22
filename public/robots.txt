@@ -1,8 +1,12 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /auth/
+Disallow: /admin/
 
 User-agent: Bingbot
 Allow: /
+Disallow: /auth/
+Disallow: /admin/
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +16,22 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /auth/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /.env
+Disallow: /config/
+Disallow: /logs/
+Disallow: /tmp/
+
+# Sitemap location
+Sitemap: https://erisync.xyz/sitemap.xml
+
+# Crawl delay to prevent aggressive crawling
+Crawl-delay: 1
+
+# Security directives for Microsoft Defender compatibility
+User-agent: *
+Disallow: /*?token=*
+Disallow: /*?key=*
+Disallow: /*?password=*
