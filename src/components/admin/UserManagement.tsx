@@ -45,10 +45,17 @@ const UserManagement = () => {
   const [tempPasswordUser, setTempPasswordUser] = useState<User | null>(null);
 
   useEffect(() => {
-    checkPermissions();
-    fetchUsers();
-    fetchTeams();
-  }, [user, currentUserRole, managedTeamIds]);
+    if (user) {
+      checkPermissions();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && hasAdminAccess) {
+      fetchTeams();
+      fetchUsers();
+    }
+  }, [user, hasAdminAccess, currentUserRole, managedTeamIds]);
 
   const fetchTeams = async () => {
     try {
