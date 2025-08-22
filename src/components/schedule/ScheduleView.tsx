@@ -410,8 +410,8 @@ useEffect(() => {
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
           ...emp,
-          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
-          displayName: `${emp.first_name} ${emp.last_name}`.trim()
+          initials: `${emp.first_name?.charAt(0) ?? ''}${emp.last_name?.charAt(0) ?? ''}`.toUpperCase(),
+          displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
         }));
 
         setEmployees(transformedEmployees);
@@ -432,8 +432,8 @@ useEffect(() => {
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
           ...emp,
-          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
-          displayName: `${emp.first_name} ${emp.last_name}`.trim()
+          initials: `${emp.first_name?.charAt(0) ?? ''}${emp.last_name?.charAt(0) ?? ''}`.toUpperCase(),
+          displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
         }));
 
         setEmployees(transformedEmployees);
