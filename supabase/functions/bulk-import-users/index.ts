@@ -79,7 +79,6 @@ Deno.serve(async (req) => {
 
     console.log(`Admin/Planner ${user.email} is performing bulk import`);
 
-    try {
     // Create Supabase admin client with RLS disabled
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
