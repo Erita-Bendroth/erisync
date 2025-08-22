@@ -280,8 +280,8 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
         </div>
 
         {/* Hidden div to capture schedule for export - positioned off-screen but rendered */}
-        <div ref={scheduleRef} className="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none">
-          <div className="bg-white p-6 min-w-[800px]">
+        <div className="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none">
+          <div ref={scheduleRef} className="bg-white p-6 w-[1024px]">
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900">
                 My Schedule - {exportRange === 'month' ? 'Month' : 'Week'} of {format(currentWeek, 'MMM dd, yyyy')}
