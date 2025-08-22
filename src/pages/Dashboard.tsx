@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { format } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 
 interface UserRole {
   role: string;
@@ -37,6 +37,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
+  const [weeklySchedule, setWeeklySchedule] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -59,8 +60,9 @@ const Dashboard = () => {
           filter: `user_id=eq.${user.id}`
         },
         () => {
-          // Refresh today's schedule when any changes occur
+          // Refresh today's schedule and weekly overview when any changes occur
           fetchTodaySchedule();
+          fetchWeeklySchedule();
         }
       )
       .subscribe();
@@ -110,8 +112,9 @@ const Dashboard = () => {
         setUserTeams(teams);
       }
 
-      // Fetch today's schedule
+      // Fetch today's schedule and weekly overview
       await fetchTodaySchedule();
+      await fetchWeeklySchedule();
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast({
@@ -144,6 +147,33 @@ const Dashboard = () => {
       setTodaySchedule(scheduleData || []);
     } catch (error) {
       console.error("Error fetching today's schedule:", error);
+    }
+  };
+
+  const fetchWeeklySchedule = async () => {
+    if (!user) return;
+    
+    try {
+      const now = new Date();
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
+      
+      const { data: scheduleData, error } = await supabase
+        .from("schedule_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", format(weekStart, 'yyyy-MM-dd'))
+        .lte("date", format(weekEnd, 'yyyy-MM-dd'))
+        .order("date", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching weekly schedule:", error);
+        return;
+      }
+
+      setWeeklySchedule(scheduleData || []);
+    } catch (error) {
+      console.error("Error fetching weekly schedule:", error);
     }
   };
 
@@ -355,7 +385,8 @@ const Dashboard = () => {
               </Button>
               {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
                 <ScheduleEntryForm onSuccess={() => {
-                  fetchTodaySchedule(); // Refresh only today's schedule after adding entry
+                  fetchTodaySchedule();
+                  fetchWeeklySchedule();
                   toast({
                     title: "Success",
                     description: "Schedule entry added successfully - dashboard updated",
@@ -375,10 +406,13 @@ const Dashboard = () => {
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
-                onClick={fetchTodaySchedule}
+                onClick={() => {
+                  fetchTodaySchedule();
+                  fetchWeeklySchedule();
+                }}
               >
                 <Calendar className="w-4 h-4 mr-2" />
-                Refresh Today's Schedule
+                Refresh Schedule
               </Button>
 
               <Button 
@@ -394,11 +428,64 @@ const Dashboard = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Latest schedule updates</CardDescription>
+              <CardTitle>This Week's Schedule</CardTitle>
+              <CardDescription>Your schedule overview for the current week</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">No recent activity</p>
+              {weeklySchedule.length > 0 ? (
+                <div className="space-y-2">
+                  {(() => {
+                    const now = new Date();
+                    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+                    const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+                    
+                    return days.map((day) => {
+                      const daySchedule = weeklySchedule.filter(
+                        entry => entry.date === format(day, 'yyyy-MM-dd')
+                      );
+                      const isToday = format(day, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+                      
+                      return (
+                        <div key={format(day, 'yyyy-MM-dd')} className={`flex items-center justify-between p-2 rounded ${isToday ? 'bg-primary/10 border border-primary/20' : ''}`}>
+                          <div className="flex items-center space-x-3">
+                            <span className={`text-sm font-medium min-w-[50px] ${isToday ? 'text-primary' : ''}`}>
+                              {format(day, 'EEE')}
+                            </span>
+                            <span className={`text-xs ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+                              {format(day, 'MMM d')}
+                            </span>
+                          </div>
+                          <div className="flex space-x-1">
+                            {daySchedule.length > 0 ? (
+                              daySchedule.map((entry, idx) => (
+                                <Badge 
+                                  key={idx} 
+                                  variant={
+                                    entry.activity_type === 'work' ? 'default' :
+                                    entry.activity_type === 'vacation' ? 'outline' :
+                                    entry.activity_type === 'sick' ? 'destructive' :
+                                    'secondary'
+                                  }
+                                  className="text-xs"
+                                >
+                                  {getActivityDisplayName(entry.activity_type)}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No schedule</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <Calendar className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No schedule entries this week</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
