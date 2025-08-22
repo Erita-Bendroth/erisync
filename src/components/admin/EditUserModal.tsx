@@ -27,17 +27,19 @@ interface User {
 interface EditUserModalProps {
   user: User | null;
   teams: Team[];
+  availableRoles: string[];
   isOpen: boolean;
   onClose: () => void;
   onUserUpdated: () => void;
 }
 
-const EditUserModal: React.FC<EditUserModalProps> = ({
-  user,
-  teams,
-  isOpen,
-  onClose,
-  onUserUpdated
+const EditUserModal: React.FC<EditUserModalProps> = ({ 
+  user, 
+  teams, 
+  availableRoles,
+  isOpen, 
+  onClose, 
+  onUserUpdated 
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -218,10 +220,14 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent className="bg-popover border border-border shadow-md z-50">
-                <SelectItem value="teammember">Team Member</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="planner">Planner</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                {availableRoles.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {role === 'teammember' ? 'Team Member' : 
+                     role === 'manager' ? 'Manager' : 
+                     role === 'planner' ? 'Planner' : 
+                     role === 'admin' ? 'Admin' : role}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

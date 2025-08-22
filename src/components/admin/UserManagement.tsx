@@ -37,6 +37,8 @@ const UserManagement = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [managedTeamIds, setManagedTeamIds] = useState<string[]>([]);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
@@ -46,7 +48,7 @@ const UserManagement = () => {
     checkPermissions();
     fetchUsers();
     fetchTeams();
-  }, [user]);
+  }, [user, currentUserRole, managedTeamIds]);
 
   const fetchTeams = async () => {
     try {
@@ -82,7 +84,26 @@ const UserManagement = () => {
       
       const roles = data?.map(r => r.role) || [];
       console.log('User roles:', roles);
-      setHasAdminAccess(roles.includes('admin') || roles.includes('planner'));
+      
+      // Determine user's highest role
+      let highestRole = "";
+      if (roles.includes('admin')) highestRole = "admin";
+      else if (roles.includes('planner')) highestRole = "planner";
+      else if (roles.includes('manager')) highestRole = "manager";
+      
+      setCurrentUserRole(highestRole);
+      setHasAdminAccess(roles.includes('admin') || roles.includes('planner') || roles.includes('manager'));
+      
+      // If user is a manager, get their managed teams
+      if (roles.includes('manager') && !roles.includes('admin') && !roles.includes('planner')) {
+        const { data: managerTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+        
+        setManagedTeamIds(managerTeams?.map(t => t.team_id) || []);
+      }
       
     } catch (error) {
       console.error("Error checking permissions:", error);
@@ -129,11 +150,19 @@ const UserManagement = () => {
       if (teamsError) throw teamsError;
 
       // Combine the data
-      const usersWithDetails = profiles?.map(profile => ({
+      let usersWithDetails = profiles?.map(profile => ({
         ...profile,
         roles: userRoles?.filter(ur => ur.user_id === profile.user_id).map(ur => ({ id: ur.id, role: ur.role })) || [],
         teams: teamMemberships?.filter(tm => tm.user_id === profile.user_id).map(tm => tm.teams) || []
       })) || [];
+
+      // Filter users based on current user's role
+      if (currentUserRole === 'manager' && managedTeamIds.length > 0) {
+        // Managers can only see users in their managed teams
+        usersWithDetails = usersWithDetails.filter(userData => 
+          userData.teams.some(team => managedTeamIds.includes(team.id))
+        );
+      }
 
       setUsers(usersWithDetails);
     } catch (error) {
@@ -339,6 +368,16 @@ const UserManagement = () => {
     setShowTempPasswordModal(false);
   };
 
+  // Get available roles based on current user's permissions
+  const getAvailableRoles = () => {
+    if (currentUserRole === 'admin' || currentUserRole === 'planner') {
+      return ['admin', 'planner', 'manager', 'teammember'];
+    } else if (currentUserRole === 'manager') {
+      return ['manager', 'teammember'];
+    }
+    return [];
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
@@ -509,6 +548,7 @@ const UserManagement = () => {
           roles: editingUser.roles.map(r => r.role)
         } : null}
         teams={teams}
+        availableRoles={getAvailableRoles()}
         isOpen={showEditModal}
         onClose={handleCloseEditModal}
         onUserUpdated={fetchUsers}
