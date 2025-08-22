@@ -282,8 +282,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_temporary_password: {
-        Args: { _password: string; _user_id: string }
+      can_view_sensitive_profile_data: {
+        Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean
       }
       create_default_schedule_with_holidays: {
@@ -365,6 +365,10 @@ export type Database = {
       }
       validate_manager_team_access: {
         Args: { _manager_id: string; _target_user_id: string }
+        Returns: boolean
+      }
+      verify_temporary_password: {
+        Args: { _password: string; _user_id: string }
         Returns: boolean
       }
       verify_user_password: {

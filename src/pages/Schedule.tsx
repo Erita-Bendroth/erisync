@@ -393,7 +393,7 @@ const Schedule = () => {
                               <div className="border rounded-lg bg-background h-64 overflow-auto">
                                 {previewHtml ? (
                                   <div className="p-4 prose prose-sm max-w-none">
-                                    <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                                    <div className="whitespace-pre-wrap">{previewHtml}</div>
                                   </div>
                                 ) : (
                                   <div className="p-6 text-center text-muted-foreground h-full flex flex-col justify-center">
