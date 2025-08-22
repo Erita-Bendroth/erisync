@@ -158,6 +158,12 @@ const Dashboard = () => {
       const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
       const weekEnd = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
       
+      console.log('Dashboard fetchWeeklySchedule:', {
+        userId: user.id,
+        weekStart: format(weekStart, 'yyyy-MM-dd'),
+        weekEnd: format(weekEnd, 'yyyy-MM-dd')
+      });
+      
       // Dashboard should always show only the current user's own schedule
       const { data: scheduleData, error } = await supabase
         .from("schedule_entries")
@@ -166,6 +172,15 @@ const Dashboard = () => {
         .gte("date", format(weekStart, 'yyyy-MM-dd'))
         .lte("date", format(weekEnd, 'yyyy-MM-dd'))
         .order("date", { ascending: true });
+
+      console.log('Dashboard schedule data:', {
+        totalEntries: scheduleData?.length || 0,
+        entries: scheduleData?.map(entry => ({
+          date: entry.date,
+          activity_type: entry.activity_type,
+          user_id: entry.user_id
+        })) || []
+      });
 
       if (error) {
         console.error("Error fetching weekly schedule:", error);
