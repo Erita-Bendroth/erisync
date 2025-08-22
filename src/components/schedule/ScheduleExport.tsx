@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { format, addDays, startOfWeek } from 'date-fns';
+import * as XLSX from 'xlsx';
 
 interface ScheduleExportProps {
   scheduleData?: any[];
@@ -25,10 +26,12 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   const [exportRange, setExportRange] = useState<'current' | 'month'>('current');
 
   const exportAsImage = async () => {
-    if (!scheduleRef.current) {
+    const scheduleContainer = document.querySelector('.schedule-view-container') as HTMLElement;
+    
+    if (!scheduleContainer) {
       toast({
         title: "Error",
-        description: "Unable to capture schedule view.",
+        description: "Schedule view not found. Please make sure the schedule is visible.",
         variant: "destructive",
       });
       return;
@@ -36,13 +39,15 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
 
     setExporting(true);
     try {
-      const canvas = await html2canvas(scheduleRef.current, {
+      const canvas = await html2canvas(scheduleContainer, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         scrollX: 0,
         scrollY: 0,
+        width: scheduleContainer.scrollWidth,
+        height: scheduleContainer.scrollHeight
       });
 
       const link = document.createElement('a');
@@ -58,7 +63,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
       console.error('Error exporting as image:', error);
       toast({
         title: "Export Failed",
-        description: "Failed to export schedule as image.",
+        description: "Failed to export schedule as image. Please ensure the schedule is fully loaded.",
         variant: "destructive",
       });
     } finally {
@@ -67,10 +72,12 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   };
 
   const exportAsPDF = async () => {
-    if (!scheduleRef.current) {
+    const scheduleContainer = document.querySelector('.schedule-view-container') as HTMLElement;
+    
+    if (!scheduleContainer) {
       toast({
         title: "Error",
-        description: "Unable to capture schedule view.",
+        description: "Schedule view not found. Please make sure the schedule is visible.",
         variant: "destructive",
       });
       return;
@@ -78,11 +85,13 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
 
     setExporting(true);
     try {
-      const canvas = await html2canvas(scheduleRef.current, {
+      const canvas = await html2canvas(scheduleContainer, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
+        width: scheduleContainer.scrollWidth,
+        height: scheduleContainer.scrollHeight
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -106,7 +115,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
       console.error('Error exporting as PDF:', error);
       toast({
         title: "Export Failed",
-        description: "Failed to export schedule as PDF.",
+        description: "Failed to export schedule as PDF. Please ensure the schedule is fully loaded.",
         variant: "destructive",
       });
     } finally {
@@ -114,51 +123,62 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
     }
   };
 
-  const exportAsCSV = () => {
+  const exportAsExcel = () => {
     setExporting(true);
     try {
       const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
       const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
       
-      // Create CSV headers
-      const headers = ['Employee', 'Date', 'Day', 'Shift Type', 'Activity', 'Status', 'Notes'];
-      const csvData = [headers];
+      // Prepare worksheet data
+      const worksheetData = [
+        ['Weekly Schedule Export'],
+        [`Week of ${format(weekStart, 'MMM dd')} - ${format(addDays(weekStart, 6), 'MMM dd, yyyy')}`],
+        [''],
+        ['Employee', 'Date', 'Day', 'Shift Type', 'Activity', 'Status', 'Notes'],
+        ...(scheduleData.map(entry => {
+          const entryDate = new Date(entry.date);
+          return [
+            `${entry.profiles?.first_name || 'Unknown'} ${entry.profiles?.last_name || 'User'}`,
+            format(entryDate, 'yyyy-MM-dd'),
+            format(entryDate, 'EEEE'),
+            entry.shift_type || '',
+            entry.activity_type || '',
+            entry.availability_status || '',
+            entry.notes || ''
+          ];
+        }))
+      ];
 
-      // Add schedule data
-      scheduleData.forEach(entry => {
-        const entryDate = new Date(entry.date);
-        csvData.push([
-          `${entry.profiles?.first_name || 'Unknown'} ${entry.profiles?.last_name || 'User'}`,
-          format(entryDate, 'yyyy-MM-dd'),
-          format(entryDate, 'EEEE'),
-          entry.shift_type || '',
-          entry.activity_type || '',
-          entry.availability_status || '',
-          entry.notes || ''
-        ]);
-      });
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { width: 20 }, // Employee
+        { width: 12 }, // Date
+        { width: 10 }, // Day
+        { width: 12 }, // Shift Type
+        { width: 15 }, // Activity
+        { width: 12 }, // Status
+        { width: 30 }  // Notes
+      ];
 
-      // Convert to CSV string
-      const csvString = csvData.map(row => 
-        row.map(cell => `"${cell}"`).join(',')
-      ).join('\n');
-
-      // Download CSV
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `schedule-${format(currentWeek, 'yyyy-MM-dd')}.csv`;
-      link.click();
+      XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+      
+      // Generate Excel file and download
+      const fileName = `schedule-${format(currentWeek, 'yyyy-MM-dd')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
 
       toast({
         title: "Export Successful",
-        description: "Schedule exported as CSV successfully.",
+        description: "Schedule exported as Excel successfully.",
       });
     } catch (error) {
-      console.error('Error exporting as CSV:', error);
+      console.error('Error exporting as Excel:', error);
       toast({
         title: "Export Failed",
-        description: "Failed to export schedule as CSV.",
+        description: "Failed to export schedule as Excel.",
         variant: "destructive",
       });
     } finally {
@@ -244,7 +264,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
           </Button>
 
           <Button 
-            onClick={exportAsCSV} 
+            onClick={exportAsExcel} 
             disabled={exporting}
             variant="outline"
             className="flex items-center gap-2"
@@ -254,7 +274,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
             ) : (
               <FileText className="w-4 h-4" />
             )}
-            Export CSV
+            Export Excel
           </Button>
         </div>
 
@@ -269,7 +289,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
           </Badge>
           <Badge variant="secondary" className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            CSV: Spreadsheet data
+            Excel: Spreadsheet data
           </Badge>
         </div>
 

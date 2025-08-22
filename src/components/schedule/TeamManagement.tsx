@@ -13,6 +13,7 @@ import { Plus, Users, Settings, Trash2, Download, BarChart3, ChevronDown, Chevro
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek, startOfYear, endOfYear } from "date-fns";
 

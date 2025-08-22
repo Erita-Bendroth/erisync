@@ -1076,7 +1076,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
+    <div className="schedule-view-container">
             {/* Activity Types Legend */}
             <div>
               <h4 className="font-medium mb-3">Activity Types</h4>

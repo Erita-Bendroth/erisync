@@ -449,14 +449,6 @@ const Schedule = () => {
               <PasswordSettings />
               <ScheduleExport />
               <OutlookIntegration />
-              
-              {/* Profile Overview - Only for planners and managers */}
-              {(isPlanner() || isManager()) && user && (
-                <UserProfileOverview 
-                  userId={user.id} 
-                  canView={isPlanner() || isManager()} 
-                />
-              )}
             </div>
           </TabsContent>
         </Tabs>

@@ -8,6 +8,7 @@ import { Download, Clock, Calendar, Briefcase, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, differenceInDays, parseISO } from "date-fns";
+import * as XLSX from 'xlsx';
 
 interface UserProfileOverviewProps {
   userId: string;
@@ -26,8 +27,6 @@ interface ProfileData {
 interface WorkSummary {
   totalWorkDays: number;
   vacationDays: number;
-  sickDays: number;
-  trainingDays: number;
   totalHours: number;
   availableDays: number;
   unavailableDays: number;
@@ -121,8 +120,6 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
       const summary: WorkSummary = {
         totalWorkDays: 0,
         vacationDays: 0,
-        sickDays: 0,
-        trainingDays: 0,
         totalHours: 0,
         availableDays: 0,
         unavailableDays: 0
@@ -138,12 +135,6 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
             break;
           case 'vacation':
             summary.vacationDays++;
-            break;
-          case 'sick':
-            summary.sickDays++;
-            break;
-          case 'training':
-            summary.trainingDays++;
             break;
           case 'hotline_support':
           case 'flextime':
@@ -202,7 +193,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
     }
   };
 
-  const downloadCSV = async () => {
+  const downloadExcel = async () => {
     if (!profile || !workSummary) return;
     
     setDownloadingCSV(true);
@@ -222,50 +213,57 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
 
       if (error) throw error;
 
-      // Create CSV content
-      const csvHeaders = [
-        'Date',
-        'Activity Type',
-        'Shift Type',
-        'Availability Status',
-        'Hours',
-        'Notes'
+      // Prepare worksheet data
+      const worksheetData = [
+        ['Employee Schedule Report'],
+        [`Name: ${profile.first_name} ${profile.last_name}`],
+        [`Year: ${currentYear}`],
+        [''],
+        ['Date', 'Activity Type', 'Shift Type', 'Availability Status', 'Hours', 'Notes'],
+        ...(data?.map(entry => [
+          entry.date,
+          entry.activity_type.replace('_', ' '),
+          entry.shift_type,
+          entry.availability_status,
+          calculateHoursFromEntry(entry),
+          entry.notes || ''
+        ]) || []),
+        [''],
+        ['Summary:'],
+        ['Total Work Days', workSummary.totalWorkDays],
+        ['Total Hours', workSummary.totalHours.toFixed(1)],
+        ['Vacation Days', workSummary.vacationDays]
       ];
 
-      const csvRows = data?.map(entry => [
-        entry.date,
-        entry.activity_type.replace('_', ' '),
-        entry.shift_type,
-        entry.availability_status,
-        calculateHoursFromEntry(entry).toString(),
-        entry.notes || ''
-      ]) || [];
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { width: 12 }, // Date
+        { width: 15 }, // Activity Type
+        { width: 12 }, // Shift Type
+        { width: 18 }, // Availability Status
+        { width: 8 },  // Hours
+        { width: 30 }  // Notes
+      ];
 
-      const csvContent = [
-        csvHeaders.join(','),
-        ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
-      ].join('\n');
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${profile.first_name}_${profile.last_name}_Schedule_${currentYear}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
+      
+      // Generate Excel file and download
+      const fileName = `${profile.first_name}_${profile.last_name}_Schedule_${currentYear}.xlsx`;
+      XLSX.writeFile(wb, fileName);
 
       toast({
         title: "Success",
-        description: "CSV file downloaded successfully"
+        description: "Excel file downloaded successfully"
       });
     } catch (error) {
-      console.error('Error downloading CSV:', error);
+      console.error('Error downloading Excel:', error);
       toast({
         title: "Error",
-        description: "Failed to download CSV file",
+        description: "Failed to download Excel file",
         variant: "destructive"
       });
     } finally {
@@ -302,8 +300,6 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
               <div class="summary-item"><span class="bold">Total Work Days:</span> ${workSummary.totalWorkDays}</div>
               <div class="summary-item"><span class="bold">Total Hours:</span> ${workSummary.totalHours.toFixed(1)}</div>
               <div class="summary-item"><span class="bold">Vacation Days:</span> ${workSummary.vacationDays}</div>
-              <div class="summary-item"><span class="bold">Sick Days:</span> ${workSummary.sickDays}</div>
-              <div class="summary-item"><span class="bold">Training Days:</span> ${workSummary.trainingDays}</div>
               <div class="summary-item"><span class="bold">Available Days:</span> ${workSummary.availableDays}</div>
               <div class="summary-item"><span class="bold">Unavailable Days:</span> ${workSummary.unavailableDays}</div>
             </div>
@@ -395,7 +391,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
             </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="space-y-2">
               <div className="flex items-center">
                 <Briefcase className="w-4 h-4 mr-2 text-blue-500" />
@@ -414,24 +410,6 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
               </div>
               <div className="text-2xl font-bold">{workSummary.vacationDays}</div>
               <div className="text-xs text-muted-foreground">days taken</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Clock className="w-4 h-4 mr-2 text-red-500" />
-                <span className="text-sm font-medium">Sick Leave</span>
-              </div>
-              <div className="text-2xl font-bold text-red-600">{workSummary.sickDays}</div>
-              <div className="text-xs text-muted-foreground">days taken</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <User className="w-4 h-4 mr-2 text-purple-500" />
-                <span className="text-sm font-medium">Training</span>
-              </div>
-              <div className="text-2xl font-bold text-purple-600">{workSummary.trainingDays}</div>
-              <div className="text-xs text-muted-foreground">days completed</div>
             </div>
           </div>
 
@@ -455,13 +433,13 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
 
             <div className="flex gap-2 pt-4">
               <Button 
-                onClick={downloadCSV} 
+                onClick={downloadExcel} 
                 disabled={downloadingCSV}
                 variant="outline"
                 size="sm"
               >
                 <Download className="w-4 h-4 mr-2" />
-                {downloadingCSV ? 'Downloading...' : 'Download CSV'}
+                {downloadingCSV ? 'Downloading...' : 'Download Excel'}
               </Button>
               <Button 
                 onClick={downloadPDF} 
