@@ -365,6 +365,13 @@ const OutlookIntegration = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Work in Progress:</strong> Outlook Calendar integration is currently under development and not fully supported at this time. Some features may not work as expected.
+            </AlertDescription>
+          </Alert>
+          
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Connection Status:</span>
