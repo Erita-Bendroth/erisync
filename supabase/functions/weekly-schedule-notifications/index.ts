@@ -173,7 +173,7 @@ serve(async (req) => {
 
         // Send email
         const emailResponse = await resend.emails.send({
-          from: "EriSync <onboarding@resend.dev>",
+          from: "EriSync <noreply@erisync.xyz>",
           to: [user.email],
           subject,
           html

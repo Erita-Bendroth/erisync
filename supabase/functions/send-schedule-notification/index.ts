@@ -29,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Sending schedule notification to:", userEmail);
 
     const emailResponse = await resend.emails.send({
-      from: "EriSync <noreply@yourdomain.com>", // Change this to your verified domain
+      from: "EriSync <noreply@erisync.xyz>",
       to: [userEmail],
       subject: "Schedule Change Notification",
       html: `

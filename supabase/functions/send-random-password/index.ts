@@ -90,7 +90,7 @@ serve(async (req) => {
 
       // Send email with new password
       const { error: emailError } = await resend.emails.send({
-        from: "EriSync <onboarding@resend.dev>",
+        from: "EriSync <noreply@erisync.xyz>",
         to: [userEmail],
         subject: "Your New EriSync Password",
         html: `

@@ -225,7 +225,7 @@ serve(async (req) => {
       // Try Resend first (recommended for modern apps)
       if (resend) {
         emailResponse = await resend.emails.send({
-          from: "EriSync <onboarding@resend.dev>",
+          from: "EriSync <noreply@erisync.xyz>",
           to: [to],
           subject,
           html
