@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { useToast } from "@/hooks/use-toast";
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
-import { EditScheduleModal } from "./EditScheduleModal";
-import { DatePicker } from "@/components/ui/date-picker";
-import { TimeBlockDisplay } from "./TimeBlockDisplay";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DatePicker } from '@/components/ui/date-picker';
+import { useToast } from '@/hooks/use-toast';
+import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth } from 'date-fns';
+import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { EditScheduleModal } from './EditScheduleModal';
+import { TimeBlockDisplay } from './TimeBlockDisplay';
+import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
   id: string;
@@ -65,6 +68,7 @@ const ScheduleView = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
   const [viewMode, setViewMode] = useState<string>("my-schedule");
   const [employees, setEmployees] = useState<Employee[]>([]);
 const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -836,19 +840,63 @@ const getActivityColor = (entry: ScheduleEntry) => {
           {(isManager() || isPlanner()) && (
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium whitespace-nowrap">Team:</label>
-              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                <SelectTrigger className="w-48 bg-background">
-                  <SelectValue placeholder="Select team" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border z-50">
-                  <SelectItem value="all">All Teams</SelectItem>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={teamDropdownOpen} onOpenChange={setTeamDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={teamDropdownOpen}
+                    className="w-48 justify-between"
+                  >
+                    {selectedTeam === "all" 
+                      ? "All Teams"
+                      : teams.find((team) => team.id === selectedTeam)?.name || "Select team..."
+                    }
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-0 bg-background border z-50">
+                  <Command>
+                    <CommandInput placeholder="Search teams..." />
+                    <CommandEmpty>No team found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedTeam("all");
+                          setTeamDropdownOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedTeam === "all" ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        All Teams
+                      </CommandItem>
+                      {teams.map((team) => (
+                        <CommandItem
+                          key={team.id}
+                          value={team.name}
+                          onSelect={() => {
+                            setSelectedTeam(team.id);
+                            setTeamDropdownOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedTeam === team.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {team.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
           

@@ -185,8 +185,61 @@ const UserManagement = () => {
         return;
       }
 
-      // SECURITY: Additional authorization check
-      if (!hasAdminAccess) {
+      // Get current user's role to determine permissions
+      const { data: currentUserRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user!.id);
+
+      const userRoles = currentUserRoles?.map(r => r.role) || [];
+      const isAdmin = userRoles.includes('admin');
+      const isPlanner = userRoles.includes('planner');
+      const isManager = userRoles.includes('manager');
+
+      // SECURITY: Restrict role assignments based on user permissions
+      if (isManager && !isPlanner && !isAdmin) {
+        // Managers can only assign teammember or manager roles to their team members
+        if (!['teammember', 'manager'].includes(newRole)) {
+          toast({
+            title: "Error",
+            description: "Managers can only assign teammember or manager roles",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Check if target user is in manager's team
+        const { data: managerTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user!.id)
+          .eq('is_manager', true);
+
+        if (managerTeams && managerTeams.length > 0) {
+          const teamIds = managerTeams.map(t => t.team_id);
+          const { data: targetUserTeams } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', userId);
+
+          const hasCommonTeam = targetUserTeams?.some(t => teamIds.includes(t.team_id));
+          if (!hasCommonTeam) {
+            toast({
+              title: "Error",
+              description: "You can only manage roles for users in your teams",
+              variant: "destructive",
+            });
+            return;
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: "You don't manage any teams",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (!isAdmin && !isPlanner) {
         toast({
           title: "Error", 
           description: "Insufficient permissions to modify user roles",
