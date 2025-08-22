@@ -296,68 +296,101 @@ useEffect(() => {
       console.log('isPlanner():', isPlanner());
       console.log('selectedTeam:', selectedTeam);
 
-      // For managers/planners, directly fetch profiles for team members
+      // For managers/planners, build employee list from schedule entries to respect RLS
       if (isManager() || isPlanner()) {
-        console.log('Manager/planner: fetching team member profiles');
+        console.log('Manager/planner: building employee list from accessible data');
 
-        let targetUserIds: string[] = [];
+        // First, get schedule entries for the current week which managers can access
+        let scheduleQuery = supabase
+          .from("schedule_entries")
+          .select(`
+            user_id,
+            profiles!inner(user_id, first_name, last_name)
+          `)
+          .gte("date", format(weekStart, "yyyy-MM-dd"))
+          .lte("date", format(addDays(weekStart, 6), "yyyy-MM-dd"));
 
         if (selectedTeam !== "all") {
-          console.log('Fetching profiles for specific team:', selectedTeam);
+          scheduleQuery = scheduleQuery.eq("team_id", selectedTeam);
+        }
+
+        const { data: scheduleData, error: scheduleError } = await scheduleQuery;
+
+        if (scheduleError) {
+          console.error('Error fetching schedule data for employees:', scheduleError);
+          setEmployees([]);
+          return;
+        }
+
+        // Extract unique users from schedule entries
+        const userMap = new Map();
+        (scheduleData || []).forEach((entry: any) => {
+          if (entry.profiles && !userMap.has(entry.user_id)) {
+            userMap.set(entry.user_id, {
+              id: entry.profiles.user_id,
+              user_id: entry.user_id,
+              first_name: entry.profiles.first_name,
+              last_name: entry.profiles.last_name
+            });
+          }
+        });
+
+        // If no schedule entries found, try to get team members for the selected team
+        if (userMap.size === 0 && selectedTeam !== "all") {
+          console.log('No schedule entries found, fetching team members directly');
           
-          // Get team members for this specific team
-          const { data: teamMembersRes, error: teamMembersError } = await supabase
+          const { data: teamMembersRes } = await supabase
             .from('team_members')
-            .select('user_id')
+            .select(`
+              user_id,
+              profiles!inner(user_id, first_name, last_name)
+            `)
             .eq('team_id', selectedTeam);
 
-          if (teamMembersError) {
-            console.error('Error fetching team members:', teamMembersError);
-            setEmployees([]);
-            return;
-          }
-
-          targetUserIds = (teamMembersRes || []).map((tm: any) => tm.user_id);
-          console.log('Target user IDs for team:', targetUserIds);
-        } else {
-          console.log('All teams: fetching from schedule entries');
-          // For "all" view, get user IDs from schedule entries
-          const { data: entriesAll } = await supabase
-            .from('schedule_entries')
-            .select('user_id')
-            .gte('date', format(weekStart, "yyyy-MM-dd"))
-            .lte('date', format(addDays(weekStart, 6), "yyyy-MM-dd"));
-          targetUserIds = [...new Set((entriesAll || []).map((e: any) => e.user_id))];
+          (teamMembersRes || []).forEach((member: any) => {
+            if (member.profiles && !userMap.has(member.user_id)) {
+              userMap.set(member.user_id, {
+                id: member.profiles.user_id,
+                user_id: member.user_id,
+                first_name: member.profiles.first_name,
+                last_name: member.profiles.last_name
+              });
+            }
+          });
         }
 
-        if (targetUserIds.length === 0) {
-          console.log('No target user IDs found');
-          setEmployees([]);
-          return;
+        // If still no users and "all teams" view, get from all accessible entries
+        if (userMap.size === 0 && selectedTeam === "all") {
+          console.log('No users found, trying broader schedule query');
+          
+          const { data: allScheduleData } = await supabase
+            .from("schedule_entries")
+            .select(`
+              user_id,
+              profiles!inner(user_id, first_name, last_name)
+            `);
+
+          (allScheduleData || []).forEach((entry: any) => {
+            if (entry.profiles && !userMap.has(entry.user_id)) {
+              userMap.set(entry.user_id, {
+                id: entry.profiles.user_id,
+                user_id: entry.user_id,
+                first_name: entry.profiles.first_name,
+                last_name: entry.profiles.last_name
+              });
+            }
+          });
         }
 
-        // Fetch profiles directly using the user IDs
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, user_id, first_name, last_name')
-          .in('user_id', targetUserIds)
-          .order('first_name');
+        const transformedEmployees = Array.from(userMap.values())
+          .map((emp: any) => ({
+            ...emp,
+            initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
+            displayName: `${emp.first_name} ${emp.last_name}`.trim()
+          }))
+          .sort((a, b) => a.first_name.localeCompare(b.first_name));
 
-        console.log('Profiles query result:', { profiles, error: profilesError });
-
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-          setEmployees([]);
-          return;
-        }
-
-        const transformedEmployees = (profiles || []).map((emp: any) => ({
-          ...emp,
-          initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
-          displayName: `${emp.first_name} ${emp.last_name}`.trim()
-        }));
-
-        console.log('Transformed employees:', transformedEmployees);
+        console.log('Transformed employees from schedule data:', transformedEmployees);
         setEmployees(transformedEmployees);
       } else if (isTeamMember()) {
         console.log('User is regular team member');
@@ -627,13 +660,15 @@ const canViewFullDetailsSync = (userId: string) => {
 
   // Render employee name/initials based on access
   const renderEmployeeName = (employee: Employee) => {
+    // Always show the employee name (available through schedule entries)
+    // For managers viewing non-managed users, show availability info instead of initials
     if (isManager() && !isPlanner()) {
       const canViewFull = canViewFullDetailsSync(employee.user_id);
       if (!canViewFull) {
         return (
           <>
             <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-            <p className="text-xs text-muted-foreground">Available/Not Available</p>
+            <p className="text-xs text-muted-foreground">Availability View</p>
           </>
         );
       } else {
@@ -676,9 +711,9 @@ const getActivityDisplay = (entry: ScheduleEntry) => {
 };
 
 const getAvailabilityStatus = (activityType: string) => {
-  // work, working_from_home, hotline_support = Available
-  // all others = Not Available
-  const availableTypes = ['work', 'working_from_home', 'hotline_support'];
+  // work, hotline_support = Available (as per user requirements)
+  // all others = Not Available  
+  const availableTypes = ['work', 'hotline_support'];
   return availableTypes.includes(activityType) ? "Available" : "Not Available";
 };
 
@@ -691,7 +726,7 @@ const getAvailabilityStatus = (activityType: string) => {
 const getActivityColor = (entry: ScheduleEntry) => {
   // Team members see availability colors only
   if (isTeamMember() && !isManager() && !isPlanner()) {
-    const availableTypes = ['work', 'working_from_home', 'hotline_support'];
+    const availableTypes = ['work', 'hotline_support'];
     return availableTypes.includes(entry.activity_type)
       ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
       : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
@@ -701,8 +736,8 @@ const getActivityColor = (entry: ScheduleEntry) => {
   if (isManager() && !isPlanner()) {
     const canViewFull = canViewFullDetailsSync(entry.user_id);
     if (!canViewFull) {
-      // Show availability colors only
-      const availableTypes = ['work', 'working_from_home', 'hotline_support'];
+      // Show availability colors only (work and hotline_support = available)
+      const availableTypes = ['work', 'hotline_support'];
       return availableTypes.includes(entry.activity_type)
         ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
         : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
