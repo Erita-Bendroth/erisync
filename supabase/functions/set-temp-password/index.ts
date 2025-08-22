@@ -20,6 +20,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Validate request method
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  }
+
   try {
     // Get JWT from Authorization header
     const authHeader = req.headers.get('Authorization');
@@ -30,17 +38,29 @@ serve(async (req) => {
       });
     }
 
-    // Create Supabase client with the user's JWT
+    // Initialize Supabase client with user's JWT
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         auth: {
           autoRefreshToken: false,
-          persistSession: false
+          persistSession: false,
         },
         global: {
           headers: { Authorization: authHeader }
+        }
+      }
+    );
+
+    // Initialize admin client for password operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
         }
       }
     );
@@ -54,32 +74,23 @@ serve(async (req) => {
       });
     }
 
-    const { userId, tempPassword } = await req.json();
-
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
-    // Verify the requesting user has admin/planner privileges
-    const { data: userRoles, error: roleCheckError } = await supabase
+    // Check if user has admin or planner role
+    const { data: userRoles, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
-    if (roleCheckError) {
-      console.error('Error checking user privileges:', roleCheckError);
-      return new Response(JSON.stringify({ error: 'Failed to verify user privileges' }), {
-        status: 500,
+    if (roleError || !userRoles?.some(r => r.role === 'admin' || r.role === 'planner')) {
+      return new Response(JSON.stringify({ error: 'Admin or planner access required' }), {
+        status: 403,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
-    const hasRequiredRole = userRoles?.some(r => ['admin', 'planner'].includes(r.role));
-    if (!hasRequiredRole) {
-      return new Response(JSON.stringify({ error: 'Insufficient privileges. Admin or Planner role required.' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+    const { userId, tempPassword } = await req.json();
+
+    if (!userId) {
+      throw new Error('User ID is required');
     }
 
     // Generate secure password if not provided, or validate provided password
@@ -90,19 +101,8 @@ serve(async (req) => {
       throw new Error('Temporary password must be at least 8 characters long');
     }
 
-    // Initialize Supabase Admin client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-
-    console.log('Setting temporary password for user:', userId);
+    // Remove duplicate supabaseAdmin client initialization
+    // (already created above)
 
     // Update user password using admin client
     const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(

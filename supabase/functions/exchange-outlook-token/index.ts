@@ -21,6 +21,31 @@ serve(async (req) => {
       });
     }
 
+    // Initialize Supabase client with user's JWT for authentication
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
+    );
+
+    // Verify the user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid JWT token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     const { code, redirectUri } = await req.json()
 
     if (!code || !redirectUri) {
@@ -32,7 +57,9 @@ serve(async (req) => {
       'localhost',
       '127.0.0.1',
       'lovable.dev',
-      '.lovable.dev'
+      '.lovable.dev',
+      'lovable.app',
+      '.lovable.app'
     ];
     
     try {
