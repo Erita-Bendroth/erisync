@@ -275,25 +275,28 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
           </Badge>
         </div>
 
-        {/* Hidden div to capture schedule for export */}
+        {/* Hidden div to capture schedule for export - now populated with real data */}
         <div ref={scheduleRef} className="hidden">
           <div className="bg-white p-6 min-w-[800px]">
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900">
-                Weekly Schedule - {format(currentWeek, 'MMM dd, yyyy')}
+                My Schedule - {exportRange === 'month' ? 'Month' : 'Week'} of {format(currentWeek, 'MMM dd, yyyy')}
               </h1>
               <p className="text-gray-600">
-                Week of {format(startOfWeek(currentWeek, { weekStartsOn: 1 }), 'MMM dd')} - {format(addDays(startOfWeek(currentWeek, { weekStartsOn: 1 }), 6), 'MMM dd, yyyy')}
+                {exportRange === 'month' 
+                  ? `Month: ${format(getRange().start, 'MMM yyyy')}`
+                  : `Week of ${format(getRange().start, 'MMM dd')} - ${format(getRange().end, 'MMM dd, yyyy')}`
+                }
               </p>
             </div>
             
             <div className="space-y-4">
-              {scheduleData.length > 0 ? (
+              {entries.length > 0 ? (
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border border-gray-300 p-2 text-left">Employee</th>
                       <th className="border border-gray-300 p-2 text-left">Date</th>
+                      <th className="border border-gray-300 p-2 text-left">Day</th>
                       <th className="border border-gray-300 p-2 text-left">Shift</th>
                       <th className="border border-gray-300 p-2 text-left">Activity</th>
                       <th className="border border-gray-300 p-2 text-left">Status</th>
@@ -301,13 +304,13 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {scheduleData.map((entry, index) => (
+                    {entries.map((entry, index) => (
                       <tr key={index} className="hover:bg-gray-50">
                         <td className="border border-gray-300 p-2">
-                          {entry.profiles?.first_name} {entry.profiles?.last_name}
+                          {format(new Date(entry.date), 'MMM dd, yyyy')}
                         </td>
                         <td className="border border-gray-300 p-2">
-                          {format(new Date(entry.date), 'MMM dd, yyyy')}
+                          {format(new Date(entry.date), 'EEEE')}
                         </td>
                         <td className="border border-gray-300 p-2">{entry.shift_type}</td>
                         <td className="border border-gray-300 p-2">{entry.activity_type}</td>
@@ -318,7 +321,10 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-600 text-center py-8">No schedule entries for this period.</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-600 text-lg">No schedule entries for this period.</p>
+                  {loadingData && <p className="text-gray-500 mt-2">Loading schedule data...</p>}
+                </div>
               )}
             </div>
           </div>

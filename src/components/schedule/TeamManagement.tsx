@@ -390,49 +390,84 @@ const TeamManagement = () => {
 
       if (error) throw error;
 
-      // Create CSV content
-      const csvHeaders = [
-        'Employee Name',
-        'Email',
-        'Date',
-        'Activity Type',
-        'Shift Type',
-        'Availability Status',
-        'Hours',
-        'Notes'
+      // Calculate totals for each member
+      const memberSummaries = members.map(member => {
+        const memberEntries = data?.filter(entry => entry.user_id === member.user_id) || [];
+        
+        let totalWorkDays = 0;
+        let totalHours = 0;
+        let vacationDays = 0;
+        
+        memberEntries.forEach(entry => {
+          if (entry.activity_type === 'work' || entry.activity_type === 'hotline_support' || entry.activity_type === 'flextime' || entry.activity_type === 'working_from_home') {
+            totalWorkDays++;
+            totalHours += calculateHoursFromScheduleEntry(entry);
+          } else if (entry.activity_type === 'vacation') {
+            vacationDays++;
+          }
+        });
+        
+        return {
+          name: `${member.profiles.first_name} ${member.profiles.last_name}`,
+          email: member.profiles.email,
+          totalWorkDays,
+          totalHours,
+          vacationDays
+        };
+      });
+
+      // Prepare worksheet data
+      const worksheetData = [
+        [`${teamName} Team Report - ${currentYear}`],
+        [''],
+        ['Employee', 'Email', 'Date', 'Activity Type', 'Shift Type', 'Availability Status', 'Hours', 'Notes'],
+        ...(data?.map(entry => {
+          const member = members.find(m => m.user_id === entry.user_id);
+          const hours = calculateHoursFromScheduleEntry(entry);
+          
+          return [
+            member ? `${member.profiles.first_name} ${member.profiles.last_name}` : 'Unknown',
+            member?.profiles.email || '',
+            entry.date,
+            entry.activity_type.replace('_', ' '),
+            entry.shift_type,
+            entry.availability_status,
+            hours,
+            entry.notes || ''
+          ];
+        }) || []),
+        [''],
+        ['Summary by Employee:'],
+        ['Employee', 'Total Work Days', 'Total Hours', 'Vacation Days'],
+        ...memberSummaries.map(summary => [
+          summary.name,
+          summary.totalWorkDays,
+          summary.totalHours.toFixed(1),
+          summary.vacationDays
+        ])
       ];
 
-      const csvRows = data?.map(entry => {
-        const member = members.find(m => m.user_id === entry.user_id);
-        const hours = calculateHoursFromScheduleEntry(entry);
-        
-        return [
-          member ? `${member.profiles.first_name} ${member.profiles.last_name}` : 'Unknown',
-          member?.profiles.email || '',
-          entry.date,
-          entry.activity_type.replace('_', ' '),
-          entry.shift_type,
-          entry.availability_status,
-          hours.toString(),
-          entry.notes || ''
-        ];
-      }) || [];
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { width: 20 }, // Employee
+        { width: 25 }, // Email
+        { width: 12 }, // Date
+        { width: 15 }, // Activity Type
+        { width: 12 }, // Shift Type
+        { width: 18 }, // Availability Status
+        { width: 8 },  // Hours
+        { width: 30 }  // Notes
+      ];
 
-      const csvContent = [
-        csvHeaders.join(','),
-        ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
-      ].join('\n');
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${teamName}_Team_Report_${currentYear}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      XLSX.utils.book_append_sheet(wb, ws, 'Team Report');
+      
+      // Generate Excel file and download
+      const fileName = `${teamName}_Team_Report_${currentYear}.xlsx`;
+      XLSX.writeFile(wb, fileName);
 
       toast({
         title: "Success",
@@ -753,7 +788,7 @@ const TeamManagement = () => {
                                 size="sm"
                               >
                                 <Download className="w-4 h-4 mr-2" />
-                                Download Team Report (CSV)
+                                Download Team Report (Excel)
                               </Button>
                             </div>
                           </div>
