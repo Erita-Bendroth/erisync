@@ -158,13 +158,42 @@ const Dashboard = () => {
       const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
       const weekEnd = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
       
-      const { data: scheduleData, error } = await supabase
+      // Use role-based filtering logic similar to main ScheduleView
+      let query = supabase
         .from("schedule_entries")
         .select("*")
-        .eq("user_id", user.id)
         .gte("date", format(weekStart, 'yyyy-MM-dd'))
         .lte("date", format(weekEnd, 'yyyy-MM-dd'))
         .order("date", { ascending: true });
+
+      // Apply role-based filtering
+      const isPlanner = userRoles.some(role => role.role === 'planner');
+      const isManager = userRoles.some(role => role.role === 'manager');
+      const isTeamMember = userRoles.some(role => role.role === 'teammember');
+
+      if (isPlanner) {
+        // Planners can see all entries - no additional filtering
+      } else if (isManager) {
+        // Managers can see entries for teams they manage
+        const { data: managedTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+        
+        if (managedTeams && managedTeams.length > 0) {
+          const teamIds = managedTeams.map(t => t.team_id);
+          query = query.in("team_id", teamIds);
+        } else {
+          // If not managing any teams, just show own entries
+          query = query.eq("user_id", user.id);
+        }
+      } else {
+        // Team members and others only see their own entries
+        query = query.eq("user_id", user.id);
+      }
+
+      const { data: scheduleData, error } = await query;
 
       if (error) {
         console.error("Error fetching weekly schedule:", error);
