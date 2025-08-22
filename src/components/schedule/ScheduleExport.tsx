@@ -25,7 +25,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   const { toast } = useToast();
   const scheduleRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'png' | 'pdf'>('png');
+  const [exportFormat, setExportFormat] = useState<'pdf'>('pdf');
   const [exportRange, setExportRange] = useState<'current' | 'month'>('current');
   const [entries, setEntries] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -169,16 +169,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   };
 
   const handleExport = () => {
-    switch (exportFormat) {
-      case 'png':
-        exportAsImage();
-        break;
-      case 'pdf':
-        exportAsPDF();
-        break;
-      default:
-        exportAsImage();
-    }
+    exportAsPDF();
   };
 
   return (
@@ -196,17 +187,11 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Export Format</label>
-            <Select value={exportFormat} onValueChange={(value: 'png' | 'pdf') => setExportFormat(value)}>
+            <Select value={exportFormat} onValueChange={(value: 'pdf') => setExportFormat(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="png">
-                  <div className="flex items-center gap-2">
-                    <FileImage className="w-4 h-4" />
-                    PNG Image
-                  </div>
-                </SelectItem>
                 <SelectItem value="pdf">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
@@ -261,10 +246,6 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
         </div>
 
         <div className="flex flex-wrap gap-2 pt-2">
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <FileImage className="w-3 h-3" />
-            PNG: High quality image
-          </Badge>
           <Badge variant="secondary" className="flex items-center gap-1">
             <FileText className="w-3 h-3" />
             PDF: Printable document
