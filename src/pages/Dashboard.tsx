@@ -500,7 +500,10 @@ const Dashboard = () => {
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
-                onClick={() => navigate("/schedule?tab=schedule")}
+                onClick={() => {
+                  const teamId = userTeams.length > 0 ? userTeams[0].id : '';
+                  navigate(`/schedule?tab=schedule&team=${teamId}`);
+                }}
               >
                 <Users className="w-4 h-4 mr-2" />
                 View Team Availability

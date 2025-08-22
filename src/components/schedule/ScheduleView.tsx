@@ -59,7 +59,11 @@ interface Holiday {
   is_public: boolean;
 }
 
-const ScheduleView = () => {
+interface ScheduleViewProps {
+  initialTeamId?: string;
+}
+
+const ScheduleView = ({ initialTeamId }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -172,6 +176,16 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       toast({ title: "Error", description: "Could not open create entry dialog", variant: "destructive" });
     }
   };
+
+  // Set initial team from prop
+  useEffect(() => {
+    if (initialTeamId && initialTeamId !== '' && teams.length > 0) {
+      const teamExists = teams.find(team => team.id === initialTeamId);
+      if (teamExists) {
+        setSelectedTeam(initialTeamId);
+      }
+    }
+  }, [initialTeamId, teams]);
 
   useEffect(() => {
     if (user) {

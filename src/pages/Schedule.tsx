@@ -28,6 +28,7 @@ const Schedule = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'admin';
+  const teamFromUrl = searchParams.get('team') || '';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
@@ -432,7 +433,7 @@ const Schedule = () => {
               </div>
               <BulkScheduleGenerator />
             </div>
-            <ScheduleView />
+            <ScheduleView initialTeamId={teamFromUrl} />
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
