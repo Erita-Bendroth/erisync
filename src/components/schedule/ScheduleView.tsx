@@ -296,102 +296,71 @@ useEffect(() => {
       console.log('isPlanner():', isPlanner());
       console.log('selectedTeam:', selectedTeam);
 
-      // For managers/planners, build employee list from schedule entries to respect RLS
+      // For managers/planners, fetch employees via team_members (do NOT depend on schedule entries)
       if (isManager() || isPlanner()) {
-        console.log('Manager/planner: building employee list from accessible data');
+        console.log('Manager/planner: fetching employees via team_members');
 
-        // First, get schedule entries for the current week which managers can access
-        let scheduleQuery = supabase
-          .from("schedule_entries")
-          .select(`
-            user_id,
-            profiles!inner(user_id, first_name, last_name)
-          `)
-          .gte("date", format(weekStart, "yyyy-MM-dd"))
-          .lte("date", format(addDays(weekStart, 6), "yyyy-MM-dd"));
+        let targetUserIds: string[] = [];
 
         if (selectedTeam !== "all") {
-          scheduleQuery = scheduleQuery.eq("team_id", selectedTeam);
+          console.log('Selected specific team:', selectedTeam);
+          const { data: teamMembersRes, error: teamMembersError } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', selectedTeam);
+
+          if (teamMembersError) {
+            console.error('Error fetching team members:', teamMembersError);
+            setEmployees([]);
+            return;
+          }
+
+          targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
+          console.log('Target user IDs for team:', targetUserIds);
+        } else {
+          console.log('All teams view: fetching all team members');
+          const { data: allMembers, error: allMembersError } = await supabase
+            .from('team_members')
+            .select('user_id');
+
+          if (allMembersError) {
+            console.error('Error fetching all team members:', allMembersError);
+            setEmployees([]);
+            return;
+          }
+
+          targetUserIds = [...new Set((allMembers || []).map((tm: any) => tm.user_id))];
+          console.log('All teams target user IDs count:', targetUserIds.length);
         }
 
-        const { data: scheduleData, error: scheduleError } = await scheduleQuery;
-
-        if (scheduleError) {
-          console.error('Error fetching schedule data for employees:', scheduleError);
+        if (targetUserIds.length === 0) {
+          console.log('No team members found for selection');
           setEmployees([]);
           return;
         }
 
-        // Extract unique users from schedule entries
-        const userMap = new Map();
-        (scheduleData || []).forEach((entry: any) => {
-          if (entry.profiles && !userMap.has(entry.user_id)) {
-            userMap.set(entry.user_id, {
-              id: entry.profiles.user_id,
-              user_id: entry.user_id,
-              first_name: entry.profiles.first_name,
-              last_name: entry.profiles.last_name
-            });
-          }
-        });
+        // Fetch profiles for those user IDs (RLS allows managers to view names)
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, user_id, first_name, last_name')
+          .in('user_id', targetUserIds)
+          .order('first_name');
 
-        // If no schedule entries found, try to get team members for the selected team
-        if (userMap.size === 0 && selectedTeam !== "all") {
-          console.log('No schedule entries found, fetching team members directly');
-          
-          const { data: teamMembersRes } = await supabase
-            .from('team_members')
-            .select(`
-              user_id,
-              profiles!inner(user_id, first_name, last_name)
-            `)
-            .eq('team_id', selectedTeam);
-
-          (teamMembersRes || []).forEach((member: any) => {
-            if (member.profiles && !userMap.has(member.user_id)) {
-              userMap.set(member.user_id, {
-                id: member.profiles.user_id,
-                user_id: member.user_id,
-                first_name: member.profiles.first_name,
-                last_name: member.profiles.last_name
-              });
-            }
-          });
+        if (profilesError) {
+          console.error('Error fetching profiles for team members:', profilesError);
+          setEmployees([]);
+          return;
         }
 
-        // If still no users and "all teams" view, get from all accessible entries
-        if (userMap.size === 0 && selectedTeam === "all") {
-          console.log('No users found, trying broader schedule query');
-          
-          const { data: allScheduleData } = await supabase
-            .from("schedule_entries")
-            .select(`
-              user_id,
-              profiles!inner(user_id, first_name, last_name)
-            `);
+        const transformedEmployees = (profiles || []).map((emp: any) => ({
+          ...emp,
+          initials: `${emp.first_name?.charAt(0) ?? ''}${emp.last_name?.charAt(0) ?? ''}`.toUpperCase(),
+          displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
+        }));
 
-          (allScheduleData || []).forEach((entry: any) => {
-            if (entry.profiles && !userMap.has(entry.user_id)) {
-              userMap.set(entry.user_id, {
-                id: entry.profiles.user_id,
-                user_id: entry.user_id,
-                first_name: entry.profiles.first_name,
-                last_name: entry.profiles.last_name
-              });
-            }
-          });
-        }
-
-        const transformedEmployees = Array.from(userMap.values())
-          .map((emp: any) => ({
-            ...emp,
-            initials: `${emp.first_name.charAt(0)}${emp.last_name.charAt(0)}`.toUpperCase(),
-            displayName: `${emp.first_name} ${emp.last_name}`.trim()
-          }))
-          .sort((a, b) => a.first_name.localeCompare(b.first_name));
-
-        console.log('Transformed employees from schedule data:', transformedEmployees);
+        console.log('Transformed employees (team_members based):', transformedEmployees.length);
         setEmployees(transformedEmployees);
+
       } else if (isTeamMember()) {
         console.log('User is regular team member');
 
