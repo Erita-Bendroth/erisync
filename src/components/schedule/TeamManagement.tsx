@@ -99,7 +99,7 @@ const TeamManagement = () => {
         .select("*")
         .order("name");
 
-      // For team members (not admin/planner/manager), only show teams they are part of
+      // Role-based team filtering
       if (userRole === 'teammember') {
         console.log("Fetching teams for team member...");
         const { data: userTeamMemberships, error: membershipError } = await supabase
@@ -119,8 +119,28 @@ const TeamManagement = () => {
           setTeams([]);
           return;
         }
+      } else if (userRole === 'manager') {
+        console.log("Fetching teams for manager...");
+        const { data: managedTeams, error: managerError } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", user!.id)
+          .eq("is_manager", true);
+        
+        console.log("Manager team memberships:", managedTeams, "Error:", managerError);
+        
+        if (managedTeams && managedTeams.length > 0) {
+          const teamIds = managedTeams.map(tm => tm.team_id);
+          console.log("Filtering teams to only show managed team IDs:", teamIds);
+          query = query.in("id", teamIds);
+        } else {
+          // Manager doesn't manage any teams, return empty array
+          console.log("Manager doesn't manage any teams, showing empty list");
+          setTeams([]);
+          return;
+        }
       } else {
-        console.log("User has elevated role, showing all teams");
+        console.log("User has admin/planner role, showing all teams");
       }
 
       const { data, error } = await query;
