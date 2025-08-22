@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Generate a secure random password
+function generateSecurePassword(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => chars[byte % chars.length]).join('');
+}
+
 interface ResetAllPasswordsRequest {
   adminUserId: string;
 }
@@ -26,7 +34,31 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    // Create Supabase admin client
+    // Get JWT from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Create Supabase client with the user's JWT
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        },
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
+    );
+
+    // Create admin client for privileged operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -38,23 +70,33 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
 
-    const { adminUserId }: ResetAllPasswordsRequest = await req.json();
-    console.log('Admin user requesting bulk password reset:', adminUserId);
+    // Verify the user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid JWT token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+    console.log('Admin user requesting bulk password reset:', user.id);
 
-    // Verify the requesting user has admin privileges
-    const { data: adminRoles, error: adminCheckError } = await supabaseAdmin
+    // Verify the requesting user has admin privileges using the authenticated client
+    const { data: adminRoles, error: adminCheckError } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', adminUserId);
+      .eq('user_id', user.id);
 
     if (adminCheckError) {
       console.error('Error checking admin privileges:', adminCheckError);
-      throw new Error('Failed to verify admin privileges');
+      return new Response(JSON.stringify({ error: 'Failed to verify admin privileges' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const hasAdminRole = adminRoles?.some(r => r.role === 'admin');
     if (!hasAdminRole) {
-      console.error('User does not have admin privileges:', adminUserId);
+      console.error('User does not have admin privileges:', user.id);
       return new Response(JSON.stringify({ error: 'Insufficient privileges. Admin role required.' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -84,15 +126,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Found ${profiles.length} users to reset passwords`);
 
-    const newPassword = 'VestasTemp2025!';
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
 
-    // Reset password for each user
+    // Reset password for each user with unique secure passwords
     for (const profile of profiles) {
       try {
         console.log(`Resetting password for user: ${profile.email} (${profile.user_id})`);
+        
+        // Generate a unique secure password for each user
+        const newPassword = generateSecurePassword();
         
         // Update the user's password using admin API
         const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -139,8 +183,8 @@ const handler = async (req: Request): Promise<Response> => {
       totalUsers: profiles.length,
       successCount,
       errorCount,
-      newPassword: 'VestasTemp2025!',
       requiresPasswordChange: true,
+      note: 'Individual secure passwords were generated for each user',
       errors: errors.length > 0 ? errors : undefined
     };
 

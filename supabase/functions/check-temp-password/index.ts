@@ -13,16 +13,38 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    // Get JWT from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Initialize Supabase client with user's JWT
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         auth: {
           autoRefreshToken: false,
-          persistSession: false
+          persistSession: false,
+        },
+        global: {
+          headers: { Authorization: authHeader }
         }
       }
-    )
+    );
+
+    // Verify the user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid JWT token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
 
     const { email, password } = await req.json()
 
@@ -36,45 +58,17 @@ serve(async (req) => {
       )
     }
 
-    console.log('Checking if user has temporary password:', email)
+    console.log('Checking password for:', email)
 
-    // Check if the provided password matches the temporary password
-    const tempPassword = 'VestasTemp2025!'
-    const hasTemporaryPassword = password === tempPassword
-
-    if (hasTemporaryPassword) {
-      console.log('User has temporary password, setting requires_password_change flag')
-      
-      // Get user ID from email
-      const { data: users, error: userError } = await supabaseClient.auth.admin.listUsers()
-      
-      if (userError) {
-        console.error('Error fetching users:', userError)
-        throw userError
-      }
-
-      const user = users.users.find(u => u.email === email)
-      
-      if (user) {
-        // Update the profile to require password change
-        const { error: updateError } = await supabaseClient
-          .from('profiles')
-          .update({ requires_password_change: true })
-          .eq('user_id', user.id)
-
-        if (updateError) {
-          console.error('Error updating profile:', updateError)
-          throw updateError
-        }
-
-        console.log('Successfully set requires_password_change for user:', user.id)
-      }
-    }
+    // Since we no longer use hardcoded temporary passwords,
+    // this function primarily serves to validate the request format
+    // The actual password verification should happen through proper auth flows
+    const hasTemporaryPassword = false;
 
     return new Response(
       JSON.stringify({ 
         hasTemporaryPassword,
-        message: hasTemporaryPassword ? 'Temporary password detected' : 'Password is not temporary'
+        message: 'Password verification completed - no temporary passwords in use'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

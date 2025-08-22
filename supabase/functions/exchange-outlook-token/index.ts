@@ -12,10 +12,41 @@ serve(async (req) => {
   }
 
   try {
+    // Get JWT from Authorization header for security
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     const { code, redirectUri } = await req.json()
 
     if (!code || !redirectUri) {
       throw new Error('Missing required parameters')
+    }
+
+    // Validate redirect URI to prevent open redirect attacks
+    const allowedDomains = [
+      'localhost',
+      '127.0.0.1',
+      'lovable.dev',
+      '.lovable.dev'
+    ];
+    
+    try {
+      const uri = new URL(redirectUri);
+      const isAllowed = allowedDomains.some(domain => 
+        uri.hostname === domain || 
+        (domain.startsWith('.') && uri.hostname.endsWith(domain))
+      );
+      
+      if (!isAllowed) {
+        throw new Error('Invalid redirect URI - not in allowed domains');
+      }
+    } catch (urlError) {
+      throw new Error('Invalid redirect URI format');
     }
 
     // Get Azure AD app configuration from environment

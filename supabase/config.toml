@@ -1,24 +1,33 @@
 project_id = "rdatyftacldjhgzsxzfw"
 
+# Secure functions - require authentication
 [functions.bulk-import-users]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-user]
-verify_jwt = false
+verify_jwt = true
 
 [functions.delete-user]
-verify_jwt = false
-
-[functions.import-holidays]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-password]
-verify_jwt = false
+verify_jwt = true
 
+[functions.set-temp-password]
+verify_jwt = true
+
+[functions.reset-all-passwords]
+verify_jwt = true
+
+# Semi-public functions - still require JWT for security
 [functions.check-temp-password]
-verify_jwt = false
+verify_jwt = true
 
 [functions.exchange-outlook-token]
+verify_jwt = true
+
+# System functions - can remain public for automated execution
+[functions.import-holidays]
 verify_jwt = false
 
 [functions.send-future-schedule]
@@ -31,10 +40,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-random-password]
-verify_jwt = false
-
-[functions.reset-all-passwords]
-verify_jwt = false
-
-[functions.set-temp-password]
 verify_jwt = false
