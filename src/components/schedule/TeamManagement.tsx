@@ -34,6 +34,7 @@ interface TeamMember {
     last_name: string;
     user_id: string;
     initials: string;
+    email?: string; // Email may not be available for security reasons
   };
 }
 
@@ -42,6 +43,7 @@ interface Profile {
   first_name: string;
   last_name: string;
   initials: string;
+  email?: string; // Email may not be available for security reasons
 }
 
 const TeamManagement = () => {
@@ -200,12 +202,12 @@ const TeamManagement = () => {
           throw profilesError;
         }
 
-        // Combine the data - note: secure function doesn't include email for non-team members
+        // Combine the data - show email if available
         const transformedData = membersData.map(member => {
           const profile = profilesData?.find(p => p.user_id === member.user_id);
           return {
             ...member,
-            profiles: profile || { first_name: '', last_name: '', user_id: member.user_id, initials: '' }
+            profiles: profile || { first_name: '', last_name: '', user_id: member.user_id, initials: '', email: null }
           };
         });
 
@@ -223,15 +225,7 @@ const TeamManagement = () => {
   const fetchProfiles = async () => {
     try {
       const { data, error } = await supabase
-        .rpc('get_multiple_basic_profile_info', { _user_ids: [] })
-        .then(async (result) => {
-          // Get all user IDs first, then fetch basic profile info
-          const { data: allUsers, error: usersError } = await supabase.auth.admin.listUsers();
-          if (usersError) throw usersError;
-          
-          const userIds = allUsers.users.map(u => u.id);
-          return await supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
-        });
+        .rpc('get_all_basic_profiles');
 
       if (error) throw error;
       setProfiles(data || []);
@@ -414,7 +408,7 @@ const TeamManagement = () => {
         
           return {
             name: `${member.profiles.first_name} ${member.profiles.last_name}`,
-            email: 'Not available', // Email not available through secure function
+            email: member.profiles.email || 'Email restricted',
             totalWorkDays,
             totalHours,
             vacationDays
@@ -432,7 +426,7 @@ const TeamManagement = () => {
           
           return [
             member ? `${member.profiles.first_name} ${member.profiles.last_name}` : 'Unknown',
-            'Email not available', // Secure function doesn't expose emails
+            member?.profiles.email || 'Email restricted',
             entry.date,
             entry.activity_type.replace('_', ' '),
             entry.shift_type,
@@ -571,7 +565,7 @@ const TeamManagement = () => {
                     <SelectContent>
                        {profiles.map((profile) => (
                          <SelectItem key={profile.user_id} value={profile.user_id}>
-                           {profile.first_name} {profile.last_name}
+                           {profile.first_name} {profile.last_name} {profile.email ? `(${profile.email})` : ''}
                          </SelectItem>
                        ))}
                     </SelectContent>
@@ -743,8 +737,7 @@ const TeamManagement = () => {
                                     }
                                   </TableCell>
                                    <TableCell className="text-muted-foreground">
-                                     {/* Note: Email not available for security reasons */}
-                                     {userRole === 'teammember' ? '***@***.***' : 'Contact admin for email'}
+                                     {member.profiles.email || 'Email restricted'}
                                    </TableCell>
                                   <TableCell>
                                     <Badge variant={member.is_manager ? "default" : "secondary"}>

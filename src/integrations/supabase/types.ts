@@ -310,9 +310,20 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_all_basic_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          email: string
+          first_name: string
+          initials: string
+          last_name: string
+          user_id: string
+        }[]
+      }
       get_basic_profile_info: {
         Args: { _user_id: string }
         Returns: {
+          email: string
           first_name: string
           initials: string
           last_name: string
@@ -335,6 +346,7 @@ export type Database = {
       get_multiple_basic_profile_info: {
         Args: { _user_ids: string[] }
         Returns: {
+          email: string
           first_name: string
           initials: string
           last_name: string

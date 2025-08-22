@@ -93,19 +93,7 @@ const BulkScheduleGenerator = () => {
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
-        .rpc('get_multiple_basic_profile_info', { _user_ids: [] })
-        .then(async (result) => {
-          // For bulk schedule generator, get all available users
-          const { data: allProfiles, error: profilesError } = await supabase
-            .from('profiles')
-            .select('user_id')
-            .order('first_name');
-          
-          if (profilesError) throw profilesError;
-          
-          const userIds = allProfiles?.map(p => p.user_id) || [];
-          return await supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
-        });
+        .rpc('get_all_basic_profiles');
 
       if (error) throw error;
       setUsers(data?.map(p => ({

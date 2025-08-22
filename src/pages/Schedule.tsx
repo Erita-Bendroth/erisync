@@ -90,19 +90,7 @@ const Schedule = () => {
     try {
       // Fetch individual users
       const { data: usersData, error: usersError } = await supabase
-        .rpc('get_multiple_basic_profile_info', { _user_ids: [] })
-        .then(async (result) => {
-          // Get all user IDs first for individual recipient selection
-          const { data: allProfiles, error: profilesError } = await supabase
-            .from('profiles')
-            .select('user_id')
-            .order('first_name');
-          
-          if (profilesError) throw profilesError;
-          
-          const userIds = allProfiles?.map(p => p.user_id) || [];
-          return await supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
-        });
+        .rpc('get_all_basic_profiles');
       if (usersError) throw usersError;
       setRecipients((usersData || []).map(p => ({ id: p.user_id, name: `${p.first_name} ${p.last_name}` })));
 
@@ -174,7 +162,7 @@ const Schedule = () => {
             <h2>Team Email Preview: ${escapeHtml(teamName)}</h2>
             <p>2-week schedule summaries will be sent to <strong>${members.length}</strong> team members:</p>
             <ul style="margin:16px 0;padding-left:24px">
-              ${members.map((m: any) => `<li>${escapeHtml(m.first_name)} ${escapeHtml(m.last_name)} (Email protected for security)</li>`).join('')}
+              ${members.map((m: any) => `<li>${escapeHtml(m.first_name)} ${escapeHtml(m.last_name)} ${m.email ? `(${escapeHtml(m.email)})` : '(Email restricted)'}</li>`).join('')}
             </ul>
             <p><em>Each team member will receive their individual 2-week schedule summary.</em></p>
           </div>
