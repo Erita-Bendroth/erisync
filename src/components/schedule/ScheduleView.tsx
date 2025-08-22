@@ -629,15 +629,14 @@ const canViewFullDetailsSync = (userId: string) => {
 
   // Render employee name/initials based on access
   const renderEmployeeName = (employee: Employee) => {
-    // Always show the employee name (available through schedule entries)
-    // For managers viewing non-managed users, show availability info instead of initials
+    // For managers: show full details for their team members, only initials for others
     if (isManager() && !isPlanner()) {
       const canViewFull = canViewFullDetailsSync(employee.user_id);
       if (!canViewFull) {
         return (
           <>
-            <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-            <p className="text-xs text-muted-foreground">Availability View</p>
+            <p className="font-medium">{employee.initials}</p>
+            <p className="text-xs text-muted-foreground">Other Team</p>
           </>
         );
       } else {
@@ -649,6 +648,7 @@ const canViewFullDetailsSync = (userId: string) => {
         );
       }
     }
+    // Planners and team members see full names
     return (
       <>
         <p className="font-medium">{employee.first_name} {employee.last_name}</p>
