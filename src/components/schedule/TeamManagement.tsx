@@ -67,9 +67,11 @@ const TeamManagement = () => {
   });
 
   useEffect(() => {
-    fetchUserRole().then(() => {
-      fetchTeams();
-      fetchProfiles();
+    fetchUserRole().then((role) => {
+      if (role) {
+        fetchTeams(role);
+        fetchProfiles();
+      }
     });
   }, [user]);
 
@@ -87,11 +89,12 @@ const TeamManagement = () => {
     }
   }, [teams]);
 
-  const fetchTeams = async () => {
+  const fetchTeams = async (currentUserRole?: string) => {
     try {
       console.log("Fetching teams...");
       console.log("Current user:", user);
-      console.log("User role:", userRole);
+      const roleToUse = currentUserRole || userRole;
+      console.log("User role:", roleToUse);
       console.log("Supabase session:", await supabase.auth.getSession());
       
       let query = supabase
@@ -100,7 +103,7 @@ const TeamManagement = () => {
         .order("name");
 
       // Role-based team filtering
-      if (userRole === 'teammember') {
+      if (roleToUse === 'teammember') {
         console.log("Fetching teams for team member...");
         const { data: userTeamMemberships, error: membershipError } = await supabase
           .from("team_members")
@@ -119,7 +122,7 @@ const TeamManagement = () => {
           setTeams([]);
           return;
         }
-      } else if (userRole === 'manager') {
+      } else if (roleToUse === 'manager') {
         console.log("Fetching teams for manager...");
         const { data: managedTeams, error: managerError } = await supabase
           .from("team_members")
@@ -251,8 +254,10 @@ const TeamManagement = () => {
       
       setUserRole(role);
       console.log("User role set to:", role, "from roles:", roles.map(r => r.role));
+      return role; // Return the role for immediate use
     } catch (error) {
       console.error("Error fetching user role:", error);
+      return "";
     }
   };
 
