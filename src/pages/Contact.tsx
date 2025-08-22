@@ -70,7 +70,7 @@ const Contact = () => {
       console.error('Contact form error:', error);
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again or contact us directly at erbet2@vestas.com",
+        description: "Failed to send message. Please try again or contact us directly at erbet@vestas.com",
         variant: "destructive",
       });
     } finally {
@@ -187,10 +187,10 @@ const Contact = () => {
                 <div className="bg-muted p-4 rounded-md">
                   <p className="font-medium">Email</p>
                   <a 
-                    href="mailto:erbet2@vestas.com" 
+                    href="mailto:erbet@vestas.com" 
                     className="text-primary hover:underline"
                   >
-                    erbet2@vestas.com
+                    erbet@vestas.com
                   </a>
                   <p className="text-muted-foreground text-sm mt-2">
                     We typically respond within 24 hours during business days.

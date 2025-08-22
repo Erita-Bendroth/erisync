@@ -38,7 +38,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email to the specified recipient
     const emailResponse = await resend.emails.send({
       from: "Employee Scheduler <onboarding@resend.dev>",
-      to: ["erbet2@vestas.com"],
+      to: ["erbet@vestas.com"],
       subject: `Contact Form Message from ${name}`,
       html: `
         <h2>New Contact Form Message</h2>

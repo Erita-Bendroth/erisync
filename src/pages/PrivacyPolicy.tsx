@@ -238,7 +238,7 @@ const PrivacyPolicy = () => {
                 please contact us:
               </p>
               <div className="bg-muted p-4 rounded-md">
-                <p className="font-medium">Email: erbet2@vestas.com</p>
+                <p className="font-medium">Email: erbet@vestas.com</p>
                 <p className="text-muted-foreground mt-2">
                   We will respond to your inquiry within 30 days.
                 </p>
