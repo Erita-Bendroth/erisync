@@ -275,8 +275,8 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
           </Badge>
         </div>
 
-        {/* Hidden div to capture schedule for export - now populated with real data */}
-        <div ref={scheduleRef} className="hidden">
+        {/* Hidden div to capture schedule for export - positioned off-screen but rendered */}
+        <div ref={scheduleRef} className="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none">
           <div className="bg-white p-6 min-w-[800px]">
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900">
