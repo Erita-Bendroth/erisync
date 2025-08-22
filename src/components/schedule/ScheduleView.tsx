@@ -627,28 +627,8 @@ const canViewFullDetailsSync = (userId: string) => {
   return managedUsersSet.has(userId);
 };
 
-  // Render employee name/initials based on access
+  // Render employee name - everyone can see full names since initials are public info
   const renderEmployeeName = (employee: Employee) => {
-    // For managers: show full details for their team members, only initials for others
-    if (isManager() && !isPlanner()) {
-      const canViewFull = canViewFullDetailsSync(employee.user_id);
-      if (!canViewFull) {
-        return (
-          <>
-            <p className="font-medium">{employee.initials}</p>
-            <p className="text-xs text-muted-foreground">Other Team</p>
-          </>
-        );
-      } else {
-        return (
-          <>
-            <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-            <p className="text-xs text-muted-foreground">{employee.initials}</p>
-          </>
-        );
-      }
-    }
-    // Planners and team members see full names
     return (
       <>
         <p className="font-medium">{employee.first_name} {employee.last_name}</p>
