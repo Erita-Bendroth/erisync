@@ -19,25 +19,24 @@ verify_jwt = true
 [functions.reset-all-passwords]
 verify_jwt = true
 
-# Semi-public functions - still require JWT for security
 [functions.check-temp-password]
 verify_jwt = true
 
 [functions.exchange-outlook-token]
 verify_jwt = true
 
-# System functions - can remain public for automated execution
 [functions.import-holidays]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-future-schedule]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-team-schedule-summary]
-verify_jwt = false
-
-[functions.weekly-schedule-notifications]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-random-password]
+verify_jwt = true
+
+# System functions - automated execution only
+[functions.weekly-schedule-notifications]
 verify_jwt = false
