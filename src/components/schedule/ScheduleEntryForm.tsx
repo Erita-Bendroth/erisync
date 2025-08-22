@@ -23,6 +23,7 @@ interface Profile {
   user_id: string;
   first_name: string;
   last_name: string;
+  initials: string;
 }
 
 interface ScheduleEntryFormProps {
@@ -120,9 +121,19 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
   const fetchProfiles = async () => {
     try {
       const { data } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name")
-        .order("first_name");
+        .rpc('get_multiple_basic_profile_info', { _user_ids: [] })
+        .then(async (result) => {
+          // For schedule entry form, get all available users  
+          const { data: allProfiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .order('first_name');
+          
+          if (profilesError) throw profilesError;
+          
+          const userIds = allProfiles?.map(p => p.user_id) || [];
+          return await supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
+        });
       
       setProfiles(data || []);
     } catch (error) {

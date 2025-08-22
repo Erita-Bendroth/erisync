@@ -339,12 +339,9 @@ useEffect(() => {
           return;
         }
 
-        // Fetch profiles for those user IDs - managers can now see basic info from all users
+        // Fetch profiles for those user IDs - use secure function for basic info
         const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, user_id, first_name, last_name')
-          .in('user_id', targetUserIds)
-          .order('first_name');
+          .rpc('get_multiple_basic_profile_info', { _user_ids: targetUserIds });
 
         if (profilesError) {
           console.error('Error fetching profiles for team members:', profilesError);
@@ -353,8 +350,11 @@ useEffect(() => {
         }
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
-          ...emp,
-          initials: `${emp.first_name?.charAt(0) ?? ''}${emp.last_name?.charAt(0) ?? ''}`.toUpperCase(),
+          id: emp.user_id,
+          user_id: emp.user_id,
+          first_name: emp.first_name ?? '',
+          last_name: emp.last_name ?? '',
+          initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
           displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
         }));
 
@@ -395,12 +395,9 @@ useEffect(() => {
           }
         }
 
-        // Fetch profiles for team members
+        // Fetch profiles for team members - use secure function
         const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, user_id, first_name, last_name')
-          .in('user_id', targetUserIds)
-          .order('first_name');
+          .rpc('get_multiple_basic_profile_info', { _user_ids: targetUserIds });
 
         if (profilesError) {
           console.error('Error fetching team member profiles:', profilesError);
@@ -409,8 +406,11 @@ useEffect(() => {
         }
 
         const transformedEmployees = (profiles || []).map((emp: any) => ({
-          ...emp,
-          initials: `${emp.first_name?.charAt(0) ?? ''}${emp.last_name?.charAt(0) ?? ''}`.toUpperCase(),
+          id: emp.user_id,
+          user_id: emp.user_id,
+          first_name: emp.first_name ?? '',
+          last_name: emp.last_name ?? '',
+          initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
           displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
         }));
 
@@ -418,11 +418,9 @@ useEffect(() => {
       } else {
         console.log('No specific role found, showing only current user');
         
-        // Fetch current user's profile
+        // Fetch current user's profile - use secure function
         const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, user_id, first_name, last_name')
-          .eq('user_id', user!.id);
+          .rpc('get_basic_profile_info', { _user_id: user!.id });
 
         if (profilesError) {
           console.error('Error fetching user profile:', profilesError);
@@ -430,9 +428,15 @@ useEffect(() => {
           return;
         }
 
-        const transformedEmployees = (profiles || []).map((emp: any) => ({
-          ...emp,
-          initials: `${emp.first_name?.charAt(0) ?? ''}${emp.last_name?.charAt(0) ?? ''}`.toUpperCase(),
+        // Convert single user result to array for consistency
+        const profilesArray = Array.isArray(profiles) ? profiles : [profiles];
+        
+        const transformedEmployees = profilesArray.map((emp: any) => ({
+          id: emp.user_id,
+          user_id: emp.user_id,
+          first_name: emp.first_name ?? '',
+          last_name: emp.last_name ?? '',
+          initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
           displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
         }));
 
@@ -535,7 +539,7 @@ useEffect(() => {
       const teamIds = [...new Set(data?.map(entry => entry.team_id) || [])];
       
       const [profilesResult, teamsResult] = await Promise.all([
-        supabase.from('profiles').select('user_id, first_name, last_name').in('user_id', userIds),
+        supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds }),
         supabase.from('teams').select('id, name').in('id', teamIds)
       ]);
       

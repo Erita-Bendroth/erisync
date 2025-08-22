@@ -310,6 +310,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_basic_profile_info: {
+        Args: { _user_id: string }
+        Returns: {
+          first_name: string
+          initials: string
+          last_name: string
+          user_id: string
+        }[]
+      }
       get_cron_status: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -322,6 +331,15 @@ export type Database = {
       get_managed_team_ids: {
         Args: { _uid: string }
         Returns: string[]
+      }
+      get_multiple_basic_profile_info: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          first_name: string
+          initials: string
+          last_name: string
+          user_id: string
+        }[]
       }
       get_schedule_availability: {
         Args: { _end: string; _start: string }

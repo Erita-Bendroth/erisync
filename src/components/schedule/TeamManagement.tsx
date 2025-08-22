@@ -32,7 +32,8 @@ interface TeamMember {
   profiles: {
     first_name: string;
     last_name: string;
-    email: string;
+    user_id: string;
+    initials: string;
   };
 }
 
@@ -40,7 +41,7 @@ interface Profile {
   user_id: string;
   first_name: string;
   last_name: string;
-  email: string;
+  initials: string;
 }
 
 const TeamManagement = () => {
@@ -192,21 +193,19 @@ const TeamManagement = () => {
         const userIds = membersData.map(member => member.user_id);
         
         const { data: profilesData, error: profilesError } = await supabase
-          .from("profiles")
-          .select("user_id, first_name, last_name, email")
-          .in("user_id", userIds);
+          .rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
 
         if (profilesError) {
           console.error(`Error fetching profiles:`, profilesError);
           throw profilesError;
         }
 
-        // Combine the data
+        // Combine the data - note: secure function doesn't include email for non-team members
         const transformedData = membersData.map(member => {
           const profile = profilesData?.find(p => p.user_id === member.user_id);
           return {
             ...member,
-            profiles: profile || { first_name: '', last_name: '', email: '' }
+            profiles: profile || { first_name: '', last_name: '', user_id: member.user_id, initials: '' }
           };
         });
 
@@ -224,9 +223,15 @@ const TeamManagement = () => {
   const fetchProfiles = async () => {
     try {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name, email")
-        .order("first_name");
+        .rpc('get_multiple_basic_profile_info', { _user_ids: [] })
+        .then(async (result) => {
+          // Get all user IDs first, then fetch basic profile info
+          const { data: allUsers, error: usersError } = await supabase.auth.admin.listUsers();
+          if (usersError) throw usersError;
+          
+          const userIds = allUsers.users.map(u => u.id);
+          return await supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
+        });
 
       if (error) throw error;
       setProfiles(data || []);
@@ -407,13 +412,13 @@ const TeamManagement = () => {
           }
         });
         
-        return {
-          name: `${member.profiles.first_name} ${member.profiles.last_name}`,
-          email: member.profiles.email,
-          totalWorkDays,
-          totalHours,
-          vacationDays
-        };
+          return {
+            name: `${member.profiles.first_name} ${member.profiles.last_name}`,
+            email: 'Not available', // Email not available through secure function
+            totalWorkDays,
+            totalHours,
+            vacationDays
+          };
       });
 
       // Prepare worksheet data
@@ -427,7 +432,7 @@ const TeamManagement = () => {
           
           return [
             member ? `${member.profiles.first_name} ${member.profiles.last_name}` : 'Unknown',
-            member?.profiles.email || '',
+            'Email not available', // Secure function doesn't expose emails
             entry.date,
             entry.activity_type.replace('_', ' '),
             entry.shift_type,
@@ -564,11 +569,11 @@ const TeamManagement = () => {
                       <SelectValue placeholder="Select user" />
                     </SelectTrigger>
                     <SelectContent>
-                      {profiles.map((profile) => (
-                        <SelectItem key={profile.user_id} value={profile.user_id}>
-                          {profile.first_name} {profile.last_name} ({profile.email})
-                        </SelectItem>
-                      ))}
+                       {profiles.map((profile) => (
+                         <SelectItem key={profile.user_id} value={profile.user_id}>
+                           {profile.first_name} {profile.last_name}
+                         </SelectItem>
+                       ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -737,9 +742,10 @@ const TeamManagement = () => {
                                       : `${member.profiles.first_name} ${member.profiles.last_name}`
                                     }
                                   </TableCell>
-                                  <TableCell className="text-muted-foreground">
-                                    {member.profiles.email}
-                                  </TableCell>
+                                   <TableCell className="text-muted-foreground">
+                                     {/* Note: Email not available for security reasons */}
+                                     {userRole === 'teammember' ? '***@***.***' : 'Contact admin for email'}
+                                   </TableCell>
                                   <TableCell>
                                     <Badge variant={member.is_manager ? "default" : "secondary"}>
                                       {member.is_manager ? "Manager" : "Member"}
