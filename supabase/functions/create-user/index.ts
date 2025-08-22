@@ -95,7 +95,6 @@ serve(async (req) => {
 
     console.log(`Admin/Planner ${user.email} is creating new user`);
 
-    try {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
