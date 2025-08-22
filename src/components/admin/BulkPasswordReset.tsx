@@ -46,7 +46,7 @@ const BulkPasswordReset = () => {
 
       toast({
         title: "Password Reset Complete",
-        description: `Successfully reset ${data.successCount} user passwords. All users must change their password on next login.`,
+        description: `Successfully reset ${data.successCount} user passwords with unique secure passwords. All users must change their password on next login.`,
       });
 
     } catch (error: any) {
@@ -76,14 +76,14 @@ const BulkPasswordReset = () => {
         <Alert className="border-orange-300 bg-orange-100 dark:border-orange-700 dark:bg-orange-900">
           <AlertTriangle className="h-4 w-4 text-orange-600" />
           <AlertDescription className="text-orange-800 dark:text-orange-200">
-            <strong>Warning:</strong> This action will reset ALL user passwords to "VestasTemp2025!" and require them to change their password on next login.
+            <strong>Warning:</strong> This action will reset ALL user passwords to unique secure passwords and require them to change their password on next login.
           </AlertDescription>
         </Alert>
 
         <div className="space-y-2">
           <h4 className="font-medium text-orange-800 dark:text-orange-200">This operation will:</h4>
           <ul className="text-sm text-orange-700 dark:text-orange-300 space-y-1 ml-4">
-            <li>• Set all user passwords to: <strong>VestasTemp2025!</strong></li>
+            <li>• Generate unique secure passwords for each user</li>
             <li>• Force all users to change their password on next login</li>
             <li>• Update password change requirements for all users</li>
             <li>• Generate a detailed report of the operation</li>
@@ -99,7 +99,7 @@ const BulkPasswordReset = () => {
                 <div>• Total Users: {resetResult.totalUsers}</div>
                 <div>• Successfully Reset: {resetResult.successCount}</div>
                 <div>• Errors: {resetResult.errorCount}</div>
-                <div>• New Password: <code className="bg-green-200 dark:bg-green-800 px-1 rounded">VestasTemp2025!</code></div>
+                <div>• New Passwords: <code className="bg-green-200 dark:bg-green-800 px-1 rounded">Unique secure passwords generated</code></div>
                 {resetResult.errors && resetResult.errors.length > 0 && (
                   <div className="mt-2">
                     <div><strong>Errors:</strong></div>
@@ -135,12 +135,12 @@ const BulkPasswordReset = () => {
               <AlertDialogDescription>
                 <div className="space-y-3">
                   <p>
-                    You are about to reset <strong>ALL USER PASSWORDS</strong> in the system to the temporary password "VestasTemp2025!".
+                    You are about to reset <strong>ALL USER PASSWORDS</strong> in the system to unique secure passwords.
                   </p>
                   <div className="bg-orange-50 p-3 rounded border border-orange-200">
                     <p className="text-sm font-medium text-orange-800">This action will:</p>
                     <ul className="text-sm text-orange-700 mt-1 space-y-1">
-                      <li>• Immediately change every user's password</li>
+                      <li>• Generate unique secure passwords for each user</li>
                       <li>• Force password change on next login for all users</li>
                       <li>• Cannot be undone</li>
                     </ul>
