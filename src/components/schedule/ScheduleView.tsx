@@ -750,7 +750,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
     switch (activityType) {
       case "work": return "Work";
       case "vacation": return "Vacation";
-      case "sick": return "Sick Leave";
+      case "sick": return "Other";
       case "hotline_support": return "Hotline Support";
       case "out_of_office": return "Out of Office";
       case "training": return "Training";
@@ -1092,7 +1092,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                        Sick Leave
+                        Other
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2">

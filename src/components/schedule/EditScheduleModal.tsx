@@ -53,7 +53,7 @@ const shiftTypes = [
 const activityTypes = [
   { value: "work", label: "Work" },
   { value: "vacation", label: "Vacation" },
-  { value: "sick", label: "Sick Leave" },
+  { value: "sick", label: "Other" },
   { value: "hotline_support", label: "Hotline Support" },
   { value: "out_of_office", label: "Out of Office" },
   { value: "training", label: "Training" },

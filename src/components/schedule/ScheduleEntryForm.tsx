@@ -320,7 +320,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 <SelectContent>
                   <SelectItem value="work">Work</SelectItem>
                   <SelectItem value="vacation">Vacation</SelectItem>
-                  <SelectItem value="sick">Sick Leave</SelectItem>
+                  <SelectItem value="sick">Other</SelectItem>
                   <SelectItem value="hotline_support">Hotline Support</SelectItem>
                   <SelectItem value="out_of_office">Out of Office</SelectItem>
                   <SelectItem value="training">Training</SelectItem>

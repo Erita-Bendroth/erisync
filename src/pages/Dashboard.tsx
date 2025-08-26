@@ -207,7 +207,7 @@ const Dashboard = () => {
       case 'vacation':
         return 'Vacation';
       case 'sick':
-        return 'Sick Leave';
+        return 'Other';
       case 'training':
         return 'Training';
       case 'hotline_support':

@@ -48,7 +48,7 @@ const getActivityDisplayName = (activityType: string) => {
   switch (activityType) {
     case "work": return "Work";
     case "vacation": return "Vacation";
-    case "sick": return "Sick Leave";
+    case "sick": return "Other";
     case "hotline_support": return "Hotline Support";
     case "out_of_office": return "Out of Office";
     case "training": return "Training";
