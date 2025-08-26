@@ -36,7 +36,7 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
       const { error } = await supabase.auth.resetPasswordForEmail(
         sanitizeInput(email),
         {
-          redirectTo: `https://erisync.lovable.app/auth#type=recovery`,
+          redirectTo: `${window.location.origin}/auth#type=recovery`,
         }
       );
 
