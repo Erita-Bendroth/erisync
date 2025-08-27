@@ -465,6 +465,25 @@ const Dashboard = () => {
                 <Calendar className="w-4 h-4 mr-2" />
                 View Schedule
               </Button>
+              
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/schedule?tab=settings")}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Location Settings
+              </Button>
+              
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/holidays")}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Manage Holidays
+              </Button>
+              
               {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
                 <ScheduleEntryForm onSuccess={() => {
                   fetchTodaySchedule();
