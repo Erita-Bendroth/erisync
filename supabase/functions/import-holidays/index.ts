@@ -17,6 +17,26 @@ interface Holiday {
   types: string[];
 }
 
+// German regional holiday mapping
+const germanRegionalHolidays: Record<string, string[]> = {
+  'BW': ['Heilige Drei Könige', 'Fronleichnam', 'Allerheiligen'], // Baden-Württemberg
+  'BY': ['Heilige Drei Könige', 'Fronleichnam', 'Mariä Himmelfahrt', 'Allerheiligen'], // Bavaria
+  'BE': ['Internationaler Frauentag'], // Berlin
+  'BB': ['Reformationstag'], // Brandenburg
+  'HB': ['Reformationstag'], // Bremen
+  'HH': ['Reformationstag'], // Hamburg
+  'HE': ['Fronleichnam'], // Hesse
+  'MV': ['Reformationstag'], // Mecklenburg-Vorpommern
+  'NI': ['Reformationstag'], // Lower Saxony
+  'NW': ['Fronleichnam', 'Allerheiligen'], // North Rhine-Westphalia
+  'RP': ['Fronleichnam', 'Allerheiligen'], // Rhineland-Palatinate
+  'SL': ['Fronleichnam', 'Mariä Himmelfahrt', 'Allerheiligen'], // Saarland
+  'SN': ['Reformationstag', 'Buß- und Bettag'], // Saxony
+  'ST': ['Heilige Drei Könige', 'Reformationstag'], // Saxony-Anhalt
+  'SH': ['Reformationstag'], // Schleswig-Holstein
+  'TH': ['Weltkindertag', 'Reformationstag'], // Thuringia
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -66,8 +86,8 @@ Deno.serve(async (req) => {
       }
     )
 
-    const { country_code, year, user_id } = await req.json()
-    console.log('Request received:', { country_code, year, user_id })
+    const { country_code, year, user_id, region_code } = await req.json()
+    console.log('Request received:', { country_code, year, user_id, region_code })
 
     if (!country_code || !year || !user_id) {
       console.error('Missing required parameters:', { country_code, year, user_id })
@@ -115,33 +135,55 @@ Deno.serve(async (req) => {
     }
 
     // Prepare holiday data for database
-    const holidayData = holidays.map(holiday => ({
-      name: holiday.localName || holiday.name,
-      date: holiday.date,
-      country_code: holiday.countryCode,
-      year: parseInt(year),
-      is_public: holiday.global || holiday.types.includes('Public'),
-      user_id: user_id
-    }))
+    const holidayData = holidays.map(holiday => {
+      let regionalCode: string | null = null;
+      
+      // For German holidays, determine if it's regional
+      if (country_code === 'DE' && region_code) {
+        const holidayName = holiday.localName || holiday.name;
+        const regionalHolidays = germanRegionalHolidays[region_code] || [];
+        
+        // Check if this holiday is region-specific
+        if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+          regionalCode = region_code;
+        }
+      }
+      
+      return {
+        name: holiday.localName || holiday.name,
+        date: holiday.date,
+        country_code: holiday.countryCode,
+        year: parseInt(year),
+        is_public: holiday.global || holiday.types.includes('Public'),
+        user_id: user_id,
+        region_code: regionalCode
+      };
+    })
 
     console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
 
     // Check for existing holidays first
     console.log('Checking for existing holidays...')
-    const { data: existingHolidays, error: checkError } = await supabaseClient
+    let existingQuery = supabaseClient
       .from('holidays')
-      .select('date')
+      .select('date, region_code')
       .eq('country_code', country_code)
       .eq('year', year)
-      .eq('user_id', user_id)
+      .eq('user_id', user_id);
+    
+    const { data: existingHolidays, error: checkError } = await existingQuery;
 
     if (checkError) {
       console.error('Error checking existing holidays:', checkError)
       throw new Error(`Database error: ${checkError.message}`)
     }
 
-    const existingDates = new Set(existingHolidays?.map(h => h.date) || [])
-    const newHolidays = holidayData.filter(holiday => !existingDates.has(holiday.date))
+    // Create a set of existing holiday keys (date + region_code combination)
+    const existingKeys = new Set(existingHolidays?.map(h => `${h.date}-${h.region_code || 'national'}`) || [])
+    const newHolidays = holidayData.filter(holiday => {
+      const key = `${holiday.date}-${holiday.region_code || 'national'}`;
+      return !existingKeys.has(key);
+    });
 
     console.log(`Found ${existingHolidays?.length || 0} existing holidays, ${newHolidays.length} new holidays to insert`)
 

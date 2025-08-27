@@ -16,6 +16,7 @@ interface Holiday {
   country_code: string;
   year: number;
   is_public: boolean;
+  region_code?: string;
 }
 
 const countries = [
@@ -77,6 +78,7 @@ const HolidayManager = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [userCountry, setUserCountry] = useState<string>('');
+  const [userRegion, setUserRegion] = useState<string>('');
 
   useEffect(() => {
     if (user) {
@@ -102,16 +104,19 @@ const HolidayManager = () => {
       
       setUserRoles(rolesData?.map(r => r.role) || []);
 
-      // Fetch user's country
+      // Fetch user's country and region
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('country_code')
+        .select('country_code, region_code')
         .eq('user_id', user.id)
         .single();
       
       if (profileData?.country_code) {
         setUserCountry(profileData.country_code);
         setSelectedCountry(profileData.country_code);
+      }
+      if (profileData?.region_code) {
+        setUserRegion(profileData.region_code);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -128,13 +133,19 @@ const HolidayManager = () => {
         .from('holidays')
         .select('*');
 
-      // For regular users (non-planners/non-admins), only show public holidays for their country
+      // For regular users (non-planners/non-admins), only show public holidays for their country and region
       if (!isPlanner() && !isAdmin()) {
         if (userCountry) {
           query = query
             .eq('country_code', userCountry)
             .eq('is_public', true)
             .is('user_id', null); // Public holidays have null user_id
+          
+          // For Germany, also filter by region for regional holidays
+          if (userCountry === 'DE' && userRegion) {
+            // Show both national holidays (no region) and regional holidays for user's region
+            query = query.or(`region_code.is.null,region_code.eq.${userRegion}`);
+          }
         } else {
           // If no country set, show no holidays
           query = query.eq('id', 'non-existent'); // This will return empty results
@@ -183,7 +194,8 @@ const HolidayManager = () => {
         body: {
           country_code: selectedCountry,
           year: selectedYear,
-          user_id: user.id
+          user_id: user.id,
+          region_code: selectedCountry === 'DE' ? userRegion : null
         }
       });
 
@@ -375,13 +387,25 @@ const HolidayManager = () => {
                             <p className="font-medium text-sm">{holiday.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(holiday.date), 'MMM dd, yyyy')}
+                              {holiday.region_code && countryCode === 'DE' && (
+                                <span className="ml-2 text-xs text-blue-600">
+                                  ({holiday.region_code})
+                                </span>
+                              )}
                             </p>
                           </div>
-                          {holiday.is_public && (
-                            <Badge variant="secondary" className="text-xs">
-                              Public
-                            </Badge>
-                          )}
+                          <div className="flex gap-2">
+                            {holiday.is_public && (
+                              <Badge variant="secondary" className="text-xs">
+                                Public
+                              </Badge>
+                            )}
+                            {holiday.region_code && (
+                              <Badge variant="outline" className="text-xs">
+                                Regional
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

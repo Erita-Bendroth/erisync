@@ -49,6 +49,7 @@ export type Database = {
           id: string
           is_public: boolean | null
           name: string
+          region_code: string | null
           updated_at: string
           user_id: string | null
           year: number
@@ -60,6 +61,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           name: string
+          region_code?: string | null
           updated_at?: string
           user_id?: string | null
           year: number
@@ -71,6 +73,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           name?: string
+          region_code?: string | null
           updated_at?: string
           user_id?: string | null
           year?: number
@@ -115,6 +118,7 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          region_code: string | null
           requires_password_change: boolean | null
           updated_at: string
           user_id: string
@@ -126,6 +130,7 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          region_code?: string | null
           requires_password_change?: boolean | null
           updated_at?: string
           user_id: string
@@ -137,6 +142,7 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          region_code?: string | null
           requires_password_change?: boolean | null
           updated_at?: string
           user_id?: string
@@ -287,14 +293,24 @@ export type Database = {
         Returns: boolean
       }
       create_default_schedule_with_holidays: {
-        Args: {
-          _country_code?: string
-          _created_by: string
-          _end_date: string
-          _start_date: string
-          _team_id: string
-          _user_id: string
-        }
+        Args:
+          | {
+              _country_code?: string
+              _created_by: string
+              _end_date: string
+              _region_code?: string
+              _start_date: string
+              _team_id: string
+              _user_id: string
+            }
+          | {
+              _country_code?: string
+              _created_by: string
+              _end_date: string
+              _start_date: string
+              _team_id: string
+              _user_id: string
+            }
         Returns: number
       }
       create_team_default_schedules_with_holidays: {
