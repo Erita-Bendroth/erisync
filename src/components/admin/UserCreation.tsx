@@ -223,7 +223,6 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
                 <SelectItem value="FI">Finland</SelectItem>
                 <SelectItem value="FR">France</SelectItem>
                 <SelectItem value="GB">United Kingdom</SelectItem>
-                <SelectItem value="GE">Georgia</SelectItem>
                 <SelectItem value="GR">Greece</SelectItem>
                 <SelectItem value="HR">Croatia</SelectItem>
                 <SelectItem value="HU">Hungary</SelectItem>
@@ -252,10 +251,15 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
                 <SelectItem value="SM">San Marino</SelectItem>
                 <SelectItem value="TR">Turkey</SelectItem>
                 <SelectItem value="UA">Ukraine</SelectItem>
+                <SelectItem value="VA">Vatican City</SelectItem>
+                <SelectItem value="XK">Kosovo</SelectItem>
                 <SelectItem value="US">United States</SelectItem>
                 <SelectItem value="CA">Canada</SelectItem>
                 <SelectItem value="AU">Australia</SelectItem>
-                <SelectItem value="VA">Vatican City</SelectItem>
+                <SelectItem value="JP">Japan</SelectItem>
+                <SelectItem value="IN">India</SelectItem>
+                <SelectItem value="BR">Brazil</SelectItem>
+                <SelectItem value="MX">Mexico</SelectItem>
               </SelectContent>
             </Select>
           </div>

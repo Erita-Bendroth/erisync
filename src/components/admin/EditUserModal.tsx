@@ -8,6 +8,64 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeInput, validateEmail } from "@/lib/validation";
 
+const countries = [
+  // European Countries (sorted alphabetically)
+  { code: "AD", name: "Andorra" },
+  { code: "AL", name: "Albania" },
+  { code: "AT", name: "Austria" },
+  { code: "BA", name: "Bosnia and Herzegovina" },
+  { code: "BE", name: "Belgium" },
+  { code: "BG", name: "Bulgaria" },
+  { code: "BY", name: "Belarus" },
+  { code: "CH", name: "Switzerland" },
+  { code: "CY", name: "Cyprus" },
+  { code: "CZ", name: "Czech Republic" },
+  { code: "DE", name: "Germany" },
+  { code: "DK", name: "Denmark" },
+  { code: "EE", name: "Estonia" },
+  { code: "ES", name: "Spain" },
+  { code: "FI", name: "Finland" },
+  { code: "FR", name: "France" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "GR", name: "Greece" },
+  { code: "HR", name: "Croatia" },
+  { code: "HU", name: "Hungary" },
+  { code: "IE", name: "Ireland" },
+  { code: "IS", name: "Iceland" },
+  { code: "IT", name: "Italy" },
+  { code: "LI", name: "Liechtenstein" },
+  { code: "LT", name: "Lithuania" },
+  { code: "LU", name: "Luxembourg" },
+  { code: "LV", name: "Latvia" },
+  { code: "MC", name: "Monaco" },
+  { code: "MD", name: "Moldova" },
+  { code: "ME", name: "Montenegro" },
+  { code: "MK", name: "North Macedonia" },
+  { code: "MT", name: "Malta" },
+  { code: "NL", name: "Netherlands" },
+  { code: "NO", name: "Norway" },
+  { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" },
+  { code: "RO", name: "Romania" },
+  { code: "RS", name: "Serbia" },
+  { code: "RU", name: "Russia" },
+  { code: "SE", name: "Sweden" },
+  { code: "SI", name: "Slovenia" },
+  { code: "SK", name: "Slovakia" },
+  { code: "SM", name: "San Marino" },
+  { code: "UA", name: "Ukraine" },
+  { code: "VA", name: "Vatican City" },
+  { code: "XK", name: "Kosovo" },
+  // Non-European but commonly used
+  { code: 'US', name: 'United States' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'IN', name: 'India' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+];
+
 interface Team {
   id: string;
   name: string;
@@ -81,10 +139,10 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
       return;
     }
 
-    if (!formData.firstName || !formData.lastName || !formData.role) {
+    if (!formData.role) {
       toast({
         title: "Error", 
-        description: "All fields are required",
+        description: "Role is required",
         variant: "destructive",
       });
       return;
@@ -180,26 +238,17 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="initials">User Initials</Label>
+            <Input
+              id="initials"
+              value={`${formData.firstName.charAt(0)}${formData.lastName.charAt(0)}`.toUpperCase()}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">
+              Generated from first and last name
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -256,42 +305,11 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
                 <SelectValue placeholder="Select country" />
               </SelectTrigger>
               <SelectContent className="bg-popover border border-border shadow-md z-50 max-h-60 overflow-y-auto">
-                <SelectItem value="US">United States</SelectItem>
-                <SelectItem value="DK">Denmark</SelectItem>
-                <SelectItem value="DE">Germany</SelectItem>
-                <SelectItem value="ES">Spain</SelectItem>
-                <SelectItem value="GB">United Kingdom</SelectItem>
-                <SelectItem value="IN">India</SelectItem>
-                <SelectItem value="CN">China</SelectItem>
-                <SelectItem value="AU">Australia</SelectItem>
-                <SelectItem value="PL">Poland</SelectItem>
-                <SelectItem value="RO">Romania</SelectItem>
-                <SelectItem value="FR">France</SelectItem>
-                <SelectItem value="IT">Italy</SelectItem>
-                <SelectItem value="NL">Netherlands</SelectItem>
-                <SelectItem value="SE">Sweden</SelectItem>
-                <SelectItem value="NO">Norway</SelectItem>
-                <SelectItem value="FI">Finland</SelectItem>
-                <SelectItem value="CA">Canada</SelectItem>
-                <SelectItem value="BR">Brazil</SelectItem>
-                <SelectItem value="MX">Mexico</SelectItem>
-                <SelectItem value="AR">Argentina</SelectItem>
-                <SelectItem value="CL">Chile</SelectItem>
-                <SelectItem value="PE">Peru</SelectItem>
-                <SelectItem value="CO">Colombia</SelectItem>
-                <SelectItem value="UY">Uruguay</SelectItem>
-                <SelectItem value="TR">Turkey</SelectItem>
-                <SelectItem value="GR">Greece</SelectItem>
-                <SelectItem value="PT">Portugal</SelectItem>
-                <SelectItem value="JP">Japan</SelectItem>
-                <SelectItem value="KR">South Korea</SelectItem>
-                <SelectItem value="TW">Taiwan</SelectItem>
-                <SelectItem value="VN">Vietnam</SelectItem>
-                <SelectItem value="PH">Philippines</SelectItem>
-                <SelectItem value="TH">Thailand</SelectItem>
-                <SelectItem value="MY">Malaysia</SelectItem>
-                <SelectItem value="SG">Singapore</SelectItem>
-                <SelectItem value="ID">Indonesia</SelectItem>
+                {countries.map((country) => (
+                  <SelectItem key={country.code} value={country.code}>
+                    {country.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

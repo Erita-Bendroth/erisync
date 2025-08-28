@@ -68,7 +68,7 @@ const BulkScheduleGenerator = () => {
       setUserRoles(roles);
       
       // Check if user has permission (planner or manager)
-      const canSchedule = roles.includes('planner') || roles.includes('manager');
+      const canSchedule = roles.includes('planner') || roles.includes('manager') || roles.includes('admin');
       setHasPermission(canSchedule);
       
     } catch (error) {
@@ -78,13 +78,33 @@ const BulkScheduleGenerator = () => {
 
   const fetchTeams = async () => {
     try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setTeams(data || []);
+      const isManager = userRoles.includes('manager') && !userRoles.includes('planner') && !userRoles.includes('admin');
+      if (isManager && user) {
+        // Managers can only see teams they manage
+        const { data, error } = await supabase
+          .from('team_members')
+          .select(`
+            teams (
+              id,
+              name
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+          
+        if (error) throw error;
+        const managerTeams = data?.map((item: any) => item.teams).filter(Boolean) || [];
+        setTeams(managerTeams);
+      } else {
+        // Planners and admins can see all teams
+        const { data, error } = await supabase
+          .from('teams')
+          .select('id, name')
+          .order('name');
+          
+        if (error) throw error;
+        setTeams(data || []);
+      }
     } catch (error) {
       console.error('Error fetching teams:', error);
     }
