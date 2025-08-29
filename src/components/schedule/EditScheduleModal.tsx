@@ -92,6 +92,12 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     notes: ""
   });
 
+  // Auto-set availability based on activity type
+  const getAutoAvailability = (activityType: string): "available" | "unavailable" => {
+    const availableTypes = ["work", "working_from_home", "hotline_support"];
+    return availableTypes.includes(activityType) ? "available" : "unavailable";
+  };
+
   useEffect(() => {
     if (entry) {
       setFormData({
@@ -349,7 +355,16 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                     <Label className="text-xs">Activity</Label>
                     <Select
                       value={block.activity_type}
-                      onValueChange={(value) => updateWorkBlock(index, 'activity_type', value)}
+                      onValueChange={(value) => {
+                        updateWorkBlock(index, 'activity_type', value);
+                        // Auto-update availability when activity changes in time blocks
+                        const hasWorkActivity = [...workBlocks.slice(0, index), { ...workBlocks[index], activity_type: value }, ...workBlocks.slice(index + 1)]
+                          .some(block => ["work", "working_from_home", "hotline_support"].includes(block.activity_type));
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          availability_status: hasWorkActivity ? "available" : "unavailable" 
+                        }));
+                      }}
                     >
                       <SelectTrigger className="h-8">
                         <SelectValue />
@@ -395,10 +410,16 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           ) : (
             <div className="grid gap-2">
               <Label htmlFor="activity_type">Activity Type</Label>
-              <Select
-                value={formData.activity_type}
-                onValueChange={(value: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => setFormData({ ...formData, activity_type: value })}
-              >
+            <Select
+              value={formData.activity_type}
+              onValueChange={(value: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => 
+                setFormData({ 
+                  ...formData, 
+                  activity_type: value,
+                  availability_status: getAutoAvailability(value)
+                })
+              }
+            >
                 <SelectTrigger>
                   <SelectValue placeholder="Select activity type" />
                 </SelectTrigger>

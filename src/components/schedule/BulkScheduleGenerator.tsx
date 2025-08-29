@@ -45,13 +45,16 @@ const BulkScheduleGenerator = () => {
   useEffect(() => {
     if (hasPermission) {
       fetchTeams();
-      fetchUsers();
       // Set default dates to current month
       const now = new Date();
       setStartDate(startOfMonth(now));
       setEndDate(endOfMonth(addMonths(now, 1)));
     }
   }, [hasPermission]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [selectedTeam, bulkMode]);
 
   const fetchUserRoles = async () => {
     if (!user) return;
@@ -95,6 +98,11 @@ const BulkScheduleGenerator = () => {
         if (error) throw error;
         const managerTeams = data?.map((item: any) => item.teams).filter(Boolean) || [];
         setTeams(managerTeams);
+        
+        // Auto-select first managed team if available
+        if (managerTeams.length > 0 && !selectedTeam) {
+          setSelectedTeam(managerTeams[0].id);
+        }
       } else {
         // Planners and admins can see all teams
         const { data, error } = await supabase
@@ -111,18 +119,59 @@ const BulkScheduleGenerator = () => {
   };
 
   const fetchUsers = async () => {
+    if (!selectedTeam || bulkMode !== 'user') {
+      setUsers([]);
+      return;
+    }
+
     try {
+      // Check if current user can manage this team
+      const isManager = userRoles.includes('manager') && !userRoles.includes('planner') && !userRoles.includes('admin');
+      if (isManager && user) {
+        const { data: managerCheck } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('team_id', selectedTeam)
+          .eq('is_manager', true)
+          .maybeSingle();
+
+        if (!managerCheck) {
+          toast({
+            title: "Access Denied",
+            description: "You can only generate schedules for teams you manage",
+            variant: "destructive"
+          });
+          setUsers([]);
+          return;
+        }
+      }
+
       const { data, error } = await supabase
-        .rpc('get_all_basic_profiles');
+        .from('team_members')
+        .select(`
+          user_id,
+          profiles!inner(first_name, last_name, email)
+        `)
+        .eq('team_id', selectedTeam);
 
       if (error) throw error;
-      setUsers(data?.map(p => ({
-        id: p.user_id,
-        first_name: p.first_name,
-        last_name: p.last_name
-      })) || []);
+
+      const usersData = data?.map((member: any) => ({
+        id: member.user_id,
+        first_name: member.profiles.first_name,
+        last_name: member.profiles.last_name,
+        email: member.profiles.email
+      })) || [];
+
+      setUsers(usersData);
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch team members",
+        variant: "destructive"
+      });
     }
   };
 
@@ -156,6 +205,27 @@ const BulkScheduleGenerator = () => {
 
     setLoading(true);
     try {
+      // Additional permission check for managers
+      const isManager = userRoles.includes('manager') && !userRoles.includes('planner') && !userRoles.includes('admin');
+      if (isManager && user) {
+        const { data: managerCheck } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('team_id', selectedTeam)
+          .eq('is_manager', true)
+          .maybeSingle();
+
+        if (!managerCheck) {
+          toast({
+            title: "Access Denied",
+            description: "You can only generate schedules for teams you manage",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       if (bulkMode === "team") {
         const { data, error } = await supabase.rpc('create_team_default_schedules_with_holidays', {
           _team_id: selectedTeam,
@@ -178,7 +248,7 @@ const BulkScheduleGenerator = () => {
         // Generate for single user
         const { data, error } = await supabase.rpc('create_default_schedule_with_holidays', {
           _user_id: selectedUser,
-          _team_id: selectedTeam || null,
+          _team_id: selectedTeam,
           _start_date: format(startDate, 'yyyy-MM-dd'),
           _end_date: format(endDate, 'yyyy-MM-dd'),
           _created_by: user.id
@@ -365,21 +435,38 @@ const BulkScheduleGenerator = () => {
             </Select>
           </div>
         ) : (
-          <div className="space-y-2">
-            <label className="text-sm font-medium">User</label>
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a user" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.first_name} {user.last_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Team</label>
+              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a team first" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">User</label>
+              <Select value={selectedUser} onValueChange={setSelectedUser} disabled={!selectedTeam}>
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedTeam ? "Select a user" : "Select team first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.first_name} {user.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
         )}
         
         <Button 

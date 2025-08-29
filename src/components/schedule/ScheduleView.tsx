@@ -1006,6 +1006,8 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                   {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
                                     <TimeBlockDisplay
                                       entry={entry}
+                                      userRole={userRoles.length > 0 ? userRoles[0].role : ""}
+                                      showNotes={isTeamMember() && !isManager() && !isPlanner()}
                                       onClick={(e) => {
                                         e?.stopPropagation();
                                         if (isManager() || isPlanner()) {

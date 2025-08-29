@@ -242,12 +242,12 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
             <Label htmlFor="initials">User Initials</Label>
             <Input
               id="initials"
-              value={`${formData.firstName.charAt(0)}${formData.lastName.charAt(0)}`.toUpperCase()}
+              value={formData.email.split('@')[0].toUpperCase()}
               disabled
               className="bg-muted"
             />
             <p className="text-xs text-muted-foreground">
-              Generated from first and last name
+              Generated from email prefix
             </p>
           </div>
 
@@ -260,6 +260,27 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name (Optional)</Label>
+              <Input
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name (Optional)</Label>
+              <Input
+                id="lastName"
+                value={formData.lastName}
+                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                placeholder="Optional"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

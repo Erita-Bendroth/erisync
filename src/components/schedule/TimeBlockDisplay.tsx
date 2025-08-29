@@ -19,6 +19,8 @@ interface TimeBlockDisplayProps {
   entry: ScheduleEntry;
   onClick?: (e?: any) => void;
   className?: string;
+  showNotes?: boolean;
+  userRole?: string;
 }
 
 const getActivityColor = (activityType: string) => {
@@ -61,7 +63,9 @@ const getActivityDisplayName = (activityType: string) => {
 export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({ 
   entry, 
   onClick, 
-  className = "" 
+  className = "",
+  showNotes = false,
+  userRole = ""
 }) => {
   // Check if entry has time split information in notes
   const timeSplitPattern = /Times:\s*(.+)/;
@@ -94,26 +98,50 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     }
   };
 
+  // Extract clean notes (remove JSON artifacts)
+  const getCleanNotes = () => {
+    if (!entry.notes) return "";
+    
+    // Remove JSON time data and auto-generated text
+    let cleanNotes = entry.notes
+      .replace(/Times:\s*\[.*?\]/g, "")
+      .replace(/Auto-generated shift.*?\)/g, "")
+      .replace(/^\s*\n+/g, "")
+      .trim();
+    
+    return cleanNotes;
+  };
+
+  const cleanNotes = getCleanNotes();
+  const isTeamMember = userRole === "teammember";
+
   if (hasTimeSplit && timeBlocks.length > 0) {
     // Display time blocks with specific times
     return (
       <div className={`space-y-1 ${className}`}>
         {timeBlocks.map((block, index) => (
-          <Badge
-            key={index}
-            variant="secondary"
-            className={`${getActivityColor(block.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs`}
-            onClick={onClick}
-          >
-            <div className="flex flex-col items-center py-1">
-              <span className="font-medium">
-                {getActivityDisplayName(block.activity_type)}
-              </span>
-              <span className="text-xs">
-                {block.start_time}–{block.end_time}
-              </span>
-            </div>
-          </Badge>
+          <div key={index} className="w-full">
+            <Badge
+              variant="secondary"
+              className={`${getActivityColor(block.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+              onClick={onClick}
+            >
+              <div className="flex flex-col items-center py-1 w-full">
+                <span className="font-medium">
+                  {getActivityDisplayName(block.activity_type)}
+                </span>
+                <span className="text-xs">
+                  {block.start_time}–{block.end_time}
+                </span>
+              </div>
+            </Badge>
+            {/* Show notes for team members */}
+            {isTeamMember && cleanNotes && index === 0 && (
+              <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
+                <strong>Notes:</strong> {cleanNotes}
+              </div>
+            )}
+          </div>
         ))}
       </div>
     );
@@ -121,20 +149,28 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     // Display single block with default shift times
     const defaultTimes = getDefaultTimes(entry.shift_type);
     return (
-      <Badge
-        variant="secondary"
-        className={`${getActivityColor(entry.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs ${className}`}
-        onClick={onClick}
-      >
-        <div className="flex flex-col items-center py-1">
-          <span className="font-medium">
-            {getActivityDisplayName(entry.activity_type)}
-          </span>
-          <span className="text-xs">
-            {defaultTimes.start}–{defaultTimes.end}
-          </span>
-        </div>
-      </Badge>
+      <div className={`w-full ${className}`}>
+        <Badge
+          variant="secondary"
+          className={`${getActivityColor(entry.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+          onClick={onClick}
+        >
+          <div className="flex flex-col items-center py-1 w-full">
+            <span className="font-medium">
+              {getActivityDisplayName(entry.activity_type)}
+            </span>
+            <span className="text-xs">
+              {defaultTimes.start}–{defaultTimes.end}
+            </span>
+          </div>
+        </Badge>
+        {/* Show notes for team members */}
+        {isTeamMember && cleanNotes && (
+          <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
+            <strong>Notes:</strong> {cleanNotes}
+          </div>
+        )}
+      </div>
     );
   }
 };
