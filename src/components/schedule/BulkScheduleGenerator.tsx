@@ -246,12 +246,22 @@ const BulkScheduleGenerator = () => {
         });
       } else {
         // Generate for single user
+        // Fetch selected user's country and region to disambiguate RPC overload
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('country_code, region_code')
+          .eq('user_id', selectedUser)
+          .maybeSingle();
+        if (profileError) throw profileError;
+
         const { data, error } = await supabase.rpc('create_default_schedule_with_holidays', {
           _user_id: selectedUser,
           _team_id: selectedTeam,
           _start_date: format(startDate, 'yyyy-MM-dd'),
           _end_date: format(endDate, 'yyyy-MM-dd'),
-          _created_by: user.id
+          _created_by: user.id,
+          _country_code: profile?.country_code || 'US',
+          _region_code: profile?.region_code || null
         });
 
         if (error) throw error;

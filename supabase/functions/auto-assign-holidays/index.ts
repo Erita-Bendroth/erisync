@@ -72,33 +72,49 @@ Deno.serve(async (req) => {
 
       // Check which holidays are not already in the schedule
       for (const holiday of holidays) {
-        const { data: existingEntry } = await supabaseClient
-          .from('schedule_entries')
-          .select('id')
-          .eq('user_id', user_id)
-          .eq('date', holiday.date)
-          .maybeSingle();
+        // Fetch user's teams
+        const { data: teams } = await supabaseClient
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user_id);
 
-        if (!existingEntry) {
-          // Auto-assign holiday to schedule as unavailable
-          const { error: insertError } = await supabaseClient
+        const teamIds = (teams || []).map(t => t.team_id);
+        if (teamIds.length === 0) {
+          console.log(`User ${user_id} has no teams; skipping team-based assignment for ${holiday.date}`);
+          continue;
+        }
+
+        // Create an entry per team if missing
+        for (const teamId of teamIds) {
+          const { data: existingEntry } = await supabaseClient
             .from('schedule_entries')
-            .insert({
-              user_id: user_id,
-              team_id: null, // Will be updated when user is assigned to team
-              date: holiday.date,
-              shift_type: 'normal',
-              activity_type: 'other',
-              availability_status: 'unavailable',
-              notes: `Public holiday: ${holiday.name}`,
-              created_by: null // System-generated
-            });
+            .select('id')
+            .eq('user_id', user_id)
+            .eq('team_id', teamId)
+            .eq('date', holiday.date)
+            .maybeSingle();
 
-          if (insertError) {
-            console.error(`Error inserting holiday for user ${user_id}:`, insertError);
-          } else {
-            totalAssigned++;
-            console.log(`Assigned holiday ${holiday.name} to user ${user_id} on ${holiday.date}`);
+          if (!existingEntry) {
+            // Auto-assign holiday to schedule as unavailable
+            const { error: insertError } = await supabaseClient
+              .from('schedule_entries')
+              .insert({
+                user_id: user_id,
+                team_id: teamId,
+                date: holiday.date,
+                shift_type: 'normal',
+                activity_type: 'sick',
+                availability_status: 'unavailable',
+                notes: `Public holiday: ${holiday.name}`,
+                created_by: user_id
+              });
+
+            if (insertError) {
+              console.error(`Error inserting holiday for user ${user_id} team ${teamId}:`, insertError);
+            } else {
+              totalAssigned++;
+              console.log(`Assigned holiday ${holiday.name} to user ${user_id} (team ${teamId}) on ${holiday.date}`);
+            }
           }
         }
       }

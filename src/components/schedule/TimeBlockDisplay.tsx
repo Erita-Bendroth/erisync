@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 interface TimeBlock {
@@ -116,6 +116,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
 
   const cleanNotes = getCleanNotes();
   const isTeamMember = userRole === "teammember";
+  const [expanded, setExpanded] = useState(false);
 
   if (hasTimeSplit && timeBlocks.length > 0) {
     // Display time blocks with specific times
@@ -128,7 +129,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
               className={`${getActivityColor(block.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
               onClick={onClick}
             >
-              <div className="flex flex-col items-center py-1 w-full">
+              <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
                 <span className="font-medium">
                   {getActivityDisplayName(block.activity_type)}
                 </span>
@@ -138,7 +139,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
               </div>
             </Badge>
             {/* Show notes for team members */}
-            {isTeamMember && cleanNotes && index === 0 && (
+            {isTeamMember && cleanNotes && index === 0 && expanded && (
               <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
                 <strong>Notes:</strong> {cleanNotes}
               </div>
@@ -157,7 +158,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
           className={`${getActivityColor(entry.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
           onClick={onClick}
         >
-          <div className="flex flex-col items-center py-1 w-full">
+          <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
             <span className="font-medium">
               {getActivityDisplayName(entry.activity_type)}
             </span>
@@ -167,7 +168,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
           </div>
         </Badge>
         {/* Show notes for team members */}
-        {isTeamMember && cleanNotes && (
+        {isTeamMember && cleanNotes && expanded && (
           <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
             <strong>Notes:</strong> {cleanNotes}
           </div>
