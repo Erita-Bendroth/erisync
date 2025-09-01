@@ -206,6 +206,7 @@ const Dashboard = () => {
         return 'Work';
       case 'vacation':
         return 'Vacation';
+      case 'other':
       case 'sick':
         return 'Other';
       case 'training':
@@ -351,7 +352,7 @@ const Dashboard = () => {
                               entry.activity_type === 'work' ? 'default' :
                               entry.activity_type === 'hotline_support' ? 'secondary' :
                               entry.activity_type === 'vacation' ? 'outline' :
-                              entry.activity_type === 'sick' ? 'destructive' :
+                              (entry.activity_type === 'other' || entry.activity_type === 'sick') ? 'destructive' :
                               entry.activity_type === 'training' ? 'outline' :
                               'default'
                             } className="font-semibold">
@@ -425,7 +426,7 @@ const Dashboard = () => {
                                   variant={
                                     entry.activity_type === 'work' ? 'default' :
                                     entry.activity_type === 'vacation' ? 'outline' :
-                                    entry.activity_type === 'sick' ? 'destructive' :
+                                    (entry.activity_type === 'other' || entry.activity_type === 'sick') ? 'destructive' :
                                     'secondary'
                                   }
                                   className="text-xs"

@@ -53,7 +53,7 @@ const shiftTypes = [
 const activityTypes = [
   { value: "work", label: "Work" },
   { value: "vacation", label: "Vacation" },
-  { value: "sick", label: "Other" },
+  { value: "other", label: "Other" },
   { value: "hotline_support", label: "Hotline Support" },
   { value: "out_of_office", label: "Out of Office" },
   { value: "training", label: "Training" },
@@ -82,7 +82,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   ]);
   const [formData, setFormData] = useState<{
     shift_type: "normal" | "early" | "late";
-    activity_type: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
+    activity_type: "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
     availability_status: "available" | "unavailable";
     notes: string;
   }>({
@@ -102,7 +102,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     if (entry) {
       setFormData({
         shift_type: (entry.shift_type as "normal" | "early" | "late") || "normal",
-        activity_type: (entry.activity_type as "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
+        activity_type: (entry.activity_type === "sick" ? "other" : entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
         availability_status: (entry.availability_status as "available" | "unavailable") || "available",
         notes: entry.notes || ""
       });
@@ -176,6 +176,9 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         primaryActivityType = primaryActivity.activity_type as any;
       }
 
+      // Map "other" back to "sick" for database compatibility
+      const dbActivityType = primaryActivityType === "other" ? "sick" : primaryActivityType as "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
+
       // Create if temp entry, otherwise update
       if (entry.id.startsWith('temp-')) {
         const { data: authData } = await supabase.auth.getUser();
@@ -184,7 +187,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           team_id: entry.team_id as any,
           date: format(new Date(entry.date), 'yyyy-MM-dd'),
           shift_type: formData.shift_type,
-          activity_type: primaryActivityType,
+          activity_type: dbActivityType,
           availability_status: formData.availability_status,
           notes: notes || null,
           created_by: authData.user?.id,
@@ -197,7 +200,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           .from('schedule_entries')
           .update({
             shift_type: formData.shift_type,
-            activity_type: primaryActivityType,
+            activity_type: dbActivityType,
             availability_status: formData.availability_status,
             notes: notes || null,
             updated_at: new Date().toISOString(),
@@ -412,7 +415,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <Label htmlFor="activity_type">Activity Type</Label>
             <Select
               value={formData.activity_type}
-              onValueChange={(value: "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => 
+              onValueChange={(value: "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => 
                 setFormData({ 
                   ...formData, 
                   activity_type: value,

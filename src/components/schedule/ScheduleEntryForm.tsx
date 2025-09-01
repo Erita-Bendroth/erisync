@@ -145,12 +145,15 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
     setLoading(true);
 
     try {
+      // Map "other" back to "sick" for database compatibility
+      const dbActivityType = formData.activity_type === "other" ? "sick" : formData.activity_type;
+      
       const scheduleData = {
         user_id: formData.user_id,
         team_id: formData.team_id,
         date: format(selectedDate, "yyyy-MM-dd"),
         shift_type: formData.shift_type as "early" | "late" | "normal",
-        activity_type: formData.activity_type as "work" | "vacation" | "sick" | "hotline_support",
+        activity_type: dbActivityType as "work" | "vacation" | "sick" | "hotline_support",
         availability_status: (formData.activity_type === "work" ? "available" : "unavailable") as "available" | "unavailable",
         notes: formData.notes,
         created_by: user!.id,
@@ -320,7 +323,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 <SelectContent>
                   <SelectItem value="work">Work</SelectItem>
                   <SelectItem value="vacation">Vacation</SelectItem>
-                  <SelectItem value="sick">Other</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                   <SelectItem value="hotline_support">Hotline Support</SelectItem>
                   <SelectItem value="out_of_office">Out of Office</SelectItem>
                   <SelectItem value="training">Training</SelectItem>

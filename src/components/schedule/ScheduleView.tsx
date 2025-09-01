@@ -717,6 +717,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "vacation":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+      case "other":
       case "sick":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
       case "hotline_support":
@@ -750,6 +751,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
     switch (activityType) {
       case "work": return "Work";
       case "vacation": return "Vacation";
+      case "other":
       case "sick": return "Other";
       case "hotline_support": return "Hotline Support";
       case "out_of_office": return "Out of Office";

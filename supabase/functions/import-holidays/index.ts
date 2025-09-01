@@ -37,6 +37,13 @@ const germanRegionalHolidays: Record<string, string[]> = {
   'TH': ['Weltkindertag', 'Reformationstag'], // Thuringia
 };
 
+// Countries to exclude non-official holidays/observances
+const holidayFilters: Record<string, string[]> = {
+  'SE': ['Julafton'], // Exclude Christmas Eve (not official)
+  'US': ['Columbus Day'], // Example filter for US
+  'GB': ['Boxing Day'] // Example filter for UK
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -134,8 +141,17 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Filter holidays to exclude non-official observances
+    const countryFilters = holidayFilters[country_code] || [];
+    const filteredHolidays = holidays.filter(holiday => {
+      const holidayName = holiday.localName || holiday.name;
+      // Exclude non-official holidays
+      return !countryFilters.some(filter => holidayName.includes(filter)) &&
+             (holiday.global || holiday.types.includes('Public'));
+    });
+
     // Prepare holiday data for database
-    const holidayData = holidays.map(holiday => {
+    const holidayData = filteredHolidays.map(holiday => {
       let regionalCode: string | null = null;
       
       // For German holidays, determine if it's regional
