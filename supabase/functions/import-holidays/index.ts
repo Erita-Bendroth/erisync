@@ -108,21 +108,52 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Fetching holidays for ${country_code} in ${year}`)
-    console.log(`API URL: https://date.nager.at/api/v3/publicholidays/${year}/${country_code}`)
 
-    // Fetch holidays from public API (nager.date is free and reliable)
-    const holidaysResponse = await fetch(
-      `https://date.nager.at/api/v3/publicholidays/${year}/${country_code}`
-    )
+    let holidays: Holiday[] = []
 
-    if (!holidaysResponse.ok) {
-      const errorText = await holidaysResponse.text()
-      console.error(`Failed to fetch holidays: ${holidaysResponse.status} - ${holidaysResponse.statusText}`)
-      console.error(`Response body: ${errorText}`)
-      throw new Error(`Failed to fetch holidays: ${holidaysResponse.statusText} (${holidaysResponse.status})`)
+    // Prefer authoritative source for Sweden (Riksdag calendar via dryg.net API)
+    if (country_code === 'SÅ' || country_code === 'SE') {
+      try {
+        const seResp = await fetch(`https://api.dryg.net/dagar/v2.1/${year}`)
+        if (seResp.ok) {
+          const seJson = await seResp.json()
+          // seJson.dagar is an array of days; map those with helgdag
+          const dagar = Array.isArray(seJson?.dagar) ? seJson.dagar : []
+          holidays = dagar
+            .filter((d: any) => d.helgdag && d.helgdag.trim().length > 0 && d.helgdag !== 'Julafton')
+            .map((d: any) => ({
+              date: d.datum, // yyyy-mm-dd
+              localName: d.helgdag,
+              name: d.helgdag,
+              countryCode: 'SE',
+              fixed: false,
+              global: true,
+              counties: [],
+              launchYear: undefined,
+              types: ['Public']
+            }))
+        }
+      } catch (e) {
+        console.warn('Failed to fetch from dryg.net, falling back to Nager.Date:', e)
+      }
     }
 
-    const holidays: Holiday[] = await holidaysResponse.json()
+    // Fallback to Nager.Date if not Sweden or if authoritative source failed
+    if (!holidays || holidays.length === 0) {
+      console.log(`API URL: https://date.nager.at/api/v3/publicholidays/${year}/${country_code}`)
+      const holidaysResponse = await fetch(
+        `https://date.nager.at/api/v3/publicholidays/${year}/${country_code}`
+      )
+
+      if (!holidaysResponse.ok) {
+        const errorText = await holidaysResponse.text()
+        console.error(`Failed to fetch holidays: ${holidaysResponse.status} - ${holidaysResponse.statusText}`)
+        console.error(`Response body: ${errorText}`)
+        throw new Error(`Failed to fetch holidays: ${holidaysResponse.statusText} (${holidaysResponse.status})`)
+      }
+
+      holidays = await holidaysResponse.json()
+    }
     console.log(`Found ${holidays.length} holidays`)
     console.log(`Sample holidays:`, holidays.slice(0, 2))
 
@@ -141,25 +172,32 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Filter holidays to exclude non-official observances
+    // Filter holidays to include ONLY official public holidays and exclude observances
     const countryFilters = holidayFilters[country_code] || [];
     const filteredHolidays = holidays.filter(holiday => {
       const holidayName = holiday.localName || holiday.name;
-      // Exclude non-official holidays
-      return !countryFilters.some(filter => holidayName.includes(filter)) &&
-             (holiday.global || holiday.types.includes('Public'));
+      // Exclude country-specific unofficial holidays
+      if (countryFilters.some(filter => holidayName.includes(filter))) return false;
+      // Only accept official public holidays
+      return holiday.types && holiday.types.includes('Public');
     });
 
     // Prepare holiday data for database
     const holidayData = filteredHolidays.map(holiday => {
       let regionalCode: string | null = null;
-      
-      // For German holidays, determine if it's regional
-      if (country_code === 'DE' && region_code) {
+
+      // Generic regional mapping: if API provides counties codes like "DE-BY"
+      if (region_code && Array.isArray(holiday.counties) && holiday.counties.length > 0) {
+        const target = `${country_code}-${region_code}`;
+        if (holiday.counties.includes(target)) {
+          regionalCode = region_code;
+        }
+      }
+
+      // Additional German safety net by name mapping
+      if (!regionalCode && country_code === 'DE' && region_code) {
         const holidayName = holiday.localName || holiday.name;
         const regionalHolidays = germanRegionalHolidays[region_code] || [];
-        
-        // Check if this holiday is region-specific
         if (regionalHolidays.some(regional => holidayName.includes(regional))) {
           regionalCode = region_code;
         }
@@ -170,7 +208,7 @@ Deno.serve(async (req) => {
         date: holiday.date,
         country_code: holiday.countryCode,
         year: parseInt(year),
-        is_public: holiday.global || holiday.types.includes('Public'),
+        is_public: true,
         user_id: user_id,
         region_code: regionalCode
       };

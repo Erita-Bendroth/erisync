@@ -356,19 +356,20 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                 <div key={index} className="flex gap-2 items-end">
                   <div className="flex-1">
                     <Label className="text-xs">Activity</Label>
-                    <Select
-                      value={block.activity_type}
-                      onValueChange={(value) => {
-                        updateWorkBlock(index, 'activity_type', value);
-                        // Auto-update availability when activity changes in time blocks
-                        const hasWorkActivity = [...workBlocks.slice(0, index), { ...workBlocks[index], activity_type: value }, ...workBlocks.slice(index + 1)]
-                          .some(block => ["work", "working_from_home", "hotline_support"].includes(block.activity_type));
-                        setFormData(prev => ({ 
-                          ...prev, 
-                          availability_status: hasWorkActivity ? "available" : "unavailable" 
-                        }));
-                      }}
-                    >
+                     <Select
+                       value={block.activity_type}
+                       onValueChange={(value) => {
+                         updateWorkBlock(index, 'activity_type', value);
+                         // Auto-update availability when activity changes in time blocks
+                         const hasWorkActivity = [...workBlocks.slice(0, index), { ...workBlocks[index], activity_type: value }, ...workBlocks.slice(index + 1)]
+                           .some(block => ["work", "working_from_home", "hotline_support"].includes(block.activity_type));
+                         setFormData(prev => ({ 
+                           ...prev, 
+                           availability_status: hasWorkActivity ? "available" : "unavailable",
+                           activity_type: value as any
+                         }));
+                       }}
+                     >
                       <SelectTrigger className="h-8">
                         <SelectValue />
                       </SelectTrigger>

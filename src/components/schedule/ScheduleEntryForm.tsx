@@ -148,16 +148,16 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
       // Map "other" back to "sick" for database compatibility
       const dbActivityType = formData.activity_type === "other" ? "sick" : formData.activity_type;
       
-      const scheduleData = {
-        user_id: formData.user_id,
-        team_id: formData.team_id,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        shift_type: formData.shift_type as "early" | "late" | "normal",
-        activity_type: dbActivityType as "work" | "vacation" | "sick" | "hotline_support",
-        availability_status: (formData.activity_type === "work" ? "available" : "unavailable") as "available" | "unavailable",
-        notes: formData.notes,
-        created_by: user!.id,
-      };
+         const scheduleData = {
+           user_id: formData.user_id,
+           team_id: formData.team_id,
+           date: format(selectedDate, "yyyy-MM-dd"),
+           shift_type: formData.shift_type as "early" | "late" | "normal",
+           activity_type: dbActivityType as "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home",
+           availability_status: (["work", "working_from_home", "hotline_support"].includes(formData.activity_type) ? "available" : "unavailable") as "available" | "unavailable",
+           notes: formData.notes,
+           created_by: user!.id,
+         };
 
       let result;
       if (editEntry) {
@@ -313,10 +313,17 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
 
             <div className="space-y-2">
               <Label htmlFor="activity-type">Activity</Label>
-              <Select
-                value={formData.activity_type}
-                onValueChange={(value) => setFormData({ ...formData, activity_type: value })}
-              >
+               <Select
+                 value={formData.activity_type}
+                 onValueChange={(value) => {
+                   const availableTypes = ["work", "working_from_home", "hotline_support"];
+                   setFormData({ 
+                     ...formData, 
+                     activity_type: value, 
+                     availability_status: (availableTypes.includes(value) ? "available" : "unavailable") 
+                   });
+                 }}
+               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

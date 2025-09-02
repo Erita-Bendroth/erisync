@@ -254,7 +254,7 @@ const BulkScheduleGenerator = () => {
           .maybeSingle();
         if (profileError) throw profileError;
 
-        const { data, error } = await supabase.rpc('create_default_schedule_with_holidays', {
+        const { data, error } = await supabase.rpc('create_default_schedule_with_holidays_v2', {
           _user_id: selectedUser,
           _team_id: selectedTeam,
           _start_date: format(startDate, 'yyyy-MM-dd'),

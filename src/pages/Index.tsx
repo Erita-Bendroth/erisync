@@ -60,7 +60,7 @@ const Index = () => {
               <Calendar className="w-12 h-12 mx-auto mb-4 text-primary" />
               <CardTitle>Schedule Management</CardTitle>
               <CardDescription>
-                Track shifts, vacation, sick leave, and special assignments
+                 Track shifts, vacation, other leave, and special assignments
               </CardDescription>
             </CardHeader>
           </Card>
@@ -101,7 +101,7 @@ const Index = () => {
                   <li>• View full team details</li>
                   <li>• Manage team member schedules</li>
                   <li>• See availability of other teams</li>
-                  <li>• Input sick/vacation time</li>
+                   <li>• Input other/vacation time</li>
                 </ul>
               </div>
               <div>
