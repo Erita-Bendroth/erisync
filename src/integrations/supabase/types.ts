@@ -313,6 +313,18 @@ export type Database = {
             }
         Returns: number
       }
+      create_default_schedule_with_holidays_v2: {
+        Args: {
+          _country_code: string
+          _created_by: string
+          _end_date: string
+          _region_code?: string
+          _start_date: string
+          _team_id: string
+          _user_id: string
+        }
+        Returns: number
+      }
       create_team_default_schedules_with_holidays: {
         Args: {
           _created_by: string

@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     let holidays: Holiday[] = []
 
     // Prefer authoritative source for Sweden (Riksdag calendar via dryg.net API)
-    if (country_code === 'SÅ' || country_code === 'SE') {
+    if (country_code === 'SE') {
       try {
         const seResp = await fetch(`https://api.dryg.net/dagar/v2.1/${year}`)
         if (seResp.ok) {
