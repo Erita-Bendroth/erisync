@@ -143,10 +143,6 @@ const AdminSetup = () => {
           description: "You cannot modify your own role",
           variant: "destructive",
         });
-useEffect(() => {
-  console.log("Runtime getAvailableRoles:", getAvailableRoles());
-}, [currentUserRole]);
-
         return;
       }
 
@@ -448,11 +444,15 @@ useEffect(() => {
                           <SelectValue placeholder="Add role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.isArray(getAvailableRoles()) && getAvailableRoles().filter(roleObj => roleObj?.value).map((roleObj) => (
-  <SelectItem key={roleObj.value} value={roleObj.value}>
-    {roleObj.label}
-  </SelectItem>
-))}
+                          {getAvailableRoles().map((role) => {
+  const value = role?.trim();
+  if (!value) return null;
+  return (
+    <SelectItem key={value} value={value}>
+      {value.charAt(0).toUpperCase() + value.slice(1)}
+    </SelectItem>
+  );
+})}
                         </SelectContent>
                       </Select>
                     </div>
