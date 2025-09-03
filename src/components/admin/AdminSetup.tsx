@@ -444,15 +444,14 @@ const AdminSetup = () => {
                           <SelectValue placeholder="Add role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getAvailableRoles().map((role) => {
-  const value = role?.trim();
-  if (!value) return null;
-  return (
-    <SelectItem key={value} value={value}>
-      {value.charAt(0).toUpperCase() + value.slice(1)}
-    </SelectItem>
-  );
-})}
+                          {Array.isArray(getAvailableRoles()) &&
+  getAvailableRoles()
+    .filter(roleObj => typeof roleObj.value === 'string' && roleObj.value.trim() !== '')
+    .map(roleObj => (
+      <SelectItem key={roleObj.value} value={roleObj.value}>
+        {roleObj.label}
+      </SelectItem>
+    ))}
                         </SelectContent>
                       </Select>
                     </div>
