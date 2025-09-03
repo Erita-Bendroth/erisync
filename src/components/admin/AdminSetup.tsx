@@ -450,7 +450,7 @@ const AdminSetup = () => {
     .map(roleObj => (
       <>{typeof roleObj.value === 'string' && roleObj.value.trim() !== '' ? (<SelectItem key={roleObj.value} value={roleObj.value}>
         {roleObj.label}
-      </SelectItem>) : null}</>
+      </SelectItem>) : null}
     ))}
                         </SelectContent>
                       </Select>
