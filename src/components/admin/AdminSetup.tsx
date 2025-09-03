@@ -448,9 +448,9 @@ const AdminSetup = () => {
   getAvailableRoles()
     .filter(roleObj => typeof roleObj.value === 'string' && roleObj.value.trim() !== '')
     .map(roleObj => (
-      {typeof roleObj.value === 'string' && roleObj.value.trim() !== '' ? (<SelectItem key={roleObj.value} value={roleObj.value}>
+      <>{typeof roleObj.value === 'string' && roleObj.value.trim() !== '' ? (<SelectItem key={roleObj.value} value={roleObj.value}>
         {roleObj.label}
-      </SelectItem>)}
+      </SelectItem>) : null}</>
     ))}
                         </SelectContent>
                       </Select>
