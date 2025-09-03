@@ -322,21 +322,25 @@ const AdminSetup = () => {
 
   // Get available roles based on current user's permissions
   const getAvailableRoles = () => {
-    if (currentUserRole === 'admin' || currentUserRole === 'planner') {
-      return [
-        { value: 'admin', label: 'Admin' },
-        { value: 'planner', label: 'Planner' },
-        { value: 'manager', label: 'Manager' },
-        { value: 'teammember', label: 'Team Member' }
-      ];
-    } else if (currentUserRole === 'manager') {
-      return [
-        { value: 'manager', label: 'Manager' },
-        { value: 'teammember', label: 'Team Member' }
-      ];
-    }
-    return [];
-  };
+  const roles: { value: string; label: string }[] = [];
+
+  if (currentUserRole === 'admin' || currentUserRole === 'planner') {
+    roles.push(
+      { value: 'admin', label: 'Admin' },
+      { value: 'planner', label: 'Planner' },
+      { value: 'manager', label: 'Manager' },
+      { value: 'teammember', label: 'Team Member' }
+    );
+  } else if (currentUserRole === 'manager') {
+    roles.push(
+      { value: 'manager', label: 'Manager' },
+      { value: 'teammember', label: 'Team Member' }
+    );
+  }
+
+  // Filter out any invalid entries
+  return roles.filter(role => typeof role.value === 'string' and role.value.trim() !== '');
+};
 
   const getRoleColor = (role: string) => {
     switch (role) {
