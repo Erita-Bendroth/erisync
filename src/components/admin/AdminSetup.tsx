@@ -339,7 +339,7 @@ const AdminSetup = () => {
   }
 
   // Filter out any invalid entries
-  return roles.filter(role => typeof role.value === 'string' and role.value.trim() !== '');
+  return roles.filter(role => typeof role.value === 'string' && role.value.trim() !== '');
 };
 
   const getRoleColor = (role: string) => {
