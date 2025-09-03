@@ -1,7 +1,7 @@
 # Force HTTPS and canonical domain redirects
-http://erisync.xyz/* https://erisync.xyz/:splat 301!
-http://www.erisync.xyz/* https://erisync.xyz/:splat 301!
-https://www.erisync.xyz/* https://erisync.xyz/:splat 301!
+http://erisync.xyz/* https://erisync.xyz/:splat 301
+http://www.erisync.xyz/* https://erisync.xyz/:splat 301
+https://www.erisync.xyz/* https://erisync.xyz/:splat 301
 
 # SPA routing - serve index.html for all routes
 /*    /index.html   200
