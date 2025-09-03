@@ -448,7 +448,7 @@ useEffect(() => {
                           <SelectValue placeholder="Add role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getAvailableRoles().filter(roleObj => typeof roleObj.value === 'string' && roleObj.value.length > 0).map((roleObj) => (
+                          {Array.isArray(getAvailableRoles()) && getAvailableRoles().filter(roleObj => roleObj?.value).map((roleObj) => (
   <SelectItem key={roleObj.value} value={roleObj.value}>
     {roleObj.label}
   </SelectItem>
