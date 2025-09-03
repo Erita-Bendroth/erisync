@@ -36,12 +36,14 @@ const AdminSetup = () => {
   const [managedTeamIds, setManagedTeamIds] = useState<string[]>([]);
 
   useEffect(() => {
+  console.log('User object:', user);
     if (user) {
       fetchCurrentUserRoles();
     }
   }, [user]);
 
   useEffect(() => {
+  console.log('User object:', user);
     if (user && (currentUserRole || currentUserRoles.length > 0)) {
       fetchProfiles();
       fetchUserRoles();
@@ -60,7 +62,8 @@ const AdminSetup = () => {
       if (error) throw error;
       
       const roles = data?.map(r => r.role) || [];
-      setCurrentUserRoles(roles);
+      console.log('Fetched roles:', roles);
+    setCurrentUserRoles(roles);
       
       // Determine user's highest role
       let highestRole = "";
@@ -68,7 +71,8 @@ const AdminSetup = () => {
       else if (roles.includes('planner')) highestRole = "planner";
       else if (roles.includes('manager')) highestRole = "manager";
       
-      setCurrentUserRole(highestRole);
+      console.log('Determined highest role:', highestRole);
+    setCurrentUserRole(highestRole);
       
       // If user is a manager (but not admin/planner), get their managed teams
       if (roles.includes('manager') && !roles.includes('admin') && !roles.includes('planner')) {
@@ -78,7 +82,9 @@ const AdminSetup = () => {
           .eq('user_id', user.id)
           .eq('is_manager', true);
         
-        setManagedTeamIds(managerTeams?.map(t => t.team_id) || []);
+        const teamIds = managerTeams?.map(t => t.team_id) || [];
+    console.log('Managed team IDs:', teamIds);
+    setManagedTeamIds(teamIds);
       }
       
     } catch (error) {
@@ -402,7 +408,8 @@ const AdminSetup = () => {
             </p>
             
             <div className="space-y-3">
-              {profiles.map((profile) => {
+              {profiles.length === 0 && (<div className="text-sm text-red-500">No profiles found or failed to load.</div>) }
+          {profiles.map((profile) => {
                 const roles = getUserRoles(profile.user_id);
                 const isCurrentUser = profile.user_id === user?.id;
                 
