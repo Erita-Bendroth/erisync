@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
         country_code: holiday.countryCode,
         year: parseInt(year),
         is_public: true,
-        user_id: user_id,
+        user_id: null, // Always null for centrally managed holidays
         region_code: regionalCode
       };
     })
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
       .select('date, region_code')
       .eq('country_code', country_code)
       .eq('year', year)
-      .eq('user_id', user_id);
+      .is('user_id', null); // Check centrally managed holidays
     
     const { data: existingHolidays, error: checkError } = await existingQuery;
 
