@@ -11,7 +11,6 @@ import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import TeamManagement from "@/components/schedule/TeamManagement";
 import AdminSetup from "@/components/admin/AdminSetup";
-import HolidayManager from "@/components/holidays/HolidayManager";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
@@ -257,7 +256,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -269,10 +268,6 @@ const Schedule = () => {
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
               Teams
-            </TabsTrigger>
-            <TabsTrigger value="holidays" className="flex items-center">
-              <Calendar className="w-4 h-4 mr-2" />
-              Holidays
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center">
               <Settings className="w-4 h-4 mr-2" />
@@ -438,10 +433,6 @@ const Schedule = () => {
 
           <TabsContent value="teams" className="space-y-6">
             <TeamManagement />
-          </TabsContent>
-
-          <TabsContent value="holidays" className="space-y-6">
-            <HolidayManager />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
