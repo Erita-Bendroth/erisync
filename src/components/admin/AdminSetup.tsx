@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import BulkUserImport from "./BulkUserImport";
 import UserManagement from "./UserManagement";
 import UserCreation from "./UserCreation";
+import AdminHolidayManager from "./AdminHolidayManager";
 
 interface Profile {
   user_id: string;
@@ -374,6 +375,7 @@ const AdminSetup = () => {
     <div className="space-y-6">
       <UserCreation onUserCreated={() => { fetchProfiles(); fetchUserRoles(); }} />
       <UserManagement />
+      <AdminHolidayManager />
       
       <Card>
         <CardHeader>

@@ -14,7 +14,7 @@ import TestReset from "./pages/TestReset";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import SecurityPolicy from "./pages/SecurityPolicy";
 import Contact from "./pages/Contact";
-import Holidays from "./pages/Holidays";
+
 
 const queryClient = new QueryClient();
 
@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/schedule" element={<Schedule />} />
-            <Route path="/holidays" element={<Holidays />} />
+            
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/test-reset" element={<TestReset />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

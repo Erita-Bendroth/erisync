@@ -49,18 +49,6 @@ const Layout = ({ children }: LayoutProps) => {
                 <Calendar className="h-4 w-4" />
                 <span>Schedule</span>
               </Link>
-              
-              <Link 
-                to="/holidays" 
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActiveRoute('/holidays') 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                <CalendarDays className="h-4 w-4" />
-                <span>Holidays</span>
-              </Link>
             </nav>
           </div>
           
