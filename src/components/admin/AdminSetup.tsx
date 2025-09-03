@@ -143,6 +143,10 @@ const AdminSetup = () => {
           description: "You cannot modify your own role",
           variant: "destructive",
         });
+useEffect(() => {
+  console.log("Runtime getAvailableRoles:", getAvailableRoles());
+}, [currentUserRole]);
+
         return;
       }
 
