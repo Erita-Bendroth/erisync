@@ -338,7 +338,7 @@ const AdminSetup = () => {
     );
   }
 
-  // Filter out any invalid entries
+  // Defensive filter to remove invalid entries
   return roles.filter(role => typeof role.value === 'string' && role.value.trim() !== '');
 };
 
