@@ -439,22 +439,21 @@ const AdminSetup = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {getAvailableRoles().length > 0 && (
-  <Select onValueChange={(role) => assignRole(profile.user_id, role)}>
-    <SelectTrigger className="w-[120px]">
-      <SelectValue placeholder="Add role" />
-    </SelectTrigger>
-    <SelectContent>
-      {getAvailableRoles()
-        .filter(roleObj => typeof roleObj.value === 'string' && roleObj.value.trim() !== '')
-        .map(roleObj => (
-          <SelectItem key={roleObj.value} value={roleObj.value}>
-            {roleObj.label}
-          </SelectItem>
-        ))}
-    </SelectContent>
-  </Select>
-)}
+                      <Select onValueChange={(role) => assignRole(profile.user_id, role)}>
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue placeholder="Add role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.isArray(getAvailableRoles()) &&
+  getAvailableRoles()
+    .filter(roleObj => typeof roleObj.value === 'string' && roleObj.value.trim() !== '')
+    .map(roleObj => (
+      {typeof roleObj.value === 'string' && roleObj.value.trim() !== '' && (<SelectItem key={roleObj.value} value={roleObj.value}>
+        {roleObj.label}
+      </SelectItem>)}
+    ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 );
