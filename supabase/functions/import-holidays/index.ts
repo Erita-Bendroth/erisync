@@ -96,10 +96,10 @@ Deno.serve(async (req) => {
     const { country_code, year, user_id, region_code } = await req.json()
     console.log('Request received:', { country_code, year, user_id, region_code })
 
-    if (!country_code || !year || !user_id) {
+    if (!country_code || !year) {
       console.error('Missing required parameters:', { country_code, year, user_id })
       return new Response(
-        JSON.stringify({ error: 'Country code, year, and user_id are required' }),
+        JSON.stringify({ error: 'Country code and year are required' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
