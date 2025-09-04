@@ -83,7 +83,7 @@ const AdminHolidayManager = () => {
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('DE');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedRegion, setSelectedRegion] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -141,7 +141,7 @@ const AdminHolidayManager = () => {
           country_code: selectedCountry,
           year: selectedYear,
           user_id: null, // Store as centrally managed holidays
-          region_code: selectedCountry === 'DE' ? selectedRegion : null
+          region_code: selectedCountry === 'DE' && selectedRegion !== 'all' ? selectedRegion : null
         }
       });
 
@@ -288,7 +288,7 @@ const AdminHolidayManager = () => {
                     <SelectValue placeholder="All regions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All regions</SelectItem>
+                    <SelectItem value="all">All regions</SelectItem>
                     {getRegions().map((region) => (
                       <SelectItem key={region.code} value={region.code}>
                         {region.name}
