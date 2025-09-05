@@ -100,17 +100,14 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
   useEffect(() => {
     if (entry) {
-      setFormData({
-        shift_type: (entry.shift_type as "normal" | "early" | "late") || "normal",
-        activity_type: (entry.activity_type === "sick" ? "other" : entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
-        availability_status: (entry.availability_status as "available" | "unavailable") || "available",
-        notes: entry.notes || ""
-      });
-      
-      // Check if entry has time split information in notes
-      const timeSplitPattern = /Times:\s*(.+)/;
+      // Extract user notes (everything after the Times: JSON data)
+      let userNotes = "";
+      const timeSplitPattern = /Times:\s*(\[.*?\])(\n(.*))?/s;
       const match = entry.notes?.match(timeSplitPattern);
+      
       if (match) {
+        // Time split data exists - extract user notes if they exist
+        userNotes = match[3] || "";
         setUseHourSplit(true);
         try {
           const timesData = JSON.parse(match[1]);
@@ -121,9 +118,18 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           console.error("Failed to parse time split data");
         }
       } else {
+        // No time split data - use notes as-is
+        userNotes = entry.notes || "";
         setUseHourSplit(false);
         setWorkBlocks([{ activity_type: "work", start_time: "09:00", end_time: "17:00" }]);
       }
+
+      setFormData({
+        shift_type: (entry.shift_type as "normal" | "early" | "late") || "normal",
+        activity_type: (entry.activity_type === "sick" ? "other" : entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
+        availability_status: (entry.availability_status as "available" | "unavailable") || "available",
+        notes: userNotes
+      });
     }
   }, [entry]);
 
