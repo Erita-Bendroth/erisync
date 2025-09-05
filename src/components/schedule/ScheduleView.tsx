@@ -235,7 +235,8 @@ useEffect(() => {
       const { data: teamUsers } = await supabase
         .from('team_members')
         .select('user_id')
-        .in('team_id', teamIds);
+        .in('team_id', teamIds)
+        .limit(10000);
 
       const ids = new Set<string>((teamUsers || []).map(tu => tu.user_id));
       // Always include self
@@ -271,6 +272,7 @@ useEffect(() => {
       const { data, error } = await supabase
         .from('teams')
         .select('id, name')
+        .limit(10000)
         .order('name');
 
       if (error) throw error;
@@ -321,7 +323,8 @@ useEffect(() => {
           const { data: teamMembersRes, error: teamMembersError } = await supabase
             .from('team_members')
             .select('user_id')
-            .eq('team_id', selectedTeam);
+            .eq('team_id', selectedTeam)
+            .limit(10000);
 
           if (teamMembersError) {
             console.error('Error fetching team members:', teamMembersError);
@@ -340,10 +343,10 @@ useEffect(() => {
           
           if (isPlanner()) {
             // Planners can see all teams
-            allTeamsQuery = supabase.from('teams').select('id');
+            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
           } else if (isManager()) {
             // Managers can see teams they manage + all teams for viewing (UI will restrict editing)
-            allTeamsQuery = supabase.from('teams').select('id');
+            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
           }
           
           const { data: allTeams, error: allTeamsError } = await allTeamsQuery;
@@ -367,7 +370,8 @@ useEffect(() => {
           const { data: allMembers, error: allMembersError } = await supabase
             .from('team_members')
             .select('user_id')
-            .in('team_id', teamIds);
+            .in('team_id', teamIds)
+            .limit(10000);
 
           if (allMembersError) {
             console.error('Error fetching all team members:', allMembersError);
@@ -429,7 +433,8 @@ useEffect(() => {
             const { data: teamMembers, error: membersError } = await supabase
               .from('team_members')
               .select('user_id')
-              .in('team_id', teamIds);
+              .in('team_id', teamIds)
+              .limit(10000);
 
             if (teamMembers && teamMembers.length > 0) {
               targetUserIds = teamMembers.map((tm: any) => tm.user_id);
@@ -566,6 +571,9 @@ useEffect(() => {
         // Default: show only own entries
         query = query.eq("user_id", user!.id);
       }
+
+      // Ensure we fetch enough rows for All Teams view
+      query = query.limit(10000);
 
       const { data, error } = await query;
 
