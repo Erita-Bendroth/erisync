@@ -332,10 +332,42 @@ useEffect(() => {
           targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
           console.log('Target user IDs for team:', targetUserIds);
         } else {
-          console.log('All teams view: fetching all team members');
+          console.log('All teams view: fetching ALL team members across ALL teams');
+          
+          // CRITICAL FIX: When "All Teams" is selected, we need to fetch ALL users from ALL teams
+          // First get all teams that the user has permission to see
+          let allTeamsQuery;
+          
+          if (isPlanner()) {
+            // Planners can see all teams
+            allTeamsQuery = supabase.from('teams').select('id');
+          } else if (isManager()) {
+            // Managers can see teams they manage + all teams for viewing (UI will restrict editing)
+            allTeamsQuery = supabase.from('teams').select('id');
+          }
+          
+          const { data: allTeams, error: allTeamsError } = await allTeamsQuery;
+          
+          if (allTeamsError) {
+            console.error('Error fetching teams:', allTeamsError);
+            setEmployees([]);
+            return;
+          }
+          
+          const teamIds = (allTeams || []).map(t => t.id);
+          console.log('All team IDs for "All Teams" view:', teamIds);
+          
+          if (teamIds.length === 0) {
+            console.log('No teams found');
+            setEmployees([]);
+            return;
+          }
+          
+          // Get all members from all teams
           const { data: allMembers, error: allMembersError } = await supabase
             .from('team_members')
-            .select('user_id');
+            .select('user_id')
+            .in('team_id', teamIds);
 
           if (allMembersError) {
             console.error('Error fetching all team members:', allMembersError);
@@ -344,7 +376,7 @@ useEffect(() => {
           }
 
           targetUserIds = [...new Set((allMembers || []).map((tm: any) => tm.user_id))];
-          console.log('All teams target user IDs count:', targetUserIds.length);
+          console.log('All teams target user IDs count:', targetUserIds.length, 'unique users');
         }
 
         if (targetUserIds.length === 0) {
