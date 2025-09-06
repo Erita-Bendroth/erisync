@@ -37,6 +37,12 @@ verify_jwt = true
 [functions.send-random-password]
 verify_jwt = true
 
+[functions.oauth-token-manager]
+verify_jwt = true
+
+[functions.outlook-graph-proxy]
+verify_jwt = true
+
 # System functions - automated execution only
 [functions.weekly-schedule-notifications]
 verify_jwt = false

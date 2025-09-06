@@ -36,12 +36,12 @@ const OutlookIntegration = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
-    const storedState = localStorage.getItem('oauth_state');
+    const storedState = sessionStorage.getItem('oauth_state'); // Use sessionStorage instead of localStorage for security
 
     if (code && state && state === storedState) {
       setLoading(true);
       try {
-        // Exchange authorization code for tokens via edge function
+        // Exchange authorization code for tokens via secure edge function
         const { data, error } = await supabase.functions.invoke('exchange-outlook-token', {
           body: { 
             code,
@@ -51,33 +51,16 @@ const OutlookIntegration = () => {
 
         if (error) throw error;
 
-        // Store tokens
-        localStorage.setItem('outlook_access_token', data.access_token);
-        if (data.refresh_token) {
-          localStorage.setItem('outlook_refresh_token', data.refresh_token);
-        }
-
-        // Get user info
-        const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-          headers: {
-            'Authorization': `Bearer ${data.access_token}`,
-          },
+        // Check connection status after successful exchange
+        await checkConnectionStatus();
+        
+        toast({
+          title: "Connected!",
+          description: "Successfully connected to Outlook calendar",
         });
 
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          localStorage.setItem('outlook_account_email', userData.mail || userData.userPrincipalName);
-          setConnectedAccount(userData.mail || userData.userPrincipalName);
-          setIsConnected(true);
-          
-          toast({
-            title: "Connected!",
-            description: `Successfully connected to Outlook calendar (${userData.mail || userData.userPrincipalName})`,
-          });
-        }
-
         // Clean up
-        localStorage.removeItem('oauth_state');
+        sessionStorage.removeItem('oauth_state');
         // Remove query parameters from URL
         window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -95,19 +78,43 @@ const OutlookIntegration = () => {
   };
 
   const checkConnectionStatus = async () => {
-    // This would typically check if user has authorized Outlook integration
-    // For demo purposes, we'll simulate the check
-    const hasToken = localStorage.getItem('outlook_access_token');
-    const accountEmail = localStorage.getItem('outlook_account_email');
+    if (!user) return;
     
-    setIsConnected(!!hasToken);
-    setConnectedAccount(accountEmail);
-    
-    if (hasToken) {
-      const lastSyncStr = localStorage.getItem('outlook_last_sync');
-      if (lastSyncStr) {
-        setLastSync(new Date(lastSyncStr));
+    try {
+      // Check connection status via secure server-side API
+      const { data, error } = await supabase.functions.invoke('oauth-token-manager/outlook', {
+        method: 'GET'
+      });
+      
+      if (error) {
+        console.error('Error checking connection status:', error);
+        setIsConnected(false);
+        return;
       }
+      
+      setIsConnected(data.exists);
+      
+      if (data.exists && data.created_at) {
+        setLastSync(new Date(data.created_at));
+      }
+      
+      // Get account info if connected
+      if (data.exists) {
+        try {
+          const { data: userInfo, error: userError } = await supabase.functions.invoke('outlook-graph-proxy', {
+            body: { endpoint: '/me', method: 'GET' }
+          });
+          
+          if (!userError && userInfo) {
+            setConnectedAccount(userInfo.mail || userInfo.userPrincipalName);
+          }
+        } catch (err) {
+          console.error('Error fetching user info:', err);
+        }
+      }
+    } catch (error) {
+      console.error('Error in checkConnectionStatus:', error);
+      setIsConnected(false);
     }
   };
 
@@ -124,7 +131,7 @@ const OutlookIntegration = () => {
       
       // Generate state parameter for security
       const state = Math.random().toString(36).substring(2, 15);
-      localStorage.setItem('oauth_state', state);
+      sessionStorage.setItem('oauth_state', state); // Use sessionStorage instead of localStorage
       
       // Build Azure AD authorization URL with tenant-specific endpoint
       const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
@@ -163,11 +170,6 @@ const OutlookIntegration = () => {
     
     setSyncing(true);
     try {
-      const accessToken = localStorage.getItem('outlook_access_token');
-      if (!accessToken) {
-        throw new Error('No access token available. Please reconnect to Outlook.');
-      }
-
       // Get user's timezone from profile
       const { data: profile } = await supabase
         .from('profiles')
@@ -207,22 +209,18 @@ const OutlookIntegration = () => {
       if (error) throw error;
 
       // Check for existing events to avoid duplicates
-      const existingEventsResponse = await fetch(
-        `https://graph.microsoft.com/v1.0/me/calendar/events?$filter=categories/any(c:c eq 'Work Schedule')&$select=id,subject,start,end`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
+      const { data: existingEventsData, error: eventsError } = await supabase.functions.invoke('outlook-graph-proxy', {
+        body: {
+          endpoint: `/me/calendar/events?$filter=categories/any(c:c eq 'Work Schedule')&$select=id,subject,start,end`,
+          method: 'GET'
         }
-      );
+      });
 
-      let existingEvents = [];
-      if (existingEventsResponse.ok) {
-        const existingData = await existingEventsResponse.json();
-        existingEvents = existingData.value || [];
+      if (eventsError) {
+        console.error('Error fetching existing events:', eventsError);
       }
 
+      const existingEvents = existingEventsData?.value || [];
       let createdCount = 0;
       
       // Create calendar events for each schedule entry
@@ -284,27 +282,24 @@ const OutlookIntegration = () => {
             categories: ['Work Schedule']
           };
 
-          // Create the event in Outlook
-          const response = await fetch('https://graph.microsoft.com/v1.0/me/calendar/events', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(calendarEvent),
+          // Create the event via secure proxy
+          const { data: createResponse, error: createError } = await supabase.functions.invoke('outlook-graph-proxy', {
+            body: {
+              endpoint: '/me/calendar/events',
+              method: 'POST',
+              data: calendarEvent
+            }
           });
 
-          if (response.ok) {
+          if (!createError && createResponse) {
             createdCount++;
           } else {
-            const errorData = await response.json();
-            console.error('Failed to create event:', errorData);
+            console.error('Failed to create event:', createError);
           }
         }
       }
       
       setLastSync(new Date());
-      localStorage.setItem('outlook_last_sync', new Date().toISOString());
       
       toast({
         title: "Sync Complete",
@@ -314,14 +309,12 @@ const OutlookIntegration = () => {
     } catch (error: any) {
       console.error('Error syncing to Outlook:', error);
       
-      // Handle token expiration
-      if (error.message?.includes('401') || error.message?.includes('token')) {
-        // Try to refresh token or ask user to reconnect
-        localStorage.removeItem('outlook_access_token');
+      // Handle token errors
+      if (error.message?.includes('Token expired') || error.message?.includes('Outlook not connected')) {
         setIsConnected(false);
         toast({
-          title: "Token Expired",
-          description: "Please reconnect to Outlook to refresh your access token",
+          title: "Connection Lost",
+          description: "Please reconnect to Outlook to refresh your access",
           variant: "destructive",
         });
       } else {
@@ -336,11 +329,21 @@ const OutlookIntegration = () => {
     }
   };
 
-  const disconnectOutlook = () => {
-    localStorage.removeItem('outlook_access_token');
-    localStorage.removeItem('outlook_refresh_token');
-    localStorage.removeItem('outlook_last_sync');
-    localStorage.removeItem('outlook_account_email');
+  const disconnectOutlook = async () => {
+    try {
+      // Remove tokens from secure server-side storage
+      const { error } = await supabase.functions.invoke('oauth-token-manager/outlook', {
+        method: 'DELETE'
+      });
+      
+      if (error) {
+        console.error('Error disconnecting from server:', error);
+      }
+    } catch (error) {
+      console.error('Error during disconnect:', error);
+    }
+    
+    // Clean up local state
     setIsConnected(false);
     setLastSync(null);
     setConnectedAccount(null);

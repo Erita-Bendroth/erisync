@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://erisync.lovable.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -115,11 +116,40 @@ serve(async (req) => {
     const tokenData = await tokenResponse.json()
     console.log('Token exchange successful')
 
-    return new Response(
-      JSON.stringify({
+    // Calculate expiry time
+    const expiryTime = new Date();
+    expiryTime.setSeconds(expiryTime.getSeconds() + (tokenData.expires_in || 3600));
+
+    // Store tokens securely in the database instead of returning them
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { error: storeError } = await supabaseAdmin
+      .from('user_oauth_tokens')
+      .upsert({
+        user_id: user.id,
+        provider: 'outlook',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
-        expires_in: tokenData.expires_in
+        expires_at: expiryTime.toISOString(),
+        scope: 'https://graph.microsoft.com/Calendars.ReadWrite offline_access User.Read',
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,provider'
+      });
+
+    if (storeError) {
+      console.error('Error storing tokens:', storeError);
+      throw new Error('Failed to store authentication tokens securely');
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Outlook connected successfully'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
