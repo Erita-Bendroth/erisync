@@ -613,6 +613,50 @@ useEffect(() => {
       
       console.log('Transformed schedule data:', transformedData.length, 'entries');
       setScheduleEntries(transformedData);
+
+      // Ensure the row list includes EVERY user that has schedule entries (e.g. legacy entries not present in team_members)
+      try {
+        const existingEmployeeIds = new Set((employees || []).map(e => e.user_id));
+        const missingUserIds = (userIds || []).filter(id => !existingEmployeeIds.has(id));
+
+        if (missingUserIds.length > 0) {
+          const { data: missingProfiles } = await supabase
+            .rpc('get_multiple_basic_profile_info', { _user_ids: missingUserIds });
+
+          const fetchedEmployees = (missingProfiles || []).map((emp: any) => ({
+            id: emp.user_id,
+            user_id: emp.user_id,
+            first_name: emp.first_name ?? '',
+            last_name: emp.last_name ?? '',
+            initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+            displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
+          }));
+
+          const returnedIds = new Set(fetchedEmployees.map(e => e.user_id));
+          // Create minimal placeholders for any users not returned due to RLS restrictions
+          const placeholderEmployees = missingUserIds
+            .filter(id => !returnedIds.has(id))
+            .map(id => ({
+              id,
+              user_id: id,
+              first_name: 'User',
+              last_name: '',
+              initials: 'U',
+              displayName: 'User'
+            }));
+
+          const toAdd = [...fetchedEmployees, ...placeholderEmployees];
+          if (toAdd.length > 0) {
+            setEmployees(prev => {
+              const map = new Map(prev.map(e => [e.user_id, e]));
+              toAdd.forEach(e => { if (!map.has(e.user_id)) map.set(e.user_id, e); });
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (mergeErr) {
+        console.error('Error merging employees with schedule users:', mergeErr);
+      }
     } catch (error) {
       console.error("Error fetching schedule entries:", error);
       toast({
