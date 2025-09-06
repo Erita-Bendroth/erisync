@@ -1,13 +1,13 @@
 /*
-  # Security Headers (HTTP only - no meta tag duplicates)
+  # Security Headers (HTTP only - no meta tag duplicates)  
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://rdatyftacldjhgzsxzfw.supabase.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; connect-src 'self' https://rdatyftacldjhgzsxzfw.supabase.co wss://rdatyftacldjhgzsxzfw.supabase.co https: wss:; font-src 'self' data: https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self' blob:; frame-ancestors 'self' *.lovable.app; frame-src 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://rdatyftacldjhgzsxzfw.supabase.co https://cdn.jsdelivr.net https://cdn.gpteng.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; connect-src 'self' https://rdatyftacldjhgzsxzfw.supabase.co wss://rdatyftacldjhgzsxzfw.supabase.co https: wss:; font-src 'self' data: https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self' blob:; frame-ancestors 'self' *.lovable.app; frame-src 'self'
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()
-  Cross-Origin-Embedder-Policy: credentialless
+  Cross-Origin-Embedder-Policy: credentialless  
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cross-Origin-Resource-Policy: cross-origin
 
