@@ -38,54 +38,63 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    // Check for recovery tokens in the URL hash
-    let hash = window.location.hash.substring(1);
-    console.log('RAW HASH:', hash);
+    // Only process URL parameters if there's actually something in the hash or search params
+    const hash = window.location.hash.substring(1);
+    const search = window.location.search;
     
-    // Fix malformed hash with double # symbols - replace # with & after the first one
-    if (hash.includes('#')) {
-      const parts = hash.split('#');
-      hash = parts[0] + '&' + parts.slice(1).join('&');
-      console.log('FIXED HASH:', hash);
+    // Only log and process if there's actually content to process
+    if (hash) {
+      console.log('RAW HASH:', hash);
+      
+      // Fix malformed hash with double # symbols - replace # with & after the first one
+      let processedHash = hash;
+      if (hash.includes('#')) {
+        const parts = hash.split('#');
+        processedHash = parts[0] + '&' + parts.slice(1).join('&');
+        console.log('FIXED HASH:', processedHash);
+      }
+      
+      const hashParams = new URLSearchParams(processedHash);
+      console.log('HASH PARAMS ENTRIES:', Array.from(hashParams.entries()));
+      
+      // Check if this is a recovery link
+      const type = hashParams.get('type');
+      const access_token = hashParams.get('access_token');
+      const refresh_token = hashParams.get('refresh_token');
+
+      console.log('PARSED VALUES:', { 
+        type: type, 
+        hasAccessToken: !!access_token, 
+        hasRefreshToken: !!refresh_token,
+        accessTokenLength: access_token?.length || 0,
+        refreshTokenLength: refresh_token?.length || 0
+      });
+
+      if (type === 'recovery' && access_token && refresh_token) {
+        console.log('✅ VALID RECOVERY LINK - REDIRECTING NOW');
+        // Create properly formatted hash for redirect
+        const properHash = `#${processedHash}`;
+        console.log('REDIRECT TARGET:', `/reset-password${properHash}`);
+        navigate(`/reset-password${properHash}`, { replace: true });
+        return;
+      } else if (type || access_token || refresh_token) {
+        // Only log error if there were auth-related parameters that failed validation
+        console.log('❌ NOT A VALID RECOVERY LINK:', { type, hasTokens: !!(access_token && refresh_token) });
+      }
     }
-    
-    const hashParams = new URLSearchParams(hash);
-    console.log('HASH PARAMS ENTRIES:', Array.from(hashParams.entries()));
-    
-    // Check if this is a recovery link
-    const type = hashParams.get('type');
-    const access_token = hashParams.get('access_token');
-    const refresh_token = hashParams.get('refresh_token');
 
-    console.log('PARSED VALUES:', { 
-      type: type, 
-      hasAccessToken: !!access_token, 
-      hasRefreshToken: !!refresh_token,
-      accessTokenLength: access_token?.length || 0,
-      refreshTokenLength: refresh_token?.length || 0
-    });
-
-    if (type === 'recovery' && access_token && refresh_token) {
-      console.log('✅ VALID RECOVERY LINK - REDIRECTING NOW');
-      // Create properly formatted hash for redirect
-      const properHash = `#${hash}`;
-      console.log('REDIRECT TARGET:', `/reset-password${properHash}`);
-      navigate(`/reset-password${properHash}`, { replace: true });
-      return;
-    } else {
-      console.log('❌ NOT A VALID RECOVERY LINK:', { type, hasTokens: !!(access_token && refresh_token) });
-    }
-
-    // Check for Outlook OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    
-    if (code && state) {
-      // This is an Outlook OAuth callback, redirect to schedule page
-      // The OutlookIntegration component will handle the token exchange
-      navigate("/schedule?tab=settings", { replace: true });
-      return;
+    // Check for Outlook OAuth callback only if there are search params
+    if (search) {
+      const urlParams = new URLSearchParams(search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      
+      if (code && state) {
+        // This is an Outlook OAuth callback, redirect to schedule page
+        // The OutlookIntegration component will handle the token exchange
+        navigate("/schedule?tab=settings", { replace: true });
+        return;
+      }
     }
   }, [navigate]);
 
@@ -230,6 +239,7 @@ const Auth = () => {
                         id="signin-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
+                        autoComplete="current-password"
                         value={signInData.password}
                         onChange={(e) =>
                           setSignInData({ ...signInData, password: e.target.value })
