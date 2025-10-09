@@ -9,18 +9,19 @@ import { UserPlus, Users, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { validateEmail, validatePassword, sanitizeInput } from "@/lib/validation";
-
 interface Team {
   id: string;
   name: string;
 }
-
 interface UserCreationProps {
   onUserCreated: () => void;
 }
-
-const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
-  const { toast } = useToast();
+const UserCreation: React.FC<UserCreationProps> = ({
+  onUserCreated
+}) => {
+  const {
+    toast
+  } = useToast();
   const [loading, setLoading] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [formData, setFormData] = useState({
@@ -28,56 +29,53 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
     initials: "",
     role: "",
     countryCode: "US",
-    teamId: "no-team",
+    teamId: "no-team"
   });
-
   useEffect(() => {
     fetchTeams();
   }, []);
-
   const fetchTeams = async () => {
     try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('id, name')
-        .order('name');
-      
+      const {
+        data,
+        error
+      } = await supabase.from('teams').select('id, name').order('name');
       if (error) throw error;
       setTeams(data || []);
     } catch (error) {
       console.error('Error fetching teams:', error);
     }
   };
-
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate input
     if (!validateEmail(formData.email)) {
       toast({
         title: "Error",
         description: "Please enter a valid email address",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     if (!formData.initials || !formData.role) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "All fields are required",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     setLoading(true);
     try {
       // Generate a temporary password that meets requirements
       const tempPassword = `TempPass${Math.random().toString(36).slice(-4)}!`;
-      
+
       // Create user account via admin function
-      const { data, error } = await supabase.functions.invoke('create-user', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('create-user', {
         body: {
           email: sanitizeInput(formData.email),
           password: tempPassword,
@@ -88,12 +86,10 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
           requiresPasswordChange: true
         }
       });
-
       if (error) throw error;
-
       toast({
         title: "Success",
-        description: `User created successfully. They will need to change their password on first login.`,
+        description: `User created successfully. They will need to change their password on first login.`
       });
 
       // Reset form
@@ -102,25 +98,21 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
         initials: "",
         role: "",
         countryCode: "US",
-        teamId: "no-team",
+        teamId: "no-team"
       });
-      
       onUserCreated();
-      
     } catch (error: any) {
       console.error('User creation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create user",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
-  return (
-    <Card>
+  return <Card>
       <CardHeader>
         <CardTitle className="flex items-center">
           <UserPlus className="w-5 h-5 mr-2" />
@@ -141,35 +133,27 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
         <form onSubmit={handleCreateUser} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="initials">User Initials</Label>
-            <Input
-              id="initials"
-              type="text"
-              value={formData.initials}
-              onChange={(e) => setFormData({ ...formData, initials: e.target.value.toUpperCase() })}
-              placeholder="Enter user initials (e.g. JD)"
-              maxLength={4}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Short initials to identify the user (2-4 characters)
-            </p>
+            <Input id="initials" type="text" value={formData.initials} onChange={e => setFormData({
+            ...formData,
+            initials: e.target.value.toUpperCase()
+          })} placeholder="Enter user initials (e.g. JD)" maxLength={4} required />
+            <p className="text-xs text-muted-foreground">Vestas initials (2-4 characters)</p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="Enter email address"
-              required
-            />
+            <Input id="email" type="email" value={formData.email} onChange={e => setFormData({
+            ...formData,
+            email: e.target.value
+          })} placeholder="Enter email address" required />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
-            <Select onValueChange={(value) => setFormData({ ...formData, role: value })}>
+            <Select onValueChange={value => setFormData({
+            ...formData,
+            role: value
+          })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select user role" />
               </SelectTrigger>
@@ -184,24 +168,28 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
 
           <div className="space-y-2">
             <Label htmlFor="team">Team (Optional)</Label>
-            <Select onValueChange={(value) => setFormData({ ...formData, teamId: value })}>
+            <Select onValueChange={value => setFormData({
+            ...formData,
+            teamId: value
+          })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select team (optional)" />
               </SelectTrigger>
               <SelectContent className="bg-popover border border-border shadow-md z-50">
                 <SelectItem value="no-team">No Team</SelectItem>
-                {teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
+                {teams.map(team => <SelectItem key={team.id} value={team.id}>
                     {team.name}
-                  </SelectItem>
-                ))}
+                  </SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="country">Country</Label>
-            <Select onValueChange={(value) => setFormData({ ...formData, countryCode: value })}>
+            <Select onValueChange={value => setFormData({
+            ...formData,
+            countryCode: value
+          })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select country" />
               </SelectTrigger>
@@ -270,8 +258,6 @@ const UserCreation: React.FC<UserCreationProps> = ({ onUserCreated }) => {
           </Button>
         </form>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default UserCreation;
