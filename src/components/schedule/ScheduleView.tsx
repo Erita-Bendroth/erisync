@@ -188,49 +188,34 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   }, [initialTeamId, teams]);
 
   useEffect(() => {
-    if (!user) return;
-    
-    const loadInitialData = async () => {
-      try {
-        setLoading(true);
-        await fetchUserRoles();
-        await fetchUserTeams();
-        await fetchTeams();
-        await fetchEmployees();
-        await fetchScheduleEntries();
-        await fetchHolidays();
-      } catch (error) {
-        console.error('Error loading initial data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadInitialData();
-  }, [user?.id]);
+    if (user) {
+      fetchUserRoles();
+      fetchUserTeams();
+    }
+  }, [user]);
 
   useEffect(() => {
-    if (!user) return;
-    // Don't set loading for subsequent updates
-    fetchEmployees();
-    fetchScheduleEntries();
-    fetchHolidays();
-  }, [currentWeek]);
+    if (user && userRoles.length > 0) {
+      fetchTeams();
+      fetchEmployees();
+      fetchScheduleEntries();
+      fetchHolidays();
+    }
+  }, [user, currentWeek, userRoles]);
 
   useEffect(() => {
-    if (!user) return;
-    // Don't set loading for subsequent updates
-    fetchEmployees();
-    fetchScheduleEntries();
-    fetchHolidays();
+    // Refetch entries when team selection or view mode changes
+    if (user && userRoles.length > 0) {
+      fetchEmployees();
+      fetchScheduleEntries();
+      fetchHolidays();
+    }
   }, [selectedTeam, viewMode]);
 
 // Pre-populate managed users set for performance and deterministic rendering
 useEffect(() => {
   const populateManagedUsersSet = async () => {
     if (!(isManager() && !isPlanner()) || !user) return;
-    if (managedCacheLoading) return; // Prevent concurrent calls
-    
     try {
       setManagedCacheLoading(true);
       // 1) Get teams current user manages
@@ -267,7 +252,7 @@ useEffect(() => {
   };
 
   populateManagedUsersSet();
-}, [user?.id, userRoles.length]); // Only depend on user ID and roles count
+}, [user, userRoles, selectedTeam, viewMode]);
 
   const fetchUserRoles = async () => {
     try {
