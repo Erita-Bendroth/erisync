@@ -188,28 +188,41 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   }, [initialTeamId, teams]);
 
   useEffect(() => {
-    if (user) {
-      fetchUserRoles();
-      fetchUserTeams();
-    }
-  }, [user?.id]); // Only re-run when user ID changes
+    if (!user) return;
+    
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        await fetchUserRoles();
+        await fetchUserTeams();
+        await fetchTeams();
+        await fetchEmployees();
+        await fetchScheduleEntries();
+        await fetchHolidays();
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadInitialData();
+  }, [user?.id]);
 
   useEffect(() => {
-    if (user && userRoles.length > 0) {
-      fetchTeams();
-      fetchEmployees();
-      fetchScheduleEntries();
-      fetchHolidays();
-    }
-  }, [user?.id, currentWeek, userRoles.length]); // Use length to avoid array reference issues
+    if (!user) return;
+    // Don't set loading for subsequent updates
+    fetchEmployees();
+    fetchScheduleEntries();
+    fetchHolidays();
+  }, [currentWeek]);
 
   useEffect(() => {
-    // Refetch entries when team selection or view mode changes
-    if (user && userRoles.length > 0) {
-      fetchEmployees();
-      fetchScheduleEntries();
-      fetchHolidays();
-    }
+    if (!user) return;
+    // Don't set loading for subsequent updates
+    fetchEmployees();
+    fetchScheduleEntries();
+    fetchHolidays();
   }, [selectedTeam, viewMode]);
 
 // Pre-populate managed users set for performance and deterministic rendering
