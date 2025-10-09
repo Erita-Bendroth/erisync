@@ -364,7 +364,7 @@ const OutlookIntegration = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <strong>Work in Progress:</strong> Outlook Calendar integration is currently under development and not
-              supported at this time. Some features may not work as expected.
+              supported at this time.
             </AlertDescription>
           </Alert>
 
