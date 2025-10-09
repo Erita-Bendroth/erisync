@@ -71,27 +71,25 @@ const TeamManagement = () => {
   });
 
   useEffect(() => {
-    fetchUserRole().then((role) => {
-      if (role) {
-        fetchTeams(role);
-        fetchProfiles();
-      }
-    });
-  }, [user]);
+    if (user) {
+      fetchUserRole().then((role) => {
+        if (role) {
+          fetchTeams(role);
+          fetchProfiles();
+        }
+      });
+    }
+  }, [user?.id]); // Only re-run when user ID actually changes
 
+  // Fetch team members when teams list changes, but avoid infinite loops
   useEffect(() => {
-    console.log("Teams effect triggered, teams:", teams);
-    console.log("Teams array length:", teams.length);
-    if (teams.length > 0) {
+    if (teams.length > 0 && !loading) {
       console.log("Fetching members for teams:", teams.map(t => ({ name: t.name, id: t.id })));
       teams.forEach(team => {
-        console.log(`About to fetch members for team: ${team.name} (${team.id})`);
         fetchTeamMembers(team.id);
       });
-    } else {
-      console.log("No teams to process");
     }
-  }, [teams]);
+  }, [teams.length]); // Only depend on the count, not the entire array
 
   const fetchTeams = async (currentUserRole?: string) => {
     try {

@@ -54,9 +54,11 @@ const EnhancedTeamManagement = () => {
   const [editTeamForm, setEditTeamForm] = useState({ name: "", description: "" });
 
   useEffect(() => {
-    fetchUserRoles();
-    fetchTeamsAndMembers();
-  }, [user]);
+    if (user) {
+      fetchUserRoles();
+      fetchTeamsAndMembers();
+    }
+  }, [user?.id]); // Only re-run when user ID actually changes
 
   const fetchUserRoles = async () => {
     if (!user) return;

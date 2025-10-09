@@ -192,7 +192,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchUserRoles();
       fetchUserTeams();
     }
-  }, [user]);
+  }, [user?.id]); // Only re-run when user ID changes
 
   useEffect(() => {
     if (user && userRoles.length > 0) {
@@ -201,7 +201,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchScheduleEntries();
       fetchHolidays();
     }
-  }, [user, currentWeek, userRoles]);
+  }, [user?.id, currentWeek, userRoles.length]); // Use length to avoid array reference issues
 
   useEffect(() => {
     // Refetch entries when team selection or view mode changes
@@ -216,6 +216,8 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
 useEffect(() => {
   const populateManagedUsersSet = async () => {
     if (!(isManager() && !isPlanner()) || !user) return;
+    if (managedCacheLoading) return; // Prevent concurrent calls
+    
     try {
       setManagedCacheLoading(true);
       // 1) Get teams current user manages
@@ -252,7 +254,7 @@ useEffect(() => {
   };
 
   populateManagedUsersSet();
-}, [user, userRoles, selectedTeam, viewMode]);
+}, [user?.id, userRoles.length]); // Only depend on user ID and roles count
 
   const fetchUserRoles = async () => {
     try {
