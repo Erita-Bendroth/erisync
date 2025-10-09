@@ -137,7 +137,7 @@ const UserCreation: React.FC<UserCreationProps> = ({
             ...formData,
             initials: e.target.value.toUpperCase()
           })} placeholder="Enter user initials (e.g. JD)" maxLength={4} required />
-            <p className="text-xs text-muted-foreground">Vestas initials (2-4 characters)</p>
+            <p className="text-xs text-muted-foreground">Vestas initials</p>
           </div>
 
           <div className="space-y-2">
