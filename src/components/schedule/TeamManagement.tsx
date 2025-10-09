@@ -71,39 +71,35 @@ const TeamManagement = () => {
   });
 
   useEffect(() => {
-    if (!user) return;
-    
-    const loadData = async () => {
-      const role = await fetchUserRole();
-      // Always fetch, even if no role - RLS will handle permissions
-      await fetchTeams(role || '');
-      await fetchProfiles();
-    };
-    
-    loadData();
-  }, [user?.id]);
-
-  // Fetch team members once teams are available - using team IDs as dependency
-  const [fetchedTeamIds, setFetchedTeamIds] = useState<Set<string>>(new Set());
-  
-  useEffect(() => {
-    if (teams.length === 0) {
-      setFetchedTeamIds(new Set());
-      return;
-    }
-    
-    teams.forEach(team => {
-      if (!fetchedTeamIds.has(team.id)) {
-        fetchTeamMembers(team.id);
-        setFetchedTeamIds(prev => new Set([...prev, team.id]));
+    fetchUserRole().then((role) => {
+      if (role) {
+        fetchTeams(role);
+        fetchProfiles();
       }
     });
+  }, [user]);
+
+  useEffect(() => {
+    console.log("Teams effect triggered, teams:", teams);
+    console.log("Teams array length:", teams.length);
+    if (teams.length > 0) {
+      console.log("Fetching members for teams:", teams.map(t => ({ name: t.name, id: t.id })));
+      teams.forEach(team => {
+        console.log(`About to fetch members for team: ${team.name} (${team.id})`);
+        fetchTeamMembers(team.id);
+      });
+    } else {
+      console.log("No teams to process");
+    }
   }, [teams]);
 
   const fetchTeams = async (currentUserRole?: string) => {
     try {
-      setLoading(true);
+      console.log("Fetching teams...");
+      console.log("Current user:", user);
       const roleToUse = currentUserRole || userRole;
+      console.log("User role:", roleToUse);
+      console.log("Supabase session:", await supabase.auth.getSession());
       
       let query = supabase
         .from("teams")
@@ -112,46 +108,59 @@ const TeamManagement = () => {
 
       // Role-based team filtering
       if (roleToUse === 'teammember') {
+        console.log("Fetching teams for team member...");
         const { data: userTeamMemberships, error: membershipError } = await supabase
           .from("team_members")
           .select("team_id")
           .eq("user_id", user!.id);
         
-        if (membershipError) throw membershipError;
+        console.log("User team memberships:", userTeamMemberships, "Error:", membershipError);
         
         if (userTeamMemberships && userTeamMemberships.length > 0) {
           const teamIds = userTeamMemberships.map(tm => tm.team_id);
+          console.log("Filtering teams to only show team IDs:", teamIds);
           query = query.in("id", teamIds);
         } else {
-          // User is not part of any teams
+          // User is not part of any teams, return empty array
+          console.log("User not in any teams, showing empty list");
           setTeams([]);
-          setLoading(false);
           return;
         }
       } else if (roleToUse === 'manager') {
+        console.log("Fetching teams for manager...");
         const { data: managedTeams, error: managerError } = await supabase
           .from("team_members")
           .select("team_id")
           .eq("user_id", user!.id)
           .eq("is_manager", true);
         
-        if (managerError) throw managerError;
+        console.log("Manager team memberships:", managedTeams, "Error:", managerError);
         
         if (managedTeams && managedTeams.length > 0) {
           const teamIds = managedTeams.map(tm => tm.team_id);
+          console.log("Filtering teams to only show managed team IDs:", teamIds);
           query = query.in("id", teamIds);
         } else {
-          // Manager doesn't manage any teams
+          // Manager doesn't manage any teams, return empty array
+          console.log("Manager doesn't manage any teams, showing empty list");
           setTeams([]);
-          setLoading(false);
           return;
         }
+      } else {
+        console.log("User has admin/planner role, showing all teams");
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      console.log("Teams query result:", { data, error });
+      console.log("Data length:", data?.length);
+
+      if (error) {
+        console.error("Teams query error:", error);
+        throw error;
+      }
       setTeams(data || []);
+      console.log("Teams set:", data);
     } catch (error) {
       console.error("Error fetching teams:", error);
       toast({
@@ -159,7 +168,6 @@ const TeamManagement = () => {
         description: "Failed to load teams",
         variant: "destructive",
       });
-      setTeams([]);
     } finally {
       setLoading(false);
     }
