@@ -544,8 +544,28 @@ useEffect(() => {
           // UI will handle display restrictions based on management rights
           query = query.eq("team_id", selectedTeam);
         } else {
-          console.log('All teams view: managers/planners fetch all teams; UI will restrict visibility');
-          // No additional filtering here; fetch all teams' entries
+          console.log('All teams view: explicitly fetching entries from all teams');
+          // CRITICAL FIX: Explicitly fetch all team IDs and query for entries from all teams
+          // This ensures we get ALL entries across all teams, avoiding RLS complications
+          let allTeamsQuery;
+          
+          if (isPlanner()) {
+            // Planners can see all teams
+            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
+          } else if (isManager()) {
+            // Managers can see all teams for viewing
+            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
+          }
+          
+          const { data: allTeams } = await allTeamsQuery;
+          
+          if (allTeams && allTeams.length > 0) {
+            const teamIds = allTeams.map(t => t.id);
+            console.log('Fetching entries for team IDs:', teamIds);
+            query = query.in("team_id", teamIds);
+          } else {
+            console.log('No teams found for All Teams view');
+          }
         }
       } else if (isTeamMember()) {
         console.log('User is regular team member');
