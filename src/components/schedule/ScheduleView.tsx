@@ -632,14 +632,23 @@ useEffect(() => {
       }) || [];
       
       console.log('Transformed schedule data:', transformedData.length, 'entries');
+      console.log('Unique user IDs in schedule entries:', userIds);
       setScheduleEntries(transformedData);
 
-      // Ensure the row list includes EVERY user that has schedule entries (e.g. legacy entries not present in team_members)
+      // CRITICAL FIX: Ensure the employee list includes ALL users who have schedule entries
+      // This is especially important for "All Teams" view where entries may exist for users
+      // not initially loaded in the employee list
       try {
-        const existingEmployeeIds = new Set((employees || []).map(e => e.user_id));
-        const missingUserIds = (userIds || []).filter(id => !existingEmployeeIds.has(id));
+        // Get current employees to check for missing ones
+        const currentEmployees = employees || [];
+        const existingEmployeeIds = new Set(currentEmployees.map(e => e.user_id));
+        const missingUserIds = userIds.filter(id => !existingEmployeeIds.has(id));
+        
+        console.log('Existing employees count:', currentEmployees.length);
+        console.log('Missing user IDs needing profiles:', missingUserIds);
 
         if (missingUserIds.length > 0) {
+          // Fetch profiles for missing users
           const { data: missingProfiles } = await supabase
             .rpc('get_multiple_basic_profile_info', { _user_ids: missingUserIds });
 
@@ -653,7 +662,6 @@ useEffect(() => {
           }));
 
           const returnedIds = new Set(fetchedEmployees.map(e => e.user_id));
-          // Create minimal placeholders for any users not returned due to RLS restrictions
           const placeholderEmployees = missingUserIds
             .filter(id => !returnedIds.has(id))
             .map(id => ({
@@ -665,14 +673,24 @@ useEffect(() => {
               displayName: 'User'
             }));
 
-          const toAdd = [...fetchedEmployees, ...placeholderEmployees];
-          if (toAdd.length > 0) {
-            setEmployees(prev => {
-              const map = new Map(prev.map(e => [e.user_id, e]));
-              toAdd.forEach(e => { if (!map.has(e.user_id)) map.set(e.user_id, e); });
-              return Array.from(map.values());
+          const allNewEmployees = [...fetchedEmployees, ...placeholderEmployees];
+          
+          console.log('Adding missing employees to list:', allNewEmployees.length);
+          
+          // Merge with existing employees using functional update to avoid race conditions
+          setEmployees(prevEmployees => {
+            const mergedMap = new Map(prevEmployees.map(e => [e.user_id, e]));
+            allNewEmployees.forEach(e => {
+              if (!mergedMap.has(e.user_id)) {
+                mergedMap.set(e.user_id, e);
+              }
             });
-          }
+            const result = Array.from(mergedMap.values());
+            console.log('Final merged employee count:', result.length);
+            return result;
+          });
+        } else {
+          console.log('All schedule users already in employee list');
         }
       } catch (mergeErr) {
         console.error('Error merging employees with schedule users:', mergeErr);
