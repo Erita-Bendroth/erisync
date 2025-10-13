@@ -5,9 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +49,9 @@ const EnhancedTeamManagement = () => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [editTeamOpen, setEditTeamOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [editTeamForm, setEditTeamForm] = useState({ name: "", description: "" });
 
   useEffect(() => {
     fetchUserRoles();
@@ -70,6 +77,8 @@ const EnhancedTeamManagement = () => {
   const isManager = () => userRoles.some(role => role.role === "manager");
   const isPlanner = () => userRoles.some(role => role.role === "planner");
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
+  const isAdmin = () => userRoles.some(role => role.role === "admin");
+  const canEditTeams = () => isAdmin() || isPlanner();
 
   const fetchTeamsAndMembers = async () => {
     try {
@@ -299,6 +308,71 @@ const EnhancedTeamManagement = () => {
     }
   };
 
+  const handleEditTeam = (team: Team) => {
+    setEditingTeam(team);
+    setEditTeamForm({ name: team.name, description: team.description || "" });
+    setEditTeamOpen(true);
+  };
+
+  const handleUpdateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingTeam) return;
+
+    // Validation: Check for empty name
+    if (!editTeamForm.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Team name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validation: Check for duplicate team names
+    const duplicateTeam = teams.find(
+      t => t.id !== editingTeam.id && t.name.toLowerCase() === editTeamForm.name.trim().toLowerCase()
+    );
+
+    if (duplicateTeam) {
+      toast({
+        title: "Validation Error",
+        description: "A team with this name already exists",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({
+          name: editTeamForm.name.trim(),
+          description: editTeamForm.description.trim() || null,
+        })
+        .eq('id', editingTeam.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Team updated successfully",
+      });
+
+      setEditTeamOpen(false);
+      setEditingTeam(null);
+      setEditTeamForm({ name: "", description: "" });
+      fetchTeamsAndMembers();
+    } catch (error: any) {
+      console.error('Error updating team:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update team",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
@@ -376,11 +450,26 @@ const EnhancedTeamManagement = () => {
                           ) : (
                             <ChevronRight className="w-4 h-4" />
                           )}
-                          <div>
-                            <h3 className="font-semibold text-lg">{team.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {team.description || `Auto-imported team: ${team.name}`}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <h3 className="font-semibold text-lg">{team.name}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {team.description || `Auto-imported team: ${team.name}`}
+                              </p>
+                            </div>
+                            {canEditTeams() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditTeam(team);
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -482,6 +571,48 @@ const EnhancedTeamManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Team Dialog */}
+      <Dialog open={editTeamOpen} onOpenChange={setEditTeamOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Team</DialogTitle>
+            <DialogDescription>
+              Update the team name and description. Team name must be unique.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateTeam}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-team-name">Team Name *</Label>
+                <Input
+                  id="edit-team-name"
+                  value={editTeamForm.name}
+                  onChange={(e) => setEditTeamForm({ ...editTeamForm, name: e.target.value })}
+                  placeholder="Enter team name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-team-description">Description</Label>
+                <Textarea
+                  id="edit-team-description"
+                  value={editTeamForm.description}
+                  onChange={(e) => setEditTeamForm({ ...editTeamForm, description: e.target.value })}
+                  placeholder="Enter team description (optional)"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditTeamOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
