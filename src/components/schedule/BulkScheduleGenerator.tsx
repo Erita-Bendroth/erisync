@@ -34,6 +34,15 @@ interface ShiftTemplate {
   days: number[]; // 0-6 (Sunday-Saturday)
 }
 
+interface ShiftConfiguration {
+  id: string;
+  shiftType: string;
+  shiftName: string;
+  dates: Date[];
+  startTime: string;
+  endTime: string;
+}
+
 const SHIFT_TEMPLATES: ShiftTemplate[] = [
   { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
   { id: 'early', name: 'Early Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
@@ -58,7 +67,8 @@ const BulkScheduleGenerator = () => {
   const [shiftTemplate, setShiftTemplate] = useState<string>('standard');
   const [customStartTime, setCustomStartTime] = useState<string>('08:00');
   const [customEndTime, setCustomEndTime] = useState<string>('16:30');
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]); // For custom shifts
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [shiftConfigurations, setShiftConfigurations] = useState<ShiftConfiguration[]>([]);
 
   useEffect(() => {
     fetchUserRoles();
@@ -232,12 +242,68 @@ const BulkScheduleGenerator = () => {
     });
   };
 
+  const addShiftConfiguration = () => {
+    if (selectedDates.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (shiftTemplate !== 'standard') {
+      if (!customStartTime || !customEndTime) {
+        toast({
+          title: "Error",
+          description: "Please set start and end times",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (customStartTime >= customEndTime) {
+        toast({
+          title: "Error",
+          description: "Start time must be before end time",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const template = SHIFT_TEMPLATES.find(t => t.id === shiftTemplate);
+    const newConfig: ShiftConfiguration = {
+      id: `shift-${Date.now()}`,
+      shiftType: shiftTemplate,
+      shiftName: template?.name || 'Custom',
+      dates: [...selectedDates],
+      startTime: shiftTemplate === 'standard' ? '08:00' : customStartTime,
+      endTime: shiftTemplate === 'standard' ? '16:30' : customEndTime,
+    };
+
+    setShiftConfigurations(prev => [...prev, newConfig]);
+    
+    // Reset form
+    setSelectedDates([]);
+    setShiftTemplate('standard');
+    setCustomStartTime('08:00');
+    setCustomEndTime('16:30');
+
+    toast({
+      title: "Shift Added",
+      description: `Added ${newConfig.shiftName} for ${newConfig.dates.length} date(s)`,
+    });
+  };
+
+  const removeShiftConfiguration = (id: string) => {
+    setShiftConfigurations(prev => prev.filter(config => config.id !== id));
+  };
+
   const getShiftTimes = () => {
-    // Standard shift has fixed times
     if (shiftTemplate === 'standard') {
       return { start: '08:00', end: '16:30' };
     }
-    // For other shifts, use custom times
     return { start: customStartTime, end: customEndTime };
   };
 
@@ -260,43 +326,22 @@ const BulkScheduleGenerator = () => {
       return;
     }
 
-    if (!startDate || !endDate || !user) {
+    if (shiftConfigurations.length === 0) {
       toast({
         title: "Error",
-        description: "Please select a date range",
+        description: "Please add at least one shift configuration",
         variant: "destructive",
       });
       return;
     }
 
-    // Validate shift configuration for non-standard shifts
-    if (shiftTemplate !== 'standard') {
-      if (selectedDates.length === 0) {
-        toast({
-          title: "Error",
-          description: "Please select at least one date",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!customStartTime || !customEndTime) {
-        toast({
-          title: "Error",
-          description: "Please set start and end times",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (customStartTime >= customEndTime) {
-        toast({
-          title: "Error",
-          description: "Start time must be before end time",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
     }
 
     setLoading(true);
@@ -322,58 +367,69 @@ const BulkScheduleGenerator = () => {
         }
       }
 
-      const times = getShiftTimes();
-      const shiftNote = `Auto-generated shift (${times.start}-${times.end})`;
+      // Generate shifts for all configurations
+      let totalGenerated = 0;
+      const targetUsers = bulkMode === "team" 
+        ? await getTeamMemberIds(selectedTeam)
+        : selectedUsers;
 
-      if (bulkMode === "team") {
-        const { data, error } = await supabase.rpc('create_team_default_schedules_with_holidays', {
-          _team_id: selectedTeam,
-          _start_date: format(startDate, 'yyyy-MM-dd'),
-          _end_date: format(endDate, 'yyyy-MM-dd'),
-          _created_by: user.id
-        });
-
-        if (error) throw error;
-
-        setGenerationResults(data || []);
-        
-        const totalShifts = data?.reduce((sum: number, result: any) => sum + result.shifts_created, 0) || 0;
-        
-        toast({
-          title: "Success",
-          description: `Generated ${totalShifts} shifts for ${data?.length || 0} team members`,
-        });
-      } else {
-        // Generate for selected users with custom template
-        let totalGenerated = 0;
-        
-        for (const userId of selectedUsers) {
-          const { data: profile, error: profileError } = await supabase
+      for (const userId of targetUsers) {
+        for (const config of shiftConfigurations) {
+          // Get user's profile for holiday checking
+          const { data: profile } = await supabase
             .from('profiles')
             .select('country_code, region_code')
             .eq('user_id', userId)
             .maybeSingle();
-          if (profileError) throw profileError;
 
-          const { data, error } = await (supabase as any).rpc('create_default_schedule_with_holidays_v2', {
-            _user_id: userId,
-            _team_id: selectedTeam,
-            _start_date: format(startDate, 'yyyy-MM-dd'),
-            _end_date: format(endDate, 'yyyy-MM-dd'),
-            _created_by: user.id,
-            _country_code: profile?.country_code || 'US',
-            _region_code: profile?.region_code || null
-          });
+          const countryCode = profile?.country_code || 'US';
+          const regionCode = profile?.region_code || null;
 
-          if (error) throw error;
-          totalGenerated += data || 0;
+          // For each date in the configuration
+          for (const date of config.dates) {
+            const dateStr = format(date, 'yyyy-MM-dd');
+            
+            // Check if it's a holiday
+            const { data: holidays } = await supabase
+              .from('holidays')
+              .select('id')
+              .eq('date', dateStr)
+              .eq('country_code', countryCode)
+              .eq('is_public', true)
+              .or(`region_code.is.null,region_code.eq.${regionCode}`)
+              .limit(1);
+
+            // Skip if it's a holiday
+            if (holidays && holidays.length > 0) continue;
+
+            // Insert or update the schedule entry
+            const { error } = await supabase
+              .from('schedule_entries')
+              .upsert({
+                user_id: userId,
+                team_id: selectedTeam,
+                date: dateStr,
+                shift_type: 'normal',
+                activity_type: 'work',
+                availability_status: 'available',
+                notes: `Auto-generated ${config.shiftName} (${config.startTime}-${config.endTime})`,
+                created_by: user.id,
+              }, {
+                onConflict: 'user_id,date,team_id',
+              });
+
+            if (!error) totalGenerated++;
+          }
         }
-        
-        toast({
-          title: "Success",
-          description: `Generated ${totalGenerated} shifts for ${selectedUsers.length} user(s)`,
-        });
       }
+      
+      toast({
+        title: "Success",
+        description: `Generated ${totalGenerated} shifts across ${shiftConfigurations.length} configuration(s)`,
+      });
+      
+      // Clear configurations after successful generation
+      setShiftConfigurations([]);
 
     } catch (error: any) {
       console.error('Error generating schedules:', error);
@@ -398,6 +454,16 @@ const BulkScheduleGenerator = () => {
     const now = new Date();
     setStartDate(startOfMonth(now));
     setEndDate(endOfMonth(addMonths(now, monthsCount - 1)));
+  };
+
+  const getTeamMemberIds = async (teamId: string): Promise<string[]> => {
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('user_id')
+      .eq('team_id', teamId);
+    
+    if (error) throw error;
+    return data?.map(m => m.user_id) || [];
   };
 
   // Don't render if user doesn't have permission
@@ -427,7 +493,7 @@ const BulkScheduleGenerator = () => {
           Bulk Schedule Generator
         </CardTitle>
         <CardDescription>
-          Generate shifts with custom templates and times, excluding holidays
+          Configure multiple shift types and dates in one batch operation
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -481,159 +547,132 @@ const BulkScheduleGenerator = () => {
           </Select>
         </div>
 
-        {/* Time and Day Selection for non-Standard shifts */}
+        {/* Time Selection for non-Standard shifts */}
         {shiftTemplate !== 'standard' && (
-          <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-            {/* Time Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Shift Times</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start-time" className="text-xs text-muted-foreground">Start Time</Label>
-                  <input
-                    id="start-time"
-                    type="time"
-                    value={customStartTime}
-                    onChange={(e) => setCustomStartTime(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md bg-background"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end-time" className="text-xs text-muted-foreground">End Time</Label>
-                  <input
-                    id="end-time"
-                    type="time"
-                    value={customEndTime}
-                    onChange={(e) => setCustomEndTime(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md bg-background"
-                  />
-                </div>
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/20">
+            <Label className="text-sm font-medium">Shift Times</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-time" className="text-xs text-muted-foreground">Start Time</Label>
+                <input
+                  id="start-time"
+                  type="time"
+                  value={customStartTime}
+                  onChange={(e) => setCustomStartTime(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                />
               </div>
-            </div>
-
-            {/* Date Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Select Specific Dates</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDates.length === 0 
-                      ? 'Pick dates' 
-                      : `${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''} selected`
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="multiple"
-                    selected={selectedDates}
-                    onSelect={(dates) => setSelectedDates(dates || [])}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-              {selectedDates.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {selectedDates.map((date, idx) => (
-                    <Badge 
-                      key={idx} 
-                      variant="secondary"
-                      className="text-xs cursor-pointer hover:bg-destructive/10"
-                      onClick={() => toggleDateSelection(date)}
-                    >
-                      {format(date, 'MMM d')}
-                      <span className="ml-1">×</span>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {selectedDates.length === 0 
-                  ? 'Click calendar to select specific dates for this shift' 
-                  : 'Click dates to add/remove, or click badges to remove'
-                }
-              </p>
+              <div className="space-y-2">
+                <Label htmlFor="end-time" className="text-xs text-muted-foreground">End Time</Label>
+                <input
+                  id="end-time"
+                  type="time"
+                  value={customEndTime}
+                  onChange={(e) => setCustomEndTime(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                />
+              </div>
             </div>
           </div>
         )}
 
-        {/* Quick date selection */}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => quickSetMonth(0)}>
-            This Month
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => quickSetMonth(1)}>
-            Next Month
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => quickSetDateRange(3)}>
-            Next 3 Months
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => quickSetDateRange(6)}>
-            Next 6 Months
-          </Button>
-        </div>
-        
-        {/* Date range */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Start Date</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !startDate && "text-muted-foreground"
-                  )}
+        {/* Date Selection */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Select Dates for This Shift</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDates.length === 0 
+                  ? 'Pick dates' 
+                  : `${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''} selected`
+                }
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="multiple"
+                selected={selectedDates}
+                onSelect={(dates) => setSelectedDates(dates || [])}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          {selectedDates.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {selectedDates.map((date, idx) => (
+                <Badge 
+                  key={idx} 
+                  variant="secondary"
+                  className="text-xs cursor-pointer hover:bg-destructive/10"
+                  onClick={() => toggleDateSelection(date)}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "PPP") : "Pick date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={setStartDate}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">End Date</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !endDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "PPP") : "Pick date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={endDate}
-                  onSelect={setEndDate}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+                  {format(date, 'MMM d')}
+                  <span className="ml-1">×</span>
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Add Shift Configuration Button */}
+        <Button 
+          onClick={addShiftConfiguration}
+          variant="secondary"
+          className="w-full"
+          disabled={selectedDates.length === 0}
+        >
+          <Zap className="w-4 h-4 mr-2" />
+          Add This Shift Configuration
+        </Button>
+
+        {/* Configured Shifts List */}
+        {shiftConfigurations.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Configured Shifts ({shiftConfigurations.length})
+            </Label>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {shiftConfigurations.map((config) => (
+                <div
+                  key={config.id}
+                  className="flex items-center justify-between p-3 border rounded-lg bg-card"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{config.shiftName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {config.startTime} - {config.endTime}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {config.dates.slice(0, 3).map((date, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {format(date, 'MMM d')}
+                        </Badge>
+                      ))}
+                      {config.dates.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{config.dates.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeShiftConfiguration(config.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Team/User selection */}
         {bulkMode === "team" ? (
@@ -739,11 +778,11 @@ const BulkScheduleGenerator = () => {
           disabled={loading || 
             (bulkMode === "team" && (!selectedTeam || selectedTeam === "")) ||
             (bulkMode === "users" && selectedUsers.length === 0) ||
-            !startDate || !endDate}
+            shiftConfigurations.length === 0}
           className="w-full"
         >
           <Zap className="w-4 h-4 mr-2" />
-          {loading ? "Generating..." : `Generate ${bulkMode === 'team' ? 'Team' : `${selectedUsers.length} User`} Shifts`}
+          {loading ? "Generating..." : `Generate All Shifts (${shiftConfigurations.length} config${shiftConfigurations.length !== 1 ? 's' : ''})`}
         </Button>
 
         {/* Info */}
@@ -751,12 +790,9 @@ const BulkScheduleGenerator = () => {
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             <span>
-              {shiftTemplate === 'standard' 
-                ? 'Standard: Mon-Fri, 08:00-16:30'
-                : `${getSelectedTemplate().name}: ${customStartTime}-${customEndTime}, ${
-                    selectedDates.length === 0 ? 'No dates selected' :
-                    `${selectedDates.length} specific date${selectedDates.length !== 1 ? 's' : ''}`
-                  }`
+              {shiftConfigurations.length === 0 
+                ? 'Add shift configurations above to get started'
+                : `Ready to generate ${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0)} shift${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0) !== 1 ? 's' : ''} across ${shiftConfigurations.length} configuration${shiftConfigurations.length !== 1 ? 's' : ''}`
               }
             </span>
           </div>
