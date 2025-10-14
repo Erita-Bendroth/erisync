@@ -840,8 +840,20 @@ useEffect(() => {
         // Filter holidays based on region
         let applicableHolidays = countryHolidays || [];
         if (country_code === 'DE' && region_code) {
-          // For Germany with region: include national holidays (no region) and regional holidays for this region
-          applicableHolidays = applicableHolidays.filter(h => !h.region_code || h.region_code === region_code);
+          // For Germany with region: prefer regional holidays, fallback to national
+          const regionalHolidays = applicableHolidays.filter(h => h.region_code === region_code);
+          const nationalHolidays = applicableHolidays.filter(h => !h.region_code);
+          
+          // For each date, prefer regional version over national if both exist
+          const holidaysByDate = new Map();
+          [...regionalHolidays, ...nationalHolidays].forEach(h => {
+            const dateKey = h.date;
+            if (!holidaysByDate.has(dateKey)) {
+              holidaysByDate.set(dateKey, h);
+            }
+          });
+          
+          applicableHolidays = Array.from(holidaysByDate.values());
         } else {
           // For other countries or no region: only national holidays
           applicableHolidays = applicableHolidays.filter(h => !h.region_code);
@@ -940,7 +952,7 @@ const getAvailabilityStatus = (activityType: string) => {
     );
 
     // Filter holidays by employee's country and region
-    const applicableHolidays = dayHolidays.filter(holiday => {
+    let applicableHolidays = dayHolidays.filter(holiday => {
       // Must match country
       if (holiday.country_code !== employee.country_code) return false;
 
@@ -954,12 +966,21 @@ const getAvailabilityStatus = (activityType: string) => {
       }
     });
 
-    // Deduplicate by holiday ID to ensure each holiday appears only once
-    const uniqueHolidays = Array.from(
-      new Map(applicableHolidays.map(h => [h.id, h])).values()
-    );
+    // For German users with regions: if both national and regional version exist for same date/name, keep only regional
+    if (employee.country_code === 'DE' && employee.region_code) {
+      const holidayMap = new Map();
+      applicableHolidays.forEach(h => {
+        const key = `${h.name}_${h.date}`;
+        const existing = holidayMap.get(key);
+        // Prefer regional over national (regional has region_code, national doesn't)
+        if (!existing || (!existing.region_code && h.region_code)) {
+          holidayMap.set(key, h);
+        }
+      });
+      applicableHolidays = Array.from(holidayMap.values());
+    }
 
-    return uniqueHolidays;
+    return applicableHolidays;
   };
 
   const getHolidaysForDay = (date: Date) => {
