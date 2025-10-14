@@ -119,7 +119,7 @@ function displayName(activity: string) {
   switch (activity) {
     case "work": return "Work";
     case "vacation": return "Vacation";
-    case "sick": return "Sick Leave";
+    case "other": return "Other";
     case "training": return "Training";
     case "hotline_support": return "Hotline Support";
     case "out_of_office": return "Out of Office";

@@ -128,7 +128,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
       setFormData({
         shift_type: (entry.shift_type as "normal" | "early" | "late") || "normal",
-        activity_type: (entry.activity_type === "sick" ? "other" : entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
+        activity_type: (entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
         availability_status: (entry.availability_status as "available" | "unavailable") || "available",
         notes: userNotes
       });
@@ -184,8 +184,8 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         primaryActivityType = primaryActivity.activity_type as any;
       }
 
-      // Map "other" back to "sick" for database compatibility
-      const dbActivityType = primaryActivityType === "other" ? "sick" : primaryActivityType as "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
+      // Use activity type directly - no mapping needed
+      const dbActivityType = primaryActivityType as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
 
       // Create if temp entry, otherwise update
       if (entry.id.startsWith('temp-')) {

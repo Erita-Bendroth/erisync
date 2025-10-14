@@ -468,7 +468,7 @@ export type Database = {
       activity_type:
         | "work"
         | "vacation"
-        | "sick"
+        | "other"
         | "hotline_support"
         | "out_of_office"
         | "training"
@@ -607,7 +607,7 @@ export const Constants = {
       activity_type: [
         "work",
         "vacation",
-        "sick",
+        "other",
         "hotline_support",
         "out_of_office",
         "training",

@@ -145,19 +145,16 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
     setLoading(true);
 
     try {
-      // Map "other" back to "sick" for database compatibility
-      const dbActivityType = formData.activity_type === "other" ? "sick" : formData.activity_type;
-      
-         const scheduleData = {
-           user_id: formData.user_id,
-           team_id: formData.team_id,
-           date: format(selectedDate, "yyyy-MM-dd"),
-           shift_type: formData.shift_type as "early" | "late" | "normal",
-           activity_type: dbActivityType as "work" | "vacation" | "sick" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home",
-           availability_status: (["work", "working_from_home", "hotline_support"].includes(formData.activity_type) ? "available" : "unavailable") as "available" | "unavailable",
-           notes: formData.notes,
-           created_by: user!.id,
-         };
+      const scheduleData = {
+        user_id: formData.user_id,
+        team_id: formData.team_id,
+        date: formData.date,
+        shift_type: formData.shift_type as "early" | "late" | "normal",
+        activity_type: formData.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home",
+        availability_status: (["work", "working_from_home", "hotline_support"].includes(formData.activity_type) ? "available" : "unavailable") as "available" | "unavailable",
+        notes: formData.notes,
+        created_by: user!.id,
+      };
 
       let result;
       if (editEntry) {

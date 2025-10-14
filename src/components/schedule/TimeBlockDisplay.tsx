@@ -42,7 +42,6 @@ const getActivityColor = (activityType: string, shiftType?: string) => {
     case "vacation":
       return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
     case "other":
-    case "sick":
       return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
     case "hotline_support":
       return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
@@ -74,8 +73,7 @@ const getActivityDisplayName = (activityType: string, shiftType?: string) => {
   switch (activityType) {
     case "work": return "Work";
     case "vacation": return "Vacation";
-    case "other":
-    case "sick": return "Other";
+    case "other": return "Other";
     case "hotline_support": return "Hotline Support";
     case "out_of_office": return "Out of Office";
     case "training": return "Training";

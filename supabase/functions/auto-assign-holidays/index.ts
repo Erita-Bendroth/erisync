@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
                 team_id: teamId,
                 date: holiday.date,
                 shift_type: 'normal',
-                activity_type: 'sick',
+                activity_type: 'other',
                 availability_status: 'unavailable',
                 notes: `Public holiday: ${holiday.name}`,
                 created_by: user_id
