@@ -83,7 +83,7 @@ const AdminHolidayManager = () => {
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('DE');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
@@ -147,22 +147,36 @@ const AdminHolidayManager = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('import-holidays', {
-        body: {
-          country_code: selectedCountry,
-          year: selectedYear,
-          user_id: null, // Store as centrally managed holidays
-          region_code: selectedCountry === 'DE' && selectedRegion !== 'all' ? selectedRegion : null
-        }
-      });
+      // For Germany, if specific regions are selected, import for each region
+      // Otherwise import national holidays only
+      const regionsToImport = selectedCountry === 'DE' && selectedRegions.length > 0 
+        ? selectedRegions 
+        : [null];
 
-      if (error) throw error;
+      let totalImported = 0;
+      let totalExisting = 0;
+
+      for (const region of regionsToImport) {
+        const { data, error } = await supabase.functions.invoke('import-holidays', {
+          body: {
+            country_code: selectedCountry,
+            year: selectedYear,
+            user_id: null, // Store as centrally managed holidays
+            region_code: region
+          }
+        });
+
+        if (error) throw error;
+        
+        totalImported += data.imported || 0;
+        totalExisting += data.existing || 0;
+      }
 
       toast({
         title: "Success",
-        description: data.imported > 0 
-          ? `Imported ${data.imported} holidays for ${selectedYear}. Auto-assignment is running in the background.`
-          : `All holidays for ${selectedYear} already exist (${data.existing} holidays)`,
+        description: totalImported > 0 
+          ? `Imported ${totalImported} holidays for ${selectedYear}${selectedRegions.length > 0 ? ` (${selectedRegions.length} regions)` : ''}. Auto-assignment is running in the background.`
+          : `All holidays for ${selectedYear} already exist (${totalExisting} holidays)`,
       });
 
       fetchHolidays();
@@ -182,7 +196,7 @@ const AdminHolidayManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegion, toast, fetchHolidays, triggerHolidayAutoAssignment]);
+  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegions, toast, fetchHolidays, triggerHolidayAutoAssignment]);
 
   const deleteHolidays = useCallback(async (countryCode: string, year: number) => {
     if (!user || !hasPermission) return;
@@ -314,20 +328,30 @@ const AdminHolidayManager = () => {
             
             {selectedCountry === 'DE' && (
               <div className="flex-1">
-                <label className="text-sm font-medium">Region (Optional)</label>
-                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All regions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All regions</SelectItem>
+                <label className="text-sm font-medium">
+                  Regions (Optional) - {selectedRegions.length > 0 ? `${selectedRegions.length} selected` : 'Select regions'}
+                </label>
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto bg-background">
+                  <div className="space-y-2">
                     {getRegions().map((region) => (
-                      <SelectItem key={region.code} value={region.code}>
-                        {region.name}
-                      </SelectItem>
+                      <label key={region.code} className="flex items-center space-x-2 cursor-pointer hover:bg-accent/50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectedRegions.includes(region.code)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRegions([...selectedRegions, region.code]);
+                            } else {
+                              setSelectedRegions(selectedRegions.filter(r => r !== region.code));
+                            }
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm">{region.name}</span>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </div>
               </div>
             )}
             
