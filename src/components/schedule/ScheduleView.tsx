@@ -501,19 +501,14 @@ useEffect(() => {
   const fetchScheduleEntries = async () => {
     try {
       setLoading(true);
-      // Fetch entries for full week (Monday-Sunday)
-      const weekEnd = addDays(weekStart, 6); // Sunday
+      const weekEnd = addDays(weekStart, 6);
       const dateStart = format(weekStart, "yyyy-MM-dd");
       const dateEnd = format(weekEnd, "yyyy-MM-dd");
-
-      console.log('🔍 FETCH START:', { dateStart, dateEnd, selectedTeam, isManager: isManager(), isPlanner: isPlanner() });
 
       // For "All Teams", fetch in batches to avoid .in() limitations and RLS issues
       let allData: any[] = [];
 
       if ((isManager() || isPlanner()) && selectedTeam === "all") {
-        console.log('📊 All Teams mode - fetching team IDs...');
-        
         // Get all team IDs
         const { data: allTeams } = await supabase
           .from('teams')
@@ -521,15 +516,12 @@ useEffect(() => {
           .limit(10000);
         
         const teamIds = allTeams?.map(t => t.id) || [];
-        console.log('📋 Total teams to query:', teamIds.length);
 
-        // Batch fetch by team to avoid .in() limits and ensure RLS doesn't truncate
-        // Process teams in chunks of 25 to stay well under any .in() limits
+        // Batch fetch by team to avoid .in() limits
         const BATCH_SIZE = 25;
         
         for (let i = 0; i < teamIds.length; i += BATCH_SIZE) {
           const batchTeamIds = teamIds.slice(i, i + BATCH_SIZE);
-          console.log(`🔄 Fetching batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(teamIds.length / BATCH_SIZE)} (${batchTeamIds.length} teams)...`);
           
           const { data: batchData, error: batchError } = await supabase
             .from("schedule_entries")
@@ -552,22 +544,15 @@ useEffect(() => {
             .order("date");
           
           if (batchError) {
-            console.error('❌ Batch error:', batchError);
+            console.error('Batch error:', batchError);
             throw batchError;
           }
-          
-          console.log(`✅ Batch ${Math.floor(i / BATCH_SIZE) + 1} returned ${batchData?.length || 0} entries`);
-          console.log(`   Dates in batch:`, [...new Set(batchData?.map(e => e.date) || [])].sort());
           
           allData = [...allData, ...(batchData || [])];
         }
         
-        console.log('📊 TOTAL entries after batching:', allData.length);
-        console.log('📅 All dates in dataset:', [...new Set(allData.map(e => e.date))].sort());
-        console.log('👥 Unique users:', [...new Set(allData.map(e => e.user_id))].length);
-        
       } else {
-        // Single team or specific view mode - use single query
+        // Single team or specific view mode
         let query = supabase
           .from("schedule_entries")
           .select(`
@@ -610,7 +595,7 @@ useEffect(() => {
         const { data, error } = await query;
         
         if (error) {
-          console.error('❌ Query error:', error);
+          console.error('Query error:', error);
           throw error;
         }
         
@@ -623,8 +608,6 @@ useEffect(() => {
       // Fetch user profiles for the entries
       const userIds = [...new Set(data?.map(entry => entry.user_id) || [])];
       const teamIds = [...new Set(data?.map(entry => entry.team_id) || [])];
-      
-      console.log('🔍 Fetching profiles and teams for:', { users: userIds.length, teams: teamIds.length });
       
       const [profilesResult, teamsResult] = await Promise.all([
         supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds }),
@@ -645,15 +628,15 @@ useEffect(() => {
         };
       }) || [];
       
-      console.log('✅ FINAL DATASET:', {
+      console.log('✅ Final merged dataset:', {
         totalEntries: transformedData.length,
         uniqueUsers: userIds.length,
-        uniqueTeams: teamIds.length,
         dates: [...new Set(transformedData.map(e => e.date))].sort(),
-        entriesPerDate: transformedData.reduce((acc, e) => {
-          acc[e.date] = (acc[e.date] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
+        fridayEntries: transformedData.filter(e => e.date === '2025-10-17').length,
+        sampleFridayUsers: transformedData
+          .filter(e => e.date === '2025-10-17')
+          .slice(0, 5)
+          .map(e => ({ userId: e.user_id.substring(0, 8), date: e.date }))
       });
       
       setScheduleEntries(transformedData);
@@ -765,9 +748,38 @@ useEffect(() => {
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    return scheduleEntries.filter(entry => 
-      entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
-    );
+    const dateStr = format(date, "yyyy-MM-dd");
+    const isFriday = format(date, "EEE") === "Fri";
+    
+    // Filter entries by matching date strings directly (more reliable than date comparison)
+    const matchingEntries = scheduleEntries.filter(entry => {
+      const entryDateStr = typeof entry.date === 'string' ? entry.date : format(new Date(entry.date), "yyyy-MM-dd");
+      const matches = entry.user_id === employeeId && entryDateStr === dateStr;
+      
+      // Debug logging for Friday only
+      if (isFriday && entry.user_id === employeeId && entryDateStr.includes('2025-10-17')) {
+        console.log('🔍 Friday match check:', {
+          employeeId: employeeId.substring(0, 8),
+          queryDate: dateStr,
+          entryDate: entryDateStr,
+          matches
+        });
+      }
+      
+      return matches;
+    });
+    
+    // Log when Friday has no entries for debugging
+    if (isFriday && matchingEntries.length === 0 && scheduleEntries.some(e => e.date.includes('2025-10-17'))) {
+      console.log('⚠️ Friday entries exist but none matched for employee:', {
+        employeeId: employeeId.substring(0, 8),
+        queryDate: dateStr,
+        totalFridayEntries: scheduleEntries.filter(e => e.date.includes('2025-10-17')).length,
+        employeeHasFridayInData: scheduleEntries.some(e => e.user_id === employeeId && e.date.includes('2025-10-17'))
+      });
+    }
+    
+    return matchingEntries;
   };
 
   const isPlanner = () => userRoles.some(role => role.role === "planner");
