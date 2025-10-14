@@ -35,10 +35,20 @@ interface ShiftTemplate {
 }
 
 const SHIFT_TEMPLATES: ShiftTemplate[] = [
-  { id: 'standard', name: 'Standard Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] }, // Mon-Fri
-  { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:00', days: [1, 2, 3, 4, 5] },
-  { id: 'late', name: 'Late Shift', startTime: '14:00', endTime: '22:00', days: [1, 2, 3, 4, 5] },
-  { id: 'custom', name: 'Custom Times', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+  { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+  { id: 'early', name: 'Early Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+  { id: 'late', name: 'Late Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+  { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+];
+
+const DAYS_OF_WEEK = [
+  { id: 1, name: 'Mon', label: 'Monday' },
+  { id: 2, name: 'Tue', label: 'Tuesday' },
+  { id: 3, name: 'Wed', label: 'Wednesday' },
+  { id: 4, name: 'Thu', label: 'Thursday' },
+  { id: 5, name: 'Fri', label: 'Friday' },
+  { id: 6, name: 'Sat', label: 'Saturday' },
+  { id: 0, name: 'Sun', label: 'Sunday' },
 ];
 
 const BulkScheduleGenerator = () => {
@@ -58,7 +68,7 @@ const BulkScheduleGenerator = () => {
   const [shiftTemplate, setShiftTemplate] = useState<string>('standard');
   const [customStartTime, setCustomStartTime] = useState<string>('08:00');
   const [customEndTime, setCustomEndTime] = useState<string>('16:30');
-  const [includeWeekends, setIncludeWeekends] = useState<boolean>(false);
+  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Default Mon-Fri
 
   useEffect(() => {
     fetchUserRoles();
@@ -217,20 +227,30 @@ const BulkScheduleGenerator = () => {
     return SHIFT_TEMPLATES.find(t => t.id === shiftTemplate) || SHIFT_TEMPLATES[0];
   };
 
+  const toggleDaySelection = (dayId: number) => {
+    setSelectedDays(prev => 
+      prev.includes(dayId) 
+        ? prev.filter(id => id !== dayId)
+        : [...prev, dayId].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+    );
+  };
+
   const getShiftDays = () => {
-    if (shiftTemplate === 'custom') {
-      return includeWeekends ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+    // Standard shift always uses Mon-Fri
+    if (shiftTemplate === 'standard') {
+      return [1, 2, 3, 4, 5];
     }
-    const template = getSelectedTemplate();
-    return includeWeekends ? [0, 1, 2, 3, 4, 5, 6] : template.days;
+    // For other shifts, use selected days
+    return selectedDays;
   };
 
   const getShiftTimes = () => {
-    if (shiftTemplate === 'custom') {
-      return { start: customStartTime, end: customEndTime };
+    // Standard shift has fixed times
+    if (shiftTemplate === 'standard') {
+      return { start: '08:00', end: '16:30' };
     }
-    const template = getSelectedTemplate();
-    return { start: template.startTime, end: template.endTime };
+    // For other shifts, use custom times
+    return { start: customStartTime, end: customEndTime };
   };
 
   const generateSchedules = async () => {
@@ -259,6 +279,36 @@ const BulkScheduleGenerator = () => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Validate shift configuration for non-standard shifts
+    if (shiftTemplate !== 'standard') {
+      if (selectedDays.length === 0) {
+        toast({
+          title: "Error",
+          description: "Please select at least one day of the week",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!customStartTime || !customEndTime) {
+        toast({
+          title: "Error",
+          description: "Please set start and end times",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (customStartTime >= customEndTime) {
+        toast({
+          title: "Error",
+          description: "Start time must be before end time",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -423,60 +473,80 @@ const BulkScheduleGenerator = () => {
 
         {/* Shift Template Selection */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Shift Template</label>
-          <Select value={shiftTemplate} onValueChange={setShiftTemplate}>
+          <label className="text-sm font-medium">Shift Type</label>
+          <Select value={shiftTemplate} onValueChange={(value) => {
+            setShiftTemplate(value);
+            // Reset to default days when changing shift type
+            if (value === 'standard') {
+              setSelectedDays([1, 2, 3, 4, 5]);
+            }
+          }}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {SHIFT_TEMPLATES.map((template) => (
                 <SelectItem key={template.id} value={template.id}>
-                  <div className="flex items-center justify-between w-full">
-                    <span>{template.name}</span>
-                    <span className="text-xs text-muted-foreground ml-2">
-                      {template.startTime}-{template.endTime}
-                    </span>
-                  </div>
+                  {template.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Custom Time Selection */}
-        {shiftTemplate === 'custom' && (
-          <div className="grid grid-cols-2 gap-4 p-3 border rounded-lg bg-muted/20">
+        {/* Time and Day Selection for non-Standard shifts */}
+        {shiftTemplate !== 'standard' && (
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+            {/* Time Selection */}
             <div className="space-y-2">
-              <Label htmlFor="start-time" className="text-sm font-medium">Start Time</Label>
-              <input
-                id="start-time"
-                type="time"
-                value={customStartTime}
-                onChange={(e) => setCustomStartTime(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-time" className="text-sm font-medium">End Time</Label>
-              <input
-                id="end-time"
-                type="time"
-                value={customEndTime}
-                onChange={(e) => setCustomEndTime(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-              />
-            </div>
-            <div className="col-span-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="weekends" 
-                  checked={includeWeekends}
-                  onCheckedChange={(checked) => setIncludeWeekends(checked as boolean)}
-                />
-                <Label htmlFor="weekends" className="text-sm cursor-pointer">
-                  Include weekends (Sat-Sun)
-                </Label>
+              <Label className="text-sm font-medium">Shift Times</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start-time" className="text-xs text-muted-foreground">Start Time</Label>
+                  <input
+                    id="start-time"
+                    type="time"
+                    value={customStartTime}
+                    onChange={(e) => setCustomStartTime(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-time" className="text-xs text-muted-foreground">End Time</Label>
+                  <input
+                    id="end-time"
+                    type="time"
+                    value={customEndTime}
+                    onChange={(e) => setCustomEndTime(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                </div>
               </div>
+            </div>
+
+            {/* Day Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Select Days</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAYS_OF_WEEK.map((day) => (
+                  <Button
+                    key={day.id}
+                    type="button"
+                    variant={selectedDays.includes(day.id) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleDaySelection(day.id)}
+                    className="w-14 h-9"
+                  >
+                    {day.name}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedDays.length === 0 
+                  ? 'Select at least one day' 
+                  : `${selectedDays.length} day${selectedDays.length !== 1 ? 's' : ''} selected`
+                }
+              </p>
             </div>
           </div>
         )}
@@ -670,9 +740,13 @@ const BulkScheduleGenerator = () => {
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             <span>
-              {shiftTemplate === 'custom' 
-                ? `Custom: ${customStartTime}-${customEndTime}${includeWeekends ? ' (Mon-Sun)' : ' (Mon-Fri)'}`
-                : `${getSelectedTemplate().name}: ${getSelectedTemplate().startTime}-${getSelectedTemplate().endTime}`
+              {shiftTemplate === 'standard' 
+                ? 'Standard: Mon-Fri, 08:00-16:30'
+                : `${getSelectedTemplate().name}: ${customStartTime}-${customEndTime}, ${
+                    selectedDays.length === 7 ? 'All days' :
+                    selectedDays.length === 0 ? 'No days selected' :
+                    DAYS_OF_WEEK.filter(d => selectedDays.includes(d.id)).map(d => d.name).join(', ')
+                  }`
               }
             </span>
           </div>
