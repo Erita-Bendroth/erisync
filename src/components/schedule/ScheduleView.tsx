@@ -785,6 +785,26 @@ useEffect(() => {
     // Use date-fns format to ensure consistent YYYY-MM-DD string regardless of timezone
     const normalizedDateStr = format(date, "yyyy-MM-dd");
     
+    // Debug logging for Friday only
+    const isFriday = normalizedDateStr === "2025-10-17";
+    if (isFriday && employeeId === employees[0]?.user_id) {
+      console.log('🔍 getEntriesForEmployeeAndDay called for Friday:', {
+        employeeId: employeeId.substring(0, 8),
+        normalizedDateStr,
+        totalEntriesInState: scheduleEntries.length,
+        entriesForThisEmployee: scheduleEntries.filter(e => e.user_id === employeeId).length,
+        entriesForFriday: scheduleEntries.filter(e => {
+          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
+          return eDate === normalizedDateStr;
+        }).length,
+        sampleEntryDates: scheduleEntries.slice(0, 5).map(e => ({
+          date: e.date,
+          dateType: typeof e.date,
+          normalized: typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd")
+        }))
+      });
+    }
+    
     // Filter entries by matching normalized date strings
     const matchingEntries = scheduleEntries.filter(entry => {
       // Normalize entry date (from DB it's already YYYY-MM-DD string)
@@ -792,7 +812,21 @@ useEffect(() => {
         ? entry.date.split('T')[0] // Handle potential ISO timestamp, take date part only
         : format(new Date(entry.date), "yyyy-MM-dd");
       
-      return entry.user_id === employeeId && entryDateStr === normalizedDateStr;
+      const userMatches = entry.user_id === employeeId;
+      const dateMatches = entryDateStr === normalizedDateStr;
+      
+      // Debug log first non-match for Friday
+      if (isFriday && employeeId === employees[0]?.user_id && !matchingEntries.length && entry.user_id === employeeId) {
+        console.log('🔍 Entry comparison for Friday:', {
+          entryDateStr,
+          normalizedDateStr,
+          dateMatches,
+          userMatches,
+          rawDate: entry.date
+        });
+      }
+      
+      return userMatches && dateMatches;
     });
     
     return matchingEntries;
