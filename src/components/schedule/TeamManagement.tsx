@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Users, Settings, Trash2, Download, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Users, Settings, Trash2, Download, BarChart3, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
+import { EditTeamModal } from "./EditTeamModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import * as XLSX from 'xlsx';
@@ -55,7 +56,9 @@ const TeamManagement = () => {
   const [loading, setLoading] = useState(true);
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [editTeamOpen, setEditTeamOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [teamToEdit, setTeamToEdit] = useState<Team | null>(null);
   const [userRole, setUserRole] = useState<string>("");
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
@@ -686,7 +689,7 @@ const TeamManagement = () => {
                 <CollapsibleTrigger asChild>
                   <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3 flex-1" onClick={() => toggleTeam()}>
                         <div className="transition-transform duration-200">
                           {isExpanded ? (
                             <ChevronDown className="w-5 h-5 text-muted-foreground" />
@@ -694,7 +697,7 @@ const TeamManagement = () => {
                             <ChevronRight className="w-5 h-5 text-muted-foreground" />
                           )}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <CardTitle className="flex items-center text-lg">
                             <Users className="w-5 h-5 mr-2 text-primary" />
                             {team.name} ({memberCount})
@@ -706,9 +709,27 @@ const TeamManagement = () => {
                           )}
                         </div>
                       </div>
-                      <Badge variant="secondary" className="ml-4">
-                        {memberCount} {memberCount === 1 ? 'member' : 'members'}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="ml-4">
+                          {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                        </Badge>
+                        {/* Edit Button - Only visible to admins */}
+                        {userRole === 'admin' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTeamToEdit(team);
+                              setEditTeamOpen(true);
+                            }}
+                            className="h-8 w-8"
+                            title="Edit team"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
@@ -822,6 +843,21 @@ const TeamManagement = () => {
           </Card>
         )}
       </div>
+
+      {/* Edit Team Modal */}
+      <EditTeamModal
+        team={teamToEdit}
+        open={editTeamOpen}
+        onOpenChange={setEditTeamOpen}
+        onTeamUpdated={() => {
+          fetchUserRole().then((role) => {
+            if (role) {
+              fetchTeams(role);
+            }
+          });
+        }}
+        allTeams={teams}
+      />
     </div>
   );
 };

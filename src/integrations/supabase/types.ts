@@ -199,6 +199,41 @@ export type Database = {
           },
         ]
       }
+      team_audit_log: {
+        Row: {
+          action: string
+          changed_by: string
+          changes: Json | null
+          created_at: string
+          id: string
+          team_id: string
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          team_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_audit_log_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string
