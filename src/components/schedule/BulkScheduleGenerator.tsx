@@ -5,7 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Clock, Users, Zap, User } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -21,7 +23,23 @@ interface User {
   id: string;
   first_name: string;
   last_name: string;
+  email: string;
 }
+
+interface ShiftTemplate {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  days: number[]; // 0-6 (Sunday-Saturday)
+}
+
+const SHIFT_TEMPLATES: ShiftTemplate[] = [
+  { id: 'standard', name: 'Standard Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] }, // Mon-Fri
+  { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:00', days: [1, 2, 3, 4, 5] },
+  { id: 'late', name: 'Late Shift', startTime: '14:00', endTime: '22:00', days: [1, 2, 3, 4, 5] },
+  { id: 'custom', name: 'Custom Times', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+];
 
 const BulkScheduleGenerator = () => {
   const { user } = useAuth();
@@ -29,14 +47,18 @@ const BulkScheduleGenerator = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
-  const [selectedUser, setSelectedUser] = useState<string>("");
-  const [bulkMode, setBulkMode] = useState<"team" | "user">("team");
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState<"team" | "users">("team");
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [loading, setLoading] = useState(false);
   const [generationResults, setGenerationResults] = useState<any[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [hasPermission, setHasPermission] = useState(false);
+  const [shiftTemplate, setShiftTemplate] = useState<string>('standard');
+  const [customStartTime, setCustomStartTime] = useState<string>('08:00');
+  const [customEndTime, setCustomEndTime] = useState<string>('16:30');
+  const [includeWeekends, setIncludeWeekends] = useState<boolean>(false);
 
   useEffect(() => {
     fetchUserRoles();
@@ -119,7 +141,7 @@ const BulkScheduleGenerator = () => {
   };
 
   const fetchUsers = async () => {
-    if (!selectedTeam || bulkMode !== 'user') {
+    if (!selectedTeam || bulkMode !== 'users') {
       setUsers([]);
       return;
     }
@@ -175,6 +197,42 @@ const BulkScheduleGenerator = () => {
     }
   };
 
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const selectAllUsers = () => {
+    setSelectedUsers(users.map(u => u.id));
+  };
+
+  const deselectAllUsers = () => {
+    setSelectedUsers([]);
+  };
+
+  const getSelectedTemplate = () => {
+    return SHIFT_TEMPLATES.find(t => t.id === shiftTemplate) || SHIFT_TEMPLATES[0];
+  };
+
+  const getShiftDays = () => {
+    if (shiftTemplate === 'custom') {
+      return includeWeekends ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+    }
+    const template = getSelectedTemplate();
+    return includeWeekends ? [0, 1, 2, 3, 4, 5, 6] : template.days;
+  };
+
+  const getShiftTimes = () => {
+    if (shiftTemplate === 'custom') {
+      return { start: customStartTime, end: customEndTime };
+    }
+    const template = getSelectedTemplate();
+    return { start: template.startTime, end: template.endTime };
+  };
+
   const generateSchedules = async () => {
     if (bulkMode === "team" && (!selectedTeam || selectedTeam === "")) {
       toast({
@@ -185,10 +243,10 @@ const BulkScheduleGenerator = () => {
       return;
     }
 
-    if (bulkMode === "user" && (!selectedUser || selectedUser === "")) {
+    if (bulkMode === "users" && selectedUsers.length === 0) {
       toast({
         title: "Error",
-        description: "Please select a user",
+        description: "Please select at least one user",
         variant: "destructive",
       });
       return;
@@ -226,6 +284,10 @@ const BulkScheduleGenerator = () => {
         }
       }
 
+      const times = getShiftTimes();
+      const shiftNote = `Auto-generated shift (${times.start}-${times.end})`;
+      const allowedDays = getShiftDays();
+
       if (bulkMode === "team") {
         const { data, error } = await supabase.rpc('create_team_default_schedules_with_holidays', {
           _team_id: selectedTeam,
@@ -245,32 +307,34 @@ const BulkScheduleGenerator = () => {
           description: `Generated ${totalShifts} shifts for ${data?.length || 0} team members`,
         });
       } else {
-        // Generate for single user
-        // Fetch selected user's country and region to disambiguate RPC overload
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('country_code, region_code')
-          .eq('user_id', selectedUser)
-          .maybeSingle();
-        if (profileError) throw profileError;
+        // Generate for selected users with custom template
+        let totalGenerated = 0;
+        
+        for (const userId of selectedUsers) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('country_code, region_code')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (profileError) throw profileError;
 
-        const { data, error } = await (supabase as any).rpc('create_default_schedule_with_holidays_v2', {
-          _user_id: selectedUser,
-          _team_id: selectedTeam,
-          _start_date: format(startDate, 'yyyy-MM-dd'),
-          _end_date: format(endDate, 'yyyy-MM-dd'),
-          _created_by: user.id,
-          _country_code: profile?.country_code || 'US',
-          _region_code: profile?.region_code || null
-        });
+          const { data, error } = await (supabase as any).rpc('create_default_schedule_with_holidays_v2', {
+            _user_id: userId,
+            _team_id: selectedTeam,
+            _start_date: format(startDate, 'yyyy-MM-dd'),
+            _end_date: format(endDate, 'yyyy-MM-dd'),
+            _created_by: user.id,
+            _country_code: profile?.country_code || 'US',
+            _region_code: profile?.region_code || null
+          });
 
-        if (error) throw error;
-
-        const shiftsCreated = data || 0;
+          if (error) throw error;
+          totalGenerated += data || 0;
+        }
         
         toast({
           title: "Success",
-          description: `Generated ${shiftsCreated} shifts for selected user`,
+          description: `Generated ${totalGenerated} shifts for ${selectedUsers.length} user(s)`,
         });
       }
 
@@ -326,14 +390,17 @@ const BulkScheduleGenerator = () => {
           Bulk Schedule Generator
         </CardTitle>
         <CardDescription>
-          Generate Mon-Fri 08:00-16:30 shifts, excluding holidays
+          Generate shifts with custom templates and times, excluding holidays
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Bulk mode selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Generation Mode</label>
-          <Select value={bulkMode} onValueChange={(value: "team" | "user") => setBulkMode(value)}>
+          <Select value={bulkMode} onValueChange={(value: "team" | "users") => {
+            setBulkMode(value);
+            setSelectedUsers([]);
+          }}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -344,15 +411,75 @@ const BulkScheduleGenerator = () => {
                   Entire Team
                 </div>
               </SelectItem>
-              <SelectItem value="user">
+              <SelectItem value="users">
                 <div className="flex items-center">
                   <User className="w-4 h-4 mr-2" />
-                  Single User
+                  Select Multiple Users
                 </div>
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
+
+        {/* Shift Template Selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Shift Template</label>
+          <Select value={shiftTemplate} onValueChange={setShiftTemplate}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SHIFT_TEMPLATES.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  <div className="flex items-center justify-between w-full">
+                    <span>{template.name}</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {template.startTime}-{template.endTime}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Custom Time Selection */}
+        {shiftTemplate === 'custom' && (
+          <div className="grid grid-cols-2 gap-4 p-3 border rounded-lg bg-muted/20">
+            <div className="space-y-2">
+              <Label htmlFor="start-time" className="text-sm font-medium">Start Time</Label>
+              <input
+                id="start-time"
+                type="time"
+                value={customStartTime}
+                onChange={(e) => setCustomStartTime(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md bg-background"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end-time" className="text-sm font-medium">End Time</Label>
+              <input
+                id="end-time"
+                type="time"
+                value={customEndTime}
+                onChange={(e) => setCustomEndTime(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md bg-background"
+              />
+            </div>
+            <div className="col-span-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="weekends" 
+                  checked={includeWeekends}
+                  onCheckedChange={(checked) => setIncludeWeekends(checked as boolean)}
+                />
+                <Label htmlFor="weekends" className="text-sm cursor-pointer">
+                  Include weekends (Sat-Sun)
+                </Label>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Quick date selection */}
         <div className="flex flex-wrap gap-2">
@@ -448,7 +575,10 @@ const BulkScheduleGenerator = () => {
           <>
             <div className="space-y-2">
               <label className="text-sm font-medium">Team</label>
-              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+              <Select value={selectedTeam} onValueChange={(value) => {
+                setSelectedTeam(value);
+                setSelectedUsers([]);
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a team first" />
                 </SelectTrigger>
@@ -462,19 +592,63 @@ const BulkScheduleGenerator = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">User</label>
-              <Select value={selectedUser} onValueChange={setSelectedUser} disabled={!selectedTeam}>
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedTeam ? "Select a user" : "Select team first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.first_name} {user.last_name}
-                    </SelectItem>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">
+                  Users ({selectedUsers.length} selected)
+                </label>
+                {users.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={selectAllUsers}
+                      className="h-7 text-xs"
+                    >
+                      Select All
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={deselectAllUsers}
+                      className="h-7 text-xs"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {!selectedTeam ? (
+                <div className="text-sm text-muted-foreground p-4 border rounded-md text-center">
+                  Select a team first to see users
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-sm text-muted-foreground p-4 border rounded-md text-center">
+                  No users found in this team
+                </div>
+              ) : (
+                <div className="border rounded-md max-h-60 overflow-y-auto">
+                  {users.map((usr) => (
+                    <div
+                      key={usr.id}
+                      className="flex items-center space-x-2 p-3 hover:bg-muted/50 cursor-pointer border-b last:border-0"
+                      onClick={() => toggleUserSelection(usr.id)}
+                    >
+                      <Checkbox 
+                        checked={selectedUsers.includes(usr.id)}
+                        onCheckedChange={() => toggleUserSelection(usr.id)}
+                      />
+                      <Label className="flex-1 cursor-pointer">
+                        {usr.first_name} {usr.last_name}
+                      </Label>
+                      {selectedUsers.includes(usr.id) && (
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      )}
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -483,17 +657,26 @@ const BulkScheduleGenerator = () => {
           onClick={generateSchedules} 
           disabled={loading || 
             (bulkMode === "team" && (!selectedTeam || selectedTeam === "")) ||
-            (bulkMode === "user" && (!selectedUser || selectedUser === "")) ||
+            (bulkMode === "users" && selectedUsers.length === 0) ||
             !startDate || !endDate}
           className="w-full"
         >
           <Zap className="w-4 h-4 mr-2" />
-          {loading ? "Generating..." : "Generate Shifts"}
+          {loading ? "Generating..." : `Generate ${bulkMode === 'team' ? 'Team' : `${selectedUsers.length} User`} Shifts`}
         </Button>
 
         {/* Info */}
-        <div className="text-xs text-muted-foreground">
-          Creates Mon-Fri shifts, excludes holidays based on country
+        <div className="text-xs text-muted-foreground space-y-1">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>
+              {shiftTemplate === 'custom' 
+                ? `Custom: ${customStartTime}-${customEndTime}${includeWeekends ? ' (Mon-Sun)' : ' (Mon-Fri)'}`
+                : `${getSelectedTemplate().name}: ${getSelectedTemplate().startTime}-${getSelectedTemplate().endTime}`
+              }
+            </span>
+          </div>
+          <div>Automatically excludes holidays based on user country</div>
         </div>
       </CardContent>
     </Card>
