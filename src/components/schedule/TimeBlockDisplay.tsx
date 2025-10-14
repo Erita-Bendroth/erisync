@@ -23,10 +23,22 @@ interface TimeBlockDisplayProps {
   userRole?: string;
 }
 
-const getActivityColor = (activityType: string) => {
+const getActivityColor = (activityType: string, shiftType?: string) => {
+  // For work activities, use shift type colors matching the legend
+  if (activityType === "work") {
+    switch (shiftType) {
+      case "early":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "late":
+        return "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300";
+      case "normal":
+      default:
+        return "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300";
+    }
+  }
+  
+  // For other activities, use activity type colors
   switch (activityType) {
-    case "work":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
     case "vacation":
       return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
     case "other":
@@ -151,7 +163,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
           <div key={index} className="w-full">
             <Badge
               variant="secondary"
-              className={`${getActivityColor(block.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+              className={`${getActivityColor(block.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
               onClick={onClick}
             >
               <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
@@ -180,7 +192,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
       <div className={`w-full ${className}`}>
         <Badge
           variant="secondary"
-          className={`${getActivityColor(entry.activity_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+          className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
           onClick={onClick}
         >
           <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
