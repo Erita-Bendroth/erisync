@@ -41,16 +41,6 @@ const SHIFT_TEMPLATES: ShiftTemplate[] = [
   { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
 ];
 
-const DAYS_OF_WEEK = [
-  { id: 1, name: 'Mon', label: 'Monday' },
-  { id: 2, name: 'Tue', label: 'Tuesday' },
-  { id: 3, name: 'Wed', label: 'Wednesday' },
-  { id: 4, name: 'Thu', label: 'Thursday' },
-  { id: 5, name: 'Fri', label: 'Friday' },
-  { id: 6, name: 'Sat', label: 'Saturday' },
-  { id: 0, name: 'Sun', label: 'Sunday' },
-];
-
 const BulkScheduleGenerator = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -68,7 +58,7 @@ const BulkScheduleGenerator = () => {
   const [shiftTemplate, setShiftTemplate] = useState<string>('standard');
   const [customStartTime, setCustomStartTime] = useState<string>('08:00');
   const [customEndTime, setCustomEndTime] = useState<string>('16:30');
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Default Mon-Fri
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]); // For custom shifts
 
   useEffect(() => {
     fetchUserRoles();
@@ -227,21 +217,19 @@ const BulkScheduleGenerator = () => {
     return SHIFT_TEMPLATES.find(t => t.id === shiftTemplate) || SHIFT_TEMPLATES[0];
   };
 
-  const toggleDaySelection = (dayId: number) => {
-    setSelectedDays(prev => 
-      prev.includes(dayId) 
-        ? prev.filter(id => id !== dayId)
-        : [...prev, dayId].sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-    );
-  };
-
-  const getShiftDays = () => {
-    // Standard shift always uses Mon-Fri
-    if (shiftTemplate === 'standard') {
-      return [1, 2, 3, 4, 5];
-    }
-    // For other shifts, use selected days
-    return selectedDays;
+  const toggleDateSelection = (date: Date | undefined) => {
+    if (!date) return;
+    
+    setSelectedDates(prev => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const exists = prev.some(d => format(d, 'yyyy-MM-dd') === dateStr);
+      
+      if (exists) {
+        return prev.filter(d => format(d, 'yyyy-MM-dd') !== dateStr);
+      } else {
+        return [...prev, date].sort((a, b) => a.getTime() - b.getTime());
+      }
+    });
   };
 
   const getShiftTimes = () => {
@@ -283,10 +271,10 @@ const BulkScheduleGenerator = () => {
 
     // Validate shift configuration for non-standard shifts
     if (shiftTemplate !== 'standard') {
-      if (selectedDays.length === 0) {
+      if (selectedDates.length === 0) {
         toast({
           title: "Error",
-          description: "Please select at least one day of the week",
+          description: "Please select at least one date",
           variant: "destructive",
         });
         return;
@@ -336,7 +324,6 @@ const BulkScheduleGenerator = () => {
 
       const times = getShiftTimes();
       const shiftNote = `Auto-generated shift (${times.start}-${times.end})`;
-      const allowedDays = getShiftDays();
 
       if (bulkMode === "team") {
         const { data, error } = await supabase.rpc('create_team_default_schedules_with_holidays', {
@@ -476,9 +463,9 @@ const BulkScheduleGenerator = () => {
           <label className="text-sm font-medium">Shift Type</label>
           <Select value={shiftTemplate} onValueChange={(value) => {
             setShiftTemplate(value);
-            // Reset to default days when changing shift type
+            // Reset selected dates when changing shift type
             if (value === 'standard') {
-              setSelectedDays([1, 2, 3, 4, 5]);
+              setSelectedDates([]);
             }
           }}>
             <SelectTrigger>
@@ -524,27 +511,51 @@ const BulkScheduleGenerator = () => {
               </div>
             </div>
 
-            {/* Day Selection */}
+            {/* Date Selection */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Select Days</Label>
-              <div className="flex flex-wrap gap-2">
-                {DAYS_OF_WEEK.map((day) => (
+              <Label className="text-sm font-medium">Select Specific Dates</Label>
+              <Popover>
+                <PopoverTrigger asChild>
                   <Button
-                    key={day.id}
-                    type="button"
-                    variant={selectedDays.includes(day.id) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleDaySelection(day.id)}
-                    className="w-14 h-9"
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
                   >
-                    {day.name}
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDates.length === 0 
+                      ? 'Pick dates' 
+                      : `${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''} selected`
+                    }
                   </Button>
-                ))}
-              </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="multiple"
+                    selected={selectedDates}
+                    onSelect={(dates) => setSelectedDates(dates || [])}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              {selectedDates.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {selectedDates.map((date, idx) => (
+                    <Badge 
+                      key={idx} 
+                      variant="secondary"
+                      className="text-xs cursor-pointer hover:bg-destructive/10"
+                      onClick={() => toggleDateSelection(date)}
+                    >
+                      {format(date, 'MMM d')}
+                      <span className="ml-1">×</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                {selectedDays.length === 0 
-                  ? 'Select at least one day' 
-                  : `${selectedDays.length} day${selectedDays.length !== 1 ? 's' : ''} selected`
+                {selectedDates.length === 0 
+                  ? 'Click calendar to select specific dates for this shift' 
+                  : 'Click dates to add/remove, or click badges to remove'
                 }
               </p>
             </div>
@@ -743,9 +754,8 @@ const BulkScheduleGenerator = () => {
               {shiftTemplate === 'standard' 
                 ? 'Standard: Mon-Fri, 08:00-16:30'
                 : `${getSelectedTemplate().name}: ${customStartTime}-${customEndTime}, ${
-                    selectedDays.length === 7 ? 'All days' :
-                    selectedDays.length === 0 ? 'No days selected' :
-                    DAYS_OF_WEEK.filter(d => selectedDays.includes(d.id)).map(d => d.name).join(', ')
+                    selectedDates.length === 0 ? 'No dates selected' :
+                    `${selectedDates.length} specific date${selectedDates.length !== 1 ? 's' : ''}`
                   }`
               }
             </span>
