@@ -631,10 +631,8 @@ useEffect(() => {
         };
       }) || [];
       
-      console.log('Transformed schedule data:', transformedData.length, 'entries');
-      console.log('Unique user IDs in schedule entries:', userIds);
-      console.log('Sample transformed entries:', transformedData.slice(0, 3));
-      console.log('All transformed dates:', [...new Set(transformedData.map(e => e.date))]);
+      console.log('Transformed schedule data:', transformedData.length, 'entries for', userIds.length, 'users');
+      console.log('Date range in entries:', [...new Set(transformedData.map(e => e.date))].sort());
       setScheduleEntries(transformedData);
 
       // CRITICAL FIX: Ensure the employee list includes ALL users who have schedule entries
@@ -646,9 +644,6 @@ useEffect(() => {
         const existingEmployeeIds = new Set(currentEmployees.map(e => e.user_id));
         const missingUserIds = userIds.filter(id => !existingEmployeeIds.has(id));
         
-        console.log('Existing employees count:', currentEmployees.length);
-        console.log('Missing user IDs needing profiles:', missingUserIds);
-
         if (missingUserIds.length > 0) {
           // Fetch profiles for missing users
           const { data: missingProfiles } = await supabase
@@ -677,8 +672,6 @@ useEffect(() => {
 
           const allNewEmployees = [...fetchedEmployees, ...placeholderEmployees];
           
-          console.log('Adding missing employees to list:', allNewEmployees.length);
-          
           // Merge with existing employees using functional update to avoid race conditions
           setEmployees(prevEmployees => {
             const mergedMap = new Map(prevEmployees.map(e => [e.user_id, e]));
@@ -687,12 +680,8 @@ useEffect(() => {
                 mergedMap.set(e.user_id, e);
               }
             });
-            const result = Array.from(mergedMap.values());
-            console.log('Final merged employee count:', result.length);
-            return result;
+            return Array.from(mergedMap.values());
           });
-        } else {
-          console.log('All schedule users already in employee list');
         }
       } catch (mergeErr) {
         console.error('Error merging employees with schedule users:', mergeErr);
@@ -753,21 +742,9 @@ useEffect(() => {
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    // Return all entries for that user/day since weekends no longer have auto-generated entries
-    const entries = scheduleEntries.filter(entry => 
+    return scheduleEntries.filter(entry => 
       entry.user_id === employeeId && isSameDay(new Date(entry.date), date)
     );
-    
-    // Debug logging for tracking missing entries
-    if (entries.length === 0) {
-      console.log(`[getEntriesForEmployeeAndDay] No entries found for employee ${employeeId} on ${format(date, 'yyyy-MM-dd')}`);
-      console.log(`[getEntriesForEmployeeAndDay] Total scheduleEntries available:`, scheduleEntries.length);
-      console.log(`[getEntriesForEmployeeAndDay] Entries for this employee:`, 
-        scheduleEntries.filter(e => e.user_id === employeeId).map(e => ({ date: e.date, activity: e.activity_type }))
-      );
-    }
-    
-    return entries;
   };
 
   const isPlanner = () => userRoles.some(role => role.role === "planner");
@@ -1077,24 +1054,6 @@ const getActivityColor = (entry: ScheduleEntry) => {
       <div className="space-y-4">
         <Card>
           <CardContent className="p-0">
-            {/* Debug summary before rendering */}
-            {(() => {
-              console.log('=== RENDER SUMMARY ===');
-              console.log('Total employees to render:', employees.length);
-              console.log('Total schedule entries:', scheduleEntries.length);
-              console.log('Selected team:', selectedTeam);
-              console.log('Week start:', format(weekStart, 'yyyy-MM-dd'));
-              console.log('Employees:', employees.map(e => `${e.first_name} ${e.last_name} (${e.user_id})`));
-              console.log('Schedule entries by user:', 
-                scheduleEntries.reduce((acc, entry) => {
-                  acc[entry.user_id] = (acc[entry.user_id] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              );
-              console.log('======================');
-              return null;
-            })()}
-            
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1112,12 +1071,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                 </TableRow>
               </TableHeader>
                <TableBody>
-                {employees.map((employee) => {
-                  // Debug: Log rendering for each employee
-                  const employeeEntries = scheduleEntries.filter(e => e.user_id === employee.user_id);
-                  console.log(`[RENDER] Employee ${employee.first_name} ${employee.last_name} (${employee.user_id}) has ${employeeEntries.length} total entries`);
-                  
-                  return (
+                {employees.map((employee) => (
                   <TableRow key={employee.user_id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -1130,17 +1084,10 @@ const getActivityColor = (entry: ScheduleEntry) => {
                         </div>
                       </div>
                     </TableCell>
-                     {workDays.map((day, dayIndex) => {
+                    {workDays.map((day, dayIndex) => {
                       const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
                       const dayHolidays = getHolidaysForDay(day);
                       const isToday = isSameDay(day, new Date());
-                      
-                      // Debug: Log each cell rendering
-                      if (dayEntries.length > 0) {
-                        console.log(`[RENDER CELL] ${employee.first_name} on ${format(day, 'yyyy-MM-dd')}: ${dayEntries.length} entries`, 
-                          dayEntries.map(e => e.activity_type)
-                        );
-                      }
                       
                       return (
                         <TableCell
@@ -1218,8 +1165,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       );
                      })}
                   </TableRow>
-                  );
-                })}
+                ))}
                 {employees.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
