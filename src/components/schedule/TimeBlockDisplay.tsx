@@ -47,7 +47,18 @@ const getActivityColor = (activityType: string) => {
   }
 };
 
-const getActivityDisplayName = (activityType: string) => {
+const getActivityDisplayName = (activityType: string, shiftType?: string) => {
+  // If activity is work, show the shift type instead
+  if (activityType === 'work' && shiftType) {
+    switch (shiftType) {
+      case 'early': return 'Early Shift';
+      case 'late': return 'Late Shift';
+      case 'normal': return 'Normal Shift';
+      default: return 'Work';
+    }
+  }
+  
+  // For non-work activities, show the activity type
   switch (activityType) {
     case "work": return "Work";
     case "vacation": return "Vacation";
@@ -145,7 +156,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
             >
               <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
                 <span className="font-medium">
-                  {getActivityDisplayName(block.activity_type)}
+                  {getActivityDisplayName(block.activity_type, entry.shift_type)}
                 </span>
                 <span className="text-xs">
                   {block.start_time}–{block.end_time}
@@ -174,7 +185,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
         >
           <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
             <span className="font-medium">
-              {getActivityDisplayName(entry.activity_type)}
+              {getActivityDisplayName(entry.activity_type, entry.shift_type)}
             </span>
             <span className="text-xs">
               {defaultTimes.start}–{defaultTimes.end}

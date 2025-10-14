@@ -406,6 +406,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             // Skip if it's a holiday
             if (holidays && holidays.length > 0) continue;
 
+            // Determine shift type based on shift name
+            let shiftType: 'early' | 'late' | 'normal' = 'normal';
+            if (config.shiftName.toLowerCase().includes('early')) {
+              shiftType = 'early';
+            } else if (config.shiftName.toLowerCase().includes('late')) {
+              shiftType = 'late';
+            }
+
             // Format notes with time block data for proper display
             const timeBlockData = [{
               activity_type: 'work',
@@ -421,7 +429,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 user_id: userId,
                 team_id: selectedTeam,
                 date: dateStr,
-                shift_type: 'normal',
+                shift_type: shiftType,
                 activity_type: 'work',
                 availability_status: 'available',
                 notes: notes,
