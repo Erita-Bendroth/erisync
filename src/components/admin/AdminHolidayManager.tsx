@@ -131,6 +131,17 @@ const AdminHolidayManager = () => {
     }
   }, [user, hasPermission]);
 
+  const triggerHolidayAutoAssignment = useCallback(async () => {
+    try {
+      await supabase.functions.invoke('auto-assign-holidays', {
+        body: { triggered_by: 'manual_import' }
+      });
+    } catch (error) {
+      console.error('Error triggering holiday auto-assignment:', error);
+      // Don't show error to user as this is a background process
+    }
+  }, []);
+
   const importHolidays = useCallback(async () => {
     if (!user || !hasPermission) return;
 
@@ -150,14 +161,16 @@ const AdminHolidayManager = () => {
       toast({
         title: "Success",
         description: data.imported > 0 
-          ? `Imported ${data.imported} holidays for ${selectedYear}. Users will automatically receive these based on their location.`
+          ? `Imported ${data.imported} holidays for ${selectedYear}. Auto-assignment is running in the background.`
           : `All holidays for ${selectedYear} already exist (${data.existing} holidays)`,
       });
 
       fetchHolidays();
       
-      // Trigger auto-assignment of holidays to users
-      await triggerHolidayAutoAssignment();
+      // Trigger auto-assignment in the background (non-blocking)
+      triggerHolidayAutoAssignment().catch(err => {
+        console.error('Background auto-assignment error:', err);
+      });
       
     } catch (error: any) {
       console.error('Error importing holidays:', error);
@@ -169,18 +182,7 @@ const AdminHolidayManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegion, toast, fetchHolidays]);
-
-  const triggerHolidayAutoAssignment = useCallback(async () => {
-    try {
-      await supabase.functions.invoke('auto-assign-holidays', {
-        body: { triggered_by: 'manual_import' }
-      });
-    } catch (error) {
-      console.error('Error triggering holiday auto-assignment:', error);
-      // Don't show error to user as this is a background process
-    }
-  }, []);
+  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegion, toast, fetchHolidays, triggerHolidayAutoAssignment]);
 
   const deleteHolidays = useCallback(async (countryCode: string, year: number) => {
     if (!user || !hasPermission) return;
