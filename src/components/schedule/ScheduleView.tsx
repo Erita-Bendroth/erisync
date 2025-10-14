@@ -544,7 +544,8 @@ useEffect(() => {
             .gte("date", dateStart)
             .lte("date", dateEnd)
             .in("team_id", batchTeamIds)
-            .order("date");
+            .order("date")
+            .limit(10000);
           
           if (batchError) {
             console.error('Batch error:', batchError);
