@@ -233,6 +233,31 @@ const AdminHolidayManager = () => {
     }, {} as Record<string, Holiday[]>);
   }, [holidays]);
 
+  // Group holidays by date and name to consolidate regional variants
+  const consolidateRegionalHolidays = useCallback((holidayList: Holiday[]) => {
+    const consolidated = new Map<string, Holiday & { regions?: string[] }>();
+    
+    holidayList.forEach(holiday => {
+      const key = `${holiday.date}-${holiday.name}`;
+      const existing = consolidated.get(key);
+      
+      if (existing) {
+        // Add region to existing holiday
+        if (holiday.region_code) {
+          existing.regions = [...(existing.regions || []), holiday.region_code];
+        }
+      } else {
+        // Create new entry
+        consolidated.set(key, {
+          ...holiday,
+          regions: holiday.region_code ? [holiday.region_code] : undefined
+        });
+      }
+    });
+    
+    return Array.from(consolidated.values());
+  }, []);
+
   const currentYears = useMemo(() => 
     Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i),
     []
@@ -367,24 +392,24 @@ const AdminHolidayManager = () => {
                       </Button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {holidayGroup.map((holiday) => (
+                      {consolidateRegionalHolidays(holidayGroup).map((holiday) => (
                         <div key={holiday.id} className="flex items-center justify-between p-2 border rounded">
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium text-sm">{holiday.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(holiday.date), 'MMM dd, yyyy')}
-                              {holiday.region_code && countryCode === 'DE' && (
-                                <span className="ml-2 text-xs text-blue-600">
-                                  ({holiday.region_code})
-                                </span>
-                              )}
                             </p>
+                            {holiday.regions && holiday.regions.length > 0 && countryCode === 'DE' && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                Regions: {holiday.regions.sort().join(', ')}
+                              </p>
+                            )}
                           </div>
                           <div className="flex gap-2">
                             <Badge variant="secondary" className="text-xs">
                               Public
                             </Badge>
-                            {holiday.region_code && (
+                            {holiday.regions && holiday.regions.length > 0 && (
                               <Badge variant="outline" className="text-xs">
                                 Regional
                               </Badge>
