@@ -333,6 +333,68 @@ export type Database = {
         }
         Relationships: []
       }
+      vacation_requests: {
+        Row: {
+          approved_at: string | null
+          approver_id: string | null
+          created_at: string
+          end_time: string | null
+          id: string
+          is_full_day: boolean
+          notes: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
+          requested_date: string
+          start_time: string | null
+          status: string
+          team_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_id?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean
+          notes?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          requested_date: string
+          start_time?: string | null
+          status?: string
+          team_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approver_id?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean
+          notes?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          requested_date?: string
+          start_time?: string | null
+          status?: string
+          team_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_requests_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -340,6 +402,17 @@ export type Database = {
     Functions: {
       can_view_sensitive_profile_data: {
         Args: { _profile_user_id: string; _viewer_id: string }
+        Returns: boolean
+      }
+      check_vacation_overlap: {
+        Args: {
+          _end_time?: string
+          _exclude_request_id?: string
+          _is_full_day?: boolean
+          _requested_date: string
+          _start_time?: string
+          _user_id: string
+        }
         Returns: boolean
       }
       create_default_schedule_with_holidays: {
@@ -446,6 +519,16 @@ export type Database = {
           path: string
           team_id: string
           team_name: string
+        }[]
+      }
+      get_top_level_approver_for_team: {
+        Args: { _team_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          team_name: string
+          user_id: string
         }[]
       }
       get_user_teams: {

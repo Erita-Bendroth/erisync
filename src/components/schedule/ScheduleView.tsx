@@ -15,6 +15,8 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { EditScheduleModal } from './EditScheduleModal';
 import { TimeBlockDisplay } from './TimeBlockDisplay';
 import { TeamHierarchyInfo } from './TeamHierarchyInfo';
+import { VacationRequestModal } from './VacationRequestModal';
+import { VacationRequestsList } from './VacationRequestsList';
 import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
@@ -88,6 +90,9 @@ const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
 // Managed users visibility cache
 const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
 const [managedCacheLoading, setManagedCacheLoading] = useState(false);
+// Vacation request modal
+const [vacationModalOpen, setVacationModalOpen] = useState(false);
+const [showVacationRequests, setShowVacationRequests] = useState(false);
 
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 // Show Monday through Sunday (full week)
@@ -1242,6 +1247,26 @@ const getActivityColor = (entry: ScheduleEntry) => {
         </div>
         
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          {/* Vacation Request Button */}
+          <Button
+            onClick={() => setVacationModalOpen(true)}
+            variant="outline"
+            className="gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            Request Vacation
+          </Button>
+
+          {(isManager() || isPlanner()) && (
+            <Button
+              onClick={() => setShowVacationRequests(!showVacationRequests)}
+              variant={showVacationRequests ? "default" : "outline"}
+              className="gap-2"
+            >
+              Vacation Requests
+            </Button>
+          )}
+
           {/* View Mode Filter - For team members - Removed problematic My Team Schedule option */}
           {isTeamMember() && !isManager() && !isPlanner() && (
             <div className="flex items-center gap-2">
@@ -1668,12 +1693,31 @@ const getActivityColor = (entry: ScheduleEntry) => {
         </CardContent>
       </Card>
 
+      {/* Vacation Requests List (Conditional) */}
+      {showVacationRequests && (isManager() || isPlanner()) && (
+        <VacationRequestsList
+          isPlanner={isPlanner()}
+          onRequestProcessed={() => {
+            fetchScheduleEntries();
+          }}
+        />
+      )}
+
       {/* Edit Modal */}
       <EditScheduleModal
         entry={editingEntry}
         isOpen={showEditModal}
         onClose={handleCloseEditModal}
         onSave={handleSaveEditModal}
+      />
+
+      {/* Vacation Request Modal */}
+      <VacationRequestModal
+        open={vacationModalOpen}
+        onOpenChange={setVacationModalOpen}
+        onRequestSubmitted={() => {
+          fetchScheduleEntries();
+        }}
       />
     </div>
   );
