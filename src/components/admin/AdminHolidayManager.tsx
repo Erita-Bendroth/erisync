@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -93,7 +93,7 @@ const AdminHolidayManager = () => {
     }
   }, [user]);
 
-  const fetchUserRoles = async () => {
+  const fetchUserRoles = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -106,20 +106,20 @@ const AdminHolidayManager = () => {
     } catch (error) {
       console.error('Error fetching user roles:', error);
     }
-  };
+  }, [user]);
 
-  const isPlanner = () => userRoles.includes('planner');
-  const isAdmin = () => userRoles.includes('admin');
-  const hasPermission = () => isPlanner() || isAdmin();
+  const isPlanner = useMemo(() => userRoles.includes('planner'), [userRoles]);
+  const isAdmin = useMemo(() => userRoles.includes('admin'), [userRoles]);
+  const hasPermission = useMemo(() => isPlanner || isAdmin, [isPlanner, isAdmin]);
 
-  const fetchHolidays = async () => {
-    if (!user || !hasPermission()) return;
+  const fetchHolidays = useCallback(async () => {
+    if (!user || !hasPermission) return;
     
     try {
-      // Fetch all centrally managed holidays (user_id is null)
+      // Fetch all centrally managed holidays (user_id is null) - only select needed fields
       const { data, error } = await supabase
         .from('holidays')
-        .select('*')
+        .select('id, name, date, country_code, year, is_public, region_code')
         .is('user_id', null) // Only centrally managed holidays
         .eq('is_public', true)
         .order('date', { ascending: true });
@@ -129,10 +129,10 @@ const AdminHolidayManager = () => {
     } catch (error) {
       console.error('Error fetching holidays:', error);
     }
-  };
+  }, [user, hasPermission]);
 
-  const importHolidays = async () => {
-    if (!user || !hasPermission()) return;
+  const importHolidays = useCallback(async () => {
+    if (!user || !hasPermission) return;
 
     setLoading(true);
     try {
@@ -169,9 +169,9 @@ const AdminHolidayManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegion, toast, fetchHolidays]);
 
-  const triggerHolidayAutoAssignment = async () => {
+  const triggerHolidayAutoAssignment = useCallback(async () => {
     try {
       await supabase.functions.invoke('auto-assign-holidays', {
         body: { triggered_by: 'manual_import' }
@@ -180,10 +180,10 @@ const AdminHolidayManager = () => {
       console.error('Error triggering holiday auto-assignment:', error);
       // Don't show error to user as this is a background process
     }
-  };
+  }, []);
 
-  const deleteHolidays = async (countryCode: string, year: number) => {
-    if (!user || !hasPermission()) return;
+  const deleteHolidays = useCallback(async (countryCode: string, year: number) => {
+    if (!user || !hasPermission) return;
     
     try {
       // Delete centrally managed holidays
@@ -210,28 +210,33 @@ const AdminHolidayManager = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [user, hasPermission, toast, fetchHolidays]);
 
-  const getCountryName = (code: string) => {
+  const getCountryName = useCallback((code: string) => {
     return countries.find(c => c.code === code)?.name || code;
-  };
+  }, []);
 
-  const getRegions = () => {
+  const getRegions = useCallback(() => {
     return countries.find(c => c.code === selectedCountry)?.regions || [];
-  };
+  }, [selectedCountry]);
 
-  const groupedHolidays = holidays.reduce((acc, holiday) => {
-    const key = `${holiday.country_code}-${holiday.year}`;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(holiday);
-    return acc;
-  }, {} as Record<string, Holiday[]>);
+  const groupedHolidays = useMemo(() => {
+    return holidays.reduce((acc, holiday) => {
+      const key = `${holiday.country_code}-${holiday.year}`;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(holiday);
+      return acc;
+    }, {} as Record<string, Holiday[]>);
+  }, [holidays]);
 
-  const currentYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i);
+  const currentYears = useMemo(() => 
+    Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i),
+    []
+  );
 
-  if (!hasPermission()) {
+  if (!hasPermission) {
     return (
       <Alert>
         <AlertCircle className="h-4 w-4" />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -98,49 +98,49 @@ const HolidayManager = () => {
     }
   }, [user, userRoles, userCountry]);
 
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     if (!user) return;
     
     try {
-      // Fetch user roles
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
+      // Fetch both user roles and profile in parallel
+      const [rolesResponse, profileResponse] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id),
+        supabase
+          .from('profiles')
+          .select('country_code, region_code')
+          .eq('user_id', user.id)
+          .single()
+      ]);
       
-      setUserRoles(rolesData?.map(r => r.role) || []);
-
-      // Fetch user's country and region
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('country_code, region_code')
-        .eq('user_id', user.id)
-        .single();
+      setUserRoles(rolesResponse.data?.map(r => r.role) || []);
       
-      if (profileData?.country_code) {
-        setUserCountry(profileData.country_code);
-        setSelectedCountry(profileData.country_code);
+      if (profileResponse.data?.country_code) {
+        setUserCountry(profileResponse.data.country_code);
+        setSelectedCountry(profileResponse.data.country_code);
       }
-      if (profileData?.region_code) {
-        setUserRegion(profileData.region_code);
+      if (profileResponse.data?.region_code) {
+        setUserRegion(profileResponse.data.region_code);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
-  };
+  }, [user]);
 
-  const isPlanner = () => userRoles.includes('planner');
-  const isAdmin = () => userRoles.includes('admin');
+  const isPlanner = useMemo(() => userRoles.includes('planner'), [userRoles]);
+  const isAdmin = useMemo(() => userRoles.includes('admin'), [userRoles]);
 
-  const fetchHolidays = async () => {
+  const fetchHolidays = useCallback(async () => {
     if (!user) return;
     try {
       let query = supabase
         .from('holidays')
-        .select('*');
+        .select('id, name, date, country_code, year, is_public, region_code'); // Only select needed fields
 
       // For regular users (non-planners/non-admins), only show public holidays for their country and region
-      if (!isPlanner() && !isAdmin()) {
+      if (!isPlanner && !isAdmin) {
         if (userCountry) {
           query = query
             .eq('country_code', userCountry)
@@ -153,8 +153,9 @@ const HolidayManager = () => {
             query = query.or(`region_code.is.null,region_code.eq.${userRegion}`);
           }
         } else {
-          // If no country set, show no holidays
-          query = query.eq('id', 'non-existent'); // This will return empty results
+          // If no country set, return empty array immediately
+          setHolidays([]);
+          return;
         }
       } else {
         // For planners/admins, show holidays they have imported
@@ -168,13 +169,13 @@ const HolidayManager = () => {
     } catch (error) {
       console.error('Error fetching holidays:', error);
     }
-  };
+  }, [user, isPlanner, isAdmin, userCountry, userRegion]);
 
-  const importHolidays = async () => {
+  const importHolidays = useCallback(async () => {
     if (!user) return;
     
     // For regular users, restrict import to their country only
-    if (!isPlanner() && !isAdmin()) {
+    if (!isPlanner && !isAdmin) {
       if (!userCountry) {
         toast({
           title: "Country Required",
@@ -225,9 +226,9 @@ const HolidayManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, isPlanner, isAdmin, userCountry, selectedCountry, selectedYear, userRegion, toast, fetchHolidays]);
 
-  const deleteHolidays = async (countryCode: string, year: number) => {
+  const deleteHolidays = useCallback(async (countryCode: string, year: number) => {
     if (!user) return;
     try {
       const { error } = await supabase
@@ -253,22 +254,27 @@ const HolidayManager = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [user, toast, fetchHolidays]);
 
-  const getCountryName = (code: string) => {
+  const getCountryName = useCallback((code: string) => {
     return countries.find(c => c.code === code)?.name || code;
-  };
+  }, []);
 
-  const groupedHolidays = holidays.reduce((acc, holiday) => {
-    const key = `${holiday.country_code}-${holiday.year}`;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(holiday);
-    return acc;
-  }, {} as Record<string, Holiday[]>);
+  const groupedHolidays = useMemo(() => {
+    return holidays.reduce((acc, holiday) => {
+      const key = `${holiday.country_code}-${holiday.year}`;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(holiday);
+      return acc;
+    }, {} as Record<string, Holiday[]>);
+  }, [holidays]);
 
-  const currentYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i);
+  const currentYears = useMemo(() => 
+    Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i),
+    []
+  );
 
   return (
     <div className="space-y-6">
@@ -283,7 +289,7 @@ const HolidayManager = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!isPlanner() && !isAdmin() && (
+          {!isPlanner && !isAdmin && (
             <div className="bg-muted p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">
                 You can only view and import holidays for your assigned country: <strong>{getCountryName(userCountry || 'Unknown')}</strong>
@@ -302,13 +308,13 @@ const HolidayManager = () => {
               <Select 
                 value={selectedCountry} 
                 onValueChange={setSelectedCountry}
-                disabled={!isPlanner() && !isAdmin()}
+                disabled={!isPlanner && !isAdmin}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(isPlanner() || isAdmin() ? countries : countries.filter(c => c.code === userCountry)).map((country) => (
+                  {(isPlanner || isAdmin ? countries : countries.filter(c => c.code === userCountry)).map((country) => (
                     <SelectItem key={country.code} value={country.code}>
                       {country.name}
                     </SelectItem>
@@ -333,7 +339,7 @@ const HolidayManager = () => {
             </div>
             <Button 
               onClick={importHolidays} 
-              disabled={loading || (!isPlanner() && !isAdmin() && !userCountry)}
+              disabled={loading || (!isPlanner && !isAdmin && !userCountry)}
             >
               <Download className="w-4 h-4 mr-2" />
               {loading ? "Importing..." : "Import Holidays"}
@@ -346,7 +352,7 @@ const HolidayManager = () => {
         <CardHeader>
           <CardTitle>Imported Holidays</CardTitle>
           <CardDescription>
-            {isPlanner() || isAdmin() 
+            {isPlanner || isAdmin 
               ? "Manage your imported public holidays by country and year"
               : `View public holidays for ${getCountryName(userCountry || 'your country')}`
             }
@@ -356,7 +362,7 @@ const HolidayManager = () => {
           <div className="space-y-6">
             {Object.keys(groupedHolidays).length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                {!isPlanner() && !isAdmin() && !userCountry 
+                {!isPlanner && !isAdmin && !userCountry 
                   ? "Please set your country in Settings to view holidays."
                   : "No holidays available yet. Use the import tool above to get started."
                 }
@@ -375,7 +381,7 @@ const HolidayManager = () => {
                           {holidayGroup.length} holidays imported
                         </p>
                       </div>
-                      {(isPlanner() || isAdmin()) && (
+                      {(isPlanner || isAdmin) && (
                         <Button
                           variant="outline"
                           size="sm"
