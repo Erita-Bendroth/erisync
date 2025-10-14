@@ -918,14 +918,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         )}
 
         {/* Team/User selection */}
-        {bulkMode === "team" || bulkMode === "rotation" ? (
+        {bulkMode === "team" ? (
           <div className="space-y-2">
             <label className="text-sm font-medium">Team</label>
             <Select value={selectedTeam} onValueChange={setSelectedTeam}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a team" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-background z-50">
                 {teams.map((team) => (
                   <SelectItem key={team.id} value={team.id}>
                     {team.name}
@@ -933,14 +933,38 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 ))}
               </SelectContent>
             </Select>
-            {bulkMode === "rotation" && !selectedTeam && (
-              <p className="text-xs text-muted-foreground">
-                Select a team to see available users for rotation assignments
-              </p>
-            )}
           </div>
-        ) : (
-          <>
+        ) : bulkMode === "users" ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">
+                Select Multiple Users ({selectedUsers.length} selected)
+              </label>
+              {users.length > 0 && (
+                <div className="flex gap-2">
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={selectAllUsers}
+                    className="h-7 text-xs"
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={deselectAllUsers}
+                    className="h-7 text-xs"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            {/* Team Selection */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Team</label>
               <Select value={selectedTeam} onValueChange={(value) => {
@@ -950,7 +974,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 <SelectTrigger>
                   <SelectValue placeholder="Select a team first" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background z-50">
                   {teams.map((team) => (
                     <SelectItem key={team.id} value={team.id}>
                       {team.name}
@@ -959,34 +983,9 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 </SelectContent>
               </Select>
             </div>
+
+            {/* User Selection */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">
-                  Users ({selectedUsers.length} selected)
-                </label>
-                {users.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button 
-                      type="button"
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={selectAllUsers}
-                      className="h-7 text-xs"
-                    >
-                      Select All
-                    </Button>
-                    <Button 
-                      type="button"
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={deselectAllUsers}
-                      className="h-7 text-xs"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                )}
-              </div>
               {!selectedTeam ? (
                 <div className="text-sm text-muted-foreground p-4 border rounded-md text-center">
                   Select a team first to see users
@@ -1018,8 +1017,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 </div>
               )}
             </div>
-          </>
-        )}
+          </div>
+        ) : null}
         
         <Button 
           onClick={generateSchedules} 
