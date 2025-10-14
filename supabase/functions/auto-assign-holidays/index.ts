@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to fetch user profiles: ${profilesError.message}`);
     }
 
-    console.log(`Processing ${profiles?.length || 0} user profiles for holiday assignment`);
+    console.log(`🔍 Auto-assign holidays: Processing ${profiles?.length || 0} user profiles`);
 
     let totalAssigned = 0;
 
@@ -60,27 +60,25 @@ Deno.serve(async (req) => {
       }
 
       // Filter holidays based on user's region
-      let holidays = allHolidays || [];
+      let applicableHolidays = allHolidays || [];
       if (country_code === 'DE' && region_code) {
         // For Germany with region: include national holidays (no region) and regional holidays for user's region
-        holidays = holidays.filter(h => !h.region_code || h.region_code === region_code);
+        applicableHolidays = applicableHolidays.filter(h => !h.region_code || h.region_code === region_code);
       } else {
         // For other countries or no region: only national holidays
-        holidays = holidays.filter(h => !h.region_code);
+        applicableHolidays = applicableHolidays.filter(h => !h.region_code);
       }
 
-      if (holidaysError) {
-        console.error(`Error fetching holidays for user ${user_id}:`, holidaysError);
-        continue;
-      }
+      const holidayDates = new Set(applicableHolidays.map(h => h.date));
+      console.log(`📅 User ${user_id.substring(0,8)} (${country_code}${region_code ? '-'+region_code : ''}): ${applicableHolidays.length} applicable holidays`);
 
-      if (!holidays || holidays.length === 0) {
-        console.log(`No holidays found for user ${user_id} in ${country_code}`);
+      if (!applicableHolidays || applicableHolidays.length === 0) {
+        console.log(`⚠️ No holidays found for user ${user_id.substring(0,8)} in ${country_code}${region_code ? '-'+region_code : ''}`);
         continue;
       }
 
       // Check which holidays are not already in the schedule
-      for (const holiday of holidays) {
+      for (const holiday of applicableHolidays) {
         // Fetch user's teams
         const { data: teams } = await supabaseClient
           .from('team_members')
@@ -89,7 +87,7 @@ Deno.serve(async (req) => {
 
         const teamIds = (teams || []).map(t => t.team_id);
         if (teamIds.length === 0) {
-          console.log(`User ${user_id} has no teams; skipping team-based assignment for ${holiday.date}`);
+          console.log(`⚠️ User ${user_id.substring(0,8)} has no teams; skipping assignment for ${holiday.date} (${holiday.name})`);
           continue;
         }
 
@@ -119,17 +117,17 @@ Deno.serve(async (req) => {
               });
 
             if (insertError) {
-              console.error(`Error inserting holiday for user ${user_id} team ${teamId}:`, insertError);
+              console.error(`❌ Error inserting holiday for user ${user_id.substring(0,8)} team ${teamId.substring(0,8)}:`, insertError);
             } else {
               totalAssigned++;
-              console.log(`Assigned holiday ${holiday.name} to user ${user_id} (team ${teamId}) on ${holiday.date}`);
+              console.log(`✅ Assigned holiday ${holiday.name} to user ${user_id.substring(0,8)} (team ${teamId.substring(0,8)}) on ${holiday.date}`);
             }
           }
         }
       }
     }
 
-    console.log(`Successfully auto-assigned ${totalAssigned} holiday entries`);
+    console.log(`✅ Auto-assign complete: Successfully assigned ${totalAssigned} holiday entries`);
 
     return new Response(
       JSON.stringify({ 

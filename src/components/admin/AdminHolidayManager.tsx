@@ -115,6 +115,8 @@ const AdminHolidayManager = () => {
   const fetchHolidays = useCallback(async () => {
     if (!user || !hasPermission) return;
     
+    console.log(`🔍 Admin Holiday Manager - Fetching holidays for admin/planner`);
+    
     try {
       // Fetch all centrally managed holidays (user_id is null) - only select needed fields
       const { data, error } = await supabase
@@ -125,6 +127,9 @@ const AdminHolidayManager = () => {
         .order('date', { ascending: true });
 
       if (error) throw error;
+      
+      console.log(`📅 Fetched ${data?.length || 0} centrally managed holidays`);
+      
       setHolidays(data || []);
     } catch (error) {
       console.error('Error fetching holidays:', error);
@@ -144,6 +149,12 @@ const AdminHolidayManager = () => {
 
   const importHolidays = useCallback(async () => {
     if (!user || !hasPermission) return;
+
+    console.log(`🚀 Importing holidays:`, {
+      country: selectedCountry,
+      year: selectedYear,
+      regions: selectedRegions.length > 0 ? selectedRegions : ['National']
+    });
 
     setLoading(true);
     try {
@@ -168,9 +179,20 @@ const AdminHolidayManager = () => {
 
         if (error) throw error;
         
+        console.log(`📥 Import result for region ${region || 'National'}:`, {
+          imported: data.imported,
+          existing: data.existing
+        });
+        
         totalImported += data.imported || 0;
         totalExisting += data.existing || 0;
       }
+
+      console.log(`✅ Import complete:`, {
+        totalImported,
+        totalExisting,
+        regionsCount: selectedRegions.length
+      });
 
       toast({
         title: "Success",

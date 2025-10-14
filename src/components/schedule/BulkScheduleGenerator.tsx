@@ -83,6 +83,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   // Rotation mode states
   const [selectedUsersForRotation, setSelectedUsersForRotation] = useState<string[]>([]);
   const [enableRecurring, setEnableRecurring] = useState(false);
+  const [excludeHolidays, setExcludeHolidays] = useState(true); // Default to excluding holidays
   const [rotationPattern, setRotationPattern] = useState<RotationPattern>({
     intervalWeeks: 4,
     cycles: 1
@@ -420,6 +421,15 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     }
 
     setLoading(true);
+    
+    console.log(`🚀 Starting bulk schedule generation:`, {
+      bulkMode,
+      selectedTeam,
+      excludeHolidays,
+      configurationsCount: shiftConfigurations.length,
+      cycles: enableRecurring ? rotationPattern.cycles : 1
+    });
+    
     try {
       // Additional permission check for managers
       const isManager = userRoles.includes('manager') && !userRoles.includes('planner') && !userRoles.includes('admin');
@@ -443,7 +453,10 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       }
 
       let totalGenerated = 0;
+      let totalSkippedHolidays = 0;
       const cycles = enableRecurring ? rotationPattern.cycles : 1;
+      
+      console.log(`📊 Processing ${cycles} cycle(s) with ${shiftConfigurations.length} shift configuration(s)`);
       
       // For each cycle (for recurring patterns)
       for (let cycle = 0; cycle < cycles; cycle++) {
@@ -473,24 +486,48 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             const countryCode = profile?.country_code || 'US';
             const regionCode = profile?.region_code || null;
 
+            console.log(`🔍 Bulk Schedule - User ${userId.substring(0,8)}: country=${countryCode}, region=${regionCode}`);
+
+            // Fetch all holidays for this country (centrally managed only)
+            const { data: allHolidays } = await supabase
+              .from('holidays')
+              .select('date, name, region_code')
+              .eq('country_code', countryCode)
+              .eq('is_public', true)
+              .is('user_id', null); // Only centrally managed holidays
+
+            // Filter holidays based on user's region
+            let applicableHolidays = allHolidays || [];
+            if (countryCode === 'DE' && regionCode) {
+              // For Germany with region: include national holidays (no region) and regional holidays for user's region
+              applicableHolidays = applicableHolidays.filter(h => !h.region_code || h.region_code === regionCode);
+            } else {
+              // For other countries or no region: only national holidays
+              applicableHolidays = applicableHolidays.filter(h => !h.region_code);
+            }
+
+            const holidayDates = new Set(applicableHolidays.map(h => h.date));
+            console.log(`📅 Applicable holidays for user: ${applicableHolidays.map(h => `${h.date}:${h.name}`).join(', ')}`);
+
             // For each date in the configuration (with cycle offset for recurring)
             for (const baseDate of config.dates) {
               const date = new Date(baseDate);
               date.setDate(date.getDate() + weekOffset);
               const dateStr = format(date, 'yyyy-MM-dd');
               
-              // Check if it's a holiday
-              const { data: holidays } = await supabase
-                .from('holidays')
-                .select('id')
-                .eq('date', dateStr)
-                .eq('country_code', countryCode)
-                .eq('is_public', true)
-                .or(`region_code.is.null,region_code.eq.${regionCode}`)
-                .limit(1);
+              // Check if it's a holiday (only if excludeHolidays is enabled)
+              let isHoliday = false;
+              if (excludeHolidays) {
+                isHoliday = holidayDates.has(dateStr);
+              }
+              
+              if (isHoliday) {
+                const holiday = applicableHolidays.find(h => h.date === dateStr);
+                console.log(`🎉 Skipping holiday: ${dateStr} - ${holiday?.name} (user: ${userId.substring(0,8)})`);
+                totalSkippedHolidays++;
+                continue; // Skip if it's a holiday
+              }
 
-              // Skip if it's a holiday
-              if (holidays && holidays.length > 0) continue;
 
               // Determine shift type based on shift name
               let shiftType: 'early' | 'late' | 'normal' = 'normal';
@@ -532,9 +569,17 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       }
       
       const cycleMsg = cycles > 1 ? ` across ${cycles} cycle(s)` : '';
+      const holidayMsg = totalSkippedHolidays > 0 ? ` (${totalSkippedHolidays} holidays excluded)` : '';
+      
+      console.log(`✅ Bulk schedule generation complete:`, {
+        totalGenerated,
+        totalSkippedHolidays,
+        cycles
+      });
+      
       toast({
         title: "Success",
-        description: `Generated ${totalGenerated} shifts${cycleMsg}`,
+        description: `Generated ${totalGenerated} shifts${cycleMsg}${holidayMsg}`,
       });
       
       // Clear configurations after successful generation
@@ -851,6 +896,20 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             )}
           </div>
         )}
+
+        {/* Exclude Holidays Option */}
+        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
+          <div className="space-y-0.5">
+            <Label className="text-sm font-medium">Exclude Public Holidays</Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically skip public holidays when generating schedules
+            </p>
+          </div>
+          <Checkbox
+            checked={excludeHolidays}
+            onCheckedChange={(checked) => setExcludeHolidays(checked === true)}
+          />
+        </div>
 
         {/* Add Shift Configuration Button */}
         <Button 
