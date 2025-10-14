@@ -503,18 +503,6 @@ useEffect(() => {
       setLoading(true);
       // Fetch entries for full week (Monday-Sunday)
       const weekEnd = addDays(weekStart, 6); // Sunday
-      
-      console.log('=== fetchScheduleEntries START ===');
-      console.log('Fetching schedule entries for work week:', {
-        weekStart: format(weekStart, "yyyy-MM-dd"),
-        weekEnd: format(weekEnd, "yyyy-MM-dd"),
-        userId: user?.id,
-        userRoles: userRoles.map(r => r.role),
-        isManager: isManager(),
-        isPlanner: isPlanner(),
-        selectedTeam: selectedTeam,
-        dateRangeQuery: `date >= ${format(weekStart, "yyyy-MM-dd")} AND date <= ${format(addDays(weekStart, 6), "yyyy-MM-dd")}`
-      });
 
       let query = supabase
         .from("schedule_entries")
@@ -533,19 +521,16 @@ useEffect(() => {
         `)
         .gte("date", format(weekStart, "yyyy-MM-dd"))
         .lte("date", format(addDays(weekStart, 6), "yyyy-MM-dd"))
-        .order("date");
+        .order("date")
+        .limit(10000); // Increase limit to handle All Teams view with many employees
 
       // Apply filtering based on user roles and permissions
       if (isManager() || isPlanner()) {
-        console.log('User has manager/planner role');
-        
         if (selectedTeam !== "all") {
-          console.log('Filtering by selected team:', selectedTeam);
           // Both managers and planners can fetch entries for any team
           // UI will handle display restrictions based on management rights
           query = query.eq("team_id", selectedTeam);
         } else {
-          console.log('All teams view: explicitly fetching entries from all teams');
           // CRITICAL FIX: Explicitly fetch all team IDs and query for entries from all teams
           // This ensures we get ALL entries across all teams, avoiding RLS complications
           let allTeamsQuery;
@@ -562,20 +547,11 @@ useEffect(() => {
           
           if (allTeams && allTeams.length > 0) {
             const teamIds = allTeams.map(t => t.id);
-            console.log('All team IDs for "All Teams" view:', teamIds);
-            console.log('Total teams to query:', teamIds.length);
             query = query.in("team_id", teamIds);
-          } else {
-            console.log('No teams found for All Teams view');
           }
         }
       } else if (isTeamMember()) {
-        console.log('User is regular team member');
-        
         if (viewMode === "my-schedule") {
-          // Team members only see their own entries
-          query = query.eq("user_id", user!.id);
-          console.log('Filtering to only show user\'s own entries');
         } else if (viewMode === "my-team") {
           // Team members see their team's entries
           const { data: userTeams } = await supabase
@@ -586,7 +562,6 @@ useEffect(() => {
           if (userTeams && userTeams.length > 0) {
             const teamIds = userTeams.map(ut => ut.team_id);
             query = query.in("team_id", teamIds);
-            console.log('Filtering to show team entries for teams:', teamIds);
           }
         }
       } else {
@@ -594,45 +569,7 @@ useEffect(() => {
         query = query.eq("user_id", user!.id);
       }
 
-      // Ensure we fetch enough rows for All Teams view
-      query = query.limit(10000);
-
       const { data, error } = await query;
-
-      console.log('=== QUERY RESULTS ===');
-      console.log('Total entries returned:', data?.length || 0);
-      console.log('Unique dates in results:', [...new Set(data?.map(entry => entry.date) || [])].sort());
-      console.log('Entries per date:', data?.reduce((acc, entry) => {
-        acc[entry.date] = (acc[entry.date] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>));
-      console.log('Sample entries:', data?.slice(0, 5).map(e => ({ 
-        date: e.date, 
-        user_id: e.user_id.substring(0, 8),
-        team_id: e.team_id.substring(0, 8),
-        activity: e.activity_type 
-      })));
-      
-      // DIAGNOSTIC: Check if Friday entries exist in database
-      if (selectedTeam === "all" && (isManager() || isPlanner())) {
-        const fridayDate = format(addDays(weekStart, 4), "yyyy-MM-dd"); // Friday
-        const { data: fridayCheck, count: fridayCount } = await supabase
-          .from("schedule_entries")
-          .select("id, date, user_id, team_id", { count: 'exact' })
-          .eq("date", fridayDate)
-          .limit(10);
-        
-        console.log('🔍 DIAGNOSTIC - Friday entries check:', {
-          fridayDate,
-          entriesFound: fridayCount || 0,
-          sampleEntries: fridayCheck?.map(e => ({
-            date: e.date,
-            user_id: e.user_id.substring(0, 8),
-            team_id: e.team_id.substring(0, 8)
-          }))
-        });
-      }
-      console.log('=====================');
 
       if (error) {
         console.error('Schedule query error:', error);
