@@ -512,7 +512,8 @@ useEffect(() => {
         userRoles: userRoles.map(r => r.role),
         isManager: isManager(),
         isPlanner: isPlanner(),
-        selectedTeam: selectedTeam
+        selectedTeam: selectedTeam,
+        dateRangeQuery: `date >= ${format(weekStart, "yyyy-MM-dd")} AND date <= ${format(addDays(weekStart, 6), "yyyy-MM-dd")}`
       });
 
       let query = supabase
@@ -561,7 +562,8 @@ useEffect(() => {
           
           if (allTeams && allTeams.length > 0) {
             const teamIds = allTeams.map(t => t.id);
-            console.log('Fetching entries for team IDs:', teamIds);
+            console.log('All team IDs for "All Teams" view:', teamIds);
+            console.log('Total teams to query:', teamIds.length);
             query = query.in("team_id", teamIds);
           } else {
             console.log('No teams found for All Teams view');
@@ -597,11 +599,40 @@ useEffect(() => {
 
       const { data, error } = await query;
 
-      console.log('Raw query result:', {
-        totalEntries: data?.length || 0,
-        sampleDates: data?.slice(0, 10).map(entry => entry.date) || [],
-        allDates: [...new Set(data?.map(entry => entry.date) || [])].sort()
-      });
+      console.log('=== QUERY RESULTS ===');
+      console.log('Total entries returned:', data?.length || 0);
+      console.log('Unique dates in results:', [...new Set(data?.map(entry => entry.date) || [])].sort());
+      console.log('Entries per date:', data?.reduce((acc, entry) => {
+        acc[entry.date] = (acc[entry.date] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>));
+      console.log('Sample entries:', data?.slice(0, 5).map(e => ({ 
+        date: e.date, 
+        user_id: e.user_id.substring(0, 8),
+        team_id: e.team_id.substring(0, 8),
+        activity: e.activity_type 
+      })));
+      
+      // DIAGNOSTIC: Check if Friday entries exist in database
+      if (selectedTeam === "all" && (isManager() || isPlanner())) {
+        const fridayDate = format(addDays(weekStart, 4), "yyyy-MM-dd"); // Friday
+        const { data: fridayCheck, count: fridayCount } = await supabase
+          .from("schedule_entries")
+          .select("id, date, user_id, team_id", { count: 'exact' })
+          .eq("date", fridayDate)
+          .limit(10);
+        
+        console.log('🔍 DIAGNOSTIC - Friday entries check:', {
+          fridayDate,
+          entriesFound: fridayCount || 0,
+          sampleEntries: fridayCheck?.map(e => ({
+            date: e.date,
+            user_id: e.user_id.substring(0, 8),
+            team_id: e.team_id.substring(0, 8)
+          }))
+        });
+      }
+      console.log('=====================');
 
       if (error) {
         console.error('Schedule query error:', error);
