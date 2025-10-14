@@ -40,6 +40,8 @@ interface Employee {
   first_name: string;
   last_name: string;
   initials: string;
+  country_code?: string;
+  region_code?: string;
 }
 
 interface Team {
@@ -56,6 +58,7 @@ interface Holiday {
   name: string;
   date: string;
   country_code: string;
+  region_code?: string;
   is_public: boolean;
 }
 
@@ -399,14 +402,30 @@ useEffect(() => {
           return;
         }
 
-        const transformedEmployees = (profiles || []).map((emp: any) => ({
-          id: emp.user_id,
-          user_id: emp.user_id,
-          first_name: emp.first_name ?? '',
-          last_name: emp.last_name ?? '',
-          initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
-          displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
-        }));
+        // Also fetch location data (country_code, region_code) separately
+        const { data: locationData } = await supabase
+          .from('profiles')
+          .select('user_id, country_code, region_code')
+          .in('user_id', targetUserIds);
+
+        // Create a map of user_id to location data
+        const locationMap = new Map(
+          (locationData || []).map(loc => [loc.user_id, { country_code: loc.country_code, region_code: loc.region_code }])
+        );
+
+        const transformedEmployees = (profiles || []).map((emp: any) => {
+          const location = locationMap.get(emp.user_id);
+          return {
+            id: emp.user_id,
+            user_id: emp.user_id,
+            first_name: emp.first_name ?? '',
+            last_name: emp.last_name ?? '',
+            initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+            displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim(),
+            country_code: location?.country_code,
+            region_code: location?.region_code
+          };
+        });
 
         console.log('Transformed employees (team_members based):', transformedEmployees.length);
         setEmployees(transformedEmployees);
@@ -456,14 +475,29 @@ useEffect(() => {
           return;
         }
 
-        const transformedEmployees = (profiles || []).map((emp: any) => ({
-          id: emp.user_id,
-          user_id: emp.user_id,
-          first_name: emp.first_name ?? '',
-          last_name: emp.last_name ?? '',
-          initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
-          displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
-        }));
+        // Also fetch location data
+        const { data: locationData } = await supabase
+          .from('profiles')
+          .select('user_id, country_code, region_code')
+          .in('user_id', targetUserIds);
+
+        const locationMap = new Map(
+          (locationData || []).map(loc => [loc.user_id, { country_code: loc.country_code, region_code: loc.region_code }])
+        );
+
+        const transformedEmployees = (profiles || []).map((emp: any) => {
+          const location = locationMap.get(emp.user_id);
+          return {
+            id: emp.user_id,
+            user_id: emp.user_id,
+            first_name: emp.first_name ?? '',
+            last_name: emp.last_name ?? '',
+            initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+            displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim(),
+            country_code: location?.country_code,
+            region_code: location?.region_code
+          };
+        });
 
         setEmployees(transformedEmployees);
       } else {
@@ -749,34 +783,81 @@ useEffect(() => {
     try {
       const weekEnd = addDays(weekStart, 4); // Friday
       
-      // First get the user's country
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('country_code')
-        .eq('user_id', user!.id)
-        .single();
-
-      if (profileError || !profileData?.country_code) {
-        console.log('No country set for user, not fetching holidays');
+      // Get all unique countries and regions from employees in current view
+      const employeeIds = employees.map(e => e.id);
+      
+      if (employeeIds.length === 0) {
+        console.log('No employees to fetch holidays for');
         setHolidays([]);
         return;
       }
 
-      const { data, error } = await supabase
-        .from('holidays')
-        .select('*')
-        .eq('country_code', profileData.country_code)
-        .gte('date', format(weekStart, "yyyy-MM-dd"))
-        .lte('date', format(weekEnd, "yyyy-MM-dd"))
-        .eq('is_public', true);
+      // Fetch profiles for all employees to get their countries and regions
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, country_code, region_code')
+        .in('user_id', employeeIds);
 
-      if (error) {
-        console.error('Error fetching holidays:', error);
+      if (profileError) {
+        console.error('Error fetching employee profiles:', profileError);
+        setHolidays([]);
         return;
       }
+
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles found for employees');
+        setHolidays([]);
+        return;
+      }
+
+      // Get unique country-region combinations
+      const locationSet = new Set(profiles.map(p => `${p.country_code}|${p.region_code || ''}`));
+      console.log(`🔍 Fetching holidays for ${locationSet.size} unique location(s):`, Array.from(locationSet));
+
+      // Fetch holidays for all country-region combinations
+      const allHolidays: any[] = [];
       
-      console.log(`Fetched ${data?.length || 0} holidays for country ${profileData.country_code}`);
-      setHolidays(data || []);
+      for (const location of locationSet) {
+        const [country_code, region_code] = location.split('|');
+        
+        if (!country_code) continue;
+
+        // Fetch all holidays for this country (centrally managed)
+        const { data: countryHolidays, error } = await supabase
+          .from('holidays')
+          .select('*')
+          .eq('country_code', country_code)
+          .is('user_id', null) // Only centrally managed holidays
+          .gte('date', format(weekStart, "yyyy-MM-dd"))
+          .lte('date', format(weekEnd, "yyyy-MM-dd"))
+          .eq('is_public', true);
+
+        if (error) {
+          console.error(`Error fetching holidays for ${country_code}:`, error);
+          continue;
+        }
+
+        // Filter holidays based on region
+        let applicableHolidays = countryHolidays || [];
+        if (country_code === 'DE' && region_code) {
+          // For Germany with region: include national holidays (no region) and regional holidays for this region
+          applicableHolidays = applicableHolidays.filter(h => !h.region_code || h.region_code === region_code);
+        } else {
+          // For other countries or no region: only national holidays
+          applicableHolidays = applicableHolidays.filter(h => !h.region_code);
+        }
+
+        console.log(`📅 ${country_code}${region_code ? '-'+region_code : ''}: ${applicableHolidays.length} holidays`);
+        allHolidays.push(...applicableHolidays);
+      }
+
+      // Remove duplicates by holiday id
+      const uniqueHolidays = Array.from(
+        new Map(allHolidays.map(h => [h.id, h])).values()
+      );
+      
+      console.log(`✅ Total unique holidays fetched: ${uniqueHolidays.length}`);
+      setHolidays(uniqueHolidays);
     } catch (error) {
       console.error('Error fetching holidays:', error);
     }
@@ -847,6 +928,34 @@ const getAvailabilityStatus = (activityType: string) => {
   const availableTypes = ['work', 'hotline_support'];
   return availableTypes.includes(activityType) ? "Available" : "Not Available";
 };
+
+  const getHolidaysForEmployeeAndDay = (employeeId: string, date: Date) => {
+    // Get the employee's profile to know their country and region
+    const employee = employees.find(e => e.id === employeeId);
+    if (!employee || !employee.country_code) return [];
+
+    // Filter holidays for this specific date
+    const dayHolidays = holidays.filter(holiday => 
+      isSameDay(new Date(holiday.date), date)
+    );
+
+    // Filter holidays by employee's country and region
+    const applicableHolidays = dayHolidays.filter(holiday => {
+      // Must match country
+      if (holiday.country_code !== employee.country_code) return false;
+
+      // Check region filtering
+      if (employee.country_code === 'DE' && employee.region_code) {
+        // For Germany with region: show national holidays (no region) or holidays for employee's specific region
+        return !holiday.region_code || holiday.region_code === employee.region_code;
+      } else {
+        // For other countries or no region: only show national holidays
+        return !holiday.region_code;
+      }
+    });
+
+    return applicableHolidays;
+  };
 
   const getHolidaysForDay = (date: Date) => {
     return holidays.filter(holiday => 
@@ -1138,7 +1247,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     </TableCell>
                     {workDays.map((day, dayIndex) => {
                       const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
-                      const dayHolidays = getHolidaysForDay(day);
+                      const dayHolidays = getHolidaysForEmployeeAndDay(employee.user_id, day);
                       const isToday = isSameDay(day, new Date());
                       
                       return (
