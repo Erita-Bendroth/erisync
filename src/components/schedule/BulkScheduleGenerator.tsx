@@ -406,6 +406,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             // Skip if it's a holiday
             if (holidays && holidays.length > 0) continue;
 
+            // Format notes with time block data for proper display
+            const timeBlockData = [{
+              activity_type: 'work',
+              start_time: config.startTime,
+              end_time: config.endTime
+            }];
+            const notes = `Times: ${JSON.stringify(timeBlockData)}\nAuto-generated ${config.shiftName}`;
+
             // Insert or update the schedule entry
             const { error } = await supabase
               .from('schedule_entries')
@@ -416,7 +424,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 shift_type: 'normal',
                 activity_type: 'work',
                 availability_status: 'available',
-                notes: `Auto-generated ${config.shiftName} (${config.startTime}-${config.endTime})`,
+                notes: notes,
                 created_by: user.id,
               }, {
                 onConflict: 'user_id,date,team_id',
