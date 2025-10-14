@@ -244,6 +244,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          parent_team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -251,6 +252,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          parent_team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -258,9 +260,18 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          parent_team_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "teams_parent_team_id_fkey"
+            columns: ["parent_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_oauth_tokens: {
         Row: {
@@ -378,6 +389,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_all_subteam_ids: {
+        Args: { _team_id: string }
+        Returns: string[]
+      }
       get_basic_profile_info: {
         Args: { _user_id: string }
         Returns: {
@@ -399,6 +414,10 @@ export type Database = {
       }
       get_managed_team_ids: {
         Args: { _uid: string }
+        Returns: string[]
+      }
+      get_manager_accessible_teams: {
+        Args: { _manager_id: string }
         Returns: string[]
       }
       get_multiple_basic_profile_info: {

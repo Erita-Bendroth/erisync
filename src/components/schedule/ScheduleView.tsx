@@ -47,6 +47,7 @@ interface Employee {
 interface Team {
   id: string;
   name: string;
+  parent_team_id?: string;
 }
 
 interface UserRole {
@@ -221,14 +222,21 @@ useEffect(() => {
     if (!(isManager() && !isPlanner()) || !user) return;
     try {
       setManagedCacheLoading(true);
-      // 1) Get teams current user manages
-      const { data: mgrTeams } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user.id)
-        .eq('is_manager', true);
+      console.log('🔄 Building managed users cache with hierarchical teams');
+      
+      // 1) Get all accessible teams (managed teams + sub-teams) using hierarchical function
+      const { data: accessibleTeamIds, error: rpcError } = await supabase
+        .rpc('get_manager_accessible_teams', { _manager_id: user.id });
 
-      const teamIds = (mgrTeams || []).map(t => t.team_id);
+      if (rpcError) {
+        console.error('Error fetching accessible teams:', rpcError);
+        setManagedUsersSet(new Set([user.id]));
+        return;
+      }
+
+      const teamIds = accessibleTeamIds || [];
+      console.log(`✅ Manager has access to ${teamIds.length} teams (including sub-teams)`);
+      
       if (teamIds.length === 0) {
         setManagedUsersSet(new Set([user.id]));
         return;
@@ -244,6 +252,7 @@ useEffect(() => {
       const ids = new Set<string>((teamUsers || []).map(tu => tu.user_id));
       // Always include self
       ids.add(user.id);
+      console.log(`✅ Managed users cache built: ${ids.size} users accessible`);
       setManagedUsersSet(ids);
     } catch (e) {
       console.error('Error populating managed users set:', e);
@@ -272,13 +281,36 @@ useEffect(() => {
 
   const fetchTeams = async () => {
     try {
+      console.log('🔍 Fetching teams with hierarchy information');
+      
+      // For managers, fetch accessible teams including sub-teams via RPC
+      if (isManager() && !isPlanner()) {
+        const { data: accessibleTeamIds, error: rpcError } = await supabase
+          .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+        
+        if (rpcError) {
+          console.error('Error fetching accessible teams:', rpcError);
+        } else {
+          console.log(`✅ Manager accessible teams (including sub-teams): ${accessibleTeamIds?.length || 0} teams`);
+          console.log('Accessible team IDs:', accessibleTeamIds);
+        }
+      }
+      
       const { data, error } = await supabase
         .from('teams')
-        .select('id, name')
+        .select('id, name, parent_team_id')
         .limit(10000)
         .order('name');
 
       if (error) throw error;
+      
+      console.log(`✅ Fetched ${data?.length || 0} total teams`);
+      const hierarchyLog = data?.filter(t => t.parent_team_id).map(t => ({
+        team: t.name,
+        parent: data.find(p => p.id === t.parent_team_id)?.name || 'Unknown'
+      }));
+      console.log('Team hierarchy relationships:', hierarchyLog);
+      
       setTeams(data || []);
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -340,27 +372,41 @@ useEffect(() => {
         } else {
           console.log('All teams view: fetching ALL team members across ALL teams');
           
-          // CRITICAL FIX: When "All Teams" is selected, we need to fetch ALL users from ALL teams
-          // First get all teams that the user has permission to see
-          let allTeamsQuery;
+          // CRITICAL: For managers, use hierarchical team access (managed teams + sub-teams)
+          // For planners, fetch all teams
+          let teamIds: string[] = [];
           
           if (isPlanner()) {
             // Planners can see all teams
-            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
+            const { data: allTeams, error: allTeamsError } = await supabase
+              .from('teams')
+              .select('id')
+              .limit(10000);
+            
+            if (allTeamsError) {
+              console.error('Error fetching teams:', allTeamsError);
+              setEmployees([]);
+              return;
+            }
+            
+            teamIds = (allTeams || []).map(t => t.id);
+            console.log(`📊 Planner viewing all teams: ${teamIds.length} teams`);
           } else if (isManager()) {
-            // Managers can see teams they manage + all teams for viewing (UI will restrict editing)
-            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
+            // Managers can see teams they manage + all sub-teams
+            const { data: accessibleTeamIds, error: rpcError } = await supabase
+              .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+            
+            if (rpcError) {
+              console.error('Error fetching manager accessible teams:', rpcError);
+              setEmployees([]);
+              return;
+            }
+            
+            teamIds = accessibleTeamIds || [];
+            console.log(`📊 Manager accessible teams (including sub-teams): ${teamIds.length} teams`);
+            console.log('Accessible team IDs:', teamIds);
           }
           
-          const { data: allTeams, error: allTeamsError } = await allTeamsQuery;
-          
-          if (allTeamsError) {
-            console.error('Error fetching teams:', allTeamsError);
-            setEmployees([]);
-            return;
-          }
-          
-          const teamIds = (allTeams || []).map(t => t.id);
           console.log('All team IDs for "All Teams" view:', teamIds);
           
           if (teamIds.length === 0) {
@@ -543,14 +589,32 @@ useEffect(() => {
       let allData: any[] = [];
 
       if ((isManager() || isPlanner()) && selectedTeam === "all") {
-        // Get all team IDs
-        const { data: allTeams } = await supabase
-          .from('teams')
-          .select('id')
-          .limit(10000);
+        // Get team IDs based on role: planners see all, managers see managed + sub-teams
+        let teamIds: string[] = [];
         
-        const teamIds = allTeams?.map(t => t.id) || [];
-        console.log(`📊 All Teams fetch: ${teamIds.length} teams total, date range: ${dateStart} to ${dateEnd}`);
+        if (isPlanner()) {
+          const { data: allTeams } = await supabase
+            .from('teams')
+            .select('id')
+            .limit(10000);
+          
+          teamIds = allTeams?.map(t => t.id) || [];
+          console.log(`📊 Planner All Teams fetch: ${teamIds.length} teams total`);
+        } else if (isManager()) {
+          const { data: accessibleTeamIds, error: rpcError } = await supabase
+            .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+          
+          if (rpcError) {
+            console.error('Error fetching manager accessible teams:', rpcError);
+            teamIds = [];
+          } else {
+            teamIds = accessibleTeamIds || [];
+            console.log(`📊 Manager All Teams fetch (including sub-teams): ${teamIds.length} teams`);
+            console.log('Accessible team IDs:', teamIds);
+          }
+        }
+        
+        console.log(`📅 Fetching schedules for date range: ${dateStart} to ${dateEnd}`);
 
         // Batch fetch by team with smaller batch size to avoid hitting limits
         const BATCH_SIZE = 10; // Reduced from 25 to ensure all dates get fetched
@@ -1176,24 +1240,74 @@ const getActivityColor = (entry: ScheduleEntry) => {
                         />
                         All Teams
                       </CommandItem>
-                      {teams.map((team) => (
-                        <CommandItem
-                          key={team.id}
-                          value={team.name}
-                          onSelect={() => {
-                            setSelectedTeam(team.id);
-                            setTeamDropdownOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedTeam === team.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {team.name}
-                        </CommandItem>
-                      ))}
+                      
+                      {/* Show parent teams first, then their sub-teams indented */}
+                      {teams
+                        .filter(team => !team.parent_team_id)
+                        .map((parentTeam) => (
+                          <React.Fragment key={parentTeam.id}>
+                            <CommandItem
+                              value={parentTeam.name}
+                              onSelect={() => {
+                                setSelectedTeam(parentTeam.id);
+                                setTeamDropdownOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedTeam === parentTeam.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {parentTeam.name}
+                            </CommandItem>
+                            
+                            {/* Show sub-teams indented */}
+                            {teams
+                              .filter(team => team.parent_team_id === parentTeam.id)
+                              .map((subTeam) => (
+                                <CommandItem
+                                  key={subTeam.id}
+                                  value={subTeam.name}
+                                  onSelect={() => {
+                                    setSelectedTeam(subTeam.id);
+                                    setTeamDropdownOpen(false);
+                                  }}
+                                  className="pl-8"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedTeam === subTeam.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  ↳ {subTeam.name}
+                                </CommandItem>
+                              ))}
+                          </React.Fragment>
+                        ))}
+                      
+                      {/* Show orphan teams (teams without parents that aren't in the parent list) */}
+                      {teams
+                        .filter(team => team.parent_team_id && !teams.find(t => t.id === team.parent_team_id))
+                        .map((team) => (
+                          <CommandItem
+                            key={team.id}
+                            value={team.name}
+                            onSelect={() => {
+                              setSelectedTeam(team.id);
+                              setTeamDropdownOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedTeam === team.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {team.name}
+                          </CommandItem>
+                        ))}
                     </CommandGroup>
                   </Command>
                 </PopoverContent>
