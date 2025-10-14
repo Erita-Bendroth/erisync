@@ -30,6 +30,7 @@ const Schedule = () => {
   const teamFromUrl = searchParams.get('team') || '';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
 
   // Two-week notification state
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -426,9 +427,9 @@ const Schedule = () => {
                   )}
                 </div>
               </div>
-              <BulkScheduleGenerator />
+              <BulkScheduleGenerator onScheduleGenerated={() => setScheduleRefreshKey(prev => prev + 1)} />
             </div>
-            <ScheduleView initialTeamId={teamFromUrl} />
+            <ScheduleView key={scheduleRefreshKey} initialTeamId={teamFromUrl} />
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">

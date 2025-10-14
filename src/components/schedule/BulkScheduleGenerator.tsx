@@ -50,7 +50,11 @@ const SHIFT_TEMPLATES: ShiftTemplate[] = [
   { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
 ];
 
-const BulkScheduleGenerator = () => {
+interface BulkScheduleGeneratorProps {
+  onScheduleGenerated?: () => void;
+}
+
+const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
@@ -430,6 +434,9 @@ const BulkScheduleGenerator = () => {
       
       // Clear configurations after successful generation
       setShiftConfigurations([]);
+      
+      // Notify parent to refresh
+      onScheduleGenerated?.();
 
     } catch (error: any) {
       console.error('Error generating schedules:', error);

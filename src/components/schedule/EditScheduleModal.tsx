@@ -42,6 +42,7 @@ interface EditScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
+  onDelete?: () => void;
 }
 
 const shiftTypes = [
@@ -70,7 +71,8 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   entry,
   isOpen,
   onClose,
-  onSave
+  onSave,
+  onDelete
 }) => {
   const { toast } = useToast();
   const { showScheduleChangeNotification } = useDesktopNotifications();
@@ -293,6 +295,32 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     }
   };
 
+  const handleDelete = async () => {
+    if (!entry || entry.id.startsWith('temp-')) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from('schedule_entries')
+        .delete()
+        .eq('id', entry.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Schedule entry deleted successfully' });
+      
+      onDelete?.();
+      onSave();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting schedule entry:', error);
+      toast({ title: 'Error', description: 'Failed to delete schedule entry', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!entry) return null;
 
   return (
@@ -488,13 +516,23 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Saving..." : "Save Changes"}
-          </Button>
+        <DialogFooter className="flex justify-between">
+          <div>
+            {!entry.id.startsWith('temp-') && (
+              <Button variant="destructive" onClick={handleDelete} disabled={loading}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
