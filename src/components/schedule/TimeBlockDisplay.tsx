@@ -87,6 +87,20 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
       console.error("Failed to parse time split data");
     }
   }
+  
+  // Also check for old format: (HH:MM-HH:MM) in notes
+  if (!hasTimeSplit && entry.notes) {
+    const oldTimePattern = /\((\d{2}:\d{2})-(\d{2}:\d{2})\)/;
+    const oldMatch = entry.notes.match(oldTimePattern);
+    if (oldMatch) {
+      timeBlocks = [{
+        activity_type: entry.activity_type,
+        start_time: oldMatch[1],
+        end_time: oldMatch[2]
+      }];
+      hasTimeSplit = true;
+    }
+  }
 
   // Default shift times if no time split
   const getDefaultTimes = (shiftType: string) => {
