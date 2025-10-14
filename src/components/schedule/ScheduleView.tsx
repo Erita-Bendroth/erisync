@@ -518,8 +518,8 @@ useEffect(() => {
         const teamIds = allTeams?.map(t => t.id) || [];
         console.log(`📊 All Teams fetch: ${teamIds.length} teams total, date range: ${dateStart} to ${dateEnd}`);
 
-        // Batch fetch by team to avoid .in() limits
-        const BATCH_SIZE = 25;
+        // Batch fetch by team with smaller batch size to avoid hitting limits
+        const BATCH_SIZE = 10; // Reduced from 25 to ensure all dates get fetched
         let batchNumber = 0;
         
         for (let i = 0; i < teamIds.length; i += BATCH_SIZE) {
@@ -795,24 +795,6 @@ useEffect(() => {
       
       return entry.user_id === employeeId && entryDateStr === normalizedDateStr;
     });
-    
-    // Debug logging for Friday only - log first call
-    if (normalizedDateStr === "2025-10-17" && matchingEntries.length === 0) {
-      console.log('🔍 FRIDAY NO MATCH:', {
-        employeeId: employeeId.substring(0, 8),
-        lookingFor: normalizedDateStr,
-        totalEntries: scheduleEntries.length,
-        fridayEntriesInState: scheduleEntries.filter(e => {
-          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
-          return eDate === "2025-10-17";
-        }).length,
-        sampleEntryForThisUser: scheduleEntries.find(e => e.user_id === employeeId),
-        sampleFridayEntry: scheduleEntries.find(e => {
-          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
-          return eDate === "2025-10-17";
-        })
-      });
-    }
     
     return matchingEntries;
   };
@@ -1158,26 +1140,6 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
                       const dayHolidays = getHolidaysForDay(day);
                       const isToday = isSameDay(day, new Date());
-                      
-                      // Debug logging for the first employee on Friday
-                      if (dayIndex === 4 && employee.user_id === employees[0]?.user_id) {
-                        const uiDateStr = format(day, "yyyy-MM-dd");
-                        console.log('🔍 Friday rendering check:', {
-                          employeeId: employee.user_id.substring(0, 8),
-                          uiDate: uiDateStr,
-                          dayObject: day.toISOString(),
-                          entriesFound: dayEntries.length,
-                          totalScheduleEntries: scheduleEntries.length,
-                          fridayEntriesInState: scheduleEntries.filter(e => {
-                            const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
-                            return eDate === '2025-10-17';
-                          }).length,
-                          sampleFridayEntry: scheduleEntries.find(e => {
-                            const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
-                            return eDate === '2025-10-17' && e.user_id === employee.user_id;
-                          })
-                        });
-                      }
                       
                       return (
                         <TableCell
