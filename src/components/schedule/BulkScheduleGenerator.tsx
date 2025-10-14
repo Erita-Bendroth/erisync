@@ -81,7 +81,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [shiftConfigurations, setShiftConfigurations] = useState<ShiftConfiguration[]>([]);
   
   // Rotation mode states
-  const [selectedUserForRotation, setSelectedUserForRotation] = useState<string>("");
+  const [selectedUsersForRotation, setSelectedUsersForRotation] = useState<string[]>([]);
   const [enableRecurring, setEnableRecurring] = useState(false);
   const [rotationPattern, setRotationPattern] = useState<RotationPattern>({
     intervalWeeks: 4,
@@ -233,6 +233,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     );
   };
 
+  const toggleRotationUserSelection = (userId: string) => {
+    setSelectedUsersForRotation(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
   const selectAllUsers = () => {
     setSelectedUsers(users.map(u => u.id));
   };
@@ -263,10 +271,10 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const addShiftConfiguration = () => {
     // Rotation mode validation
     if (bulkMode === 'rotation') {
-      if (!selectedUserForRotation) {
+      if (selectedUsersForRotation.length === 0) {
         toast({
           title: "Error",
-          description: "Please select a user for this shift",
+          description: "Please select at least one user for this shift",
           variant: "destructive",
         });
         return;
@@ -303,19 +311,46 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     }
 
     const template = SHIFT_TEMPLATES.find(t => t.id === shiftTemplate);
-    const selectedUser = users.find(u => u.id === selectedUserForRotation);
     
-    const newConfig: ShiftConfiguration = {
-      id: `shift-${Date.now()}`,
-      shiftType: shiftTemplate,
-      shiftName: template?.name || 'Custom',
-      dates: [...selectedDates],
-      startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
-      endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
-      userId: bulkMode === 'rotation' ? selectedUserForRotation : undefined
-    };
+    // For rotation mode, create separate configs for each selected user
+    if (bulkMode === 'rotation') {
+      const newConfigs = selectedUsersForRotation.map(userId => {
+        const selectedUser = users.find(u => u.id === userId);
+        return {
+          id: `shift-${Date.now()}-${userId}`,
+          shiftType: shiftTemplate,
+          shiftName: template?.name || 'Custom',
+          dates: [...selectedDates],
+          startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
+          endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
+          userId: userId
+        };
+      });
+      
+      setShiftConfigurations(prev => [...prev, ...newConfigs]);
+      
+      toast({
+        title: "Shifts Added",
+        description: `Added ${template?.name || 'Custom'} for ${selectedUsersForRotation.length} user(s) on ${selectedDates.length} date(s)`,
+      });
+    } else {
+      const newConfig: ShiftConfiguration = {
+        id: `shift-${Date.now()}`,
+        shiftType: shiftTemplate,
+        shiftName: template?.name || 'Custom',
+        dates: [...selectedDates],
+        startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
+        endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
+        userId: undefined
+      };
 
-    setShiftConfigurations(prev => [...prev, newConfig]);
+      setShiftConfigurations(prev => [...prev, newConfig]);
+      
+      toast({
+        title: "Shift Added",
+        description: `Added ${newConfig.shiftName} for ${newConfig.dates.length} date(s)`,
+      });
+    }
     
     // Reset form
     setSelectedDates([]);
@@ -323,15 +358,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     setCustomStartTime('08:00');
     setCustomEndTime('16:30');
     if (bulkMode === 'rotation') {
-      setSelectedUserForRotation("");
+      setSelectedUsersForRotation([]);
     }
-
-    toast({
-      title: "Shift Added",
-      description: bulkMode === 'rotation' 
-        ? `Added ${newConfig.shiftName} for ${selectedUser?.first_name} ${selectedUser?.last_name} on ${newConfig.dates.length} date(s)`
-        : `Added ${newConfig.shiftName} for ${newConfig.dates.length} date(s)`,
-    });
   };
 
   const removeShiftConfiguration = (id: string) => {
@@ -590,7 +618,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             setBulkMode(value);
             setSelectedUsers([]);
             setShiftConfigurations([]);
-            setSelectedUserForRotation("");
+            setSelectedUsersForRotation([]);
           }}>
             <SelectTrigger>
               <SelectValue />
@@ -623,22 +651,51 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           )}
         </div>
 
-        {/* User Selection for Rotation Mode */}
+        {/* Team Selection for Rotation Mode - Moved Above User Selection */}
         {bulkMode === 'rotation' && (
-          <div className="space-y-2 p-3 border rounded-lg bg-muted/10">
-            <label className="text-sm font-medium">Select User for This Shift</label>
-            <Select value={selectedUserForRotation} onValueChange={setSelectedUserForRotation}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Team</label>
+            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a user..." />
+                <SelectValue placeholder="Select a team" />
               </SelectTrigger>
-              <SelectContent>
-                {users.map((usr) => (
-                  <SelectItem key={usr.id} value={usr.id}>
-                    {usr.first_name} {usr.last_name}
+              <SelectContent className="bg-background z-50">
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {/* Multiple User Selection for Rotation Mode */}
+        {bulkMode === 'rotation' && selectedTeam && users.length > 0 && (
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/10">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Select Users for This Shift</label>
+              <div className="text-xs text-muted-foreground">
+                {selectedUsersForRotation.length} selected
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+              {users.map((usr) => (
+                <div
+                  key={usr.id}
+                  className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                  onClick={() => toggleRotationUserSelection(usr.id)}
+                >
+                  <Checkbox
+                    checked={selectedUsersForRotation.includes(usr.id)}
+                    onCheckedChange={() => toggleRotationUserSelection(usr.id)}
+                  />
+                  <label className="text-sm cursor-pointer flex-1">
+                    {usr.first_name} {usr.last_name}
+                  </label>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -800,7 +857,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           onClick={addShiftConfiguration}
           variant="secondary"
           className="w-full"
-          disabled={selectedDates.length === 0 || (bulkMode === 'rotation' && !selectedUserForRotation)}
+          disabled={selectedDates.length === 0 || (bulkMode === 'rotation' && selectedUsersForRotation.length === 0)}
         >
           <Zap className="w-4 h-4 mr-2" />
           Add This Shift Configuration
