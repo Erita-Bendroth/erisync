@@ -137,34 +137,9 @@ const AdminHolidayManager = () => {
   }, [user, hasPermission]);
 
   const triggerHolidayAutoAssignment = useCallback(async () => {
-    try {
-      setLoading(true);
-      toast({
-        title: "Auto-assigning holidays",
-        description: "Assigning holidays to all users based on their location...",
-      });
-
-      const { data, error } = await supabase.functions.invoke('auto-assign-holidays', {
-        body: { triggered_by: 'manual_trigger' }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: data?.message || `Assigned ${data?.assigned || 0} holiday entries to users`,
-      });
-    } catch (error: any) {
-      console.error('Error triggering holiday auto-assignment:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to auto-assign holidays",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+    // Holidays are now displayed directly from holidays table - no need to create schedule entries
+    console.log('Holidays are automatically displayed from holidays table');
+  }, []);
 
   const importHolidays = useCallback(async () => {
     if (!user || !hasPermission) return;
@@ -215,17 +190,12 @@ const AdminHolidayManager = () => {
 
       toast({
         title: "Success",
-        description: totalImported > 0 
-          ? `Imported ${totalImported} holidays for ${selectedYear}${selectedRegions.length > 0 ? ` (${selectedRegions.length} regions)` : ''}. Auto-assignment is running in the background.`
+        description: totalImported > 0
+          ? `Imported ${totalImported} holidays for ${selectedYear}${selectedRegions.length > 0 ? ` (${selectedRegions.length} regions)` : ''}. They will automatically appear for users based on their location.`
           : `All holidays for ${selectedYear} already exist (${totalExisting} holidays)`,
       });
 
       fetchHolidays();
-      
-      // Trigger auto-assignment in the background (non-blocking)
-      triggerHolidayAutoAssignment().catch(err => {
-        console.error('Background auto-assignment error:', err);
-      });
       
     } catch (error: any) {
       console.error('Error importing holidays:', error);
@@ -237,7 +207,7 @@ const AdminHolidayManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegions, toast, fetchHolidays, triggerHolidayAutoAssignment]);
+  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegions, toast, fetchHolidays]);
 
   const deleteHolidays = useCallback(async (countryCode: string, year: number) => {
     if (!user || !hasPermission) return;
@@ -345,8 +315,8 @@ const AdminHolidayManager = () => {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Important:</strong> Holidays imported here are automatically assigned to users based on their country and region settings. 
-              Users do not need to manually import holidays - they receive them automatically based on their location profile.
+              <strong>Important:</strong> Holidays imported here automatically appear for users based on their country and region settings. 
+              They display as informational badges in the schedule view, NOT as shifts.
             </AlertDescription>
           </Alert>
           
@@ -415,32 +385,6 @@ const AdminHolidayManager = () => {
             <Button onClick={importHolidays} disabled={loading}>
               <Download className="w-4 h-4 mr-2" />
               {loading ? "Importing..." : "Import Holidays"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Auto-Assign Holidays to Users</CardTitle>
-          <CardDescription>
-            Manually trigger holiday assignment for all users based on their location profiles
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                This will automatically create schedule entries for public holidays for all users based on their country and region settings. Only future holidays will be assigned.
-              </AlertDescription>
-            </Alert>
-            <Button 
-              onClick={triggerHolidayAutoAssignment} 
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? "Assigning..." : "Auto-Assign Holidays to All Users"}
             </Button>
           </div>
         </CardContent>
