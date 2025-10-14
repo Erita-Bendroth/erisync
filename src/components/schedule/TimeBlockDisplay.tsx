@@ -90,6 +90,28 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   showNotes = false,
   userRole = ""
 }) => {
+  // Check if this is a holiday entry (activity_type = 'other' with "Public holiday:" in notes)
+  const isHoliday = entry.activity_type === 'other' && entry.notes?.includes('Public holiday:');
+  
+  // If it's a holiday, display ONLY the holiday name badge with NO time information
+  if (isHoliday) {
+    const holidayName = entry.notes?.replace(/Public holiday:\s*/, '').trim() || 'Holiday';
+    return (
+      <div className={`w-full ${className}`}>
+        <Badge
+          variant="outline"
+          className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 block text-xs w-full cursor-default"
+        >
+          <div className="flex flex-col items-center py-1 w-full">
+            <span className="font-medium">
+              🎉 {holidayName}
+            </span>
+          </div>
+        </Badge>
+      </div>
+    );
+  }
+  
   // Check if entry has time split information in notes
   const timeSplitPattern = /Times:\s*(.+)/;
   const match = entry.notes?.match(timeSplitPattern);
