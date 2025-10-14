@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { EditScheduleModal } from './EditScheduleModal';
 import { TimeBlockDisplay } from './TimeBlockDisplay';
+import { TeamHierarchyInfo } from './TeamHierarchyInfo';
 import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
@@ -283,19 +284,7 @@ useEffect(() => {
     try {
       console.log('🔍 Fetching teams with hierarchy information');
       
-      // For managers, fetch accessible teams including sub-teams via RPC
-      if (isManager() && !isPlanner()) {
-        const { data: accessibleTeamIds, error: rpcError } = await supabase
-          .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
-        
-        if (rpcError) {
-          console.error('Error fetching accessible teams:', rpcError);
-        } else {
-          console.log(`✅ Manager accessible teams (including sub-teams): ${accessibleTeamIds?.length || 0} teams`);
-          console.log('Accessible team IDs:', accessibleTeamIds);
-        }
-      }
-      
+      // Fetch all teams first
       const { data, error } = await supabase
         .from('teams')
         .select('id, name, parent_team_id')
@@ -309,7 +298,34 @@ useEffect(() => {
         team: t.name,
         parent: data.find(p => p.id === t.parent_team_id)?.name || 'Unknown'
       }));
-      console.log('Team hierarchy relationships:', hierarchyLog);
+      console.log('📊 Team hierarchy relationships:', hierarchyLog);
+      
+      // For managers, log accessible teams with hierarchy context
+      if (isManager() && !isPlanner()) {
+        const { data: accessibleTeamIds, error: rpcError } = await supabase
+          .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+        
+        if (rpcError) {
+          console.error('❌ Error fetching accessible teams:', rpcError);
+        } else {
+          console.log(`✅ Manager accessible teams (including sub-teams): ${accessibleTeamIds?.length || 0} teams`);
+          
+          // Log diagnostic information about access
+          const accessibleTeams = data?.filter(t => accessibleTeamIds?.includes(t.id)) || [];
+          console.log('🔓 HIERARCHICAL ACCESS DIAGNOSTIC:');
+          accessibleTeams.forEach(team => {
+            const parent = data?.find(p => p.id === team.parent_team_id);
+            const children = data?.filter(t => t.parent_team_id === team.id);
+            console.log(`  • ${team.name}`, {
+              reason: team.parent_team_id 
+                ? `Access granted via parent: ${parent?.name || 'Unknown'}` 
+                : 'Direct team assignment',
+              hasChildren: children.length > 0,
+              childTeams: children.map(c => c.name)
+            });
+          });
+        }
+      }
       
       setTeams(data || []);
     } catch (error) {
@@ -354,23 +370,64 @@ useEffect(() => {
         let targetUserIds: string[] = [];
 
         if (selectedTeam !== "all") {
-          console.log('Selected specific team:', selectedTeam);
-          const { data: teamMembersRes, error: teamMembersError } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .eq('team_id', selectedTeam)
-            .limit(10000);
+          console.log('🎯 Selected specific team:', selectedTeam);
+          
+          // Get the selected team's info for diagnostics
+          const { data: selectedTeamData } = await supabase
+            .from('teams')
+            .select('name, parent_team_id')
+            .eq('id', selectedTeam)
+            .single();
+          
+          // For managers, use hierarchical access (selected team + sub-teams)
+          if (isManager() && !isPlanner()) {
+            const { data: subteamIds } = await supabase
+              .rpc('get_all_subteam_ids', { _team_id: selectedTeam });
+            
+            const teamIdsToQuery = subteamIds || [selectedTeam];
+            const childTeamsCount = teamIdsToQuery.length - 1; // Subtract the parent team itself
+            
+            console.log(`🔓 HIERARCHICAL ACCESS GRANTED:`);
+            console.log(`  Team: "${selectedTeamData?.name}"`);
+            console.log(`  Access Level: ${selectedTeamData?.parent_team_id ? 'Mid/Lower-Level Manager' : 'Top-Level Manager'}`);
+            console.log(`  Total Teams Accessible: ${teamIdsToQuery.length} (1 parent + ${childTeamsCount} child team${childTeamsCount !== 1 ? 's' : ''})`);
+            console.log(`  Reason: Hierarchical team structure - manager can view assigned team and all descendant teams`);
+            
+            const { data: teamMembersRes, error: teamMembersError } = await supabase
+              .from('team_members')
+              .select('user_id')
+              .in('team_id', teamIdsToQuery)
+              .limit(10000);
 
-          if (teamMembersError) {
-            console.error('Error fetching team members:', teamMembersError);
-            setEmployees([]);
-            return;
+            if (teamMembersError) {
+              console.error('Error fetching team members:', teamMembersError);
+              setEmployees([]);
+              return;
+            }
+
+            targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
+            console.log(`  👥 Total Users Accessible: ${targetUserIds.length} users across all teams`);
+          } else {
+            // Planners see only the selected team (no hierarchy for planners in single team view)
+            const { data: teamMembersRes, error: teamMembersError } = await supabase
+              .from('team_members')
+              .select('user_id')
+              .eq('team_id', selectedTeam)
+              .limit(10000);
+
+            if (teamMembersError) {
+              console.error('Error fetching team members:', teamMembersError);
+              setEmployees([]);
+              return;
+            }
+
+            targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
+            console.log(`📊 Planner viewing single team: "${selectedTeamData?.name}" with ${targetUserIds.length} users`);
           }
-
-          targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
+          
           console.log('Target user IDs for team:', targetUserIds);
         } else {
-          console.log('All teams view: fetching ALL team members across ALL teams');
+          console.log('All teams view: fetching ALL team members across ALL accessible teams');
           
           // CRITICAL: For managers, use hierarchical team access (managed teams + sub-teams)
           // For planners, fetch all teams
@@ -403,8 +460,7 @@ useEffect(() => {
             }
             
             teamIds = accessibleTeamIds || [];
-            console.log(`📊 Manager accessible teams (including sub-teams): ${teamIds.length} teams`);
-            console.log('Accessible team IDs:', teamIds);
+            console.log(`🔓 HIERARCHICAL ACCESS: Manager can view ${teamIds.length} teams (including sub-teams)`);
           }
           
           console.log('All team IDs for "All Teams" view:', teamIds);
@@ -1241,51 +1297,81 @@ const getActivityColor = (entry: ScheduleEntry) => {
                         All Teams
                       </CommandItem>
                       
-                      {/* Show parent teams first, then their sub-teams indented */}
+                      {/* Hierarchical team display: Top-level → Mid-level → Lower-level */}
                       {teams
                         .filter(team => !team.parent_team_id)
-                        .map((parentTeam) => (
-                          <React.Fragment key={parentTeam.id}>
-                            <CommandItem
-                              value={parentTeam.name}
-                              onSelect={() => {
-                                setSelectedTeam(parentTeam.id);
-                                setTeamDropdownOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedTeam === parentTeam.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {parentTeam.name}
-                            </CommandItem>
-                            
-                            {/* Show sub-teams indented */}
-                            {teams
-                              .filter(team => team.parent_team_id === parentTeam.id)
-                              .map((subTeam) => (
-                                <CommandItem
-                                  key={subTeam.id}
-                                  value={subTeam.name}
-                                  onSelect={() => {
-                                    setSelectedTeam(subTeam.id);
-                                    setTeamDropdownOpen(false);
-                                  }}
-                                  className="pl-8"
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedTeam === subTeam.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  ↳ {subTeam.name}
-                                </CommandItem>
-                              ))}
-                          </React.Fragment>
-                        ))}
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((topLevelTeam) => {
+                          const midLevelTeams = teams.filter(t => t.parent_team_id === topLevelTeam.id);
+                          
+                          return (
+                            <React.Fragment key={topLevelTeam.id}>
+                              <CommandItem
+                                value={topLevelTeam.name}
+                                onSelect={() => {
+                                  setSelectedTeam(topLevelTeam.id);
+                                  setTeamDropdownOpen(false);
+                                }}
+                                className="font-semibold"
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedTeam === topLevelTeam.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                📍 {topLevelTeam.name}
+                              </CommandItem>
+                              
+                              {/* Mid-level teams (yellow in diagram) */}
+                              {midLevelTeams.sort((a, b) => a.name.localeCompare(b.name)).map((midTeam) => {
+                                const lowerLevelTeams = teams.filter(t => t.parent_team_id === midTeam.id);
+                                
+                                return (
+                                  <React.Fragment key={midTeam.id}>
+                                    <CommandItem
+                                      value={midTeam.name}
+                                      onSelect={() => {
+                                        setSelectedTeam(midTeam.id);
+                                        setTeamDropdownOpen(false);
+                                      }}
+                                      className="pl-6"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          selectedTeam === midTeam.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      ├─ {midTeam.name}
+                                    </CommandItem>
+                                    
+                                    {/* Lower-level teams (third level) */}
+                                    {lowerLevelTeams.sort((a, b) => a.name.localeCompare(b.name)).map((lowerTeam) => (
+                                      <CommandItem
+                                        key={lowerTeam.id}
+                                        value={lowerTeam.name}
+                                        onSelect={() => {
+                                          setSelectedTeam(lowerTeam.id);
+                                          setTeamDropdownOpen(false);
+                                        }}
+                                        className="pl-12 text-sm"
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            selectedTeam === lowerTeam.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        └─ {lowerTeam.name}
+                                      </CommandItem>
+                                    ))}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
                       
                       {/* Show orphan teams (teams without parents that aren't in the parent list) */}
                       {teams
@@ -1348,6 +1434,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
           </div>
         </div>
       </div>
+
+      {/* Hierarchical Team Information */}
+      {(isManager() || isPlanner()) && selectedTeam !== "all" && (
+        <TeamHierarchyInfo selectedTeamId={selectedTeam} teams={teams} />
+      )}
 
       {/* Table-based Schedule View */}
       <div className="space-y-4">
