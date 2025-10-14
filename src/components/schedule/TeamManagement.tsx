@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Users, Settings, Trash2, Download, BarChart3, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { Plus, Users, Settings, Trash2, Download, BarChart3, ChevronDown, ChevronRight, Pencil, UserCheck } from "lucide-react";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import { EditTeamModal } from "./EditTeamModal";
+import { DelegateAccessModal } from "./DelegateAccessModal";
+import { DelegationIndicator } from "./DelegationIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import * as XLSX from 'xlsx';
@@ -57,6 +59,7 @@ const TeamManagement = () => {
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [editTeamOpen, setEditTeamOpen] = useState(false);
+  const [delegateAccessOpen, setDelegateAccessOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [teamToEdit, setTeamToEdit] = useState<Team | null>(null);
   const [userRole, setUserRole] = useState<string>("");
@@ -619,6 +622,13 @@ const TeamManagement = () => {
           </Dialog>
           )}
 
+          {userRole === 'manager' && (
+            <Button size="sm" onClick={() => setDelegateAccessOpen(true)}>
+              <UserCheck className="w-4 h-4 mr-2" />
+              Delegate Access
+            </Button>
+          )}
+
           {(userRole === 'admin' || userRole === 'planner') && (
             <Dialog open={createTeamOpen} onOpenChange={setCreateTeamOpen}>
               <DialogTrigger asChild>
@@ -844,6 +854,11 @@ const TeamManagement = () => {
         )}
       </div>
 
+      {/* Delegation Indicator - Only for managers */}
+      {userRole === 'manager' && user && (
+        <DelegationIndicator userId={user.id} isManager={true} />
+      )}
+
       {/* Edit Team Modal */}
       <EditTeamModal
         team={teamToEdit}
@@ -858,6 +873,21 @@ const TeamManagement = () => {
         }}
         allTeams={teams}
       />
+
+      {/* Delegate Access Modal - Only for managers */}
+      {user && (
+        <DelegateAccessModal
+          open={delegateAccessOpen}
+          onOpenChange={setDelegateAccessOpen}
+          managerId={user.id}
+          onSuccess={() => {
+            toast({
+              title: "Success",
+              description: "Delegation created successfully",
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

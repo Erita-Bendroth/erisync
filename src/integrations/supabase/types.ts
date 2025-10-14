@@ -41,6 +41,41 @@ export type Database = {
         }
         Relationships: []
       }
+      delegation_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          delegation_id: string
+          details: Json | null
+          id: string
+          performed_by: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          delegation_id: string
+          details?: Json | null
+          id?: string
+          performed_by: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          delegation_id?: string
+          details?: Json | null
+          id?: string
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delegation_audit_log_delegation_id_fkey"
+            columns: ["delegation_id"]
+            isOneToOne: false
+            referencedRelation: "manager_delegations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           country_code: string
@@ -77,6 +112,45 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           year?: number
+        }
+        Relationships: []
+      }
+      manager_delegations: {
+        Row: {
+          created_at: string
+          delegate_id: string
+          end_date: string
+          id: string
+          manager_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delegate_id: string
+          end_date: string
+          id?: string
+          manager_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delegate_id?: string
+          end_date?: string
+          id?: string
+          manager_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -487,6 +561,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      expire_old_delegations: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_all_basic_profiles: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -519,6 +597,10 @@ export type Database = {
           jobname: string
           schedule: string
         }[]
+      }
+      get_delegated_manager_teams: {
+        Args: { _delegate_id: string }
+        Returns: string[]
       }
       get_managed_team_ids: {
         Args: { _uid: string }
@@ -570,6 +652,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: string[]
       }
+      has_manager_access: {
+        Args: { _team_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -580,6 +666,10 @@ export type Database = {
       import_holidays_for_year: {
         Args: { _country_code: string; _year: number }
         Returns: undefined
+      }
+      is_active_delegate: {
+        Args: { _delegate_id: string; _manager_id: string }
+        Returns: boolean
       }
       is_manager_of_team: {
         Args: { _team_id: string; _user_id: string }

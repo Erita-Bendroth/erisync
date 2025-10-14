@@ -7,6 +7,7 @@ import { Calendar, Users, Clock, UserCheck, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { DelegationIndicator } from "@/components/schedule/DelegationIndicator";
 
 interface UserRole {
   role: string;
@@ -123,6 +124,11 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
         </Card>
+      )}
+
+      {/* Delegation Indicator for Managers */}
+      {userRole === 'manager' && user && (
+        <DelegationIndicator userId={user.id} isManager={true} />
       )}
 
       {/* Quick Stats */}
