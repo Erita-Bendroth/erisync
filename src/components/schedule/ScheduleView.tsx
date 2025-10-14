@@ -632,11 +632,16 @@ useEffect(() => {
         totalEntries: transformedData.length,
         uniqueUsers: userIds.length,
         dates: [...new Set(transformedData.map(e => e.date))].sort(),
-        fridayEntries: transformedData.filter(e => e.date === '2025-10-17').length,
-        sampleFridayUsers: transformedData
-          .filter(e => e.date === '2025-10-17')
-          .slice(0, 5)
-          .map(e => ({ userId: e.user_id.substring(0, 8), date: e.date }))
+        entriesPerDate: transformedData.reduce((acc, e) => {
+          const dateKey = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
+          acc[dateKey] = (acc[dateKey] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        sampleEntries: transformedData.slice(0, 3).map(e => ({
+          userId: e.user_id.substring(0, 8),
+          date: e.date,
+          dateType: typeof e.date
+        }))
       });
       
       setScheduleEntries(transformedData);
@@ -748,36 +753,23 @@ useEffect(() => {
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
-    const isFriday = format(date, "EEE") === "Fri";
+    // Normalize UI date to YYYY-MM-DD format at midnight UTC to avoid timezone issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const normalizedDateStr = `${year}-${month}-${day}`;
     
-    // Filter entries by matching date strings directly (more reliable than date comparison)
+    // Filter entries by matching normalized date strings
     const matchingEntries = scheduleEntries.filter(entry => {
-      const entryDateStr = typeof entry.date === 'string' ? entry.date : format(new Date(entry.date), "yyyy-MM-dd");
-      const matches = entry.user_id === employeeId && entryDateStr === dateStr;
+      // Normalize entry date (from DB it's already YYYY-MM-DD string)
+      const entryDateStr = typeof entry.date === 'string' 
+        ? entry.date.split('T')[0] // Handle potential ISO timestamp, take date part only
+        : format(new Date(entry.date), "yyyy-MM-dd");
       
-      // Debug logging for Friday only
-      if (isFriday && entry.user_id === employeeId && entryDateStr.includes('2025-10-17')) {
-        console.log('🔍 Friday match check:', {
-          employeeId: employeeId.substring(0, 8),
-          queryDate: dateStr,
-          entryDate: entryDateStr,
-          matches
-        });
-      }
+      const matches = entry.user_id === employeeId && entryDateStr === normalizedDateStr;
       
       return matches;
     });
-    
-    // Log when Friday has no entries for debugging
-    if (isFriday && matchingEntries.length === 0 && scheduleEntries.some(e => e.date.includes('2025-10-17'))) {
-      console.log('⚠️ Friday entries exist but none matched for employee:', {
-        employeeId: employeeId.substring(0, 8),
-        queryDate: dateStr,
-        totalFridayEntries: scheduleEntries.filter(e => e.date.includes('2025-10-17')).length,
-        employeeHasFridayInData: scheduleEntries.some(e => e.user_id === employeeId && e.date.includes('2025-10-17'))
-      });
-    }
     
     return matchingEntries;
   };
@@ -1123,6 +1115,24 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
                       const dayHolidays = getHolidaysForDay(day);
                       const isToday = isSameDay(day, new Date());
+                      
+                      // Debug logging for the first employee on Friday
+                      if (dayIndex === 4 && employee.user_id === employees[0]?.user_id) {
+                        const year = day.getFullYear();
+                        const month = String(day.getMonth() + 1).padStart(2, '0');
+                        const dayNum = String(day.getDate()).padStart(2, '0');
+                        console.log('🔍 Friday rendering check:', {
+                          employeeId: employee.user_id.substring(0, 8),
+                          uiDate: `${year}-${month}-${dayNum}`,
+                          dayObject: day.toISOString(),
+                          entriesFound: dayEntries.length,
+                          totalScheduleEntries: scheduleEntries.length,
+                          fridayEntriesInState: scheduleEntries.filter(e => {
+                            const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
+                            return eDate === '2025-10-17';
+                          }).length
+                        });
+                      }
                       
                       return (
                         <TableCell
