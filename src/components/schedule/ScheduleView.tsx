@@ -516,11 +516,14 @@ useEffect(() => {
           .limit(10000);
         
         const teamIds = allTeams?.map(t => t.id) || [];
+        console.log(`📊 All Teams fetch: ${teamIds.length} teams total, date range: ${dateStart} to ${dateEnd}`);
 
         // Batch fetch by team to avoid .in() limits
         const BATCH_SIZE = 25;
+        let batchNumber = 0;
         
         for (let i = 0; i < teamIds.length; i += BATCH_SIZE) {
+          batchNumber++;
           const batchTeamIds = teamIds.slice(i, i + BATCH_SIZE);
           
           const { data: batchData, error: batchError } = await supabase
@@ -548,8 +551,34 @@ useEffect(() => {
             throw batchError;
           }
           
+          // Log batch details
+          const batchEntriesPerDate = (batchData || []).reduce((acc, e) => {
+            const dateKey = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
+            acc[dateKey] = (acc[dateKey] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          
+          console.log(`📦 Batch ${batchNumber}/${Math.ceil(teamIds.length / BATCH_SIZE)}:`, {
+            teamsInBatch: batchTeamIds.length,
+            entriesInBatch: batchData?.length || 0,
+            entriesPerDate: batchEntriesPerDate,
+            accumulatedTotal: allData.length + (batchData?.length || 0)
+          });
+          
           allData = [...allData, ...(batchData || [])];
         }
+        
+        // Log final accumulated data before transformation
+        const finalEntriesPerDate = allData.reduce((acc, e) => {
+          const dateKey = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
+          acc[dateKey] = (acc[dateKey] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('🎯 All batches merged:', {
+          totalEntries: allData.length,
+          entriesPerDate: finalEntriesPerDate
+        });
         
       } else {
         // Single team or specific view mode
