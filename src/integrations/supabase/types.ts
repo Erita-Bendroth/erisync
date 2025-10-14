@@ -439,6 +439,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_team_hierarchy: {
+        Args: { _team_id: string }
+        Returns: {
+          level: number
+          path: string
+          team_id: string
+          team_name: string
+        }[]
+      }
       get_user_teams: {
         Args: { _user_id: string }
         Returns: string[]
