@@ -785,23 +785,22 @@ useEffect(() => {
     // Use date-fns format to ensure consistent YYYY-MM-DD string regardless of timezone
     const normalizedDateStr = format(date, "yyyy-MM-dd");
     
-    // Debug logging for Friday only
+    // Debug logging for Friday only - simplified
     const isFriday = normalizedDateStr === "2025-10-17";
-    if (isFriday && employeeId === employees[0]?.user_id) {
-      console.log('🔍 getEntriesForEmployeeAndDay called for Friday:', {
+    if (isFriday) {
+      console.log('🔍 FRIDAY LOOKUP:', {
         employeeId: employeeId.substring(0, 8),
-        normalizedDateStr,
-        totalEntriesInState: scheduleEntries.length,
-        entriesForThisEmployee: scheduleEntries.filter(e => e.user_id === employeeId).length,
-        entriesForFriday: scheduleEntries.filter(e => {
+        lookingFor: normalizedDateStr,
+        totalEntries: scheduleEntries.length,
+        fridayEntriesTotal: scheduleEntries.filter(e => {
           const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
-          return eDate === normalizedDateStr;
+          return eDate === "2025-10-17";
         }).length,
-        sampleEntryDates: scheduleEntries.slice(0, 5).map(e => ({
-          date: e.date,
-          dateType: typeof e.date,
-          normalized: typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd")
-        }))
+        thisEmployeeFridayEntries: scheduleEntries.filter(e => {
+          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
+          return e.user_id === employeeId && eDate === "2025-10-17";
+        }).length,
+        firstFewDates: scheduleEntries.slice(0, 3).map(e => e.date)
       });
     }
     
@@ -812,22 +811,15 @@ useEffect(() => {
         ? entry.date.split('T')[0] // Handle potential ISO timestamp, take date part only
         : format(new Date(entry.date), "yyyy-MM-dd");
       
-      const userMatches = entry.user_id === employeeId;
-      const dateMatches = entryDateStr === normalizedDateStr;
-      
-      // Debug log first non-match for Friday
-      if (isFriday && employeeId === employees[0]?.user_id && !matchingEntries.length && entry.user_id === employeeId) {
-        console.log('🔍 Entry comparison for Friday:', {
-          entryDateStr,
-          normalizedDateStr,
-          dateMatches,
-          userMatches,
-          rawDate: entry.date
-        });
-      }
-      
-      return userMatches && dateMatches;
+      return entry.user_id === employeeId && entryDateStr === normalizedDateStr;
     });
+    
+    if (isFriday) {
+      console.log('🔍 FRIDAY RESULT:', {
+        employeeId: employeeId.substring(0, 8),
+        foundEntries: matchingEntries.length
+      });
+    }
     
     return matchingEntries;
   };
