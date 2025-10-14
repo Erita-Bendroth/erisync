@@ -785,25 +785,6 @@ useEffect(() => {
     // Use date-fns format to ensure consistent YYYY-MM-DD string regardless of timezone
     const normalizedDateStr = format(date, "yyyy-MM-dd");
     
-    // Debug logging for Friday only - simplified
-    const isFriday = normalizedDateStr === "2025-10-17";
-    if (isFriday) {
-      console.log('🔍 FRIDAY LOOKUP:', {
-        employeeId: employeeId.substring(0, 8),
-        lookingFor: normalizedDateStr,
-        totalEntries: scheduleEntries.length,
-        fridayEntriesTotal: scheduleEntries.filter(e => {
-          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
-          return eDate === "2025-10-17";
-        }).length,
-        thisEmployeeFridayEntries: scheduleEntries.filter(e => {
-          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
-          return e.user_id === employeeId && eDate === "2025-10-17";
-        }).length,
-        firstFewDates: scheduleEntries.slice(0, 3).map(e => e.date)
-      });
-    }
-    
     // Filter entries by matching normalized date strings
     const matchingEntries = scheduleEntries.filter(entry => {
       // Normalize entry date (from DB it's already YYYY-MM-DD string)
@@ -814,10 +795,21 @@ useEffect(() => {
       return entry.user_id === employeeId && entryDateStr === normalizedDateStr;
     });
     
-    if (isFriday) {
-      console.log('🔍 FRIDAY RESULT:', {
+    // Debug logging for Friday only - log first call
+    if (normalizedDateStr === "2025-10-17" && matchingEntries.length === 0) {
+      console.log('🔍 FRIDAY NO MATCH:', {
         employeeId: employeeId.substring(0, 8),
-        foundEntries: matchingEntries.length
+        lookingFor: normalizedDateStr,
+        totalEntries: scheduleEntries.length,
+        fridayEntriesInState: scheduleEntries.filter(e => {
+          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
+          return eDate === "2025-10-17";
+        }).length,
+        sampleEntryForThisUser: scheduleEntries.find(e => e.user_id === employeeId),
+        sampleFridayEntry: scheduleEntries.find(e => {
+          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
+          return eDate === "2025-10-17";
+        })
       });
     }
     
