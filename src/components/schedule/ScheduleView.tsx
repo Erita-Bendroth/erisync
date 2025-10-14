@@ -782,11 +782,8 @@ useEffect(() => {
   };
 
   const getEntriesForEmployeeAndDay = (employeeId: string, date: Date) => {
-    // Normalize UI date to YYYY-MM-DD format at midnight UTC to avoid timezone issues
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const normalizedDateStr = `${year}-${month}-${day}`;
+    // Use date-fns format to ensure consistent YYYY-MM-DD string regardless of timezone
+    const normalizedDateStr = format(date, "yyyy-MM-dd");
     
     // Filter entries by matching normalized date strings
     const matchingEntries = scheduleEntries.filter(entry => {
@@ -795,9 +792,7 @@ useEffect(() => {
         ? entry.date.split('T')[0] // Handle potential ISO timestamp, take date part only
         : format(new Date(entry.date), "yyyy-MM-dd");
       
-      const matches = entry.user_id === employeeId && entryDateStr === normalizedDateStr;
-      
-      return matches;
+      return entry.user_id === employeeId && entryDateStr === normalizedDateStr;
     });
     
     return matchingEntries;
@@ -1147,19 +1142,21 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       
                       // Debug logging for the first employee on Friday
                       if (dayIndex === 4 && employee.user_id === employees[0]?.user_id) {
-                        const year = day.getFullYear();
-                        const month = String(day.getMonth() + 1).padStart(2, '0');
-                        const dayNum = String(day.getDate()).padStart(2, '0');
+                        const uiDateStr = format(day, "yyyy-MM-dd");
                         console.log('🔍 Friday rendering check:', {
                           employeeId: employee.user_id.substring(0, 8),
-                          uiDate: `${year}-${month}-${dayNum}`,
+                          uiDate: uiDateStr,
                           dayObject: day.toISOString(),
                           entriesFound: dayEntries.length,
                           totalScheduleEntries: scheduleEntries.length,
                           fridayEntriesInState: scheduleEntries.filter(e => {
                             const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
                             return eDate === '2025-10-17';
-                          }).length
+                          }).length,
+                          sampleFridayEntry: scheduleEntries.find(e => {
+                            const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : e.date;
+                            return eDate === '2025-10-17' && e.user_id === employee.user_id;
+                          })
                         });
                       }
                       
