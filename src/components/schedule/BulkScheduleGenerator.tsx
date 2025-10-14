@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2, Repeat, X } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -41,12 +41,18 @@ interface ShiftConfiguration {
   dates: Date[];
   startTime: string;
   endTime: string;
+  userId?: string; // For rotation mode
+}
+
+interface RotationPattern {
+  intervalWeeks: number;
+  cycles: number;
 }
 
 const SHIFT_TEMPLATES: ShiftTemplate[] = [
   { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-  { id: 'early', name: 'Early Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-  { id: 'late', name: 'Late Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+  { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+  { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
   { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
 ];
 
@@ -61,7 +67,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [users, setUsers] = useState<User[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [bulkMode, setBulkMode] = useState<"team" | "users">("team");
+  const [bulkMode, setBulkMode] = useState<"team" | "users" | "rotation">("team");
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [loading, setLoading] = useState(false);
@@ -73,6 +79,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [customEndTime, setCustomEndTime] = useState<string>('16:30');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [shiftConfigurations, setShiftConfigurations] = useState<ShiftConfiguration[]>([]);
+  
+  // Rotation mode states
+  const [selectedUserForRotation, setSelectedUserForRotation] = useState<string>("");
+  const [enableRecurring, setEnableRecurring] = useState(false);
+  const [rotationPattern, setRotationPattern] = useState<RotationPattern>({
+    intervalWeeks: 4,
+    cycles: 1
+  });
 
   useEffect(() => {
     fetchUserRoles();
@@ -155,7 +169,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   };
 
   const fetchUsers = async () => {
-    if (!selectedTeam || bulkMode !== 'users') {
+    if (!selectedTeam || (bulkMode !== 'users' && bulkMode !== 'rotation')) {
       setUsers([]);
       return;
     }
@@ -247,6 +261,18 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   };
 
   const addShiftConfiguration = () => {
+    // Rotation mode validation
+    if (bulkMode === 'rotation') {
+      if (!selectedUserForRotation) {
+        toast({
+          title: "Error",
+          description: "Please select a user for this shift",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     if (selectedDates.length === 0) {
       toast({
         title: "Error",
@@ -277,13 +303,16 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     }
 
     const template = SHIFT_TEMPLATES.find(t => t.id === shiftTemplate);
+    const selectedUser = users.find(u => u.id === selectedUserForRotation);
+    
     const newConfig: ShiftConfiguration = {
       id: `shift-${Date.now()}`,
       shiftType: shiftTemplate,
       shiftName: template?.name || 'Custom',
       dates: [...selectedDates],
-      startTime: shiftTemplate === 'standard' ? '08:00' : customStartTime,
-      endTime: shiftTemplate === 'standard' ? '16:30' : customEndTime,
+      startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
+      endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
+      userId: bulkMode === 'rotation' ? selectedUserForRotation : undefined
     };
 
     setShiftConfigurations(prev => [...prev, newConfig]);
@@ -293,10 +322,15 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     setShiftTemplate('standard');
     setCustomStartTime('08:00');
     setCustomEndTime('16:30');
+    if (bulkMode === 'rotation') {
+      setSelectedUserForRotation("");
+    }
 
     toast({
       title: "Shift Added",
-      description: `Added ${newConfig.shiftName} for ${newConfig.dates.length} date(s)`,
+      description: bulkMode === 'rotation' 
+        ? `Added ${newConfig.shiftName} for ${selectedUser?.first_name} ${selectedUser?.last_name} on ${newConfig.dates.length} date(s)`
+        : `Added ${newConfig.shiftName} for ${newConfig.dates.length} date(s)`,
     });
   };
 
@@ -325,6 +359,15 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       toast({
         title: "Error",
         description: "Please select at least one user",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (bulkMode === "rotation" && shiftConfigurations.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one user-shift configuration",
         variant: "destructive",
       });
       return;
@@ -371,85 +414,105 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         }
       }
 
-      // Generate shifts for all configurations
       let totalGenerated = 0;
-      const targetUsers = bulkMode === "team" 
-        ? await getTeamMemberIds(selectedTeam)
-        : selectedUsers;
-
-      for (const userId of targetUsers) {
+      const cycles = enableRecurring ? rotationPattern.cycles : 1;
+      
+      // For each cycle (for recurring patterns)
+      for (let cycle = 0; cycle < cycles; cycle++) {
+        const weekOffset = cycle * rotationPattern.intervalWeeks * 7;
+        
+        // Generate shifts for all configurations
         for (const config of shiftConfigurations) {
-          // Get user's profile for holiday checking
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('country_code, region_code')
-            .eq('user_id', userId)
-            .maybeSingle();
+          // Determine target users based on mode
+          let targetUsers: string[];
+          if (bulkMode === "rotation") {
+            // In rotation mode, each config has its own user
+            targetUsers = config.userId ? [config.userId] : [];
+          } else if (bulkMode === "team") {
+            targetUsers = await getTeamMemberIds(selectedTeam);
+          } else {
+            targetUsers = selectedUsers;
+          }
 
-          const countryCode = profile?.country_code || 'US';
-          const regionCode = profile?.region_code || null;
+          for (const userId of targetUsers) {
+            // Get user's profile for holiday checking
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('country_code, region_code')
+              .eq('user_id', userId)
+              .maybeSingle();
 
-          // For each date in the configuration
-          for (const date of config.dates) {
-            const dateStr = format(date, 'yyyy-MM-dd');
-            
-            // Check if it's a holiday
-            const { data: holidays } = await supabase
-              .from('holidays')
-              .select('id')
-              .eq('date', dateStr)
-              .eq('country_code', countryCode)
-              .eq('is_public', true)
-              .or(`region_code.is.null,region_code.eq.${regionCode}`)
-              .limit(1);
+            const countryCode = profile?.country_code || 'US';
+            const regionCode = profile?.region_code || null;
 
-            // Skip if it's a holiday
-            if (holidays && holidays.length > 0) continue;
+            // For each date in the configuration (with cycle offset for recurring)
+            for (const baseDate of config.dates) {
+              const date = new Date(baseDate);
+              date.setDate(date.getDate() + weekOffset);
+              const dateStr = format(date, 'yyyy-MM-dd');
+              
+              // Check if it's a holiday
+              const { data: holidays } = await supabase
+                .from('holidays')
+                .select('id')
+                .eq('date', dateStr)
+                .eq('country_code', countryCode)
+                .eq('is_public', true)
+                .or(`region_code.is.null,region_code.eq.${regionCode}`)
+                .limit(1);
 
-            // Determine shift type based on shift name
-            let shiftType: 'early' | 'late' | 'normal' = 'normal';
-            if (config.shiftName.toLowerCase().includes('early')) {
-              shiftType = 'early';
-            } else if (config.shiftName.toLowerCase().includes('late')) {
-              shiftType = 'late';
-            }
+              // Skip if it's a holiday
+              if (holidays && holidays.length > 0) continue;
 
-            // Format notes with time block data for proper display
-            const timeBlockData = [{
-              activity_type: 'work',
-              start_time: config.startTime,
-              end_time: config.endTime
-            }];
-            const notes = `Times: ${JSON.stringify(timeBlockData)}\nAuto-generated ${config.shiftName}`;
+              // Determine shift type based on shift name
+              let shiftType: 'early' | 'late' | 'normal' = 'normal';
+              if (config.shiftName.toLowerCase().includes('early')) {
+                shiftType = 'early';
+              } else if (config.shiftName.toLowerCase().includes('late')) {
+                shiftType = 'late';
+              }
 
-            // Insert or update the schedule entry
-            const { error } = await supabase
-              .from('schedule_entries')
-              .upsert({
-                user_id: userId,
-                team_id: selectedTeam,
-                date: dateStr,
-                shift_type: shiftType,
+              // Format notes with time block data for proper display
+              const timeBlockData = [{
                 activity_type: 'work',
-                availability_status: 'available',
-                notes: notes,
-                created_by: user.id,
-              }, {
-                onConflict: 'user_id,date,team_id',
-              });
+                start_time: config.startTime,
+                end_time: config.endTime
+              }];
+              const cycleInfo = cycles > 1 ? ` (Cycle ${cycle + 1}/${cycles})` : '';
+              const notes = `Times: ${JSON.stringify(timeBlockData)}\nAuto-generated ${config.shiftName}${cycleInfo}`;
 
-            if (!error) totalGenerated++;
+              // Insert or update the schedule entry
+              const { error } = await supabase
+                .from('schedule_entries')
+                .upsert({
+                  user_id: userId,
+                  team_id: selectedTeam,
+                  date: dateStr,
+                  shift_type: shiftType,
+                  activity_type: 'work',
+                  availability_status: 'available',
+                  notes: notes,
+                  created_by: user.id,
+                }, {
+                  onConflict: 'user_id,date,team_id',
+                });
+
+              if (!error) totalGenerated++;
+            }
           }
         }
       }
       
+      const cycleMsg = cycles > 1 ? ` across ${cycles} cycle(s)` : '';
       toast({
         title: "Success",
-        description: `Generated ${totalGenerated} shifts across ${shiftConfigurations.length} configuration(s)`,
+        description: `Generated ${totalGenerated} shifts${cycleMsg}`,
       });
       
       // Clear configurations after successful generation
       setShiftConfigurations([]);
+      setEnableRecurring(false);
+      setRotationPattern({ intervalWeeks: 4, cycles: 1 });
       
       // Notify parent to refresh
       onScheduleGenerated?.();
@@ -523,9 +586,11 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         {/* Bulk mode selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Generation Mode</label>
-          <Select value={bulkMode} onValueChange={(value: "team" | "users") => {
+          <Select value={bulkMode} onValueChange={(value: "team" | "users" | "rotation") => {
             setBulkMode(value);
             setSelectedUsers([]);
+            setShiftConfigurations([]);
+            setSelectedUserForRotation("");
           }}>
             <SelectTrigger>
               <SelectValue />
@@ -534,24 +599,59 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
               <SelectItem value="team">
                 <div className="flex items-center">
                   <Users className="w-4 h-4 mr-2" />
-                  Entire Team
+                  Entire Team (Same Shifts)
                 </div>
               </SelectItem>
               <SelectItem value="users">
                 <div className="flex items-center">
                   <User className="w-4 h-4 mr-2" />
-                  Select Multiple Users
+                  Select Multiple Users (Same Shifts)
+                </div>
+              </SelectItem>
+              <SelectItem value="rotation">
+                <div className="flex items-center">
+                  <Repeat className="w-4 h-4 mr-2" />
+                  Rotation Schedule (Different Shifts Per User)
                 </div>
               </SelectItem>
             </SelectContent>
           </Select>
+          {bulkMode === 'rotation' && (
+            <p className="text-xs text-muted-foreground">
+              Assign different shifts to different users for specific dates with optional recurring patterns
+            </p>
+          )}
         </div>
+
+        {/* User Selection for Rotation Mode */}
+        {bulkMode === 'rotation' && (
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/10">
+            <label className="text-sm font-medium">Select User for This Shift</label>
+            <Select value={selectedUserForRotation} onValueChange={setSelectedUserForRotation}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a user..." />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((usr) => (
+                  <SelectItem key={usr.id} value={usr.id}>
+                    {usr.first_name} {usr.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Shift Template Selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Shift Type</label>
           <Select value={shiftTemplate} onValueChange={(value) => {
             setShiftTemplate(value);
+            const template = SHIFT_TEMPLATES.find(t => t.id === value);
+            if (template) {
+              setCustomStartTime(template.startTime);
+              setCustomEndTime(template.endTime);
+            }
             // Reset selected dates when changing shift type
             if (value === 'standard') {
               setSelectedDates([]);
@@ -642,12 +742,65 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           )}
         </div>
 
+        {/* Recurring Pattern Option (Rotation Mode Only) */}
+        {bulkMode === 'rotation' && (
+          <div className="space-y-3 p-3 border rounded-lg bg-muted/10">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Enable Recurring Pattern</Label>
+                <p className="text-xs text-muted-foreground">
+                  Repeat this rotation schedule at regular intervals
+                </p>
+              </div>
+              <Checkbox
+                checked={enableRecurring}
+                onCheckedChange={(checked) => setEnableRecurring(checked === true)}
+              />
+            </div>
+            
+            {enableRecurring && (
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="interval" className="text-xs">Repeat Every (Weeks)</Label>
+                  <input
+                    id="interval"
+                    type="number"
+                    min="1"
+                    max="52"
+                    value={rotationPattern.intervalWeeks}
+                    onChange={(e) => setRotationPattern(prev => ({ 
+                      ...prev, 
+                      intervalWeeks: parseInt(e.target.value) || 1 
+                    }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cycles" className="text-xs">Number of Cycles</Label>
+                  <input
+                    id="cycles"
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={rotationPattern.cycles}
+                    onChange={(e) => setRotationPattern(prev => ({ 
+                      ...prev, 
+                      cycles: parseInt(e.target.value) || 1 
+                    }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Add Shift Configuration Button */}
         <Button 
           onClick={addShiftConfiguration}
           variant="secondary"
           className="w-full"
-          disabled={selectedDates.length === 0}
+          disabled={selectedDates.length === 0 || (bulkMode === 'rotation' && !selectedUserForRotation)}
         >
           <Zap className="w-4 h-4 mr-2" />
           Add This Shift Configuration
@@ -660,45 +813,55 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
               Configured Shifts ({shiftConfigurations.length})
             </Label>
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {shiftConfigurations.map((config) => (
-                <div
-                  key={config.id}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-card"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{config.shiftName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {config.startTime} - {config.endTime}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {config.dates.slice(0, 3).map((date, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {format(date, 'MMM d')}
-                        </Badge>
-                      ))}
-                      {config.dates.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{config.dates.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeShiftConfiguration(config.id)}
-                    className="text-destructive hover:text-destructive"
+              {shiftConfigurations.map((config) => {
+                const assignedUser = users.find(u => u.id === config.userId);
+                return (
+                  <div
+                    key={config.id}
+                    className="flex items-center justify-between p-3 border rounded-lg bg-card"
                   >
-                    ×
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm">{config.shiftName}</div>
+                        {assignedUser && (
+                          <Badge variant="outline" className="text-xs">
+                            {assignedUser.first_name} {assignedUser.last_name}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {config.startTime} - {config.endTime}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {config.dates.slice(0, 3).map((date, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {format(date, 'MMM d')}
+                          </Badge>
+                        ))}
+                        {config.dates.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{config.dates.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeShiftConfiguration(config.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Team/User selection */}
-        {bulkMode === "team" ? (
+        {bulkMode === "team" || bulkMode === "rotation" ? (
           <div className="space-y-2">
             <label className="text-sm font-medium">Team</label>
             <Select value={selectedTeam} onValueChange={setSelectedTeam}>
@@ -713,6 +876,11 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 ))}
               </SelectContent>
             </Select>
+            {bulkMode === "rotation" && !selectedTeam && (
+              <p className="text-xs text-muted-foreground">
+                Select a team to see available users for rotation assignments
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -800,12 +968,13 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           onClick={generateSchedules} 
           disabled={loading || 
             (bulkMode === "team" && (!selectedTeam || selectedTeam === "")) ||
+            (bulkMode === "rotation" && (!selectedTeam || selectedTeam === "")) ||
             (bulkMode === "users" && selectedUsers.length === 0) ||
             shiftConfigurations.length === 0}
           className="w-full"
         >
           <Zap className="w-4 h-4 mr-2" />
-          {loading ? "Generating..." : `Generate All Shifts (${shiftConfigurations.length} config${shiftConfigurations.length !== 1 ? 's' : ''})`}
+          {loading ? "Generating..." : `Generate ${bulkMode === 'rotation' && enableRecurring ? `Rotation (${rotationPattern.cycles} cycle${rotationPattern.cycles > 1 ? 's' : ''})` : `All Shifts`} (${shiftConfigurations.length} config${shiftConfigurations.length !== 1 ? 's' : ''})`}
         </Button>
 
         {/* Info */}
@@ -815,11 +984,21 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             <span>
               {shiftConfigurations.length === 0 
                 ? 'Add shift configurations above to get started'
-                : `Ready to generate ${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0)} shift${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0) !== 1 ? 's' : ''} across ${shiftConfigurations.length} configuration${shiftConfigurations.length !== 1 ? 's' : ''}`
+                : bulkMode === 'rotation' && enableRecurring
+                  ? `Ready to generate ${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0)} shifts per cycle × ${rotationPattern.cycles} cycles = ${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0) * rotationPattern.cycles} total shifts`
+                  : `Ready to generate ${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0)} shift${shiftConfigurations.reduce((sum, c) => sum + c.dates.length, 0) !== 1 ? 's' : ''} across ${shiftConfigurations.length} configuration${shiftConfigurations.length !== 1 ? 's' : ''}`
               }
             </span>
           </div>
           <div>Automatically excludes holidays based on user country</div>
+          {bulkMode === 'rotation' && enableRecurring && (
+            <div className="flex items-center gap-1 text-primary">
+              <Repeat className="w-3 h-3" />
+              <span>
+                Pattern repeats every {rotationPattern.intervalWeeks} week{rotationPattern.intervalWeeks > 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
