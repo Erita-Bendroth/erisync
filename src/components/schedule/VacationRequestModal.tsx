@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TimeSelect } from '@/components/ui/time-select';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar, Clock } from 'lucide-react';
+import { Loader2, Calendar, Clock, AlertCircle, Info } from 'lucide-react';
 
 interface VacationRequestModalProps {
   open: boolean;
@@ -159,29 +160,51 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Request Vacation
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Calendar className="h-5 w-5 text-primary" />
+            </div>
+            Request Time Off
           </DialogTitle>
-          <DialogDescription>
-            Submit a vacation request for approval by your team's planner/manager.
+          <DialogDescription className="text-base">
+            Submit your vacation request for manager approval. You'll receive an email notification once it's reviewed.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-5 py-4">
+          {/* Info Alert */}
+          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
+              Your request will be sent to your top-level manager for approval.
+            </AlertDescription>
+          </Alert>
+
+          {/* Date Selection */}
           <div className="space-y-2">
-            <Label>Date *</Label>
+            <Label className="text-base font-semibold flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              Vacation Date *
+            </Label>
             <DatePicker
               date={selectedDate}
               onDateChange={setSelectedDate}
-              placeholder="Select vacation date"
+              placeholder="Select your vacation date"
             />
           </div>
 
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="full-day" className="flex-1">Full Day Vacation</Label>
+          {/* Full Day Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+            <div className="flex-1">
+              <Label htmlFor="full-day" className="text-base font-semibold cursor-pointer">
+                Full Day Off
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Toggle off to select specific hours
+              </p>
+            </div>
             <Switch
               id="full-day"
               checked={isFullDay}
@@ -189,57 +212,66 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
             />
           </div>
 
+          {/* Time Selection (Partial Day) */}
           {!isFullDay && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Start Time
-                </Label>
-                <TimeSelect
-                  value={startTime}
-                  onValueChange={setStartTime}
-                  placeholder="Select start time"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  End Time
-                </Label>
-                <TimeSelect
-                  value={endTime}
-                  onValueChange={setEndTime}
-                  placeholder="Select end time"
-                />
+            <div className="space-y-4 p-4 rounded-lg border bg-background">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Time Range
+              </Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Start Time</Label>
+                  <TimeSelect
+                    value={startTime}
+                    onValueChange={setStartTime}
+                    placeholder="From"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">End Time</Label>
+                  <TimeSelect
+                    value={endTime}
+                    onValueChange={setEndTime}
+                    placeholder="To"
+                  />
+                </div>
               </div>
             </div>
           )}
 
+          {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
+            <Label htmlFor="notes" className="text-base font-semibold">
+              Additional Notes <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
             <Textarea
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any additional context or information..."
-              className="resize-none"
-              rows={3}
+              placeholder="Add context for your request (e.g., medical appointment, family event)..."
+              className="resize-none min-h-[100px]"
+              rows={4}
             />
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Submit Request
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting || !selectedDate}
+            className="w-full sm:w-auto gap-2"
+          >
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isSubmitting ? 'Submitting...' : 'Submit Request'}
           </Button>
         </DialogFooter>
       </DialogContent>

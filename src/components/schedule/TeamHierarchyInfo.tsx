@@ -2,6 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Network } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Team {
   id: string;
@@ -55,49 +56,68 @@ export const TeamHierarchyInfo: React.FC<TeamHierarchyInfoProps> = ({ selectedTe
   const isMidLevel = selectedTeam.parent_team_id && childTeams.length > 0;
 
   return (
-    <Card className="bg-muted/50 border-primary/20">
-      <CardContent className="pt-4 pb-3">
-        <div className="flex items-start gap-3">
-          <Network className="w-5 h-5 text-primary mt-0.5" />
-          <div className="flex-1 space-y-2">
+    <Card className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border-primary/30 shadow-sm">
+      <CardContent className="pt-5 pb-4">
+        <div className="flex items-start gap-4">
+          <div className="p-2.5 rounded-lg bg-primary/10 ring-2 ring-primary/20">
+            <Network className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium">Hierarchical View:</span>
+              <span className="text-sm font-semibold">Team Hierarchy:</span>
               {isTopLevel && (
-                <Badge variant="destructive" className="text-xs">
-                  Top-Level (Full Access)
+                <Badge variant="destructive" className="text-xs shadow-sm gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  Top-Level Access
                 </Badge>
               )}
               {isMidLevel && (
-                <Badge variant="default" className="text-xs">
-                  Mid-Level (Team + Sub-teams)
+                <Badge className="text-xs shadow-sm gap-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-600 dark:bg-yellow-400" />
+                  Mid-Level Access
                 </Badge>
               )}
               {!isTopLevel && !isMidLevel && (
-                <Badge variant="secondary" className="text-xs">
-                  Lower-Level (Team Only)
+                <Badge variant="secondary" className="text-xs shadow-sm">
+                  Team-Level Access
                 </Badge>
               )}
             </div>
             
             {parentChain.length > 1 && (
-              <div className="text-xs text-muted-foreground">
-                <span className="font-medium">Path:</span>{' '}
-                {parentChain.map((t, idx) => (
-                  <React.Fragment key={t.id}>
-                    {idx > 0 && ' → '}
-                    <span className={idx === parentChain.length - 1 ? 'font-semibold text-foreground' : ''}>
-                      {t.name}
-                    </span>
-                  </React.Fragment>
-                ))}
+              <div className="flex items-start gap-2 p-3 rounded-md bg-background/60 backdrop-blur-sm border">
+                <div className="text-xs text-muted-foreground font-medium min-w-fit">Path:</div>
+                <div className="text-xs">
+                  {parentChain.map((t, idx) => (
+                    <React.Fragment key={t.id}>
+                      {idx > 0 && <span className="text-muted-foreground mx-1.5">→</span>}
+                      <span className={cn(
+                        "transition-colors",
+                        idx === parentChain.length - 1 
+                          ? 'font-semibold text-primary' 
+                          : 'text-foreground'
+                      )}>
+                        {t.name}
+                      </span>
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
             )}
             
             {childTeams.length > 0 && (
-              <div className="text-xs text-muted-foreground">
-                <span className="font-medium">Includes {childTeams.length} sub-team{childTeams.length !== 1 ? 's' : ''}:</span>{' '}
-                {childTeams.slice(0, 3).map(t => t.name).join(', ')}
-                {childTeams.length > 3 && ` +${childTeams.length - 3} more`}
+              <div className="flex items-start gap-2 p-3 rounded-md bg-background/60 backdrop-blur-sm border">
+                <div className="text-xs text-muted-foreground font-medium min-w-fit">
+                  Includes:
+                </div>
+                <div className="text-xs">
+                  <span className="font-semibold text-primary">{childTeams.length} sub-team{childTeams.length !== 1 ? 's' : ''}</span>
+                  <span className="text-muted-foreground mx-1.5">–</span>
+                  <span className="text-muted-foreground">
+                    {childTeams.slice(0, 3).map(t => t.name).join(', ')}
+                    {childTeams.length > 3 && <span className="font-medium"> +{childTeams.length - 3} more</span>}
+                  </span>
+                </div>
               </div>
             )}
           </div>

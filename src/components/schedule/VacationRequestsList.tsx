@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface VacationRequest {
@@ -266,82 +267,114 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       ? 'Full Day'
       : `${request.start_time} - ${request.end_time}`;
 
+    const statusConfig = {
+      pending: { variant: 'secondary' as const, icon: Clock, color: 'text-yellow-600 dark:text-yellow-400' },
+      approved: { variant: 'default' as const, icon: CheckCircle2, color: 'text-green-600 dark:text-green-400' },
+      rejected: { variant: 'destructive' as const, icon: XCircle, color: 'text-red-600 dark:text-red-400' },
+    };
+
+    const config = statusConfig[request.status as keyof typeof statusConfig] || statusConfig.pending;
+    const StatusIcon = config.icon;
+
     return (
-      <Card key={request.id} className="mb-3">
-        <CardContent className="pt-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 space-y-2">
-              {isPlanner && (
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {request.requester.first_name} {request.requester.last_name}
-                  </span>
-                  <span className="text-muted-foreground">• {request.team.name}</span>
-                </div>
-              )}
+      <Card key={request.id} className="mb-3 hover:shadow-md transition-shadow">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                {isPlanner && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 rounded-full bg-primary/10">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-base">
+                        {request.requester.first_name} {request.requester.last_name}
+                      </span>
+                      <span className="text-sm text-muted-foreground ml-2">• {request.team.name}</span>
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>{dateStr}</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="font-medium">{dateStr}</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className={request.is_full_day ? "font-medium" : ""}>{timeStr}</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{timeStr}</span>
+              <div className="flex flex-col items-end gap-3">
+                <Badge variant={config.variant} className="gap-1.5 px-3 py-1">
+                  <StatusIcon className="h-3.5 w-3.5" />
+                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                </Badge>
+
+                {isPlanner && request.status === 'pending' && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(request)}
+                      disabled={processingId === request.id}
+                      className="gap-1.5"
+                    >
+                      {processingId === request.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Approve
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => openRejectDialog(request)}
+                      disabled={processingId === request.id}
+                      className="gap-1.5"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Reject
+                    </Button>
+                  </div>
+                )}
               </div>
-
-              {request.notes && (
-                <p className="text-sm text-muted-foreground italic">{request.notes}</p>
-              )}
-
-              {request.rejection_reason && (
-                <div className="mt-2 p-2 bg-destructive/10 rounded-md">
-                  <p className="text-sm text-destructive">
-                    <strong>Rejection reason:</strong> {request.rejection_reason}
-                  </p>
-                </div>
-              )}
             </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <Badge
-                variant={
-                  request.status === 'approved'
-                    ? 'default'
-                    : request.status === 'rejected'
-                    ? 'destructive'
-                    : 'secondary'
-                }
-              >
-                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-              </Badge>
-
-              {isPlanner && request.status === 'pending' && (
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleApprove(request)}
-                    disabled={processingId === request.id}
-                  >
-                    {processingId === request.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => openRejectDialog(request)}
-                    disabled={processingId === request.id}
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </Button>
+            {/* Notes */}
+            {request.notes && (
+              <>
+                <Separator />
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50">
+                  <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">Notes</p>
+                    <p className="text-sm text-muted-foreground italic">{request.notes}</p>
+                  </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
+
+            {/* Rejection Reason */}
+            {request.rejection_reason && (
+              <>
+                <Separator />
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-destructive mb-1">Rejection Reason</p>
+                    <p className="text-sm text-destructive/90">{request.rejection_reason}</p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -366,49 +399,95 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Vacation Requests</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Calendar className="h-5 w-5 text-primary" />
+            </div>
+            Vacation Requests
+          </CardTitle>
+          <CardDescription>
+            {isPlanner 
+              ? 'Review and manage vacation requests from your team members'
+              : 'Track the status of your vacation requests'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="pending">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pending">
-                Pending ({pendingRequests.length})
+          <Tabs defaultValue="pending" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="pending" className="gap-2">
+                <Clock className="h-4 w-4" />
+                Pending
+                {pendingRequests.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 h-5 min-w-[20px]">
+                    {pendingRequests.length}
+                  </Badge>
+                )}
               </TabsTrigger>
-              <TabsTrigger value="approved">
-                Approved ({approvedRequests.length})
+              <TabsTrigger value="approved" className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Approved
+                {approvedRequests.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 h-5 min-w-[20px]">
+                    {approvedRequests.length}
+                  </Badge>
+                )}
               </TabsTrigger>
-              <TabsTrigger value="rejected">
-                Rejected ({rejectedRequests.length})
+              <TabsTrigger value="rejected" className="gap-2">
+                <XCircle className="h-4 w-4" />
+                Rejected
+                {rejectedRequests.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 h-5 min-w-[20px]">
+                    {rejectedRequests.length}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="pending" className="mt-4">
+            <TabsContent value="pending" className="mt-0">
               {pendingRequests.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No pending requests
-                </p>
+                <div className="text-center py-12 px-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <Clock className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">No pending requests</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {isPlanner ? 'All requests have been reviewed' : 'You have no pending requests'}
+                  </p>
+                </div>
               ) : (
-                pendingRequests.map(renderRequest)
+                <div className="space-y-3">
+                  {pendingRequests.map(renderRequest)}
+                </div>
               )}
             </TabsContent>
 
-            <TabsContent value="approved" className="mt-4">
+            <TabsContent value="approved" className="mt-0">
               {approvedRequests.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No approved requests
-                </p>
+                <div className="text-center py-12 px-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">No approved requests</p>
+                </div>
               ) : (
-                approvedRequests.map(renderRequest)
+                <div className="space-y-3">
+                  {approvedRequests.map(renderRequest)}
+                </div>
               )}
             </TabsContent>
 
-            <TabsContent value="rejected" className="mt-4">
+            <TabsContent value="rejected" className="mt-0">
               {rejectedRequests.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No rejected requests
-                </p>
+                <div className="text-center py-12 px-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center mb-4">
+                    <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">No rejected requests</p>
+                </div>
               ) : (
-                rejectedRequests.map(renderRequest)
+                <div className="space-y-3">
+                  {rejectedRequests.map(renderRequest)}
+                </div>
               )}
             </TabsContent>
           </Tabs>

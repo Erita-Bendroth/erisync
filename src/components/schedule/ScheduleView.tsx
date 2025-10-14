@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth } from 'date-fns';
-import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { EditScheduleModal } from './EditScheduleModal';
@@ -1246,28 +1246,33 @@ const getActivityColor = (entry: ScheduleEntry) => {
           )}
         </div>
         
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          {/* Vacation Request Button */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+          {/* Vacation Request Button - Primary Action */}
           <Button
             onClick={() => setVacationModalOpen(true)}
-            variant="outline"
-            className="gap-2"
+            size="default"
+            className="gap-2 shadow-sm"
           >
             <Calendar className="h-4 w-4" />
-            Request Vacation
+            Request Time Off
           </Button>
 
+          {/* Vacation Requests Toggle - For Managers/Planners */}
           {(isManager() || isPlanner()) && (
             <Button
               onClick={() => setShowVacationRequests(!showVacationRequests)}
               variant={showVacationRequests ? "default" : "outline"}
+              size="default"
               className="gap-2"
             >
-              Vacation Requests
+              <FileText className="h-4 w-4" />
+              {showVacationRequests ? 'Hide' : 'Show'} Requests
             </Button>
           )}
 
-          {/* View Mode Filter - For team members - Removed problematic My Team Schedule option */}
+          <div className="flex-1" />
+
+          {/* View Mode Filter - For team members */}
           {isTeamMember() && !isManager() && !isPlanner() && (
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium whitespace-nowrap">View:</label>
@@ -1292,26 +1297,29 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     variant="outline"
                     role="combobox"
                     aria-expanded={teamDropdownOpen}
-                    className="w-48 justify-between"
+                    className="w-56 justify-between shadow-sm"
                   >
-                    {selectedTeam === "all" 
-                      ? "All Teams"
-                      : teams.find((team) => team.id === selectedTeam)?.name || "Select team..."
-                    }
+                    <span className="truncate">
+                      {selectedTeam === "all" 
+                        ? "All Teams"
+                        : teams.find((team) => team.id === selectedTeam)?.name || "Select team..."
+                      }
+                    </span>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-48 p-0 bg-background border z-50">
+                <PopoverContent className="w-[300px] p-0 bg-background border z-50" align="end">
                   <Command>
-                    <CommandInput placeholder="Search teams..." />
+                    <CommandInput placeholder="Search teams..." className="h-10" />
                     <CommandEmpty>No team found.</CommandEmpty>
-                    <CommandGroup>
+                    <CommandGroup className="max-h-[400px] overflow-y-auto">
                       <CommandItem
                         value="all"
                         onSelect={() => {
                           setSelectedTeam("all");
                           setTeamDropdownOpen(false);
                         }}
+                        className="py-3"
                       >
                         <Check
                           className={cn(
@@ -1319,10 +1327,10 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             selectedTeam === "all" ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        All Teams
+                        <span className="font-medium">All Teams</span>
                       </CommandItem>
                       
-                      {/* Hierarchical team display: Top-level → Mid-level → Lower-level */}
+                      {/* Hierarchical team list */}
                       {teams
                         .filter(team => !team.parent_team_id)
                         .sort((a, b) => a.name.localeCompare(b.name))
@@ -1337,7 +1345,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                   setSelectedTeam(topLevelTeam.id);
                                   setTeamDropdownOpen(false);
                                 }}
-                                className="font-semibold"
+                                className="py-3 font-semibold text-primary"
                               >
                                 <Check
                                   className={cn(
@@ -1345,10 +1353,13 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                     selectedTeam === topLevelTeam.id ? "opacity-100" : "opacity-0"
                                   )}
                                 />
-                                📍 {topLevelTeam.name}
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                                  {topLevelTeam.name}
+                                </div>
                               </CommandItem>
                               
-                              {/* Mid-level teams (yellow in diagram) */}
+                              {/* Mid-level teams */}
                               {midLevelTeams.sort((a, b) => a.name.localeCompare(b.name)).map((midTeam) => {
                                 const lowerLevelTeams = teams.filter(t => t.parent_team_id === midTeam.id);
                                 
@@ -1360,7 +1371,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                         setSelectedTeam(midTeam.id);
                                         setTeamDropdownOpen(false);
                                       }}
-                                      className="pl-6"
+                                      className="py-3 pl-8 font-medium"
                                     >
                                       <Check
                                         className={cn(
@@ -1368,10 +1379,13 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                           selectedTeam === midTeam.id ? "opacity-100" : "opacity-0"
                                         )}
                                       />
-                                      ├─ {midTeam.name}
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                                        {midTeam.name}
+                                      </div>
                                     </CommandItem>
                                     
-                                    {/* Lower-level teams (third level) */}
+                                    {/* Lower-level teams */}
                                     {lowerLevelTeams.sort((a, b) => a.name.localeCompare(b.name)).map((lowerTeam) => (
                                       <CommandItem
                                         key={lowerTeam.id}
