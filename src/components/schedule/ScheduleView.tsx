@@ -954,7 +954,12 @@ const getAvailabilityStatus = (activityType: string) => {
       }
     });
 
-    return applicableHolidays;
+    // Deduplicate by holiday ID to ensure each holiday appears only once
+    const uniqueHolidays = Array.from(
+      new Map(applicableHolidays.map(h => [h.id, h])).values()
+    );
+
+    return uniqueHolidays;
   };
 
   const getHolidaysForDay = (date: Date) => {
