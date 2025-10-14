@@ -503,82 +503,128 @@ useEffect(() => {
       setLoading(true);
       // Fetch entries for full week (Monday-Sunday)
       const weekEnd = addDays(weekStart, 6); // Sunday
+      const dateStart = format(weekStart, "yyyy-MM-dd");
+      const dateEnd = format(weekEnd, "yyyy-MM-dd");
 
-      let query = supabase
-        .from("schedule_entries")
-        .select(`
-          id,
-          user_id,
-          team_id,
-          date,
-          shift_type,
-          activity_type,
-          availability_status,
-          notes,
-          created_by,
-          created_at,
-          updated_at
-        `)
-        .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(addDays(weekStart, 6), "yyyy-MM-dd"))
-        .order("date")
-        .limit(10000); // Increase limit to handle All Teams view with many employees
+      console.log('🔍 FETCH START:', { dateStart, dateEnd, selectedTeam, isManager: isManager(), isPlanner: isPlanner() });
 
-      // Apply filtering based on user roles and permissions
-      if (isManager() || isPlanner()) {
-        if (selectedTeam !== "all") {
-          // Both managers and planners can fetch entries for any team
-          // UI will handle display restrictions based on management rights
-          query = query.eq("team_id", selectedTeam);
-        } else {
-          // CRITICAL FIX: Explicitly fetch all team IDs and query for entries from all teams
-          // This ensures we get ALL entries across all teams, avoiding RLS complications
-          let allTeamsQuery;
+      // For "All Teams", fetch in batches to avoid .in() limitations and RLS issues
+      let allData: any[] = [];
+
+      if ((isManager() || isPlanner()) && selectedTeam === "all") {
+        console.log('📊 All Teams mode - fetching team IDs...');
+        
+        // Get all team IDs
+        const { data: allTeams } = await supabase
+          .from('teams')
+          .select('id')
+          .limit(10000);
+        
+        const teamIds = allTeams?.map(t => t.id) || [];
+        console.log('📋 Total teams to query:', teamIds.length);
+
+        // Batch fetch by team to avoid .in() limits and ensure RLS doesn't truncate
+        // Process teams in chunks of 25 to stay well under any .in() limits
+        const BATCH_SIZE = 25;
+        
+        for (let i = 0; i < teamIds.length; i += BATCH_SIZE) {
+          const batchTeamIds = teamIds.slice(i, i + BATCH_SIZE);
+          console.log(`🔄 Fetching batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(teamIds.length / BATCH_SIZE)} (${batchTeamIds.length} teams)...`);
           
-          if (isPlanner()) {
-            // Planners can see all teams
-            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
-          } else if (isManager()) {
-            // Managers can see all teams for viewing
-            allTeamsQuery = supabase.from('teams').select('id').limit(10000);
+          const { data: batchData, error: batchError } = await supabase
+            .from("schedule_entries")
+            .select(`
+              id,
+              user_id,
+              team_id,
+              date,
+              shift_type,
+              activity_type,
+              availability_status,
+              notes,
+              created_by,
+              created_at,
+              updated_at
+            `)
+            .gte("date", dateStart)
+            .lte("date", dateEnd)
+            .in("team_id", batchTeamIds)
+            .order("date");
+          
+          if (batchError) {
+            console.error('❌ Batch error:', batchError);
+            throw batchError;
           }
           
-          const { data: allTeams } = await allTeamsQuery;
+          console.log(`✅ Batch ${Math.floor(i / BATCH_SIZE) + 1} returned ${batchData?.length || 0} entries`);
+          console.log(`   Dates in batch:`, [...new Set(batchData?.map(e => e.date) || [])].sort());
           
-          if (allTeams && allTeams.length > 0) {
-            const teamIds = allTeams.map(t => t.id);
-            query = query.in("team_id", teamIds);
-          }
+          allData = [...allData, ...(batchData || [])];
         }
-      } else if (isTeamMember()) {
-        if (viewMode === "my-schedule") {
-        } else if (viewMode === "my-team") {
-          // Team members see their team's entries
-          const { data: userTeams } = await supabase
-            .from('team_members')
-            .select('team_id')
-            .eq('user_id', user!.id);
-          
-          if (userTeams && userTeams.length > 0) {
-            const teamIds = userTeams.map(ut => ut.team_id);
-            query = query.in("team_id", teamIds);
-          }
-        }
+        
+        console.log('📊 TOTAL entries after batching:', allData.length);
+        console.log('📅 All dates in dataset:', [...new Set(allData.map(e => e.date))].sort());
+        console.log('👥 Unique users:', [...new Set(allData.map(e => e.user_id))].length);
+        
       } else {
-        // Default: show only own entries
-        query = query.eq("user_id", user!.id);
+        // Single team or specific view mode - use single query
+        let query = supabase
+          .from("schedule_entries")
+          .select(`
+            id,
+            user_id,
+            team_id,
+            date,
+            shift_type,
+            activity_type,
+            availability_status,
+            notes,
+            created_by,
+            created_at,
+            updated_at
+          `)
+          .gte("date", dateStart)
+          .lte("date", dateEnd)
+          .order("date");
+
+        if (selectedTeam !== "all") {
+          query = query.eq("team_id", selectedTeam);
+        } else if (isTeamMember()) {
+          if (viewMode === "my-schedule") {
+            query = query.eq("user_id", user!.id);
+          } else if (viewMode === "my-team") {
+            const { data: userTeams } = await supabase
+              .from('team_members')
+              .select('team_id')
+              .eq('user_id', user!.id);
+            
+            if (userTeams && userTeams.length > 0) {
+              const teamIds = userTeams.map(ut => ut.team_id);
+              query = query.in("team_id", teamIds);
+            }
+          }
+        } else {
+          query = query.eq("user_id", user!.id);
+        }
+
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('❌ Query error:', error);
+          throw error;
+        }
+        
+        allData = data || [];
       }
 
-      const { data, error } = await query;
+      const data = allData;
+      const error = null;
 
-      if (error) {
-        console.error('Schedule query error:', error);
-        throw error;
-      }
-      
       // Fetch user profiles for the entries
       const userIds = [...new Set(data?.map(entry => entry.user_id) || [])];
       const teamIds = [...new Set(data?.map(entry => entry.team_id) || [])];
+      
+      console.log('🔍 Fetching profiles and teams for:', { users: userIds.length, teams: teamIds.length });
       
       const [profilesResult, teamsResult] = await Promise.all([
         supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds }),
@@ -599,8 +645,17 @@ useEffect(() => {
         };
       }) || [];
       
-      console.log('Transformed schedule data:', transformedData.length, 'entries for', userIds.length, 'users');
-      console.log('Date range in entries:', [...new Set(transformedData.map(e => e.date))].sort());
+      console.log('✅ FINAL DATASET:', {
+        totalEntries: transformedData.length,
+        uniqueUsers: userIds.length,
+        uniqueTeams: teamIds.length,
+        dates: [...new Set(transformedData.map(e => e.date))].sort(),
+        entriesPerDate: transformedData.reduce((acc, e) => {
+          acc[e.date] = (acc[e.date] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      });
+      
       setScheduleEntries(transformedData);
 
       // CRITICAL FIX: Ensure the employee list includes ALL users who have schedule entries
