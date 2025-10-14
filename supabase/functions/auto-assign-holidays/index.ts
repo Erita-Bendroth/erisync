@@ -43,22 +43,31 @@ Deno.serve(async (req) => {
     for (const profile of profiles || []) {
       const { user_id, country_code, region_code } = profile;
 
-      // Get holidays for this user's location
+      // Get holidays for this user's location (only centrally managed public holidays)
       let holidayQuery = supabaseClient
         .from('holidays')
-        .select('date, name')
+        .select('date, name, region_code')
         .eq('country_code', country_code)
         .eq('is_public', true)
+        .is('user_id', null) // Only centrally managed holidays
         .gte('date', new Date().toISOString().split('T')[0]); // Only future holidays
 
-      // For Germany, include both national and regional holidays
-      if (country_code === 'DE' && region_code) {
-        holidayQuery = holidayQuery.or(`region_code.is.null,region_code.eq.${region_code}`);
-      } else {
-        holidayQuery = holidayQuery.is('region_code', null);
+      const { data: allHolidays, error: holidaysError } = await holidayQuery;
+
+      if (holidaysError) {
+        console.error(`Error fetching holidays for user ${user_id}:`, holidaysError);
+        continue;
       }
 
-      const { data: holidays, error: holidaysError } = await holidayQuery;
+      // Filter holidays based on user's region
+      let holidays = allHolidays || [];
+      if (country_code === 'DE' && region_code) {
+        // For Germany with region: include national holidays (no region) and regional holidays for user's region
+        holidays = holidays.filter(h => !h.region_code || h.region_code === region_code);
+      } else {
+        // For other countries or no region: only national holidays
+        holidays = holidays.filter(h => !h.region_code);
+      }
 
       if (holidaysError) {
         console.error(`Error fetching holidays for user ${user_id}:`, holidaysError);

@@ -158,8 +158,10 @@ const HolidayManager = () => {
           return;
         }
       } else {
-        // For planners/admins, show holidays they have imported
-        query = query.eq('user_id', user.id);
+        // For planners/admins, show ALL centrally managed public holidays
+        query = query
+          .eq('is_public', true)
+          .is('user_id', null); // Only centrally managed holidays
       }
 
       const { data, error } = await query.order('date', { ascending: true });
