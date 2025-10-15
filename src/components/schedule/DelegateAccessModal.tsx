@@ -222,7 +222,13 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
                     mode="single"
                     selected={startDate}
                     onSelect={setStartDate}
-                    disabled={(date) => date < new Date()}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const compareDate = new Date(date);
+                      compareDate.setHours(0, 0, 0, 0);
+                      return compareDate < today;
+                    }}
                     initialFocus
                     className={cn("p-3 pointer-events-auto")}
                   />
@@ -250,7 +256,14 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
                     mode="single"
                     selected={endDate}
                     onSelect={setEndDate}
-                    disabled={(date) => !startDate || date <= startDate}
+                    disabled={(date) => {
+                      if (!startDate) return true;
+                      const compareDate = new Date(date);
+                      compareDate.setHours(0, 0, 0, 0);
+                      const compareStart = new Date(startDate);
+                      compareStart.setHours(0, 0, 0, 0);
+                      return compareDate < compareStart;
+                    }}
                     initialFocus
                     className={cn("p-3 pointer-events-auto")}
                   />
