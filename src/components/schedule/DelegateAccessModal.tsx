@@ -42,26 +42,26 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
 
   const fetchEligibleUsers = async () => {
     try {
-      // Fetch all users except admins and the current manager
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name, email")
-        .neq("user_id", managerId);
-
-      if (profilesError) throw profilesError;
-
-      // Filter out admins
-      const { data: roles, error: rolesError } = await supabase
+      // Fetch all users with manager role, except the current manager
+      const { data: managerRoles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id, role")
-        .neq("role", "admin");
+        .eq("role", "manager")
+        .neq("user_id", managerId);
 
       if (rolesError) throw rolesError;
 
-      const nonAdminUserIds = roles.map(r => r.user_id);
-      const eligibleUsers = profiles.filter(p => nonAdminUserIds.includes(p.user_id));
+      const managerUserIds = managerRoles.map(r => r.user_id);
 
-      setUsers(eligibleUsers);
+      // Fetch profiles for these managers
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, email")
+        .in("user_id", managerUserIds);
+
+      if (profilesError) throw profilesError;
+
+      setUsers(profiles || []);
     } catch (error: any) {
       console.error("Error fetching users:", error);
       toast({
