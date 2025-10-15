@@ -513,6 +513,10 @@ export type Database = {
         Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean
       }
+      check_and_expire_delegations: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       check_vacation_overlap: {
         Args: {
           _end_time?: string
