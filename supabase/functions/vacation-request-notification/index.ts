@@ -47,13 +47,17 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (type === "request") {
-      // Get the top-level approver for the team
-      const { data: approver, error: approverError } = await supabase
-        .rpc("get_top_level_approver_for_team", { _team_id: request.team_id })
-        .single();
+      // Get planners for the team's hierarchy
+      const { data: planners, error: plannersError } = await supabase
+        .from("user_roles")
+        .select(`
+          user_id,
+          profiles!user_roles_user_id_fkey(first_name, last_name, email)
+        `)
+        .eq("role", "planner");
 
-      if (approverError || !approver) {
-        throw new Error(`Failed to find approver: ${approverError?.message}`);
+      if (plannersError || !planners || planners.length === 0) {
+        throw new Error(`Failed to find planners: ${plannersError?.message}`);
       }
 
       const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
@@ -69,41 +73,126 @@ const handler = async (req: Request): Promise<Response> => {
 
       const approveUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://app.")}/schedule?pendingApproval=${requestId}`;
 
+      // Send notification to all planners
+      for (const planner of planners) {
+        await resend.emails.send({
+          from: "EriSync <noreply@erisync.xyz>",
+          to: [planner.profiles.email],
+          subject: `Vacation Request Pending: ${request.requester.first_name} ${request.requester.last_name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Vacation Request Pending Approval</h2>
+              <p>Hello ${planner.profiles.first_name},</p>
+              <p>A new vacation request requires your approval:</p>
+              
+              <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
+                <p><strong>Team:</strong> ${request.team.name}</p>
+                <p><strong>Date:</strong> ${dateStr}</p>
+                <p><strong>Time:</strong> ${timeStr}</p>
+                ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
+              </div>
+              
+              <p>
+                <a href="${approveUrl}" 
+                   style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Review Request
+                </a>
+              </p>
+              
+              <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                You're receiving this because you are a planner for ${request.team.name}.
+              </p>
+            </div>
+          `,
+        });
+      }
+
+      console.log(`Request notifications sent to ${planners.length} planner(s)`);
+    } else if (type === "approval") {
+      const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const timeStr = request.is_full_day
+        ? "Full Day"
+        : `${request.start_time} - ${request.end_time}`;
+
+      // Send approval notification to requester
       await resend.emails.send({
         from: "EriSync <noreply@erisync.xyz>",
-        to: [approver.email],
-        subject: `Vacation Request Pending: ${request.requester.first_name} ${request.requester.last_name}`,
+        to: [request.requester.email],
+        subject: `Vacation Request Approved`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Vacation Request Pending Approval</h2>
-            <p>Hello ${approver.first_name},</p>
-            <p>A new vacation request requires your approval:</p>
+            <h2 style="color: #22c55e;">Vacation Request Approved</h2>
+            <p>Hello ${request.requester.first_name},</p>
+            <p>Your vacation request has been <strong>approved</strong>.</p>
             
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
-              <p><strong>Team:</strong> ${request.team.name}</p>
               <p><strong>Date:</strong> ${dateStr}</p>
               <p><strong>Time:</strong> ${timeStr}</p>
-              ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
+              ${request.notes ? `<p><strong>Your Notes:</strong> ${request.notes}</p>` : ""}
             </div>
             
-            <p>
-              <a href="${approveUrl}" 
-                 style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Review Request
-              </a>
-            </p>
+            <p style="color: #22c55e;">Your vacation has been added to the schedule and all other shifts for this date have been removed.</p>
             
             <p style="color: #666; font-size: 14px; margin-top: 30px;">
-              You're receiving this because you are a top-level planner/manager for ${approver.team_name}.
+              Approved by: ${request.approver?.first_name} ${request.approver?.last_name}
             </p>
           </div>
         `,
       });
 
-      console.log(`Request notification sent to: ${approver.email}`);
-    } else if (type === "approval" || type === "rejection") {
-      const status = type === "approval" ? "Approved" : "Rejected";
+      console.log(`Approval notification sent to: ${request.requester.email}`);
+
+      // Get the manager for the employee's team and send notification
+      const { data: teamMember, error: tmError } = await supabase
+        .from("team_members")
+        .select(`
+          team_id,
+          is_manager,
+          profiles!team_members_user_id_fkey(first_name, last_name, email)
+        `)
+        .eq("team_id", request.team_id)
+        .eq("is_manager", true)
+        .limit(1)
+        .single();
+
+      if (!tmError && teamMember && teamMember.profiles) {
+        await resend.emails.send({
+          from: "EriSync <noreply@erisync.xyz>",
+          to: [teamMember.profiles.email],
+          subject: `Team Member Vacation Approved: ${request.requester.first_name} ${request.requester.last_name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Team Member Vacation Approved</h2>
+              <p>Hello ${teamMember.profiles.first_name},</p>
+              <p>A vacation request for your team member has been approved by a planner:</p>
+              
+              <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
+                <p><strong>Team:</strong> ${request.team.name}</p>
+                <p><strong>Date:</strong> ${dateStr}</p>
+                <p><strong>Time:</strong> ${timeStr}</p>
+                ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
+              </div>
+              
+              <p>The vacation has been added to the schedule.</p>
+              
+              <p style="color: #666; font-size: 14px; margin-top: 30px;">
+                Approved by: ${request.approver?.first_name} ${request.approver?.last_name}
+              </p>
+            </div>
+          `,
+        });
+
+        console.log(`Manager notification sent to: ${teamMember.profiles.email}`);
+      }
+    } else if (type === "rejection") {
       const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
         weekday: "long",
         year: "numeric",
@@ -118,14 +207,12 @@ const handler = async (req: Request): Promise<Response> => {
       await resend.emails.send({
         from: "EriSync <noreply@erisync.xyz>",
         to: [request.requester.email],
-        subject: `Vacation Request ${status}`,
+        subject: `Vacation Request Rejected`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: ${type === "approval" ? "#22c55e" : "#ef4444"};">
-              Vacation Request ${status}
-            </h2>
+            <h2 style="color: #ef4444;">Vacation Request Rejected</h2>
             <p>Hello ${request.requester.first_name},</p>
-            <p>Your vacation request has been <strong>${status.toLowerCase()}</strong>.</p>
+            <p>Your vacation request has been <strong>rejected</strong>.</p>
             
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p><strong>Date:</strong> ${dateStr}</p>
@@ -134,10 +221,7 @@ const handler = async (req: Request): Promise<Response> => {
               ${request.rejection_reason ? `<p><strong>Reason:</strong> ${request.rejection_reason}</p>` : ""}
             </div>
             
-            ${type === "approval" ? 
-              `<p style="color: #22c55e;">Your vacation has been added to the schedule.</p>` :
-              `<p>If you have questions about this decision, please contact your manager.</p>`
-            }
+            <p>If you have questions about this decision, please contact your planner or manager.</p>
             
             <p style="color: #666; font-size: 14px; margin-top: 30px;">
               Reviewed by: ${request.approver?.first_name} ${request.approver?.last_name}
@@ -146,7 +230,7 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
 
-      console.log(`${status} notification sent to: ${request.requester.email}`);
+      console.log(`Rejection notification sent to: ${request.requester.email}`);
     }
 
     return new Response(

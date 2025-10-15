@@ -142,6 +142,19 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Delete any existing schedule entries for this date
+      const { error: deleteError } = await supabase
+        .from('schedule_entries')
+        .delete()
+        .eq('user_id', request.user_id)
+        .eq('team_id', request.team_id)
+        .eq('date', request.requested_date);
+
+      if (deleteError) {
+        console.error('Failed to delete existing schedule entries:', deleteError);
+        // Continue with approval even if delete fails
+      }
+
       // Update request status
       const { error: updateError } = await supabase
         .from('vacation_requests')
@@ -168,12 +181,9 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
           created_by: user.id,
         });
 
-      if (scheduleError) {
-        console.error('Failed to create schedule entry:', scheduleError);
-        // Don't fail the approval if schedule creation fails
-      }
+      if (scheduleError) throw scheduleError;
 
-      // Send notification
+      // Send notifications (to requester and manager)
       await supabase.functions.invoke('vacation-request-notification', {
         body: {
           requestId: request.id,
@@ -183,7 +193,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
       toast({
         title: "Request approved",
-        description: "Vacation has been approved and added to the schedule.",
+        description: "Vacation has been approved, added to the schedule, and notifications sent.",
       });
 
       onRequestProcessed?.();

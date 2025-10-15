@@ -178,7 +178,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
-              Your request will be sent to your top-level manager for approval.
+              Your request will be sent to planners for approval. Your manager will be notified once approved.
             </AlertDescription>
           </Alert>
 
