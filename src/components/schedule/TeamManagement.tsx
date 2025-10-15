@@ -622,7 +622,7 @@ const TeamManagement = () => {
           </Dialog>
           )}
 
-          {userRole === 'manager' && (
+          {(userRole === 'manager' || userRole === 'admin') && (
             <Button size="sm" onClick={() => setDelegateAccessOpen(true)}>
               <UserCheck className="w-4 h-4 mr-2" />
               Delegate Access
@@ -854,8 +854,8 @@ const TeamManagement = () => {
         )}
       </div>
 
-      {/* Delegation Indicator - Only for managers */}
-      {userRole === 'manager' && user && (
+      {/* Delegation Indicator - For managers and admins */}
+      {(userRole === 'manager' || userRole === 'admin') && user && (
         <DelegationIndicator userId={user.id} isManager={true} />
       )}
 
