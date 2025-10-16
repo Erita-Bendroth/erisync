@@ -42,6 +42,7 @@ interface ShiftConfiguration {
   startTime: string;
   endTime: string;
   userId?: string; // For rotation mode
+  perDateTimes?: { [dateStr: string]: { startTime: string; endTime: string } }; // For rotation mode with different times per date
 }
 
 interface RotationPattern {
@@ -89,6 +90,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     intervalWeeks: 4,
     cycles: 1
   });
+  const [perDateTimes, setPerDateTimes] = useState<{ [dateStr: string]: { startTime: string; endTime: string } }>({});
 
   useEffect(() => {
     fetchUserRoles();
@@ -263,6 +265,39 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     return allDates.filter(date => !isWeekend(date)); // Only weekdays
   };
 
+  // Update per-date times when date range changes (rotation mode only)
+  useEffect(() => {
+    if (bulkMode === 'rotation' && rangeStartDate && rangeEndDate) {
+      const dateRange = getDateRangeArray();
+      
+      // Check max 7 days for rotation mode
+      if (dateRange.length > 7) {
+        toast({
+          title: "Date Range Too Long",
+          description: "Rotation schedule mode supports a maximum of 7 days",
+          variant: "destructive",
+        });
+        setRangeEndDate(undefined);
+        return;
+      }
+      
+      // Initialize times for each date if not already set
+      const newPerDateTimes: { [dateStr: string]: { startTime: string; endTime: string } } = {};
+      dateRange.forEach(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (perDateTimes[dateStr]) {
+          newPerDateTimes[dateStr] = perDateTimes[dateStr];
+        } else {
+          newPerDateTimes[dateStr] = {
+            startTime: customStartTime || '08:00',
+            endTime: customEndTime || '16:30'
+          };
+        }
+      });
+      setPerDateTimes(newPerDateTimes);
+    }
+  }, [rangeStartDate, rangeEndDate, bulkMode]);
+
   const addShiftConfiguration = () => {
     // Rotation mode validation
     if (bulkMode === 'rotation') {
@@ -304,7 +339,29 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       return;
     }
 
-    if (shiftTemplate !== 'standard') {
+    // For rotation mode, validate per-date times
+    if (bulkMode === 'rotation') {
+      for (const date of dateRange) {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const times = perDateTimes[dateStr];
+        if (!times || !times.startTime || !times.endTime) {
+          toast({
+            title: "Error",
+            description: `Please set start and end times for ${format(date, 'PPP')}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        if (times.startTime >= times.endTime) {
+          toast({
+            title: "Error",
+            description: `Start time must be before end time for ${format(date, 'PPP')}`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    } else if (shiftTemplate !== 'standard') {
       if (!customStartTime || !customEndTime) {
         toast({
           title: "Error",
@@ -337,7 +394,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           dates: [...dateRange],
           startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
           endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
-          userId: userId
+          userId: userId,
+          perDateTimes: { ...perDateTimes } // Store individual times per date
         };
       });
       
@@ -372,6 +430,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     setShiftTemplate('standard');
     setCustomStartTime('08:00');
     setCustomEndTime('16:30');
+    setPerDateTimes({});
     if (bulkMode === 'rotation') {
       setSelectedUsersForRotation([]);
     }
@@ -551,11 +610,17 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 shiftType = 'late';
               }
 
+              // Get times for this specific date (if per-date times exist)
+              const dateTimes = config.perDateTimes?.[dateStr] || {
+                startTime: config.startTime,
+                endTime: config.endTime
+              };
+
               // Format notes with time block data for proper display
               const timeBlockData = [{
                 activity_type: 'work',
-                start_time: config.startTime,
-                end_time: config.endTime
+                start_time: dateTimes.startTime,
+                end_time: dateTimes.endTime
               }];
               const cycleInfo = cycles > 1 ? ` (Cycle ${cycle + 1}/${cycles})` : '';
               const notes = `Times: ${JSON.stringify(timeBlockData)}\nAuto-generated ${config.shiftName}${cycleInfo}`;
@@ -758,32 +823,34 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
-        {/* Shift Template Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Shift Type</label>
-          <Select value={shiftTemplate} onValueChange={(value) => {
-            setShiftTemplate(value);
-            const template = SHIFT_TEMPLATES.find(t => t.id === value);
-            if (template) {
-              setCustomStartTime(template.startTime);
-              setCustomEndTime(template.endTime);
-            }
-          }}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SHIFT_TEMPLATES.map((template) => (
-                <SelectItem key={template.id} value={template.id}>
-                  {template.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Shift Template Selection - Only for non-rotation modes */}
+        {bulkMode !== 'rotation' && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Shift Type</label>
+            <Select value={shiftTemplate} onValueChange={(value) => {
+              setShiftTemplate(value);
+              const template = SHIFT_TEMPLATES.find(t => t.id === value);
+              if (template) {
+                setCustomStartTime(template.startTime);
+                setCustomEndTime(template.endTime);
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHIFT_TEMPLATES.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-        {/* Time Selection for non-Standard shifts */}
-        {shiftTemplate !== 'standard' && (
+        {/* Time Selection for non-Standard shifts - Only for non-rotation modes */}
+        {bulkMode !== 'rotation' && shiftTemplate !== 'standard' && (
           <div className="space-y-2 p-3 border rounded-lg bg-muted/20">
             <Label className="text-sm font-medium">Shift Times</Label>
             <div className="grid grid-cols-2 gap-4">
@@ -875,6 +942,63 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             </div>
           )}
         </div>
+
+        {/* Per-Date Time Configuration for Rotation Mode */}
+        {bulkMode === 'rotation' && rangeStartDate && rangeEndDate && getDateRangeArray().length > 0 && (
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/10">
+            <Label className="text-sm font-medium">Shift Times for Each Date</Label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Configure different shift times for each date in the selected range
+            </p>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {getDateRangeArray().map((date) => {
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const times = perDateTimes[dateStr] || { startTime: '08:00', endTime: '16:30' };
+                return (
+                  <div key={dateStr} className="p-3 border rounded-md bg-background space-y-2">
+                    <div className="font-medium text-sm">{format(date, 'EEEE, MMMM d, yyyy')}</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor={`start-${dateStr}`} className="text-xs text-muted-foreground">
+                          Start Time
+                        </Label>
+                        <input
+                          id={`start-${dateStr}`}
+                          type="time"
+                          value={times.startTime}
+                          onChange={(e) => {
+                            setPerDateTimes(prev => ({
+                              ...prev,
+                              [dateStr]: { ...prev[dateStr], startTime: e.target.value }
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`end-${dateStr}`} className="text-xs text-muted-foreground">
+                          End Time
+                        </Label>
+                        <input
+                          id={`end-${dateStr}`}
+                          type="time"
+                          value={times.endTime}
+                          onChange={(e) => {
+                            setPerDateTimes(prev => ({
+                              ...prev,
+                              [dateStr]: { ...prev[dateStr], endTime: e.target.value }
+                            }));
+                          }}
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Recurring Pattern Option (Rotation Mode Only) */}
         {bulkMode === 'rotation' && (
@@ -978,7 +1102,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {config.startTime} - {config.endTime}
+                        {config.perDateTimes ? 'Custom times per date' : `${config.startTime} - ${config.endTime}`}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {config.dates.slice(0, 3).map((date, idx) => (
