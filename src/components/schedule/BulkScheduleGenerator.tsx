@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2, Repeat, X } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -77,7 +77,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [shiftTemplate, setShiftTemplate] = useState<string>('standard');
   const [customStartTime, setCustomStartTime] = useState<string>('08:00');
   const [customEndTime, setCustomEndTime] = useState<string>('16:30');
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [rangeStartDate, setRangeStartDate] = useState<Date>();
+  const [rangeEndDate, setRangeEndDate] = useState<Date>();
   const [shiftConfigurations, setShiftConfigurations] = useState<ShiftConfiguration[]>([]);
   
   // Rotation mode states
@@ -254,19 +255,12 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     return SHIFT_TEMPLATES.find(t => t.id === shiftTemplate) || SHIFT_TEMPLATES[0];
   };
 
-  const toggleDateSelection = (date: Date | undefined) => {
-    if (!date) return;
+  const getDateRangeArray = (): Date[] => {
+    if (!rangeStartDate || !rangeEndDate) return [];
     
-    setSelectedDates(prev => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const exists = prev.some(d => format(d, 'yyyy-MM-dd') === dateStr);
-      
-      if (exists) {
-        return prev.filter(d => format(d, 'yyyy-MM-dd') !== dateStr);
-      } else {
-        return [...prev, date].sort((a, b) => a.getTime() - b.getTime());
-      }
-    });
+    // Generate all weekdays (Mon-Fri) in the range
+    const allDates = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
+    return allDates.filter(date => !isWeekend(date)); // Only weekdays
   };
 
   const addShiftConfiguration = () => {
@@ -282,10 +276,29 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       }
     }
 
-    if (selectedDates.length === 0) {
+    if (!rangeStartDate || !rangeEndDate) {
       toast({
         title: "Error",
-        description: "Please select at least one date",
+        description: "Please select both start and end dates",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (rangeStartDate > rangeEndDate) {
+      toast({
+        title: "Error",
+        description: "Start date must be before or equal to end date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dateRange = getDateRangeArray();
+    if (dateRange.length === 0) {
+      toast({
+        title: "Error",
+        description: "No weekdays found in the selected date range",
         variant: "destructive",
       });
       return;
@@ -321,7 +334,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           id: `shift-${Date.now()}-${userId}`,
           shiftType: shiftTemplate,
           shiftName: template?.name || 'Custom',
-          dates: [...selectedDates],
+          dates: [...dateRange],
           startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
           endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
           userId: userId
@@ -332,14 +345,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       
       toast({
         title: "Shifts Added",
-        description: `Added ${template?.name || 'Custom'} for ${selectedUsersForRotation.length} user(s) on ${selectedDates.length} date(s)`,
+        description: `Added ${template?.name || 'Custom'} for ${selectedUsersForRotation.length} user(s) on ${dateRange.length} date(s)`,
       });
     } else {
       const newConfig: ShiftConfiguration = {
         id: `shift-${Date.now()}`,
         shiftType: shiftTemplate,
         shiftName: template?.name || 'Custom',
-        dates: [...selectedDates],
+        dates: [...dateRange],
         startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
         endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
         userId: undefined
@@ -354,7 +367,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     }
     
     // Reset form
-    setSelectedDates([]);
+    setRangeStartDate(undefined);
+    setRangeEndDate(undefined);
     setShiftTemplate('standard');
     setCustomStartTime('08:00');
     setCustomEndTime('16:30');
@@ -754,10 +768,6 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
               setCustomStartTime(template.startTime);
               setCustomEndTime(template.endTime);
             }
-            // Reset selected dates when changing shift type
-            if (value === 'standard') {
-              setSelectedDates([]);
-            }
           }}>
             <SelectTrigger>
               <SelectValue />
@@ -801,45 +811,67 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
-        {/* Date Selection */}
+        {/* Date Range Selection */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Select Dates for This Shift</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-left font-normal"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDates.length === 0 
-                  ? 'Pick dates' 
-                  : `${selectedDates.length} date${selectedDates.length !== 1 ? 's' : ''} selected`
-                }
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="multiple"
-                selected={selectedDates}
-                onSelect={(dates) => setSelectedDates(dates || [])}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-          {selectedDates.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {selectedDates.map((date, idx) => (
-                <Badge 
-                  key={idx} 
-                  variant="secondary"
-                  className="text-xs cursor-pointer hover:bg-destructive/10"
-                  onClick={() => toggleDateSelection(date)}
-                >
-                  {format(date, 'MMM d')}
-                  <span className="ml-1">×</span>
-                </Badge>
-              ))}
+          <Label className="text-sm font-medium">Select Date Range for This Shift</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">From Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !rangeStartDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {rangeStartDate ? format(rangeStartDate, "PPP") : "Start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={rangeStartDate}
+                    onSelect={setRangeStartDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">To Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !rangeEndDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {rangeEndDate ? format(rangeEndDate, "PPP") : "End date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={rangeEndDate}
+                    onSelect={setRangeEndDate}
+                    disabled={(date) => rangeStartDate ? date < rangeStartDate : false}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          {rangeStartDate && rangeEndDate && (
+            <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+              {getDateRangeArray().length} weekdays selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
             </div>
           )}
         </div>
@@ -916,7 +948,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           onClick={addShiftConfiguration}
           variant="secondary"
           className="w-full"
-          disabled={selectedDates.length === 0 || (bulkMode === 'rotation' && selectedUsersForRotation.length === 0)}
+          disabled={!rangeStartDate || !rangeEndDate || (bulkMode === 'rotation' && selectedUsersForRotation.length === 0)}
         >
           <Zap className="w-4 h-4 mr-2" />
           Add This Shift Configuration
