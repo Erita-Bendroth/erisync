@@ -86,6 +86,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [selectedUsersForRotation, setSelectedUsersForRotation] = useState<string[]>([]);
   const [enableRecurring, setEnableRecurring] = useState(false);
   const [excludeHolidays, setExcludeHolidays] = useState(true); // Default to excluding holidays
+  const [includeWeekends, setIncludeWeekends] = useState(false); // For non-standard shifts
   const [rotationPattern, setRotationPattern] = useState<RotationPattern>({
     intervalWeeks: 4,
     cycles: 1
@@ -260,8 +261,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const getDateRangeArray = (): Date[] => {
     if (!rangeStartDate || !rangeEndDate) return [];
     
-    // Generate all weekdays (Mon-Fri) in the range
     const allDates = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
+    
+    // For non-standard shifts with includeWeekends enabled, include all days
+    // For standard shifts or when includeWeekends is false, exclude weekends
+    if (shiftTemplate !== 'standard' && includeWeekends) {
+      return allDates; // Include all days including weekends
+    }
+    
     return allDates.filter(date => !isWeekend(date)); // Only weekdays
   };
 
@@ -430,6 +437,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     setShiftTemplate('standard');
     setCustomStartTime('08:00');
     setCustomEndTime('16:30');
+    setIncludeWeekends(false);
     setPerDateTimes({});
     if (bulkMode === 'rotation') {
       setSelectedUsersForRotation([]);
@@ -878,6 +886,22 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
+        {/* Include Weekends Option - Only for non-standard shifts in non-rotation modes */}
+        {bulkMode !== 'rotation' && shiftTemplate !== 'standard' && (
+          <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Include Weekends</Label>
+              <p className="text-xs text-muted-foreground">
+                Schedule shifts on Saturdays and Sundays for this shift type
+              </p>
+            </div>
+            <Checkbox
+              checked={includeWeekends}
+              onCheckedChange={(checked) => setIncludeWeekends(checked === true)}
+            />
+          </div>
+        )}
+
         {/* Date Range Selection */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Select Date Range for This Shift</Label>
@@ -938,7 +962,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
           {rangeStartDate && rangeEndDate && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-              {getDateRangeArray().length} weekdays selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
+              {getDateRangeArray().length} {shiftTemplate !== 'standard' && includeWeekends ? 'days' : 'weekdays'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
             </div>
           )}
         </div>
