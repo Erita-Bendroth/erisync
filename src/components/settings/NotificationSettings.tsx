@@ -64,6 +64,16 @@ const NotificationSettings = () => {
       return;
     }
 
+    // Check if we're on a secure context (HTTPS)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      toast({
+        title: "HTTPS Required",
+        description: "Desktop notifications only work on secure (HTTPS) connections.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const permission = await Notification.requestPermission();
       setNotificationPermission(permission);
@@ -72,21 +82,28 @@ const NotificationSettings = () => {
         savePreferences({ ...preferences, desktopNotifications: true });
         toast({
           title: "Permission Granted",
-          description: "Desktop notifications are now enabled.",
+          description: "Desktop notifications are now enabled. You'll receive alerts for schedule changes.",
         });
-      } else {
+      } else if (permission === 'denied') {
         savePreferences({ ...preferences, desktopNotifications: false });
         toast({
           title: "Permission Denied",
-          description: "Desktop notifications have been blocked.",
+          description: "Please enable notifications in your browser settings to receive alerts.",
           variant: "destructive",
+        });
+      } else {
+        // Permission was dismissed
+        savePreferences({ ...preferences, desktopNotifications: false });
+        toast({
+          title: "Permission Not Set",
+          description: "You can enable notifications later in your browser settings.",
         });
       }
     } catch (error) {
       console.error('Error requesting notification permission:', error);
       toast({
         title: "Error",
-        description: "Failed to request notification permission.",
+        description: "Failed to request notification permission. Please try again.",
         variant: "destructive",
       });
     }
@@ -166,7 +183,16 @@ const NotificationSettings = () => {
             {getPermissionBadge()}
           </div>
           
-          {notificationPermission !== 'granted' && (
+          {notificationPermission === 'denied' && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Notifications are blocked. To enable them, click the lock icon in your browser's address bar and allow notifications for this site.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {notificationPermission === 'default' && (
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>

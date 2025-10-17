@@ -6,8 +6,20 @@ const allowedOrigins = [
   'https://erisync.xyz'
 ];
 
+const isOriginAllowed = (origin: string | null): boolean => {
+  if (!origin) return false;
+  
+  // Check exact matches
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Check for Lovable preview domains (*.lovableproject.com)
+  if (origin.endsWith('.lovableproject.com')) return true;
+  
+  return false;
+};
+
 const getCorsHeaders = (origin: string | null) => {
-  const allowedOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  const allowedOrigin = isOriginAllowed(origin) ? origin : allowedOrigins[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

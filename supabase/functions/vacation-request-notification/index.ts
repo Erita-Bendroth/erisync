@@ -4,10 +4,29 @@ import { Resend } from "npm:resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+const allowedOrigins = [
+  'https://erisync.lovable.app',
+  'https://erisync.xyz'
+];
+
+const isOriginAllowed = (origin: string | null): boolean => {
+  if (!origin) return false;
+  
+  // Check exact matches
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Check for Lovable preview domains (*.lovableproject.com)
+  if (origin.endsWith('.lovableproject.com')) return true;
+  
+  return false;
+};
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigin = isOriginAllowed(origin) ? origin : allowedOrigins[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
 };
 
 interface VacationRequestNotification {
@@ -17,6 +36,9 @@ interface VacationRequestNotification {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get('Origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
