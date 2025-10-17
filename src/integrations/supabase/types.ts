@@ -454,6 +454,7 @@ export type Database = {
           rejected_at: string | null
           rejection_reason: string | null
           requested_date: string
+          selected_planner_id: string | null
           start_time: string | null
           status: string
           team_id: string
@@ -471,6 +472,7 @@ export type Database = {
           rejected_at?: string | null
           rejection_reason?: string | null
           requested_date: string
+          selected_planner_id?: string | null
           start_time?: string | null
           status?: string
           team_id: string
@@ -488,6 +490,7 @@ export type Database = {
           rejected_at?: string | null
           rejection_reason?: string | null
           requested_date?: string
+          selected_planner_id?: string | null
           start_time?: string | null
           status?: string
           team_id?: string
@@ -639,6 +642,15 @@ export type Database = {
           email: string
           first_name: string
           initials: string
+          last_name: string
+          user_id: string
+        }[]
+      }
+      get_planners_for_user_team: {
+        Args: { _user_id: string }
+        Returns: {
+          email: string
+          first_name: string
           last_name: string
           user_id: string
         }[]

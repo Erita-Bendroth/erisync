@@ -37,6 +37,7 @@ const handler = async (req: Request): Promise<Response> => {
         *,
         requester:profiles!vacation_requests_user_id_fkey(first_name, last_name, email),
         approver:profiles!vacation_requests_approver_id_fkey(first_name, last_name, email),
+        selected_planner:profiles!vacation_requests_selected_planner_id_fkey(first_name, last_name, email),
         team:teams(name)
       `)
       .eq("id", requestId)
@@ -47,17 +48,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (type === "request") {
-      // Get planners for the team's hierarchy
-      const { data: planners, error: plannersError } = await supabase
-        .from("user_roles")
-        .select(`
-          user_id,
-          profiles!user_roles_user_id_fkey(first_name, last_name, email)
-        `)
-        .eq("role", "planner");
-
-      if (plannersError || !planners || planners.length === 0) {
-        throw new Error(`Failed to find planners: ${plannersError?.message}`);
+      // Check if selected planner exists
+      if (!request.selected_planner_id || !request.selected_planner) {
+        throw new Error("No planner selected for this vacation request");
       }
 
       const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
@@ -73,42 +66,40 @@ const handler = async (req: Request): Promise<Response> => {
 
       const approveUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://app.")}/schedule?pendingApproval=${requestId}`;
 
-      // Send notification to all planners
-      for (const planner of planners) {
-        await resend.emails.send({
-          from: "EriSync <noreply@erisync.xyz>",
-          to: [planner.profiles.email],
-          subject: `Vacation Request Pending: ${request.requester.first_name} ${request.requester.last_name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Vacation Request Pending Approval</h2>
-              <p>Hello ${planner.profiles.first_name},</p>
-              <p>A new vacation request requires your approval:</p>
-              
-              <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
-                <p><strong>Team:</strong> ${request.team.name}</p>
-                <p><strong>Date:</strong> ${dateStr}</p>
-                <p><strong>Time:</strong> ${timeStr}</p>
-                ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
-              </div>
-              
-              <p>
-                <a href="${approveUrl}" 
-                   style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  Review Request
-                </a>
-              </p>
-              
-              <p style="color: #666; font-size: 14px; margin-top: 30px;">
-                You're receiving this because you are a planner for ${request.team.name}.
-              </p>
+      // Send notification only to the selected planner
+      await resend.emails.send({
+        from: "EriSync <noreply@erisync.xyz>",
+        to: [request.selected_planner.email],
+        subject: `Vacation Request Pending: ${request.requester.first_name} ${request.requester.last_name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Vacation Request Pending Approval</h2>
+            <p>Hello ${request.selected_planner.first_name},</p>
+            <p>A new vacation request requires your approval:</p>
+            
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
+              <p><strong>Team:</strong> ${request.team.name}</p>
+              <p><strong>Date:</strong> ${dateStr}</p>
+              <p><strong>Time:</strong> ${timeStr}</p>
+              ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
             </div>
-          `,
-        });
-      }
+            
+            <p>
+              <a href="${approveUrl}" 
+                 style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Review Request
+              </a>
+            </p>
+            
+            <p style="color: #666; font-size: 14px; margin-top: 30px;">
+              You're receiving this because ${request.requester.first_name} ${request.requester.last_name} selected you to review their vacation request.
+            </p>
+          </div>
+        `,
+      });
 
-      console.log(`Request notifications sent to ${planners.length} planner(s)`);
+      console.log(`Request notification sent to planner: ${request.selected_planner.email}`);
     } else if (type === "approval") {
       const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
         weekday: "long",

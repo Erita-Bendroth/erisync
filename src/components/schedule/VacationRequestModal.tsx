@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -7,9 +7,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { TimeSelect } from '@/components/ui/time-select';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar, Clock, AlertCircle, Info } from 'lucide-react';
+import { Loader2, Calendar, Clock, AlertCircle, Info, Users } from 'lucide-react';
+
+interface Planner {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
 
 interface VacationRequestModalProps {
   open: boolean;
@@ -29,12 +37,60 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
   const [startTime, setStartTime] = useState<string>('08:00');
   const [endTime, setEndTime] = useState<string>('16:30');
   const [notes, setNotes] = useState('');
+  const [planners, setPlanners] = useState<Planner[]>([]);
+  const [selectedPlannerId, setSelectedPlannerId] = useState<string>('');
+  const [loadingPlanners, setLoadingPlanners] = useState(true);
+
+  // Fetch planners when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchPlanners();
+    }
+  }, [open]);
+
+  const fetchPlanners = async () => {
+    try {
+      setLoadingPlanners(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .rpc('get_planners_for_user_team', { _user_id: user.id });
+
+      if (error) throw error;
+
+      setPlanners(data || []);
+      
+      // Auto-select first planner if available
+      if (data && data.length > 0 && !selectedPlannerId) {
+        setSelectedPlannerId(data[0].user_id);
+      }
+    } catch (error) {
+      console.error('Error fetching planners:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load planners list",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPlanners(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!selectedDate) {
       toast({
         title: "Date required",
         description: "Please select a date for your vacation request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedPlannerId) {
+      toast({
+        title: "Planner required",
+        description: "Please select a planner to review your request.",
         variant: "destructive",
       });
       return;
@@ -110,6 +166,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           end_time: isFullDay ? null : endTime,
           notes: notes.trim() || null,
           status: 'pending',
+          selected_planner_id: selectedPlannerId,
         })
         .select()
         .single();
@@ -143,6 +200,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
       setStartTime('08:00');
       setEndTime('16:30');
       setNotes('');
+      setSelectedPlannerId('');
       
       onRequestSubmitted();
       onOpenChange(false);
@@ -178,9 +236,48 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
-              Your request will be sent to planners for approval. Your manager will be notified once approved.
+              Your request will be sent to the selected planner for approval. Your manager will be notified once approved.
             </AlertDescription>
           </Alert>
+
+          {/* Planner Selection */}
+          <div className="space-y-2">
+            <Label className="text-base font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              Send to Planner *
+            </Label>
+            {loadingPlanners ? (
+              <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading planners...</span>
+              </div>
+            ) : planners.length === 0 ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No planners available for your team. Please contact your administrator.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Select value={selectedPlannerId} onValueChange={setSelectedPlannerId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a planner to review your request" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {planners.map((planner) => (
+                    <SelectItem key={planner.user_id} value={planner.user_id}>
+                      {planner.first_name} {planner.last_name}
+                      {planner.email && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({planner.email})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
 
           {/* Date Selection */}
           <div className="space-y-2">
@@ -267,7 +364,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || !selectedDate}
+            disabled={isSubmitting || !selectedDate || !selectedPlannerId || planners.length === 0}
             className="w-full sm:w-auto gap-2"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
