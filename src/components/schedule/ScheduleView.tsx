@@ -615,10 +615,12 @@ useEffect(() => {
 
   const fetchScheduleEntries = async () => {
     try {
+      console.log('🚀 fetchScheduleEntries START');
       setLoading(true);
       const weekEnd = addDays(weekStart, 6);
       const dateStart = format(weekStart, "yyyy-MM-dd");
       const dateEnd = format(weekEnd, "yyyy-MM-dd");
+      console.log(`📅 Date range: ${dateStart} to ${dateEnd}`);
 
       // For "All Teams", fetch in batches to avoid .in() limitations and RLS issues
       let allData: any[] = [];
@@ -636,13 +638,20 @@ useEffect(() => {
           teamIds = allTeams?.map(t => t.id) || [];
           console.log(`📊 Planner All Teams fetch: ${teamIds.length} teams total`);
         } else if (isManager()) {
+          console.log('🔍 Calling get_manager_accessible_teams RPC...');
           const { data: accessibleTeamIds, error: rpcError } = await supabase
             .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
           
           if (rpcError) {
-            console.error('Error fetching manager accessible teams:', rpcError);
+            console.error('❌ Error fetching manager accessible teams:', rpcError);
+            toast({
+              title: "Error Loading Teams",
+              description: `Failed to fetch accessible teams: ${rpcError.message}`,
+              variant: "destructive",
+            });
             teamIds = [];
           } else {
+            console.log('✅ get_manager_accessible_teams returned successfully');
             teamIds = accessibleTeamIds || [];
             console.log(`📊 Manager All Teams fetch (including sub-teams): ${teamIds.length} teams`);
             console.log('Accessible team IDs:', teamIds);
@@ -772,10 +781,21 @@ useEffect(() => {
       const userIds = [...new Set(data?.map(entry => entry.user_id) || [])];
       const teamIds = [...new Set(data?.map(entry => entry.team_id) || [])];
       
+      console.log('🔍 Fetching profiles and teams for entries...');
       const [profilesResult, teamsResult] = await Promise.all([
         supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds }),
         supabase.from('teams').select('id, name').in('id', teamIds)
       ]);
+      
+      if (profilesResult.error) {
+        console.error('❌ Error fetching profiles:', profilesResult.error);
+        throw profilesResult.error;
+      }
+      if (teamsResult.error) {
+        console.error('❌ Error fetching teams:', teamsResult.error);
+        throw teamsResult.error;
+      }
+      console.log('✅ Profiles and teams fetched successfully');
       
       const profilesMap = new Map((profilesResult.data || []).map(p => [p.user_id, p]));
       const teamsMap = new Map((teamsResult.data || []).map(t => [t.id, t]));
