@@ -32,7 +32,8 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
   const [isFullDay, setIsFullDay] = useState(true);
   const [startTime, setStartTime] = useState<string>('08:00');
   const [endTime, setEndTime] = useState<string>('16:30');
@@ -77,11 +78,39 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
     }
   };
 
+  // Calculate working days (excluding weekends)
+  const getWorkingDays = (start: Date, end: Date): Date[] => {
+    const days: Date[] = [];
+    const current = new Date(start);
+    
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      // 0 = Sunday, 6 = Saturday
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        days.push(new Date(current));
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return days;
+  };
+
+  const workingDaysCount = startDate && endDate ? getWorkingDays(startDate, endDate).length : 0;
+
   const handleSubmit = async () => {
-    if (!selectedDate) {
+    if (!startDate || !endDate) {
       toast({
-        title: "Date required",
-        description: "Please select a date for your vacation request.",
+        title: "Dates required",
+        description: "Please select start and end dates for your vacation request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (endDate < startDate) {
+      toast({
+        title: "Invalid date range",
+        description: "End date must be after or equal to start date.",
         variant: "destructive",
       });
       return;
@@ -132,70 +161,89 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
         throw new Error("Unable to find your team assignment");
       }
 
-      // Check for overlapping requests
-      const { data: hasOverlap, error: overlapError } = await supabase
-        .rpc('check_vacation_overlap', {
-          _user_id: user.id,
-          _requested_date: selectedDate.toISOString().split('T')[0],
-          _start_time: isFullDay ? null : startTime,
-          _end_time: isFullDay ? null : endTime,
-          _is_full_day: isFullDay,
-        });
+      // Get all working days in the range
+      const workingDays = getWorkingDays(startDate, endDate);
 
-      if (overlapError) throw overlapError;
-
-      if (hasOverlap) {
+      if (workingDays.length === 0) {
         toast({
-          title: "Overlapping request",
-          description: "You already have a vacation request for this date/time.",
+          title: "No working days",
+          description: "The selected date range contains no working days.",
           variant: "destructive",
         });
         setIsSubmitting(false);
         return;
       }
 
-      // Create the vacation request
-      const { data: request, error: insertError } = await supabase
+      // Check for overlapping requests for each working day
+      for (const day of workingDays) {
+        const { data: hasOverlap, error: overlapError } = await supabase
+          .rpc('check_vacation_overlap', {
+            _user_id: user.id,
+            _requested_date: day.toISOString().split('T')[0],
+            _start_time: isFullDay ? null : startTime,
+            _end_time: isFullDay ? null : endTime,
+            _is_full_day: isFullDay,
+          });
+
+        if (overlapError) throw overlapError;
+
+        if (hasOverlap) {
+          toast({
+            title: "Overlapping request",
+            description: `You already have a vacation request for ${day.toLocaleDateString()}.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Create vacation requests for all working days
+      const requests = workingDays.map(day => ({
+        user_id: user.id,
+        team_id: teamMember.team_id,
+        requested_date: day.toISOString().split('T')[0],
+        is_full_day: isFullDay,
+        start_time: isFullDay ? null : startTime,
+        end_time: isFullDay ? null : endTime,
+        notes: notes.trim() || null,
+        status: 'pending',
+        selected_planner_id: selectedPlannerId,
+      }));
+
+      const { data: insertedRequests, error: insertError } = await supabase
         .from('vacation_requests')
-        .insert({
-          user_id: user.id,
-          team_id: teamMember.team_id,
-          requested_date: selectedDate.toISOString().split('T')[0],
-          is_full_day: isFullDay,
-          start_time: isFullDay ? null : startTime,
-          end_time: isFullDay ? null : endTime,
-          notes: notes.trim() || null,
-          status: 'pending',
-          selected_planner_id: selectedPlannerId,
-        })
-        .select()
-        .single();
+        .insert(requests)
+        .select();
 
       if (insertError) throw insertError;
 
-      // Send notification to approver
-      const { error: notificationError } = await supabase.functions.invoke(
-        'vacation-request-notification',
-        {
-          body: {
-            requestId: request.id,
-            type: 'request',
-          },
-        }
-      );
+      // Send notification for the first request (representing the range)
+      if (insertedRequests && insertedRequests.length > 0) {
+        const { error: notificationError } = await supabase.functions.invoke(
+          'vacation-request-notification',
+          {
+            body: {
+              requestId: insertedRequests[0].id,
+              type: 'request',
+            },
+          }
+        );
 
-      if (notificationError) {
-        console.error('Failed to send notification:', notificationError);
-        // Don't fail the whole request if notification fails
+        if (notificationError) {
+          console.error('Failed to send notification:', notificationError);
+          // Don't fail the whole request if notification fails
+        }
       }
 
       toast({
         title: "Request submitted",
-        description: "Your vacation request has been submitted for approval.",
+        description: `Your vacation request for ${workingDays.length} working day${workingDays.length > 1 ? 's' : ''} has been submitted for approval.`,
       });
 
       // Reset form
-      setSelectedDate(undefined);
+      setStartDate(undefined);
+      setEndDate(undefined);
       setIsFullDay(true);
       setStartTime('08:00');
       setEndTime('16:30');
@@ -279,17 +327,39 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
             )}
           </div>
 
-          {/* Date Selection */}
-          <div className="space-y-2">
+          {/* Date Range Selection */}
+          <div className="space-y-4">
             <Label className="text-base font-semibold flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              Vacation Date *
+              Vacation Period *
             </Label>
-            <DatePicker
-              date={selectedDate}
-              onDateChange={setSelectedDate}
-              placeholder="Select your vacation date"
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Start Date</Label>
+                <DatePicker
+                  date={startDate}
+                  onDateChange={setStartDate}
+                  placeholder="From"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">End Date</Label>
+                <DatePicker
+                  date={endDate}
+                  onDateChange={setEndDate}
+                  placeholder="To"
+                />
+              </div>
+            </div>
+            {startDate && endDate && workingDaysCount > 0 && (
+              <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
+                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
+                  You are requesting <strong>{workingDaysCount} working day{workingDaysCount > 1 ? 's' : ''}</strong> from{' '}
+                  {startDate.toLocaleDateString()} to {endDate.toLocaleDateString()} (weekends excluded).
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {/* Full Day Toggle */}
@@ -364,7 +434,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || !selectedDate || !selectedPlannerId || planners.length === 0}
+            disabled={isSubmitting || !startDate || !endDate || !selectedPlannerId || planners.length === 0}
             className="w-full sm:w-auto gap-2"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
