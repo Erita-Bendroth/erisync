@@ -1509,7 +1509,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
           {isTeamMember() && !isManager() && !isPlanner() && userTeams.length > 0 && userTeams[0]?.id && (
             <MonthlyScheduleView 
               currentMonth={currentMonth}
-              teamId={userTeams[0].id}
+              teamId={userTeams[0]!.id}
               userId={user!.id}
             />
           )}
