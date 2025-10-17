@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download } from "lucide-react";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import TeamManagement from "@/components/schedule/TeamManagement";
@@ -247,6 +248,7 @@ const Schedule = () => {
               <Calendar className="w-4 h-4 mr-2" />
               Back to Dashboard
             </Button>
+            <ThemeToggle />
             <Button onClick={handleSignOut} variant="outline" size="sm">
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out

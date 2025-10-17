@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import ForgotPassword from "@/components/auth/ForgotPassword";
 import ResetPassword from "@/components/auth/ResetPassword";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -198,6 +199,9 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="flex flex-col items-center space-y-6">
         <div className="flex items-center space-x-2">
           <Clock className="h-8 w-8 text-primary" />
