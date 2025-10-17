@@ -21,6 +21,8 @@ import { VacationRequestsList } from './VacationRequestsList';
 import { TeamAvailabilityView } from './TeamAvailabilityView';
 import { MonthlyScheduleView } from './MonthlyScheduleView';
 import { TeamFavoritesManager } from './TeamFavoritesManager';
+import { TeamFavoritesQuickAccess } from './TeamFavoritesQuickAccess';
+import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
@@ -77,6 +79,7 @@ interface ScheduleViewProps {
 const ScheduleView = ({ initialTeamId }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { favorites } = useTeamFavorites();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
@@ -1514,8 +1517,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
               <TeamFavoritesManager
                 currentSelectedTeamIds={selectedTeams.filter(id => id !== "all")}
                 teams={teams}
-                onApplyFavorite={(teamIds) => {
+                onApplyFavorite={(teamIds, name) => {
                   setSelectedTeams(teamIds);
+                  toast({
+                    title: 'Favorite Applied',
+                    description: `Viewing teams from "${name}"`,
+                  });
                 }}
               />
             </div>
@@ -1588,6 +1595,21 @@ const getActivityColor = (entry: ScheduleEntry) => {
           </div>
         </div>
       </div>
+
+      {/* Quick Access Favorites Bar */}
+      {(isManager() || isPlanner()) && favorites.length > 0 && (
+        <TeamFavoritesQuickAccess
+          favorites={favorites}
+          currentSelectedTeamIds={selectedTeams.filter(id => id !== "all")}
+          onApplyFavorite={(teamIds, name) => {
+            setSelectedTeams(teamIds);
+            toast({
+              title: 'Favorite Applied',
+              description: `Switched to "${name}"`,
+            });
+          }}
+        />
+      )}
 
       {/* Hierarchical Team Information */}
       {(isManager() || isPlanner()) && !selectedTeams.includes("all") && selectedTeams.length === 1 && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,22 +19,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Star, Trash2, Edit2, Plus } from 'lucide-react';
+import { Settings, Trash2, Edit2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-
-interface TeamFavorite {
-  id: string;
-  name: string;
-  team_ids: string[];
-  created_at: string;
-}
+import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 
 interface TeamFavoritesManagerProps {
   currentSelectedTeamIds: string[];
   teams: Array<{ id: string; name: string }>;
-  onApplyFavorite: (teamIds: string[]) => void;
+  onApplyFavorite: (teamIds: string[], name: string) => void;
 }
 
 export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
@@ -43,36 +37,14 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
   onApplyFavorite,
 }) => {
   const { toast } = useToast();
-  const [favorites, setFavorites] = useState<TeamFavorite[]>([]);
+  const { favorites, refetchFavorites } = useTeamFavorites();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [favoriteName, setFavoriteName] = useState('');
-  const [editingFavorite, setEditingFavorite] = useState<TeamFavorite | null>(null);
-  const [deletingFavorite, setDeletingFavorite] = useState<TeamFavorite | null>(null);
+  const [editingFavorite, setEditingFavorite] = useState<any>(null);
+  const [deletingFavorite, setDeletingFavorite] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchFavorites();
-  }, []);
-
-  const fetchFavorites = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('team_view_favorites')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setFavorites(data || []);
-    } catch (error) {
-      console.error('Error fetching favorites:', error);
-    }
-  };
 
   const handleSaveFavorite = async () => {
     if (!favoriteName.trim()) {
@@ -125,7 +97,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
 
       setFavoriteName('');
       setShowSaveDialog(false);
-      fetchFavorites();
+      refetchFavorites();
     } catch (error) {
       console.error('Error saving favorite:', error);
       toast({
@@ -171,7 +143,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
       setFavoriteName('');
       setShowEditDialog(false);
       setEditingFavorite(null);
-      fetchFavorites();
+      refetchFavorites();
     } catch (error) {
       console.error('Error updating favorite:', error);
       toast({
@@ -203,7 +175,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
 
       setShowDeleteDialog(false);
       setDeletingFavorite(null);
-      fetchFavorites();
+      refetchFavorites();
     } catch (error) {
       console.error('Error deleting favorite:', error);
       toast({
@@ -216,8 +188,8 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
     }
   };
 
-  const handleApplyFavorite = (favorite: TeamFavorite) => {
-    onApplyFavorite(favorite.team_ids);
+  const handleApplyFavorite = (favorite: any) => {
+    onApplyFavorite(favorite.team_ids, favorite.name);
     toast({
       title: 'Favorite Applied',
       description: `Viewing teams from "${favorite.name}"`,
@@ -237,8 +209,8 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="default" className="gap-2">
-              <Star className="h-4 w-4" />
-              Favorites
+              <Settings className="h-4 w-4" />
+              Manage Favorites
               {favorites.length > 0 && (
                 <Badge variant="secondary" className="ml-1">
                   {favorites.length}
