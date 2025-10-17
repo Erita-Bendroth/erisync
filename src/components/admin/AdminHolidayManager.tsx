@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Download, Trash2, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Calendar, Download, Trash2, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,18 @@ interface Holiday {
   year: number;
   is_public: boolean;
   region_code?: string;
+}
+
+interface ImportStatus {
+  id: string;
+  country_code: string;
+  year: number;
+  region_code: string | null;
+  status: 'pending' | 'completed' | 'failed';
+  imported_count: number;
+  started_at: string;
+  completed_at: string | null;
+  error_message: string | null;
 }
 
 // European countries with focus on Germany and regional support
@@ -85,13 +98,28 @@ const AdminHolidayManager = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [importStatuses, setImportStatuses] = useState<ImportStatus[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchUserRoles();
       fetchHolidays();
+      fetchImportStatuses();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Poll for status updates while imports are pending
+    const hasPending = importStatuses.some(s => s.status === 'pending');
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      fetchImportStatuses();
+      fetchHolidays();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [importStatuses]);
 
   const fetchUserRoles = useCallback(async () => {
     if (!user) return;
@@ -136,6 +164,31 @@ const AdminHolidayManager = () => {
     }
   }, [user, hasPermission]);
 
+  const fetchImportStatuses = useCallback(async () => {
+    if (!user || !hasPermission) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('holiday_import_status')
+        .select('*')
+        .order('started_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setImportStatuses((data || []) as ImportStatus[]);
+    } catch (error) {
+      console.error('Error fetching import statuses:', error);
+    }
+  }, [user, hasPermission]);
+
+  const getImportStatus = useCallback((countryCode: string, year: number, regionCode?: string | null) => {
+    return importStatuses.find(
+      s => s.country_code === countryCode && 
+           s.year === year && 
+           s.region_code === (regionCode || null)
+    );
+  }, [importStatuses]);
+
   const triggerHolidayAutoAssignment = useCallback(async () => {
     // Holidays are now displayed directly from holidays table - no need to create schedule entries
     console.log('Holidays are automatically displayed from holidays table');
@@ -160,8 +213,16 @@ const AdminHolidayManager = () => {
 
       let totalImported = 0;
       let totalExisting = 0;
+      let totalPending = 0;
 
       for (const region of regionsToImport) {
+        // Check if already imported or in progress
+        const existingStatus = getImportStatus(selectedCountry, selectedYear, region);
+        if (existingStatus?.status === 'pending') {
+          totalPending++;
+          continue;
+        }
+
         const { data, error } = await supabase.functions.invoke('import-holidays', {
           body: {
             country_code: selectedCountry,
@@ -171,7 +232,14 @@ const AdminHolidayManager = () => {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          // Check if it's a conflict error (409)
+          if (error.message?.includes('already in progress')) {
+            totalPending++;
+            continue;
+          }
+          throw error;
+        }
         
         console.log(`📥 Import result for region ${region || 'National'}:`, {
           imported: data.imported,
@@ -185,12 +253,18 @@ const AdminHolidayManager = () => {
       console.log(`✅ Import complete:`, {
         totalImported,
         totalExisting,
+        totalPending,
         regionsCount: selectedRegions.length
       });
 
+      // Refresh statuses immediately
+      await fetchImportStatuses();
+
       toast({
         title: "Success",
-        description: totalImported > 0
+        description: totalPending > 0
+          ? `${totalPending} import(s) already in progress. Data is syncing in the background.`
+          : totalImported > 0
           ? `Imported ${totalImported} holidays for ${selectedYear}${selectedRegions.length > 0 ? ` (${selectedRegions.length} regions)` : ''}. They will automatically appear for users based on their location.`
           : `All holidays for ${selectedYear} already exist (${totalExisting} holidays)`,
       });
@@ -207,7 +281,7 @@ const AdminHolidayManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegions, toast, fetchHolidays]);
+  }, [user, hasPermission, selectedCountry, selectedYear, selectedRegions, toast, fetchHolidays, fetchImportStatuses, getImportStatus]);
 
   const deleteHolidays = useCallback(async (countryCode: string, year: number) => {
     if (!user || !hasPermission) return;
@@ -328,11 +402,22 @@ const AdminHolidayManager = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {countries.map((country) => (
-                    <SelectItem key={country.code} value={country.code}>
-                      {country.name}
-                    </SelectItem>
-                  ))}
+                  {countries.map((country) => {
+                    const status = getImportStatus(country.code, selectedYear);
+                    return (
+                      <SelectItem key={country.code} value={country.code}>
+                        <div className="flex items-center gap-2">
+                          <span>{country.name}</span>
+                          {status?.status === 'completed' && (
+                            <CheckCircle2 className="w-3 h-3 text-green-600" />
+                          )}
+                          {status?.status === 'pending' && (
+                            <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -382,10 +467,39 @@ const AdminHolidayManager = () => {
               </Select>
             </div>
             
-            <Button onClick={importHolidays} disabled={loading}>
-              <Download className="w-4 h-4 mr-2" />
-              {loading ? "Importing..." : "Import Holidays"}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    onClick={importHolidays} 
+                    disabled={loading || (() => {
+                      const regionsToCheck = selectedCountry === 'DE' && selectedRegions.length > 0 
+                        ? selectedRegions 
+                        : [null];
+                      return regionsToCheck.some(region => 
+                        getImportStatus(selectedCountry, selectedYear, region)?.status === 'pending'
+                      );
+                    })()}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    {loading ? "Importing..." : "Import Holidays"}
+                  </Button>
+                </TooltipTrigger>
+                {(() => {
+                  const regionsToCheck = selectedCountry === 'DE' && selectedRegions.length > 0 
+                    ? selectedRegions 
+                    : [null];
+                  const pendingImport = regionsToCheck.find(region => 
+                    getImportStatus(selectedCountry, selectedYear, region)?.status === 'pending'
+                  );
+                  return pendingImport && (
+                    <TooltipContent>
+                      <p>Import already in progress. Holidays are syncing in the background.</p>
+                    </TooltipContent>
+                  );
+                })()}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </CardContent>
       </Card>
@@ -398,6 +512,17 @@ const AdminHolidayManager = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Show pending imports */}
+          {importStatuses.filter(s => s.status === 'pending').length > 0 && (
+            <Alert className="mb-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription>
+                <strong>Syncing in progress:</strong> {importStatuses.filter(s => s.status === 'pending').length} import(s) running in the background. 
+                The page will automatically refresh when complete.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="space-y-6">
             {Object.keys(groupedHolidays).length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
@@ -409,10 +534,41 @@ const AdminHolidayManager = () => {
                 return (
                   <div key={key} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg">
-                          {getCountryName(countryCode)} {year}
-                        </h3>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-lg">
+                            {getCountryName(countryCode)} {year}
+                          </h3>
+                          {(() => {
+                            const status = getImportStatus(countryCode, parseInt(year));
+                            if (status?.status === 'pending') {
+                              return (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Badge variant="outline" className="gap-1">
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        Syncing
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Holidays are being imported in the background</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            }
+                            if (status?.status === 'completed') {
+                              return (
+                                <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Imported
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {holidayGroup.length} public holidays available to users
                         </p>

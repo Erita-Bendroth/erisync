@@ -107,6 +107,49 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Check if import is already in progress or completed
+    const { data: existingStatus } = await supabaseClient
+      .from('holiday_import_status')
+      .select('*')
+      .eq('country_code', country_code)
+      .eq('year', year)
+      .eq('region_code', region_code || null)
+      .maybeSingle();
+
+    if (existingStatus && existingStatus.status === 'pending') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Import already in progress',
+          status: 'pending',
+          started_at: existingStatus.started_at
+        }),
+        { 
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Create or update import status record
+    const { error: statusError } = await supabaseClient
+      .from('holiday_import_status')
+      .upsert({
+        country_code,
+        year: parseInt(year),
+        region_code: region_code || null,
+        status: 'pending',
+        started_at: new Date().toISOString(),
+        created_by: user.id,
+        completed_at: null,
+        error_message: null
+      }, {
+        onConflict: 'country_code,year,region_code'
+      });
+
+    if (statusError) {
+      console.error('Error creating import status:', statusError);
+    }
+
     console.log(`Fetching holidays for ${country_code} in ${year}`)
 
     let holidays: Holiday[] = []
@@ -243,6 +286,19 @@ Deno.serve(async (req) => {
 
     if (newHolidays.length === 0) {
       console.log('All holidays already exist')
+      
+      // Update status to completed even if no new holidays
+      await supabaseClient
+        .from('holiday_import_status')
+        .update({
+          status: 'completed',
+          imported_count: 0,
+          completed_at: new Date().toISOString()
+        })
+        .eq('country_code', country_code)
+        .eq('year', year)
+        .eq('region_code', region_code || null);
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -282,6 +338,18 @@ Deno.serve(async (req) => {
 
     console.log(`Successfully imported ${newHolidays.length} holidays`)
 
+    // Update import status to completed
+    await supabaseClient
+      .from('holiday_import_status')
+      .update({
+        status: 'completed',
+        imported_count: newHolidays.length,
+        completed_at: new Date().toISOString()
+      })
+      .eq('country_code', country_code)
+      .eq('year', year)
+      .eq('region_code', region_code || null);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -297,6 +365,24 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error importing holidays:', error)
+    
+    // Update import status to failed
+    try {
+      const requestBody = await req.clone().json();
+      await supabaseClient
+        .from('holiday_import_status')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+          completed_at: new Date().toISOString()
+        })
+        .eq('country_code', requestBody.country_code)
+        .eq('year', requestBody.year)
+        .eq('region_code', requestBody.region_code || null);
+    } catch (updateError) {
+      console.error('Error updating import status:', updateError);
+    }
+    
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

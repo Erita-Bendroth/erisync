@@ -76,6 +76,48 @@ export type Database = {
           },
         ]
       }
+      holiday_import_status: {
+        Row: {
+          completed_at: string | null
+          country_code: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          imported_count: number | null
+          region_code: string | null
+          started_at: string
+          status: string
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          completed_at?: string | null
+          country_code: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          imported_count?: number | null
+          region_code?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          completed_at?: string | null
+          country_code?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          imported_count?: number | null
+          region_code?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       holidays: {
         Row: {
           country_code: string
