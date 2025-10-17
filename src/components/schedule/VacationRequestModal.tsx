@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar, Clock, AlertCircle, Info, Users } from 'lucide-react';
+import { Loader2, Calendar, Clock, AlertCircle, Info, UserCheck } from 'lucide-react';
 
 interface Planner {
   user_id: string;
@@ -243,7 +243,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           {/* Planner Selection */}
           <div className="space-y-2">
             <Label className="text-base font-semibold flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
               Send to Planner *
             </Label>
             {loadingPlanners ? (

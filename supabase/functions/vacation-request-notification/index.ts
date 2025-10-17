@@ -37,7 +37,6 @@ const handler = async (req: Request): Promise<Response> => {
         *,
         requester:profiles!vacation_requests_user_id_fkey(first_name, last_name, email),
         approver:profiles!vacation_requests_approver_id_fkey(first_name, last_name, email),
-        selected_planner:profiles!vacation_requests_selected_planner_id_fkey(first_name, last_name, email),
         team:teams(name)
       `)
       .eq("id", requestId)
@@ -48,9 +47,16 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (type === "request") {
-      // Check if selected planner exists
-      if (!request.selected_planner_id || !request.selected_planner) {
-        throw new Error("No planner selected for this vacation request");
+      // Get the selected planner's information
+      const { data: planner, error: plannerError } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("user_id", request.selected_planner_id)
+        .single();
+
+      if (plannerError || !planner) {
+        console.error("Failed to find selected planner:", plannerError);
+        throw new Error(`Failed to find selected planner: ${plannerError?.message}`);
       }
 
       const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
@@ -66,15 +72,15 @@ const handler = async (req: Request): Promise<Response> => {
 
       const approveUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://app.")}/schedule?pendingApproval=${requestId}`;
 
-      // Send notification only to the selected planner
+      // Send notification to the selected planner
       await resend.emails.send({
         from: "EriSync <noreply@erisync.xyz>",
-        to: [request.selected_planner.email],
+        to: [planner.email],
         subject: `Vacation Request Pending: ${request.requester.first_name} ${request.requester.last_name}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #333;">Vacation Request Pending Approval</h2>
-            <p>Hello ${request.selected_planner.first_name},</p>
+            <p>Hello ${planner.first_name},</p>
             <p>A new vacation request requires your approval:</p>
             
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -93,13 +99,13 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             
             <p style="color: #666; font-size: 14px; margin-top: 30px;">
-              You're receiving this because ${request.requester.first_name} ${request.requester.last_name} selected you to review their vacation request.
+              You were selected by ${request.requester.first_name} ${request.requester.last_name} to review this request.
             </p>
           </div>
         `,
       });
 
-      console.log(`Request notification sent to planner: ${request.selected_planner.email}`);
+      console.log(`Request notification sent to planner: ${planner.email}`);
     } else if (type === "approval") {
       const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
         weekday: "long",
