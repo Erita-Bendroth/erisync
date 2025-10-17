@@ -694,6 +694,10 @@ export type Database = {
         Args: { _delegate_id: string; _manager_id: string }
         Returns: boolean
       }
+      is_in_same_team: {
+        Args: { _team_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_manager_of_team: {
         Args: { _team_id: string; _user_id: string }
         Returns: boolean
