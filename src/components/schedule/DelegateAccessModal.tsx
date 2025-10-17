@@ -90,6 +90,13 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log("Delegation form submission started:", {
+      managerId,
+      selectedUserId,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+    });
+
     if (!selectedUserId || !startDate || !endDate) {
       toast({
         title: "Validation Error",
@@ -111,6 +118,8 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
     setLoading(true);
 
     try {
+      console.log("Calling create_manager_delegation RPC function...");
+      
       // Use the secure function to create delegation with automatic team access
       const { data: delegationResult, error: delegationError } = await supabase
         .rpc("create_manager_delegation", {
@@ -121,6 +130,7 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
         });
 
       if (delegationError) {
+        console.error("RPC function error:", delegationError);
         throw new Error(delegationError.message || "Failed to create delegation");
       }
 

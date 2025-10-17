@@ -120,25 +120,20 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
       const delegation = delegations.find(d => d.id === delegationId);
       if (!delegation) return;
 
-      const { error: updateError } = await supabase
-        .from("manager_delegations")
-        .update({
-          status: "revoked",
-          revoked_at: new Date().toISOString(),
-          revoked_by: userId,
-        })
-        .eq("id", delegationId);
+      console.log("Revoking delegation:", delegationId);
 
-      if (updateError) throw updateError;
-
-      // Create audit log
-      await supabase
-        .from("delegation_audit_log")
-        .insert({
-          delegation_id: delegationId,
-          action: "revoked",
-          performed_by: userId,
+      // Use the secure function to revoke delegation
+      const { data: revokeResult, error: revokeError } = await supabase
+        .rpc("revoke_manager_delegation", {
+          _delegation_id: delegationId,
+          _revoked_by: userId,
         });
+
+      if (revokeError) {
+        throw new Error(revokeError.message || "Failed to revoke delegation");
+      }
+
+      console.log("Delegation revoked successfully:", revokeResult);
 
       // Send cancellation notification to both parties
       const { data: managerProfile } = await supabase
@@ -167,17 +162,21 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
         });
       }
 
+      const teamsRemoved = (revokeResult as any)?.teams_removed || 0;
       toast({
         title: "Success",
-        description: "Delegation cancelled successfully. Both parties have been notified.",
+        description: teamsRemoved > 0
+          ? `Delegation cancelled. Temporary access to ${teamsRemoved} team${teamsRemoved > 1 ? 's' : ''} has been removed. Both parties have been notified.`
+          : "Delegation cancelled successfully. Both parties have been notified.",
       });
 
+      // Refresh delegations list
       fetchDelegations();
     } catch (error: any) {
       console.error("Error revoking delegation:", error);
       toast({
         title: "Error",
-        description: "Failed to cancel delegation",
+        description: error.message || "Failed to cancel delegation",
         variant: "destructive",
       });
     }

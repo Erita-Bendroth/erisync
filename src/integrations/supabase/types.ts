@@ -706,6 +706,10 @@ export type Database = {
         Args: { _manager_id: string; _target_user_id: string }
         Returns: boolean
       }
+      revoke_manager_delegation: {
+        Args: { _delegation_id: string; _revoked_by: string }
+        Returns: Json
+      }
       trigger_weekly_notifications: {
         Args: Record<PropertyKey, never>
         Returns: Json
