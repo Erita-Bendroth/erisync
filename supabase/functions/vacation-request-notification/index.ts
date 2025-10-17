@@ -86,7 +86,7 @@ const handler = async (req: Request): Promise<Response> => {
       const durationStr = isMultiDay ? ` (${dates.length} working days)` : "";
       const approveUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://app.")}/schedule?pendingApproval=${requestId}`;
 
-      // Send notification to the selected planner
+      // Send notification ONLY to the selected planner
       await resend.emails.send({
         from: "EriSync <noreply@erisync.xyz>",
         to: [planner.email],
@@ -157,7 +157,7 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
 
-      console.log(`Approval notification sent to: ${request.requester.email}`);
+      console.log(`Approval notification sent to requester: ${request.requester.email}`);
 
       // Get the manager for the employee's team and send notification
       const { data: teamMember, error: tmError } = await supabase
@@ -200,7 +200,7 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
 
-      console.log(`Manager notification sent to: ${teamMember.profiles.email}`);
+        console.log(`Manager notification sent to: ${teamMember.profiles.email}`);
       }
     } else if (type === "rejection") {
       const dateStr = isMultiDay
