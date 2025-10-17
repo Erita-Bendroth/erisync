@@ -8,6 +8,7 @@ import { Calendar, Clock, Users, LogOut, Mail } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -33,6 +34,7 @@ const Dashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { showScheduleChangeNotification } = useDesktopNotifications();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -60,7 +62,19 @@ const Dashboard = () => {
           table: 'schedule_entries',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
+        (payload) => {
+          console.log('Schedule update received:', payload);
+          
+          // Show desktop notification for schedule changes
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const entry = payload.new as any;
+            showScheduleChangeNotification({
+              employeeName: profile?.first_name ? `${profile.first_name} ${profile.last_name}` : 'Your',
+              date: format(new Date(entry.date), 'MMM dd, yyyy'),
+              changeType: payload.eventType === 'INSERT' ? 'added' : 'updated',
+            });
+          }
+          
           // Refresh today's schedule and weekly overview when any changes occur
           fetchTodaySchedule();
           fetchWeeklySchedule();
@@ -71,7 +85,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, profile, showScheduleChangeNotification]);
 
   const fetchUserData = async () => {
     try {

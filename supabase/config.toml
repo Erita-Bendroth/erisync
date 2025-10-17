@@ -43,6 +43,9 @@ verify_jwt = true
 [functions.outlook-graph-proxy]
 verify_jwt = true
 
+[functions.send-push-notification]
+verify_jwt = true
+
 # System functions - automated execution only
 [functions.weekly-schedule-notifications]
 verify_jwt = false
