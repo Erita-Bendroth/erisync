@@ -203,8 +203,12 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
 
   useEffect(() => {
     if (user) {
+      console.log('✅ User authenticated, fetching roles...');
       fetchUserRoles();
       fetchUserTeams();
+    } else {
+      console.log('❌ No authenticated user');
+      setLoading(false);
     }
   }, [user]);
 
@@ -1217,6 +1221,17 @@ const getActivityColor = (entry: ScheduleEntry) => {
   };
 
   const isCacheReady = !(isManager() && !isPlanner()) || !managedCacheLoading;
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-muted-foreground">Please sign in to view the schedule</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !isCacheReady) {
     return (
