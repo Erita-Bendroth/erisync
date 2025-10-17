@@ -1506,7 +1506,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
       {timeView === "monthly" && (
         <>
           {/* For team members, use their first team */}
-          {isTeamMember() && !isManager() && !isPlanner() && userTeams.length > 0 && (
+          {isTeamMember() && !isManager() && !isPlanner() && userTeams.length > 0 && userTeams[0]?.id && (
             <MonthlyScheduleView 
               currentMonth={currentMonth}
               teamId={userTeams[0].id}
