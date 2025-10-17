@@ -20,6 +20,7 @@ import { VacationRequestModal } from './VacationRequestModal';
 import { VacationRequestsList } from './VacationRequestsList';
 import { TeamAvailabilityView } from './TeamAvailabilityView';
 import { MonthlyScheduleView } from './MonthlyScheduleView';
+import { TeamFavoritesManager } from './TeamFavoritesManager';
 import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
@@ -82,7 +83,7 @@ const ScheduleView = ({ initialTeamId }: ScheduleViewProps) => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedTeams, setSelectedTeams] = useState<string[]>(["all"]);
   const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
   const [viewMode, setViewMode] = useState<string>("my-schedule");
   const [timeView, setTimeView] = useState<"weekly" | "monthly">("weekly");
@@ -198,7 +199,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     if (initialTeamId && initialTeamId !== '' && teams.length > 0) {
       const teamExists = teams.find(team => team.id === initialTeamId);
       if (teamExists) {
-        setSelectedTeam(initialTeamId);
+        setSelectedTeams([initialTeamId]);
       }
     }
   }, [initialTeamId, teams]);
@@ -234,7 +235,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchScheduleEntries();
       fetchHolidays();
     }
-  }, [selectedTeam, viewMode]);
+  }, [selectedTeams, viewMode]);
 
 // Pre-populate managed users set for performance and deterministic rendering
 useEffect(() => {
@@ -284,7 +285,7 @@ useEffect(() => {
   };
 
   populateManagedUsersSet();
-}, [user, userRoles, selectedTeam, viewMode]);
+}, [user, userRoles, selectedTeams, viewMode]);
 
 // Fetch pending vacation requests count for notification badge
 const fetchPendingRequestsCount = async () => {
@@ -419,7 +420,7 @@ useEffect(() => {
       console.log('userRoles:', userRoles.map(r => r.role));
       console.log('isManager():', isManager());
       console.log('isPlanner():', isPlanner());
-      console.log('selectedTeam:', selectedTeam);
+      console.log('selectedTeams:', selectedTeams);
 
       // For managers/planners, fetch employees via team_members (do NOT depend on schedule entries)
       if (isManager() || isPlanner()) {
@@ -427,22 +428,16 @@ useEffect(() => {
 
         let targetUserIds: string[] = [];
 
-        if (selectedTeam !== "all") {
-          console.log('🎯 Selected specific team:', selectedTeam);
+        const isAllTeams = selectedTeams.includes("all");
+        
+        if (!isAllTeams && selectedTeams.length > 0) {
+          console.log('🎯 Selected specific teams:', selectedTeams);
           
-          // Get the selected team's info for diagnostics
-          const { data: selectedTeamData } = await supabase
-            .from('teams')
-            .select('name, parent_team_id')
-            .eq('id', selectedTeam)
-            .single();
-          
-          // FIXED: When a specific team is selected, show ONLY that team's members (no hierarchy)
-          // This applies to both managers and planners
+          // Get members from all selected teams
           const { data: teamMembersRes, error: teamMembersError } = await supabase
             .from('team_members')
             .select('user_id')
-            .eq('team_id', selectedTeam)
+            .in('team_id', selectedTeams)
             .limit(10000);
 
           if (teamMembersError) {
@@ -452,8 +447,8 @@ useEffect(() => {
           }
 
           targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
-          console.log(`📊 Viewing single team: "${selectedTeamData?.name}" with ${targetUserIds.length} users (no hierarchy)`);
-          console.log('Target user IDs for team:', targetUserIds);
+          console.log(`📊 Viewing ${selectedTeams.length} team(s) with ${targetUserIds.length} users`);
+          console.log('Target user IDs for teams:', targetUserIds);
         } else {
           console.log('All teams view: fetching ALL team members across ALL accessible teams');
           
@@ -674,7 +669,9 @@ useEffect(() => {
       // For "All Teams", fetch in batches to avoid .in() limitations and RLS issues
       let allData: any[] = [];
 
-      if ((isManager() || isPlanner()) && selectedTeam === "all") {
+      const isAllTeams = selectedTeams.includes("all");
+      
+      if ((isManager() || isPlanner()) && isAllTeams) {
         // Get team IDs based on role: planners see all, managers see managed + sub-teams
         let teamIds: string[] = [];
         
@@ -773,7 +770,7 @@ useEffect(() => {
         });
         
       } else {
-        // Single team or specific view mode
+        // Single team, multiple specific teams, or specific view mode
         let query = supabase
           .from("schedule_entries")
           .select(`
@@ -793,8 +790,9 @@ useEffect(() => {
           .lte("date", dateEnd)
           .order("date");
 
-        if (selectedTeam !== "all") {
-          query = query.eq("team_id", selectedTeam);
+        // Handle multiple specific teams selection
+        if (!isAllTeams && selectedTeams.length > 0) {
+          query = query.in("team_id", selectedTeams);
         } else if (isTeamMember()) {
           if (viewMode === "my-schedule") {
             query = query.eq("user_id", user!.id);
@@ -1372,9 +1370,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     className="w-56 justify-between shadow-sm"
                   >
                     <span className="truncate">
-                      {selectedTeam === "all" 
+                      {selectedTeams.includes("all")
                         ? "All Teams"
-                        : teams.find((team) => team.id === selectedTeam)?.name || "Select team..."
+                        : selectedTeams.length === 1
+                        ? teams.find((team) => team.id === selectedTeams[0])?.name || "Select team..."
+                        : `${selectedTeams.length} Teams Selected`
                       }
                     </span>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1388,7 +1388,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       <CommandItem
                         value="all"
                         onSelect={() => {
-                          setSelectedTeam("all");
+                          setSelectedTeams(["all"]);
                           setTeamDropdownOpen(false);
                         }}
                         className="py-3"
@@ -1396,7 +1396,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            selectedTeam === "all" ? "opacity-100" : "opacity-0"
+                            selectedTeams.includes("all") ? "opacity-100" : "opacity-0"
                           )}
                         />
                         <span className="font-medium">All Teams</span>
@@ -1414,7 +1414,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                               <CommandItem
                                 value={topLevelTeam.name}
                                 onSelect={() => {
-                                  setSelectedTeam(topLevelTeam.id);
+                                  setSelectedTeams([topLevelTeam.id]);
                                   setTeamDropdownOpen(false);
                                 }}
                                 className="py-3 font-semibold text-primary"
@@ -1422,7 +1422,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    selectedTeam === topLevelTeam.id ? "opacity-100" : "opacity-0"
+                                    selectedTeams.includes(topLevelTeam.id) ? "opacity-100" : "opacity-0"
                                   )}
                                 />
                                 <div className="flex items-center gap-2">
@@ -1440,7 +1440,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                     <CommandItem
                                       value={midTeam.name}
                                       onSelect={() => {
-                                        setSelectedTeam(midTeam.id);
+                                        setSelectedTeams([midTeam.id]);
                                         setTeamDropdownOpen(false);
                                       }}
                                       className="py-3 pl-8 font-medium"
@@ -1448,7 +1448,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       <Check
                                         className={cn(
                                           "mr-2 h-4 w-4",
-                                          selectedTeam === midTeam.id ? "opacity-100" : "opacity-0"
+                                          selectedTeams.includes(midTeam.id) ? "opacity-100" : "opacity-0"
                                         )}
                                       />
                                       <div className="flex items-center gap-2">
@@ -1463,7 +1463,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                         key={lowerTeam.id}
                                         value={lowerTeam.name}
                                         onSelect={() => {
-                                          setSelectedTeam(lowerTeam.id);
+                                          setSelectedTeams([lowerTeam.id]);
                                           setTeamDropdownOpen(false);
                                         }}
                                         className="pl-12 text-sm"
@@ -1471,7 +1471,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                         <Check
                                           className={cn(
                                             "mr-2 h-4 w-4",
-                                            selectedTeam === lowerTeam.id ? "opacity-100" : "opacity-0"
+                                            selectedTeams.includes(lowerTeam.id) ? "opacity-100" : "opacity-0"
                                           )}
                                         />
                                         └─ {lowerTeam.name}
@@ -1492,14 +1492,14 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             key={team.id}
                             value={team.name}
                             onSelect={() => {
-                              setSelectedTeam(team.id);
+                              setSelectedTeams([team.id]);
                               setTeamDropdownOpen(false);
                             }}
                           >
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                selectedTeam === team.id ? "opacity-100" : "opacity-0"
+                                selectedTeams.includes(team.id) ? "opacity-100" : "opacity-0"
                               )}
                             />
                             {team.name}
@@ -1509,6 +1509,15 @@ const getActivityColor = (entry: ScheduleEntry) => {
                   </Command>
                 </PopoverContent>
               </Popover>
+
+              {/* Team Favorites Manager */}
+              <TeamFavoritesManager
+                currentSelectedTeamIds={selectedTeams.filter(id => id !== "all")}
+                teams={teams}
+                onApplyFavorite={(teamIds) => {
+                  setSelectedTeams(teamIds);
+                }}
+              />
             </div>
           )}
           
@@ -1581,8 +1590,8 @@ const getActivityColor = (entry: ScheduleEntry) => {
       </div>
 
       {/* Hierarchical Team Information */}
-      {(isManager() || isPlanner()) && selectedTeam !== "all" && (
-        <TeamHierarchyInfo selectedTeamId={selectedTeam} teams={teams} />
+      {(isManager() || isPlanner()) && !selectedTeams.includes("all") && selectedTeams.length === 1 && (
+        <TeamHierarchyInfo selectedTeamId={selectedTeams[0]} teams={teams} />
       )}
 
       {/* Team Availability View for Team Members */}
@@ -1603,20 +1612,20 @@ const getActivityColor = (entry: ScheduleEntry) => {
           )}
           
           {/* For managers/planners, require team selection */}
-          {(isManager() || isPlanner()) && selectedTeam !== "all" && (
+          {(isManager() || isPlanner()) && !selectedTeams.includes("all") && selectedTeams.length === 1 && (
             <MonthlyScheduleView 
               currentMonth={currentMonth}
-              teamId={selectedTeam}
+              teamId={selectedTeams[0]}
               userId={user!.id}
             />
           )}
 
-          {/* Message when monthly view is selected with "All Teams" for managers/planners */}
-          {(isManager() || isPlanner()) && selectedTeam === "all" && (
+          {/* Message when monthly view is selected with "All Teams" or multiple teams for managers/planners */}
+          {(isManager() || isPlanner()) && (selectedTeams.includes("all") || selectedTeams.length !== 1) && (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground">
-                  Please select a specific team to view the monthly schedule.
+                  Please select a single team to view the monthly schedule.
                 </p>
               </CardContent>
             </Card>
