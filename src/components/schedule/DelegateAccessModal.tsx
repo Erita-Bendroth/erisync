@@ -42,22 +42,51 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
 
   const fetchEligibleUsers = async () => {
     try {
-      // Fetch all users with manager role, except the current manager
-      const { data: managerRoles, error: rolesError } = await supabase
+      // Get current user's roles
+      const { data: currentUserRoles, error: currentRoleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", managerId);
+
+      if (currentRoleError) throw currentRoleError;
+
+      const roles = currentUserRoles?.map(r => r.role) || [];
+      const isAdmin = roles.includes("admin");
+      const isPlanner = roles.includes("planner");
+      const isManager = roles.includes("manager");
+
+      // Determine eligible roles based on current user's role
+      let eligibleRoles: Array<"admin" | "planner" | "manager"> = [];
+      if (isAdmin) {
+        eligibleRoles = ["admin", "planner", "manager"];
+      } else if (isPlanner) {
+        eligibleRoles = ["planner", "manager"];
+      } else if (isManager) {
+        eligibleRoles = ["manager"];
+      }
+
+      // Fetch all users with eligible roles, except the current user
+      const { data: eligibleRoles_data, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id, role")
-        .eq("role", "manager")
+        .in("role", eligibleRoles)
         .neq("user_id", managerId);
 
       if (rolesError) throw rolesError;
 
-      const managerUserIds = managerRoles.map(r => r.user_id);
+      const eligibleUserIds = [...new Set(eligibleRoles_data?.map(r => r.user_id) || [])];
 
-      // Fetch profiles for these managers
+      if (eligibleUserIds.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Fetch profiles for eligible users
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("user_id, first_name, last_name, email")
-        .in("user_id", managerUserIds);
+        .in("user_id", eligibleUserIds)
+        .order("first_name", { ascending: true });
 
       if (profilesError) throw profilesError;
 
@@ -96,6 +125,43 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
     setLoading(true);
 
     try {
+      // Check if delegate has access to delegator's teams
+      const { data: delegatorTeams, error: teamsError } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", managerId)
+        .eq("is_manager", true);
+
+      if (teamsError) throw teamsError;
+
+      const { data: delegateTeams, error: delegateTeamsError } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", selectedUserId);
+
+      if (delegateTeamsError) throw delegateTeamsError;
+
+      const delegatorTeamIds = delegatorTeams?.map(t => t.team_id) || [];
+      const delegateTeamIds = delegateTeams?.map(t => t.team_id) || [];
+      const missingTeamAccess = delegatorTeamIds.filter(id => !delegateTeamIds.includes(id));
+
+      // Grant temporary team access if needed
+      if (missingTeamAccess.length > 0) {
+        const teamMemberInserts = missingTeamAccess.map(teamId => ({
+          user_id: selectedUserId,
+          team_id: teamId,
+          is_manager: false,
+        }));
+
+        const { error: teamAccessError } = await supabase
+          .from("team_members")
+          .insert(teamMemberInserts);
+
+        if (teamAccessError) {
+          throw new Error(`Cannot grant team access: ${teamAccessError.message}. Please contact an admin.`);
+        }
+      }
+
       // Create delegation
       const { data: delegation, error: delegationError } = await supabase
         .from("manager_delegations")
@@ -122,16 +188,25 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
             delegate_id: selectedUserId,
             start_date: startDate.toISOString(),
             end_date: endDate.toISOString(),
+            teams_granted: missingTeamAccess,
           },
         });
 
       // Send notification email
       const selectedUser = users.find(u => u.user_id === selectedUserId);
-      if (selectedUser) {
+      const { data: currentUserProfile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("user_id", managerId)
+        .single();
+
+      if (selectedUser && currentUserProfile) {
         await supabase.functions.invoke("send-delegation-notification", {
           body: {
+            action: "created",
             delegateEmail: selectedUser.email,
             delegateName: `${selectedUser.first_name} ${selectedUser.last_name}`,
+            managerName: `${currentUserProfile.first_name} ${currentUserProfile.last_name}`,
             startDate: format(startDate, "PPP"),
             endDate: format(endDate, "PPP"),
           },
@@ -140,7 +215,9 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
 
       toast({
         title: "Success",
-        description: "Delegation created successfully",
+        description: missingTeamAccess.length > 0 
+          ? "Delegation created and team access granted successfully"
+          : "Delegation created successfully",
       });
 
       onSuccess();
