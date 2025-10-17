@@ -118,9 +118,20 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
   const handleRevoke = async (delegationId: string) => {
     try {
       const delegation = delegations.find(d => d.id === delegationId);
-      if (!delegation) return;
+      if (!delegation) {
+        toast({
+          title: "Error",
+          description: "Delegation not found",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      console.log("Revoking delegation:", delegationId);
+      console.log("Revoking delegation:", {
+        delegationId,
+        userId,
+        delegationType: delegation.type,
+      });
 
       // Use the secure function to revoke delegation
       const { data: revokeResult, error: revokeError } = await supabase
@@ -130,12 +141,13 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
         });
 
       if (revokeError) {
+        console.error("RPC revoke error:", revokeError);
         throw new Error(revokeError.message || "Failed to revoke delegation");
       }
 
       console.log("Delegation revoked successfully:", revokeResult);
 
-      // Send cancellation notification to both parties
+      // Get profiles for notification
       const { data: managerProfile } = await supabase
         .from("profiles")
         .select("first_name, last_name, email")
@@ -148,18 +160,26 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
         .eq("user_id", delegation.delegate_id)
         .single();
 
+      // Send cancellation notification to both parties
       if (managerProfile && delegateProfile) {
-        await supabase.functions.invoke("send-delegation-notification", {
-          body: {
-            action: "cancelled",
-            managerEmail: managerProfile.email,
-            delegateEmail: delegateProfile.email,
-            managerName: `${managerProfile.first_name} ${managerProfile.last_name}`,
-            delegateName: `${delegateProfile.first_name} ${delegateProfile.last_name}`,
-            startDate: format(new Date(delegation.start_date), "PPP"),
-            endDate: format(new Date(delegation.end_date), "PPP"),
-          },
-        });
+        console.log("Sending cancellation notifications...");
+        try {
+          await supabase.functions.invoke("send-delegation-notification", {
+            body: {
+              action: "cancelled",
+              managerEmail: managerProfile.email,
+              delegateEmail: delegateProfile.email,
+              managerName: `${managerProfile.first_name} ${managerProfile.last_name}`,
+              delegateName: `${delegateProfile.first_name} ${delegateProfile.last_name}`,
+              startDate: format(new Date(delegation.start_date), "PPP"),
+              endDate: format(new Date(delegation.end_date), "PPP"),
+            },
+          });
+          console.log("Cancellation notifications sent successfully");
+        } catch (notifError) {
+          console.error("Failed to send notifications:", notifError);
+          // Don't fail the whole operation if notification fails
+        }
       }
 
       const teamsRemoved = (revokeResult as any)?.teams_removed || 0;
@@ -171,6 +191,7 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
       });
 
       // Refresh delegations list
+      console.log("Refreshing delegations list...");
       fetchDelegations();
     } catch (error: any) {
       console.error("Error revoking delegation:", error);
