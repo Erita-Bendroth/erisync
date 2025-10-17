@@ -84,7 +84,8 @@ const handler = async (req: Request): Promise<Response> => {
         : `${request.start_time} - ${request.end_time}`;
 
       const durationStr = isMultiDay ? ` (${dates.length} working days)` : "";
-      const approveUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://app.")}/schedule?pendingApproval=${requestId}`;
+      // Use production domain for approval URL (erisync.xyz)
+      const approveUrl = `https://erisync.xyz/schedule?pendingApproval=${requestId}`;
 
       // Send notification ONLY to the selected planner
       await resend.emails.send({
