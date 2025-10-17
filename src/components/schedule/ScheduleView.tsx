@@ -97,6 +97,7 @@ const [managedCacheLoading, setManagedCacheLoading] = useState(false);
 // Vacation request modal
 const [vacationModalOpen, setVacationModalOpen] = useState(false);
 const [showVacationRequests, setShowVacationRequests] = useState(false);
+const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 // Show Monday through Sunday (full week)
@@ -218,6 +219,10 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchEmployees();
       fetchScheduleEntries();
       fetchHolidays();
+      // Fetch pending requests count for managers/planners
+      if (isManager() || isPlanner()) {
+        fetchPendingRequestsCount();
+      }
     }
   }, [user, currentWeek, userRoles]);
 
@@ -279,6 +284,45 @@ useEffect(() => {
 
   populateManagedUsersSet();
 }, [user, userRoles, selectedTeam, viewMode]);
+
+// Fetch pending vacation requests count for notification badge
+const fetchPendingRequestsCount = async () => {
+  try {
+    const { count, error } = await supabase
+      .from('vacation_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    
+    if (error) throw error;
+    setPendingRequestsCount(count || 0);
+  } catch (error) {
+    console.error('Error fetching pending requests count:', error);
+  }
+};
+
+// Subscribe to vacation request changes for real-time badge updates
+useEffect(() => {
+  if (!user || (!isManager() && !isPlanner())) return;
+
+  const channel = supabase
+    .channel('vacation-requests-badge')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'vacation_requests',
+      },
+      () => {
+        fetchPendingRequestsCount();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user, userRoles]);
 
   const fetchUserRoles = async () => {
     try {
@@ -1279,12 +1323,20 @@ const getActivityColor = (entry: ScheduleEntry) => {
           {(isManager() || isPlanner()) && (
             <Button
               onClick={() => setShowVacationRequests(!showVacationRequests)}
-              variant={showVacationRequests ? "default" : "outline"}
+              variant={showVacationRequests ? "default" : (pendingRequestsCount > 0 ? "destructive" : "outline")}
               size="default"
-              className="gap-2"
+              className="gap-2 relative"
             >
               <FileText className="h-4 w-4" />
               {showVacationRequests ? 'Hide' : 'Show'} Requests
+              {pendingRequestsCount > 0 && (
+                <Badge 
+                  variant="secondary" 
+                  className="ml-2 bg-white text-destructive font-bold px-2"
+                >
+                  {pendingRequestsCount}
+                </Badge>
+              )}
             </Button>
           )}
 
@@ -1818,6 +1870,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
           isPlanner={isPlanner()}
           onRequestProcessed={() => {
             fetchScheduleEntries();
+            fetchPendingRequestsCount(); // Update badge count
           }}
         />
       )}
