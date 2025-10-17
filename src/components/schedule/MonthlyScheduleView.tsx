@@ -13,6 +13,7 @@ interface MonthlyScheduleEntry {
   availability_status: string;
   activity_type: string;
   shift_type: string;
+  notes?: string;
   first_name: string;
   last_name: string;
   initials: string;
@@ -51,10 +52,10 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
 
       const memberIds = [...new Set(teamMembers?.map(m => m.user_id) || [])];
 
-      // Get schedule entries for all team members for the entire month
+      // Get schedule entries for all team members for the entire month - include notes for time blocks
       const { data: scheduleData, error: scheduleError } = await supabase
         .from("schedule_entries")
-        .select("user_id, date, availability_status, activity_type, shift_type")
+        .select("user_id, date, availability_status, activity_type, shift_type, notes")
         .in("user_id", memberIds)
         .gte("date", format(monthStart, "yyyy-MM-dd"))
         .lte("date", format(monthEnd, "yyyy-MM-dd"));
@@ -91,17 +92,50 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
 
   const getEntriesForUserAndDay = (userId: string, day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
-    return scheduleData.filter(
-      entry => entry.user_id === userId && entry.date === dateStr
-    );
+    return scheduleData.filter(entry => {
+      // Normalize the entry date to YYYY-MM-DD format
+      const entryDate = typeof entry.date === 'string' 
+        ? entry.date.split('T')[0] 
+        : format(new Date(entry.date), "yyyy-MM-dd");
+      return entry.user_id === userId && entryDate === dateStr;
+    });
+  };
+
+  // Helper to check if entry has hotline support (either as main activity or in time blocks)
+  const hasHotlineSupport = (entry: MonthlyScheduleEntry): boolean => {
+    // Check main activity type
+    if (entry.activity_type === "hotline_support") {
+      return true;
+    }
+    
+    // Check time blocks in notes
+    if (entry.notes) {
+      const timeSplitPattern = /Times:\s*(.+)/;
+      const match = entry.notes.match(timeSplitPattern);
+      if (match) {
+        try {
+          const timesData = JSON.parse(match[1]);
+          if (Array.isArray(timesData)) {
+            return timesData.some(block => block.activity_type === "hotline_support");
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+    
+    return false;
   };
 
   const getHotlinePersonForDay = (day: Date): MonthlyScheduleEntry | null => {
     const dateStr = format(day, "yyyy-MM-dd");
     return (
-      scheduleData.find(
-        entry => entry.date === dateStr && entry.activity_type === "hotline_support"
-      ) || null
+      scheduleData.find(entry => {
+        const entryDate = typeof entry.date === 'string' 
+          ? entry.date.split('T')[0] 
+          : format(new Date(entry.date), "yyyy-MM-dd");
+        return entryDate === dateStr && hasHotlineSupport(entry);
+      }) || null
     );
   };
 
@@ -268,9 +302,7 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                         const isAvailable = entries.some(
                           e => e.availability_status === "available"
                         );
-                        const isHotline = entries.some(
-                          e => e.activity_type === "hotline_support"
-                        );
+                        const isHotline = entries.some(e => hasHotlineSupport(e));
                         const isToday = isSameDay(day, new Date());
                         const isWeekendDay = isWeekend(day);
 

@@ -119,6 +119,32 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
     });
   };
 
+  // Helper to check if entry has hotline support (either as main activity or in time blocks)
+  const hasHotlineSupport = (entry: TeamAvailabilityEntry): boolean => {
+    // Check main activity type
+    if (entry.activity_type === "hotline_support") {
+      return true;
+    }
+    
+    // Check time blocks in notes
+    if (entry.notes) {
+      const timeSplitPattern = /Times:\s*(.+)/;
+      const match = entry.notes.match(timeSplitPattern);
+      if (match) {
+        try {
+          const timesData = JSON.parse(match[1]);
+          if (Array.isArray(timesData)) {
+            return timesData.some(block => block.activity_type === "hotline_support");
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+    
+    return false;
+  };
+
   const getHotlinePersonForDay = (day: Date): TeamAvailabilityEntry | null => {
     const dateStr = format(day, "yyyy-MM-dd");
     const hotlinePerson = availabilityData.find(entry => {
@@ -126,7 +152,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
       const entryDate = typeof entry.date === 'string' 
         ? entry.date.split('T')[0] 
         : format(new Date(entry.date), "yyyy-MM-dd");
-      return entryDate === dateStr && entry.activity_type === "hotline_support";
+      return entryDate === dateStr && hasHotlineSupport(entry);
     }) || null;
     
     if (dateStr === format(new Date(), "yyyy-MM-dd")) {
@@ -139,7 +165,8 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
           return eDate === dateStr;
         }).map(e => ({
           name: `${e.first_name} ${e.last_name}`,
-          activity: e.activity_type
+          activity: e.activity_type,
+          notes: e.notes?.substring(0, 50)
         }))
       });
     }
@@ -263,14 +290,12 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                         </span>
                       </div>
                     </TableCell>
-                    {workDays.map((day, dayIndex) => {
+                     {workDays.map((day, dayIndex) => {
                       const entries = getEntriesForUserAndDay(user.user_id, day);
                       const isAvailable = entries.some(
                         e => e.availability_status === "available"
                       );
-                      const isHotline = entries.some(
-                        e => e.activity_type === "hotline_support"
-                      );
+                      const isHotline = entries.some(e => hasHotlineSupport(e));
                       const isToday = isSameDay(day, new Date());
 
                       return (
