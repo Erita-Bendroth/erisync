@@ -100,27 +100,6 @@ const AdminHolidayManager = () => {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [importStatuses, setImportStatuses] = useState<ImportStatus[]>([]);
 
-  useEffect(() => {
-    if (user) {
-      fetchUserRoles();
-      fetchHolidays();
-      fetchImportStatuses();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    // Poll for status updates while imports are pending
-    const hasPending = importStatuses.some(s => s.status === 'pending');
-    if (!hasPending) return;
-
-    const interval = setInterval(() => {
-      fetchImportStatuses();
-      fetchHolidays();
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [importStatuses]);
-
   const fetchUserRoles = useCallback(async () => {
     if (!user) return;
     
@@ -181,6 +160,19 @@ const AdminHolidayManager = () => {
     }
   }, [user, hasPermission]);
 
+  useEffect(() => {
+    if (user) {
+      fetchUserRoles();
+    }
+  }, [user, fetchUserRoles]);
+
+  useEffect(() => {
+    if (user && hasPermission) {
+      fetchHolidays();
+      fetchImportStatuses();
+    }
+  }, [user, hasPermission, fetchHolidays, fetchImportStatuses]);
+
   const getImportStatus = useCallback((countryCode: string, year: number, regionCode?: string | null) => {
     return importStatuses.find(
       s => s.country_code === countryCode && 
@@ -188,6 +180,36 @@ const AdminHolidayManager = () => {
            s.region_code === (regionCode || null)
     );
   }, [importStatuses]);
+
+  const hasAnyImportForCountryYear = useCallback((countryCode: string, year: number) => {
+    return importStatuses.some(
+      s => s.country_code === countryCode && s.year === year
+    );
+  }, [importStatuses]);
+
+  const getCountryYearStatus = useCallback((countryCode: string, year: number): 'completed' | 'pending' | 'none' => {
+    const statuses = importStatuses.filter(
+      s => s.country_code === countryCode && s.year === year
+    );
+    
+    if (statuses.length === 0) return 'none';
+    if (statuses.some(s => s.status === 'pending')) return 'pending';
+    if (statuses.every(s => s.status === 'completed')) return 'completed';
+    return 'pending';
+  }, [importStatuses]);
+
+  useEffect(() => {
+    // Poll for status updates while imports are pending
+    const hasPending = importStatuses.some(s => s.status === 'pending');
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      fetchImportStatuses();
+      fetchHolidays();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [importStatuses, fetchImportStatuses, fetchHolidays]);
 
   const triggerHolidayAutoAssignment = useCallback(async () => {
     // Holidays are now displayed directly from holidays table - no need to create schedule entries
@@ -215,10 +237,27 @@ const AdminHolidayManager = () => {
       let totalExisting = 0;
       let totalPending = 0;
 
+      // Optimistically add pending status to state immediately
+      const newPendingStatuses: ImportStatus[] = regionsToImport
+        .filter(region => !getImportStatus(selectedCountry, selectedYear, region))
+        .map(region => ({
+          id: `temp-${Date.now()}-${region || 'national'}`,
+          country_code: selectedCountry,
+          year: selectedYear,
+          region_code: region,
+          status: 'pending' as const,
+          imported_count: 0,
+          started_at: new Date().toISOString(),
+          completed_at: null,
+          error_message: null,
+        }));
+      
+      setImportStatuses(prev => [...prev, ...newPendingStatuses]);
+
       for (const region of regionsToImport) {
         // Check if already imported or in progress
         const existingStatus = getImportStatus(selectedCountry, selectedYear, region);
-        if (existingStatus?.status === 'pending') {
+        if (existingStatus?.status === 'pending' && !existingStatus.id.startsWith('temp-')) {
           totalPending++;
           continue;
         }
@@ -403,15 +442,15 @@ const AdminHolidayManager = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {countries.map((country) => {
-                    const status = getImportStatus(country.code, selectedYear);
+                    const countryStatus = getCountryYearStatus(country.code, selectedYear);
                     return (
                       <SelectItem key={country.code} value={country.code}>
                         <div className="flex items-center gap-2">
                           <span>{country.name}</span>
-                          {status?.status === 'completed' && (
+                          {countryStatus === 'completed' && (
                             <CheckCircle2 className="w-3 h-3 text-green-600" />
                           )}
-                          {status?.status === 'pending' && (
+                          {countryStatus === 'pending' && (
                             <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
                           )}
                         </div>
@@ -540,8 +579,8 @@ const AdminHolidayManager = () => {
                             {getCountryName(countryCode)} {year}
                           </h3>
                           {(() => {
-                            const status = getImportStatus(countryCode, parseInt(year));
-                            if (status?.status === 'pending') {
+                            const countryStatus = getCountryYearStatus(countryCode, parseInt(year));
+                            if (countryStatus === 'pending') {
                               return (
                                 <TooltipProvider>
                                   <Tooltip>
@@ -558,7 +597,7 @@ const AdminHolidayManager = () => {
                                 </TooltipProvider>
                               );
                             }
-                            if (status?.status === 'completed') {
+                            if (countryStatus === 'completed' || holidayGroup.length > 0) {
                               return (
                                 <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
                                   <CheckCircle2 className="w-3 h-3" />
