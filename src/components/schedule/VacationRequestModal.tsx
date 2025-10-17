@@ -198,6 +198,9 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
         }
       }
 
+      // Generate a group ID for multi-day requests
+      const groupId = workingDays.length > 1 ? crypto.randomUUID() : null;
+
       // Create vacation requests for all working days
       const requests = workingDays.map(day => ({
         user_id: user.id,
@@ -209,6 +212,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
         notes: notes.trim() || null,
         status: 'pending',
         selected_planner_id: selectedPlannerId,
+        request_group_id: groupId,
       }));
 
       const { data: insertedRequests, error: insertError } = await supabase

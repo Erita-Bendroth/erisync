@@ -13,6 +13,7 @@ const corsHeaders = {
 interface VacationRequestNotification {
   requestId: string;
   type: "request" | "approval" | "rejection";
+  groupId?: string | null;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -26,25 +27,40 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { requestId, type }: VacationRequestNotification = await req.json();
+    const { requestId, type, groupId }: VacationRequestNotification = await req.json();
 
-    console.log(`Processing vacation ${type} notification for request: ${requestId}`);
+    console.log(`Processing vacation ${type} notification for request: ${requestId}${groupId ? ` (group: ${groupId})` : ''}`);
 
-    // Fetch the vacation request details
-    const { data: request, error: requestError } = await supabase
+    // Fetch all requests in the group (or just the single request)
+    let requestsQuery = supabase
       .from("vacation_requests")
       .select(`
         *,
         requester:profiles!vacation_requests_user_id_fkey(first_name, last_name, email),
         approver:profiles!vacation_requests_approver_id_fkey(first_name, last_name, email),
         team:teams(name)
-      `)
-      .eq("id", requestId)
-      .single();
+      `);
 
-    if (requestError || !request) {
-      throw new Error(`Failed to fetch request: ${requestError?.message}`);
+    if (groupId) {
+      requestsQuery = requestsQuery.eq("request_group_id", groupId);
+    } else {
+      requestsQuery = requestsQuery.eq("id", requestId);
     }
+
+    const { data: requests, error: requestError } = await requestsQuery;
+
+    if (requestError || !requests || requests.length === 0) {
+      throw new Error(`Failed to fetch request(s): ${requestError?.message}`);
+    }
+
+    // Use the first request for common data
+    const request = requests[0];
+    const isMultiDay = requests.length > 1;
+
+    // Get date range info
+    const dates = requests.map(r => new Date(r.requested_date)).sort((a, b) => a.getTime() - b.getTime());
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
 
     if (type === "request") {
       // Get the selected planner's information
@@ -59,17 +75,15 @@ const handler = async (req: Request): Promise<Response> => {
         throw new Error(`Failed to find selected planner: ${plannerError?.message}`);
       }
 
-      const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+      const dateStr = isMultiDay
+        ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+        : startDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
       const timeStr = request.is_full_day
         ? "Full Day"
         : `${request.start_time} - ${request.end_time}`;
 
+      const durationStr = isMultiDay ? ` (${dates.length} working days)` : "";
       const approveUrl = `${Deno.env.get("SUPABASE_URL")?.replace("https://", "https://app.")}/schedule?pendingApproval=${requestId}`;
 
       // Send notification to the selected planner
@@ -86,7 +100,7 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
               <p><strong>Team:</strong> ${request.team.name}</p>
-              <p><strong>Date:</strong> ${dateStr}</p>
+              <p><strong>Date${isMultiDay ? 's' : ''}:</strong> ${dateStr}${durationStr}</p>
               <p><strong>Time:</strong> ${timeStr}</p>
               ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
             </div>
@@ -107,16 +121,15 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log(`Request notification sent to planner: ${planner.email}`);
     } else if (type === "approval") {
-      const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+      const dateStr = isMultiDay
+        ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+        : startDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
       const timeStr = request.is_full_day
         ? "Full Day"
         : `${request.start_time} - ${request.end_time}`;
+
+      const durationStr = isMultiDay ? ` (${dates.length} working days)` : "";
 
       // Send approval notification to requester
       await resend.emails.send({
@@ -130,12 +143,12 @@ const handler = async (req: Request): Promise<Response> => {
             <p>Your vacation request has been <strong>approved</strong>.</p>
             
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Date:</strong> ${dateStr}</p>
+              <p><strong>Date${isMultiDay ? 's' : ''}:</strong> ${dateStr}${durationStr}</p>
               <p><strong>Time:</strong> ${timeStr}</p>
               ${request.notes ? `<p><strong>Your Notes:</strong> ${request.notes}</p>` : ""}
             </div>
             
-            <p style="color: #22c55e;">Your vacation has been added to the schedule and all other shifts for this date have been removed.</p>
+            <p style="color: #22c55e;">Your vacation has been added to the schedule and all other shifts for ${isMultiDay ? 'these dates' : 'this date'} have been removed.</p>
             
             <p style="color: #666; font-size: 14px; margin-top: 30px;">
               Approved by: ${request.approver?.first_name} ${request.approver?.last_name}
@@ -173,7 +186,7 @@ const handler = async (req: Request): Promise<Response> => {
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
                 <p><strong>Team:</strong> ${request.team.name}</p>
-                <p><strong>Date:</strong> ${dateStr}</p>
+                <p><strong>Date${isMultiDay ? 's' : ''}:</strong> ${dateStr}${durationStr}</p>
                 <p><strong>Time:</strong> ${timeStr}</p>
                 ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
               </div>
@@ -187,19 +200,18 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
 
-        console.log(`Manager notification sent to: ${teamMember.profiles.email}`);
+      console.log(`Manager notification sent to: ${teamMember.profiles.email}`);
       }
     } else if (type === "rejection") {
-      const dateStr = new Date(request.requested_date).toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+      const dateStr = isMultiDay
+        ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+        : startDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
       const timeStr = request.is_full_day
         ? "Full Day"
         : `${request.start_time} - ${request.end_time}`;
+
+      const durationStr = isMultiDay ? ` (${dates.length} working days)` : "";
 
       await resend.emails.send({
         from: "EriSync <noreply@erisync.xyz>",
@@ -212,7 +224,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p>Your vacation request has been <strong>rejected</strong>.</p>
             
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Date:</strong> ${dateStr}</p>
+              <p><strong>Date${isMultiDay ? 's' : ''}:</strong> ${dateStr}${durationStr}</p>
               <p><strong>Time:</strong> ${timeStr}</p>
               ${request.notes ? `<p><strong>Your Notes:</strong> ${request.notes}</p>` : ""}
               ${request.rejection_reason ? `<p><strong>Reason:</strong> ${request.rejection_reason}</p>` : ""}

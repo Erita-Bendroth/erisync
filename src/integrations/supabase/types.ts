@@ -453,6 +453,7 @@ export type Database = {
           notes: string | null
           rejected_at: string | null
           rejection_reason: string | null
+          request_group_id: string | null
           requested_date: string
           selected_planner_id: string | null
           start_time: string | null
@@ -471,6 +472,7 @@ export type Database = {
           notes?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
+          request_group_id?: string | null
           requested_date: string
           selected_planner_id?: string | null
           start_time?: string | null
@@ -489,6 +491,7 @@ export type Database = {
           notes?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
+          request_group_id?: string | null
           requested_date?: string
           selected_planner_id?: string | null
           start_time?: string | null

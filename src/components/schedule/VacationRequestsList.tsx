@@ -24,6 +24,7 @@ interface VacationRequest {
   status: string;
   rejection_reason: string | null;
   created_at: string;
+  request_group_id: string | null;
   requester: {
     user_id: string;
     first_name: string;
@@ -33,6 +34,33 @@ interface VacationRequest {
   team: {
     name: string;
   };
+}
+
+interface GroupedRequest {
+  id: string; // Primary request ID
+  groupId: string | null;
+  user_id: string;
+  team_id: string;
+  dates: string[]; // All dates in the group
+  startDate: string;
+  endDate: string;
+  is_full_day: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  notes: string | null;
+  status: string;
+  rejection_reason: string | null;
+  created_at: string;
+  requester: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  team: {
+    name: string;
+  };
+  requestIds: string[]; // All request IDs in the group
 }
 
 interface VacationRequestsListProps {
@@ -46,10 +74,11 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 }) => {
   const { toast } = useToast();
   const [requests, setRequests] = useState<VacationRequest[]>([]);
+  const [groupedRequests, setGroupedRequests] = useState<GroupedRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<VacationRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<GroupedRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
@@ -123,6 +152,68 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       }));
 
       setRequests(enrichedRequests as VacationRequest[]);
+
+      // Group requests by request_group_id
+      const grouped: GroupedRequest[] = [];
+      const processedGroups = new Set<string>();
+
+      enrichedRequests.forEach((req: VacationRequest) => {
+        if (req.request_group_id && !processedGroups.has(req.request_group_id)) {
+          // This is part of a multi-day request
+          const groupRequests = enrichedRequests.filter(
+            r => r.request_group_id === req.request_group_id
+          );
+          
+          const sortedDates = groupRequests
+            .map(r => r.requested_date)
+            .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+          grouped.push({
+            id: req.id,
+            groupId: req.request_group_id,
+            user_id: req.user_id,
+            team_id: req.team_id,
+            dates: sortedDates,
+            startDate: sortedDates[0],
+            endDate: sortedDates[sortedDates.length - 1],
+            is_full_day: req.is_full_day,
+            start_time: req.start_time,
+            end_time: req.end_time,
+            notes: req.notes,
+            status: req.status,
+            rejection_reason: req.rejection_reason,
+            created_at: req.created_at,
+            requester: req.requester,
+            team: req.team,
+            requestIds: groupRequests.map(r => r.id),
+          });
+
+          processedGroups.add(req.request_group_id);
+        } else if (!req.request_group_id) {
+          // Single-day request
+          grouped.push({
+            id: req.id,
+            groupId: null,
+            user_id: req.user_id,
+            team_id: req.team_id,
+            dates: [req.requested_date],
+            startDate: req.requested_date,
+            endDate: req.requested_date,
+            is_full_day: req.is_full_day,
+            start_time: req.start_time,
+            end_time: req.end_time,
+            notes: req.notes,
+            status: req.status,
+            rejection_reason: req.rejection_reason,
+            created_at: req.created_at,
+            requester: req.requester,
+            team: req.team,
+            requestIds: [req.id],
+          });
+        }
+      });
+
+      setGroupedRequests(grouped);
     } catch (error: any) {
       console.error('Error fetching vacation requests:', error);
       toast({
@@ -135,27 +226,27 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     }
   };
 
-  const handleApprove = async (request: VacationRequest) => {
+  const handleApprove = async (request: GroupedRequest) => {
     setProcessingId(request.id);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Delete any existing schedule entries for this date
+      // Delete any existing schedule entries for all dates in the group
       const { error: deleteError } = await supabase
         .from('schedule_entries')
         .delete()
         .eq('user_id', request.user_id)
         .eq('team_id', request.team_id)
-        .eq('date', request.requested_date);
+        .in('date', request.dates);
 
       if (deleteError) {
         console.error('Failed to delete existing schedule entries:', deleteError);
         // Continue with approval even if delete fails
       }
 
-      // Update request status
+      // Update all request statuses in the group
       const { error: updateError } = await supabase
         .from('vacation_requests')
         .update({
@@ -163,37 +254,44 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
           approver_id: user.id,
           approved_at: new Date().toISOString(),
         })
-        .eq('id', request.id);
+        .in('id', request.requestIds);
 
       if (updateError) throw updateError;
 
-      // Create schedule entry for the vacation
+      // Create schedule entries for all vacation days
+      const scheduleEntries = request.dates.map(date => ({
+        user_id: request.user_id,
+        team_id: request.team_id,
+        date,
+        activity_type: 'vacation' as const,
+        availability_status: 'unavailable' as const,
+        shift_type: 'normal' as const,
+        notes: `Vacation - ${request.is_full_day ? 'Full Day' : `${request.start_time} - ${request.end_time}`}${request.notes ? ` | ${request.notes}` : ''}`,
+        created_by: user.id,
+      }));
+
       const { error: scheduleError } = await supabase
         .from('schedule_entries')
-        .insert({
-          user_id: request.user_id,
-          team_id: request.team_id,
-          date: request.requested_date,
-          activity_type: 'vacation',
-          availability_status: 'unavailable',
-          shift_type: 'normal',
-          notes: `Vacation - ${request.is_full_day ? 'Full Day' : `${request.start_time} - ${request.end_time}`}${request.notes ? ` | ${request.notes}` : ''}`,
-          created_by: user.id,
-        });
+        .insert(scheduleEntries);
 
       if (scheduleError) throw scheduleError;
 
-      // Send notifications (to requester and manager)
+      // Send notifications (to requester and manager) - only once for the group
       await supabase.functions.invoke('vacation-request-notification', {
         body: {
           requestId: request.id,
           type: 'approval',
+          groupId: request.groupId,
         },
       });
 
+      const daysText = request.dates.length === 1 
+        ? "1 day" 
+        : `${request.dates.length} working days`;
+
       toast({
         title: "Request approved",
-        description: "Vacation has been approved, added to the schedule, and notifications sent.",
+        description: `Vacation for ${daysText} has been approved, added to the schedule, and notifications sent.`,
       });
 
       onRequestProcessed?.();
@@ -225,6 +323,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Update all request statuses in the group
       const { error: updateError } = await supabase
         .from('vacation_requests')
         .update({
@@ -233,15 +332,16 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
           rejected_at: new Date().toISOString(),
           rejection_reason: rejectionReason.trim(),
         })
-        .eq('id', selectedRequest.id);
+        .in('id', selectedRequest.requestIds);
 
       if (updateError) throw updateError;
 
-      // Send notification
+      // Send notification - only once for the group
       await supabase.functions.invoke('vacation-request-notification', {
         body: {
           requestId: selectedRequest.id,
           type: 'rejection',
+          groupId: selectedRequest.groupId,
         },
       });
 
@@ -266,13 +366,18 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     }
   };
 
-  const openRejectDialog = (request: VacationRequest) => {
+  const openRejectDialog = (request: GroupedRequest) => {
     setSelectedRequest(request);
     setRejectDialogOpen(true);
   };
 
-  const renderRequest = (request: VacationRequest) => {
-    const dateStr = format(new Date(request.requested_date), 'EEEE, MMMM d, yyyy');
+  const renderRequest = (request: GroupedRequest) => {
+    const isMultiDay = request.dates.length > 1;
+    
+    const dateStr = isMultiDay
+      ? `${format(new Date(request.startDate), 'MMM d, yyyy')} - ${format(new Date(request.endDate), 'MMM d, yyyy')}`
+      : format(new Date(request.startDate), 'EEEE, MMMM d, yyyy');
+    
     const timeStr = request.is_full_day
       ? 'Full Day'
       : `${request.start_time} - ${request.end_time}`;
@@ -310,7 +415,14 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
                     <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className="font-medium">{dateStr}</span>
+                    <div>
+                      <span className="font-medium">{dateStr}</span>
+                      {isMultiDay && (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          ({request.dates.length} working days)
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -401,9 +513,9 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     );
   }
 
-  const pendingRequests = requests.filter((r) => r.status === 'pending');
-  const approvedRequests = requests.filter((r) => r.status === 'approved');
-  const rejectedRequests = requests.filter((r) => r.status === 'rejected');
+  const pendingRequests = groupedRequests.filter((r) => r.status === 'pending');
+  const approvedRequests = groupedRequests.filter((r) => r.status === 'approved');
+  const rejectedRequests = groupedRequests.filter((r) => r.status === 'rejected');
 
   return (
     <>
