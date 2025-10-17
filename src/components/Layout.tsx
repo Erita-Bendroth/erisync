@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -58,6 +59,7 @@ const Layout = ({ children }: LayoutProps) => {
                 Logged in as: <strong className="text-primary">{user?.email || 'Not logged in'}</strong>
               </span>
             </div>
+            <ThemeToggle />
             <Button
               variant="outline"
               size="sm"
