@@ -11,6 +11,8 @@ interface TeamAvailabilityEntry {
   date: string;
   availability_status: string;
   activity_type: string;
+  notes?: string;
+  shift_type?: string;
   first_name: string;
   last_name: string;
   initials: string;
@@ -61,15 +63,22 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
 
       const memberIds = [...new Set(teamMembers?.map(m => m.user_id) || [])];
 
-      // Get schedule entries for all team members
+      // Get schedule entries for all team members - include notes for time block parsing
       const { data: scheduleData, error: scheduleError } = await supabase
         .from("schedule_entries")
-        .select("user_id, date, availability_status, activity_type")
+        .select("user_id, date, availability_status, activity_type, notes, shift_type")
         .in("user_id", memberIds)
         .gte("date", startDate)
         .lte("date", endDate);
 
       if (scheduleError) throw scheduleError;
+      
+      console.log('TeamAvailabilityView - Schedule data:', {
+        totalEntries: scheduleData?.length || 0,
+        hotlineEntries: scheduleData?.filter(e => e.activity_type === 'hotline_support').length || 0,
+        dateRange: `${startDate} to ${endDate}`,
+        sampleEntry: scheduleData?.[0]
+      });
 
       // Get profiles for team members
       const { data: profiles, error: profilesError } = await supabase
@@ -101,18 +110,41 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
 
   const getEntriesForUserAndDay = (userId: string, day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
-    return availabilityData.filter(
-      entry => entry.user_id === userId && entry.date === dateStr
-    );
+    return availabilityData.filter(entry => {
+      // Normalize the entry date to YYYY-MM-DD format (strip time/timezone)
+      const entryDate = typeof entry.date === 'string' 
+        ? entry.date.split('T')[0] 
+        : format(new Date(entry.date), "yyyy-MM-dd");
+      return entry.user_id === userId && entryDate === dateStr;
+    });
   };
 
   const getHotlinePersonForDay = (day: Date): TeamAvailabilityEntry | null => {
     const dateStr = format(day, "yyyy-MM-dd");
-    return (
-      availabilityData.find(
-        entry => entry.date === dateStr && entry.activity_type === "hotline_support"
-      ) || null
-    );
+    const hotlinePerson = availabilityData.find(entry => {
+      // Normalize the entry date to YYYY-MM-DD format
+      const entryDate = typeof entry.date === 'string' 
+        ? entry.date.split('T')[0] 
+        : format(new Date(entry.date), "yyyy-MM-dd");
+      return entryDate === dateStr && entry.activity_type === "hotline_support";
+    }) || null;
+    
+    if (dateStr === format(new Date(), "yyyy-MM-dd")) {
+      console.log('Hotline check for today:', {
+        dateStr,
+        found: !!hotlinePerson,
+        person: hotlinePerson ? `${hotlinePerson.first_name} ${hotlinePerson.last_name}` : 'none',
+        allEntriesForDay: availabilityData.filter(e => {
+          const eDate = typeof e.date === 'string' ? e.date.split('T')[0] : format(new Date(e.date), "yyyy-MM-dd");
+          return eDate === dateStr;
+        }).map(e => ({
+          name: `${e.first_name} ${e.last_name}`,
+          activity: e.activity_type
+        }))
+      });
+    }
+    
+    return hotlinePerson;
   };
 
   // Get unique users from all team members (not just those with schedule entries)
