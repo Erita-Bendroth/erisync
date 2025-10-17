@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth } from 'date-fns';
@@ -1322,13 +1323,13 @@ const getActivityColor = (entry: ScheduleEntry) => {
           {/* Vacation Requests Toggle - For Managers/Planners */}
           {(isManager() || isPlanner()) && (
             <Button
-              onClick={() => setShowVacationRequests(!showVacationRequests)}
-              variant={showVacationRequests ? "default" : (pendingRequestsCount > 0 ? "destructive" : "outline")}
+              onClick={() => setShowVacationRequests(true)}
+              variant={pendingRequestsCount > 0 ? "destructive" : "outline"}
               size="default"
               className="gap-2 relative"
             >
               <FileText className="h-4 w-4" />
-              {showVacationRequests ? 'Hide' : 'Show'} Requests
+              Show Requests
               {pendingRequestsCount > 0 && (
                 <Badge 
                   variant="secondary" 
@@ -1864,16 +1865,28 @@ const getActivityColor = (entry: ScheduleEntry) => {
         </CardContent>
       </Card>
 
-      {/* Vacation Requests List (Conditional) */}
-      {showVacationRequests && (isManager() || isPlanner()) && (
-        <VacationRequestsList
-          isPlanner={isPlanner()}
-          onRequestProcessed={() => {
-            fetchScheduleEntries();
-            fetchPendingRequestsCount(); // Update badge count
-          }}
-        />
-      )}
+      {/* Vacation Requests Sheet */}
+      <Sheet open={showVacationRequests} onOpenChange={setShowVacationRequests}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Vacation Requests</SheetTitle>
+            <SheetDescription>
+              Review and manage vacation requests from your team members.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            {(isManager() || isPlanner()) && (
+              <VacationRequestsList
+                isPlanner={isPlanner()}
+                onRequestProcessed={() => {
+                  fetchScheduleEntries();
+                  fetchPendingRequestsCount(); // Update badge count
+                }}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit Modal */}
       <EditScheduleModal
