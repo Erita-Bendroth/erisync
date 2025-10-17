@@ -23,6 +23,7 @@ interface TeamAvailabilityViewProps {
 
 export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewProps) {
   const [availabilityData, setAvailabilityData] = useState<TeamAvailabilityEntry[]>([]);
+  const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -76,6 +77,9 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
 
       if (profilesError) throw profilesError;
 
+      // Store all team members (profiles)
+      setAllTeamMembers(profiles || []);
+
       // Combine schedule data with profile info
       const combined = (scheduleData || []).map(entry => {
         const profile = profiles?.find(p => p.user_id === entry.user_id);
@@ -111,20 +115,15 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
     );
   };
 
-  // Get unique users from availability data
-  const uniqueUsers = Array.from(
-    new Map(
-      availabilityData.map(entry => [
-        entry.user_id,
-        {
-          user_id: entry.user_id,
-          first_name: entry.first_name,
-          last_name: entry.last_name,
-          initials: entry.initials,
-        },
-      ])
-    ).values()
-  ).sort((a, b) => a.first_name.localeCompare(b.first_name));
+  // Get unique users from all team members (not just those with schedule entries)
+  const uniqueUsers = allTeamMembers
+    .map(profile => ({
+      user_id: profile.user_id,
+      first_name: profile.first_name || "Unknown",
+      last_name: profile.last_name || "",
+      initials: profile.initials || "?",
+    }))
+    .sort((a, b) => a.first_name.localeCompare(b.first_name));
 
   if (loading) {
     return (
