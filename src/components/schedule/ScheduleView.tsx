@@ -388,52 +388,22 @@ useEffect(() => {
             .eq('id', selectedTeam)
             .single();
           
-          // For managers, use hierarchical access (selected team + sub-teams)
-          if (isManager() && !isPlanner()) {
-            const { data: subteamIds } = await supabase
-              .rpc('get_all_subteam_ids', { _team_id: selectedTeam });
-            
-            const teamIdsToQuery = subteamIds || [selectedTeam];
-            const childTeamsCount = teamIdsToQuery.length - 1; // Subtract the parent team itself
-            
-            console.log(`🔓 HIERARCHICAL ACCESS GRANTED:`);
-            console.log(`  Team: "${selectedTeamData?.name}"`);
-            console.log(`  Access Level: ${selectedTeamData?.parent_team_id ? 'Mid/Lower-Level Manager' : 'Top-Level Manager'}`);
-            console.log(`  Total Teams Accessible: ${teamIdsToQuery.length} (1 parent + ${childTeamsCount} child team${childTeamsCount !== 1 ? 's' : ''})`);
-            console.log(`  Reason: Hierarchical team structure - manager can view assigned team and all descendant teams`);
-            
-            const { data: teamMembersRes, error: teamMembersError } = await supabase
-              .from('team_members')
-              .select('user_id')
-              .in('team_id', teamIdsToQuery)
-              .limit(10000);
+          // FIXED: When a specific team is selected, show ONLY that team's members (no hierarchy)
+          // This applies to both managers and planners
+          const { data: teamMembersRes, error: teamMembersError } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', selectedTeam)
+            .limit(10000);
 
-            if (teamMembersError) {
-              console.error('Error fetching team members:', teamMembersError);
-              setEmployees([]);
-              return;
-            }
-
-            targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
-            console.log(`  👥 Total Users Accessible: ${targetUserIds.length} users across all teams`);
-          } else {
-            // Planners see only the selected team (no hierarchy for planners in single team view)
-            const { data: teamMembersRes, error: teamMembersError } = await supabase
-              .from('team_members')
-              .select('user_id')
-              .eq('team_id', selectedTeam)
-              .limit(10000);
-
-            if (teamMembersError) {
-              console.error('Error fetching team members:', teamMembersError);
-              setEmployees([]);
-              return;
-            }
-
-            targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
-            console.log(`📊 Planner viewing single team: "${selectedTeamData?.name}" with ${targetUserIds.length} users`);
+          if (teamMembersError) {
+            console.error('Error fetching team members:', teamMembersError);
+            setEmployees([]);
+            return;
           }
-          
+
+          targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
+          console.log(`📊 Viewing single team: "${selectedTeamData?.name}" with ${targetUserIds.length} users (no hierarchy)`);
           console.log('Target user IDs for team:', targetUserIds);
         } else {
           console.log('All teams view: fetching ALL team members across ALL accessible teams');
