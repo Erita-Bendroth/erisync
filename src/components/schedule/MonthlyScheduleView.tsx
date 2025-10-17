@@ -235,38 +235,55 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {uniqueUsers.map((user) => (
-                  <TableRow key={user.user_id}>
-                    <TableCell className="font-medium sticky left-0 bg-background">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
-                          {user.initials}
+                {uniqueUsers.map((user) => {
+                  const isCurrentUser = user.user_id === userId;
+                  return (
+                    <TableRow 
+                      key={user.user_id}
+                      className={cn(
+                        isCurrentUser && "bg-primary/5 border-l-4 border-l-primary"
+                      )}
+                    >
+                      <TableCell className={cn(
+                        "font-medium sticky left-0 z-10",
+                        isCurrentUser ? "bg-primary/5" : "bg-background"
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold",
+                            isCurrentUser ? "bg-primary text-primary-foreground" : "bg-primary/10"
+                          )}>
+                            {user.initials}
+                          </div>
+                          <span className={cn(
+                            "text-sm",
+                            isCurrentUser && "font-bold"
+                          )}>
+                            {user.first_name} {user.last_name}
+                          </span>
                         </div>
-                        <span className="text-sm">
-                          {user.first_name} {user.last_name}
-                        </span>
-                      </div>
-                    </TableCell>
-                    {allDays.map((day, dayIndex) => {
-                      const entries = getEntriesForUserAndDay(user.user_id, day);
-                      const isAvailable = entries.some(
-                        e => e.availability_status === "available"
-                      );
-                      const isHotline = entries.some(
-                        e => e.activity_type === "hotline_support"
-                      );
-                      const isToday = isSameDay(day, new Date());
-                      const isWeekendDay = isWeekend(day);
+                      </TableCell>
+                      {allDays.map((day, dayIndex) => {
+                        const entries = getEntriesForUserAndDay(user.user_id, day);
+                        const isAvailable = entries.some(
+                          e => e.availability_status === "available"
+                        );
+                        const isHotline = entries.some(
+                          e => e.activity_type === "hotline_support"
+                        );
+                        const isToday = isSameDay(day, new Date());
+                        const isWeekendDay = isWeekend(day);
 
-                      return (
-                        <TableCell
-                          key={dayIndex}
-                          className={cn(
-                            "text-center p-1",
-                            isToday && "bg-primary/5",
-                            isWeekendDay && "bg-muted/30"
-                          )}
-                        >
+                        return (
+                          <TableCell
+                            key={dayIndex}
+                            className={cn(
+                              "text-center p-1",
+                              isCurrentUser && "bg-primary/5",
+                              isToday && !isCurrentUser && "bg-primary/5",
+                              isWeekendDay && !isCurrentUser && "bg-muted/30"
+                            )}
+                          >
                           {entries.length > 0 ? (
                             <div className="flex flex-col items-center gap-1">
                               {isHotline ? (
@@ -280,11 +297,12 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
                 {uniqueUsers.length === 0 && (
                   <TableRow>
                     <TableCell
