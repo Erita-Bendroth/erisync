@@ -42,6 +42,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, session) => {
         if (!mounted) return;
         
+        console.log('Auth state changed:', event, session ? 'session exists' : 'no session');
+        
+        // Handle token refresh errors
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          console.error('Token refresh failed, clearing invalid session');
+          // Clear invalid session data
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+              localStorage.removeItem(key);
+            }
+          });
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          setIsInitialized(true);
+          // Redirect to login
+          window.location.replace('/auth');
+          return;
+        }
+        
+        // Handle signed out event
+        if (event === 'SIGNED_OUT') {
+          console.log('User signed out');
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          setIsInitialized(true);
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -53,17 +83,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Check for existing session with error handling
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) return;
+      
+      // If there's an error getting the session, clear everything
+      if (error) {
+        console.error('Error getting session:', error);
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+            localStorage.removeItem(key);
+          }
+        });
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        setIsInitialized(true);
+        window.location.replace('/auth');
+        return;
+      }
       
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
       setIsInitialized(true);
-      
-      // Don't check for password change on initial page load/refresh
-      // Only check when user actually signs in
+    }).catch((error) => {
+      console.error('Fatal error getting session:', error);
+      // Clear everything on fatal error
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      setIsInitialized(true);
+      window.location.replace('/auth');
     });
 
     return () => {
