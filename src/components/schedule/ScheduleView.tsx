@@ -18,6 +18,7 @@ import { TeamHierarchyInfo } from './TeamHierarchyInfo';
 import { VacationRequestModal } from './VacationRequestModal';
 import { VacationRequestsList } from './VacationRequestsList';
 import { TeamAvailabilityView } from './TeamAvailabilityView';
+import { MonthlyScheduleView } from './MonthlyScheduleView';
 import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
@@ -75,6 +76,7 @@ const ScheduleView = ({ initialTeamId }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -82,6 +84,7 @@ const ScheduleView = ({ initialTeamId }: ScheduleViewProps) => {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
   const [viewMode, setViewMode] = useState<string>("my-schedule");
+  const [timeView, setTimeView] = useState<"weekly" | "monthly">("weekly");
   const [employees, setEmployees] = useState<Employee[]>([]);
 const [holidays, setHolidays] = useState<Holiday[]>([]);
 const [loading, setLoading] = useState(true);
@@ -1186,7 +1189,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
   };
 
   const navigateWeek = (direction: "prev" | "next") => {
-    setCurrentWeek(prev => direction === "next" ? addWeeks(prev, 1) : subWeeks(prev, 1));
+    if (timeView === "monthly") {
+      setCurrentMonth(prev => direction === "next" ? addMonths(prev, 1) : subMonths(prev, 1));
+    } else {
+      setCurrentWeek(prev => direction === "next" ? addWeeks(prev, 1) : subWeeks(prev, 1));
+    }
   };
 
   const navigateMonth = (direction: "prev" | "next") => {
@@ -1236,9 +1243,14 @@ const getActivityColor = (entry: ScheduleEntry) => {
     <div className="schedule-view-container space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Weekly Schedule</h2>
+          <h2 className="text-2xl font-bold">
+            {timeView === "monthly" ? "Monthly Schedule" : "Weekly Schedule"}
+          </h2>
           <p className="text-muted-foreground">
-            {format(weekStart, "MMM d")} - {format(addDays(weekStart, 6), "MMM d, yyyy")} (Full Week)
+            {timeView === "monthly" 
+              ? format(currentMonth, "MMMM yyyy")
+              : `${format(weekStart, "MMM d")} - ${format(addDays(weekStart, 6), "MMM d, yyyy")} (Full Week)`
+            }
           </p>
           {userTeams.length > 0 && (
             <p className="text-sm text-muted-foreground">
@@ -1443,20 +1455,44 @@ const getActivityColor = (entry: ScheduleEntry) => {
           )}
           
           <div className="flex items-center gap-2">
+            {/* View Toggle - Weekly/Monthly */}
+            <div className="flex items-center gap-1 border rounded-md p-1">
+              <Button
+                variant={timeView === "weekly" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setTimeView("weekly")}
+                className="h-8"
+              >
+                Weekly
+              </Button>
+              <Button
+                variant={timeView === "monthly" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setTimeView("monthly")}
+                className="h-8"
+              >
+                Monthly
+              </Button>
+            </div>
+
             {/* Date Picker for easy navigation */}
             <DatePicker 
-              date={currentWeek}
+              date={timeView === "monthly" ? currentMonth : currentWeek}
               onDateChange={(date) => {
                 if (date) {
-                  setCurrentWeek(startOfWeek(date, { weekStartsOn: 1 }));
+                  if (timeView === "monthly") {
+                    setCurrentMonth(startOfMonth(date));
+                  } else {
+                    setCurrentWeek(startOfWeek(date, { weekStartsOn: 1 }));
+                  }
                 }
               }}
               placeholder="Select date"
             />
             
-            {/* Week Navigation */}
+            {/* Week/Month Navigation */}
             <div className="flex items-center gap-1">
-              {(isManager() || isPlanner()) && (
+              {(isManager() || isPlanner()) && timeView === "weekly" && (
                 <Button size="sm">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Entry
@@ -1465,7 +1501,17 @@ const getActivityColor = (entry: ScheduleEntry) => {
               <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentWeek(new Date())}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  if (timeView === "monthly") {
+                    setCurrentMonth(new Date());
+                  } else {
+                    setCurrentWeek(new Date());
+                  }
+                }}
+              >
                 Today
               </Button>
               <Button variant="outline" size="sm" onClick={() => navigateWeek("next")}>
@@ -1482,12 +1528,57 @@ const getActivityColor = (entry: ScheduleEntry) => {
       )}
 
       {/* Team Availability View for Team Members */}
-      {isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability" && (
+      {isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability" && timeView === "weekly" && (
         <TeamAvailabilityView workDays={workDays} userId={user!.id} />
       )}
 
-      {/* Table-based Schedule View */}
-      {!(isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability") && (
+      {/* Monthly Schedule View */}
+      {timeView === "monthly" && (
+        <>
+          {/* For team members, use their first team */}
+          {isTeamMember() && !isManager() && !isPlanner() && userTeams.length > 0 && (
+            <MonthlyScheduleView 
+              currentMonth={currentMonth}
+              teamId={userTeams[0].id}
+              userId={user!.id}
+            />
+          )}
+          
+          {/* For managers/planners, require team selection */}
+          {(isManager() || isPlanner()) && selectedTeam !== "all" && (
+            <MonthlyScheduleView 
+              currentMonth={currentMonth}
+              teamId={selectedTeam}
+              userId={user!.id}
+            />
+          )}
+
+          {/* Message when monthly view is selected with "All Teams" for managers/planners */}
+          {(isManager() || isPlanner()) && selectedTeam === "all" && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  Please select a specific team to view the monthly schedule.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Message for team members without teams */}
+          {isTeamMember() && !isManager() && !isPlanner() && userTeams.length === 0 && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  You are not assigned to any team yet.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Table-based Schedule View - Only show in weekly view */}
+      {timeView === "weekly" && !(isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability") && (
         <div className="space-y-4">
           <Card>
             <CardContent className="p-0">
