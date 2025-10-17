@@ -17,6 +17,7 @@ import { TimeBlockDisplay } from './TimeBlockDisplay';
 import { TeamHierarchyInfo } from './TeamHierarchyInfo';
 import { VacationRequestModal } from './VacationRequestModal';
 import { VacationRequestsList } from './VacationRequestsList';
+import { TeamAvailabilityView } from './TeamAvailabilityView';
 import { cn } from '@/lib/utils';
 
 interface ScheduleEntry {
@@ -1277,11 +1278,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium whitespace-nowrap">View:</label>
               <Select value={viewMode} onValueChange={setViewMode}>
-                <SelectTrigger className="w-48 bg-background">
+                <SelectTrigger className="w-56 bg-background">
                   <SelectValue placeholder="Select view" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border z-50">
                   <SelectItem value="my-schedule">My Schedule</SelectItem>
+                  <SelectItem value="team-availability">Team Availability</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1479,11 +1481,17 @@ const getActivityColor = (entry: ScheduleEntry) => {
         <TeamHierarchyInfo selectedTeamId={selectedTeam} teams={teams} />
       )}
 
+      {/* Team Availability View for Team Members */}
+      {isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability" && (
+        <TeamAvailabilityView workDays={workDays} userId={user!.id} />
+      )}
+
       {/* Table-based Schedule View */}
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="p-0">
-            <Table>
+      {!(isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability") && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-48 font-semibold">Employee</TableHead>
@@ -1607,6 +1615,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <Card>
         <CardHeader>
