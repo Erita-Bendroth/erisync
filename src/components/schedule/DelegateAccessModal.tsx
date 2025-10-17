@@ -42,62 +42,48 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
 
   const fetchEligibleUsers = async () => {
     try {
-      // Get current user's roles
-      const { data: currentUserRoles, error: currentRoleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", managerId);
+      console.log("Fetching eligible users for delegation, managerId:", managerId);
+      
+      // Use the security definer function to get eligible users
+      const { data, error } = await supabase
+        .rpc("get_eligible_delegation_users", {
+          _requesting_user_id: managerId
+        });
 
-      if (currentRoleError) throw currentRoleError;
-
-      const roles = currentUserRoles?.map(r => r.role) || [];
-      const isAdmin = roles.includes("admin");
-      const isPlanner = roles.includes("planner");
-      const isManager = roles.includes("manager");
-
-      // Determine eligible roles based on current user's role
-      let eligibleRoles: Array<"admin" | "planner" | "manager"> = [];
-      if (isAdmin) {
-        eligibleRoles = ["admin", "planner", "manager"];
-      } else if (isPlanner) {
-        eligibleRoles = ["planner", "manager"];
-      } else if (isManager) {
-        eligibleRoles = ["manager"];
+      if (error) {
+        console.error("Error from get_eligible_delegation_users:", error);
+        throw error;
       }
 
-      // Fetch all users with eligible roles, except the current user
-      const { data: eligibleRoles_data, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", eligibleRoles)
-        .neq("user_id", managerId);
+      console.log("Eligible users found:", data?.length || 0);
 
-      if (rolesError) throw rolesError;
-
-      const eligibleUserIds = [...new Set(eligibleRoles_data?.map(r => r.user_id) || [])];
-
-      if (eligibleUserIds.length === 0) {
+      if (!data || data.length === 0) {
         setUsers([]);
+        toast({
+          title: "No Eligible Users",
+          description: "No users available for delegation. You may need appropriate permissions or there are no other users with delegatable roles.",
+          variant: "default",
+        });
         return;
       }
 
-      // Fetch profiles for eligible users
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name, email")
-        .in("user_id", eligibleUserIds)
-        .order("first_name", { ascending: true });
+      // Map the data to the User interface format
+      const mappedUsers = data.map(user => ({
+        user_id: user.user_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+      }));
 
-      if (profilesError) throw profilesError;
-
-      setUsers(profiles || []);
+      setUsers(mappedUsers);
     } catch (error: any) {
-      console.error("Error fetching users:", error);
+      console.error("Error fetching eligible delegation users:", error);
       toast({
         title: "Error",
-        description: "Failed to load users",
+        description: error.message || "Failed to load users",
         variant: "destructive",
       });
+      setUsers([]);
     }
   };
 
@@ -264,18 +250,27 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="delegate">Select User</Label>
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a user..." />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.user_id} value={user.user_id}>
-                    {user.first_name} {user.last_name} ({user.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {users.length === 0 ? (
+              <div className="p-4 text-center border rounded-md bg-muted/50">
+                <p className="text-sm text-muted-foreground">
+                  No eligible users available for delegation. 
+                  {/* This could be because you don't have the appropriate permissions or there are no other users with delegatable roles. */}
+                </p>
+              </div>
+            ) : (
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.first_name} {user.last_name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -358,7 +353,10 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || users.length === 0}
+            >
               {loading ? "Creating..." : "Create Delegation"}
             </Button>
           </div>

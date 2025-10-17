@@ -606,6 +606,16 @@ export type Database = {
         Args: { _delegate_id: string }
         Returns: string[]
       }
+      get_eligible_delegation_users: {
+        Args: { _requesting_user_id: string }
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          roles: string[]
+          user_id: string
+        }[]
+      }
       get_managed_team_ids: {
         Args: { _uid: string }
         Returns: string[]
