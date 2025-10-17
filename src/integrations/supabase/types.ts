@@ -552,6 +552,15 @@ export type Database = {
         }
         Returns: number
       }
+      create_manager_delegation: {
+        Args: {
+          _delegate_id: string
+          _end_date: string
+          _manager_id: string
+          _start_date: string
+        }
+        Returns: Json
+      }
       create_team_default_schedules_with_holidays: {
         Args: {
           _created_by: string

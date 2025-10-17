@@ -111,72 +111,20 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
     setLoading(true);
 
     try {
-      // Check if delegate has access to delegator's teams
-      const { data: delegatorTeams, error: teamsError } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("user_id", managerId)
-        .eq("is_manager", true);
+      // Use the secure function to create delegation with automatic team access
+      const { data: delegationResult, error: delegationError } = await supabase
+        .rpc("create_manager_delegation", {
+          _manager_id: managerId,
+          _delegate_id: selectedUserId,
+          _start_date: startDate.toISOString(),
+          _end_date: endDate.toISOString(),
+        });
 
-      if (teamsError) throw teamsError;
-
-      const { data: delegateTeams, error: delegateTeamsError } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("user_id", selectedUserId);
-
-      if (delegateTeamsError) throw delegateTeamsError;
-
-      const delegatorTeamIds = delegatorTeams?.map(t => t.team_id) || [];
-      const delegateTeamIds = delegateTeams?.map(t => t.team_id) || [];
-      const missingTeamAccess = delegatorTeamIds.filter(id => !delegateTeamIds.includes(id));
-
-      // Grant temporary team access if needed
-      if (missingTeamAccess.length > 0) {
-        const teamMemberInserts = missingTeamAccess.map(teamId => ({
-          user_id: selectedUserId,
-          team_id: teamId,
-          is_manager: false,
-        }));
-
-        const { error: teamAccessError } = await supabase
-          .from("team_members")
-          .insert(teamMemberInserts);
-
-        if (teamAccessError) {
-          throw new Error(`Cannot grant team access: ${teamAccessError.message}. Please contact an admin.`);
-        }
+      if (delegationError) {
+        throw new Error(delegationError.message || "Failed to create delegation");
       }
 
-      // Create delegation
-      const { data: delegation, error: delegationError } = await supabase
-        .from("manager_delegations")
-        .insert({
-          manager_id: managerId,
-          delegate_id: selectedUserId,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          status: "active",
-        })
-        .select()
-        .single();
-
-      if (delegationError) throw delegationError;
-
-      // Create audit log
-      await supabase
-        .from("delegation_audit_log")
-        .insert({
-          delegation_id: delegation.id,
-          action: "created",
-          performed_by: managerId,
-          details: {
-            delegate_id: selectedUserId,
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
-            teams_granted: missingTeamAccess,
-          },
-        });
+      console.log("Delegation created successfully:", delegationResult);
 
       // Send notification email
       const selectedUser = users.find(u => u.user_id === selectedUserId);
@@ -199,10 +147,11 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
         });
       }
 
+      const teamsGranted = (delegationResult as any)?.teams_granted || 0;
       toast({
         title: "Success",
-        description: missingTeamAccess.length > 0 
-          ? "Delegation created and team access granted successfully"
+        description: teamsGranted > 0 
+          ? `Delegation created and temporary access granted to ${teamsGranted} team${teamsGranted > 1 ? 's' : ''}`
           : "Delegation created successfully",
       });
 
