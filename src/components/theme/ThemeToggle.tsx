@@ -7,9 +7,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useUserTheme } from "@/hooks/useUserTheme";
 
 export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { theme: nextTheme } = useTheme();
+  const { setTheme: setUserTheme } = useUserTheme();
+
+  const handleThemeChange = async (newTheme: "light" | "dark" | "system") => {
+    await setUserTheme(newTheme);
+  };
 
   return (
     <DropdownMenu>
@@ -21,13 +27,13 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="z-50">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("system")}>
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

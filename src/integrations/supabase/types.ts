@@ -194,6 +194,7 @@ export type Database = {
           last_name: string
           region_code: string | null
           requires_password_change: boolean | null
+          theme_preference: string | null
           updated_at: string
           user_id: string
         }
@@ -206,6 +207,7 @@ export type Database = {
           last_name: string
           region_code?: string | null
           requires_password_change?: boolean | null
+          theme_preference?: string | null
           updated_at?: string
           user_id: string
         }
@@ -218,6 +220,7 @@ export type Database = {
           last_name?: string
           region_code?: string | null
           requires_password_change?: boolean | null
+          theme_preference?: string | null
           updated_at?: string
           user_id?: string
         }
