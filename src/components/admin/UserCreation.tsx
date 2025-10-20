@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UserPlus, Users, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -29,7 +30,8 @@ const UserCreation: React.FC<UserCreationProps> = ({
     initials: "",
     role: "",
     countryCode: "US",
-    teamId: "no-team"
+    teamId: "no-team",
+    sendEmail: false
   });
   useEffect(() => {
     fetchTeams();
@@ -66,8 +68,29 @@ const UserCreation: React.FC<UserCreationProps> = ({
       });
       return;
     }
+    
     setLoading(true);
     try {
+      // Check if email already exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', formData.email.toLowerCase().trim())
+        .maybeSingle();
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existingUser) {
+        toast({
+          title: "Error",
+          description: "This email address is already associated with an existing user. Please use a different email.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
       // Generate a temporary password that meets requirements
       const tempPassword = `TempPass${Math.random().toString(36).slice(-4)}!`;
 
@@ -83,13 +106,16 @@ const UserCreation: React.FC<UserCreationProps> = ({
           role: formData.role,
           countryCode: formData.countryCode,
           teamId: formData.teamId,
-          requiresPasswordChange: true
+          requiresPasswordChange: true,
+          sendEmail: formData.sendEmail
         }
       });
       if (error) throw error;
       toast({
         title: "Success",
-        description: `User created successfully. They will need to change their password on first login.`
+        description: formData.sendEmail 
+          ? "User created successfully and welcome email sent."
+          : "User created successfully. They will need to change their password on first login."
       });
 
       // Reset form
@@ -98,7 +124,8 @@ const UserCreation: React.FC<UserCreationProps> = ({
         initials: "",
         role: "",
         countryCode: "US",
-        teamId: "no-team"
+        teamId: "no-team",
+        sendEmail: false
       });
       onUserCreated();
     } catch (error: any) {
@@ -250,6 +277,23 @@ const UserCreation: React.FC<UserCreationProps> = ({
                 <SelectItem value="MX">Mexico</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox 
+              id="sendEmail" 
+              checked={formData.sendEmail}
+              onCheckedChange={(checked) => setFormData({
+                ...formData,
+                sendEmail: checked as boolean
+              })}
+            />
+            <Label 
+              htmlFor="sendEmail" 
+              className="text-sm font-normal cursor-pointer"
+            >
+              Send email notification to the new user with login credentials
+            </Label>
           </div>
 
           <Button type="submit" disabled={loading} className="w-full">

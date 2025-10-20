@@ -106,10 +106,13 @@ serve(async (req) => {
       }
     );
 
-    const { email, password, firstName, lastName, role, countryCode, teamId, requiresPasswordChange } = await req.json();
+    const { email, password, firstName, lastName, role, countryCode, teamId, requiresPasswordChange, sendEmail, initials } = await req.json();
 
-    // Validate input
-    if (!email || !password || !firstName || !lastName || !role) {
+    // Validate input - support both firstName/lastName and initials
+    const userFirstName = firstName || (initials ? initials.split(' ')[0] || initials : '');
+    const userLastName = lastName || (initials ? initials.split(' ')[1] || '' : '');
+    
+    if (!email || !password || !userFirstName || !role) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { 
@@ -123,13 +126,13 @@ serve(async (req) => {
     const tempPassword = generateSecurePassword();
     
     // Create user
-    const { data: user, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
-        first_name: firstName,
-        last_name: lastName
+        first_name: userFirstName,
+        last_name: userLastName
       }
     });
 
@@ -144,13 +147,24 @@ serve(async (req) => {
       );
     }
 
+    const createdUser = userData.user;
+    if (!createdUser) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to create user' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Create profile
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
-        user_id: user.user!.id,
-        first_name: firstName,
-        last_name: lastName,
+        user_id: createdUser.id,
+        first_name: userFirstName,
+        last_name: userLastName,
         email: email,
         country_code: countryCode || 'US',
         requires_password_change: true // Always require password change for new users
@@ -164,7 +178,7 @@ serve(async (req) => {
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
-        user_id: user.user!.id,
+        user_id: createdUser.id,
         role: role
       });
 
@@ -177,7 +191,7 @@ serve(async (req) => {
       const { error: teamError } = await supabaseAdmin
         .from('team_members')
         .insert({
-          user_id: user.user!.id,
+          user_id: createdUser.id,
           team_id: teamId,
           is_manager: role === 'manager'
         });
@@ -187,10 +201,53 @@ serve(async (req) => {
       }
     }
 
+    // Send welcome email if requested
+    if (sendEmail) {
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      if (resendApiKey) {
+        try {
+          const resendResponse = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${resendApiKey}`
+            },
+            body: JSON.stringify({
+              from: 'Schedule System <onboarding@resend.dev>',
+              to: [email],
+              subject: 'Welcome to Schedule System',
+              html: `
+                <h1>Welcome to Schedule System!</h1>
+                <p>Hello ${userFirstName} ${userLastName},</p>
+                <p>Your account has been created successfully. Here are your login details:</p>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+                <p><strong>Important:</strong> You will be required to change your password on first login for security purposes.</p>
+                <p>Please keep this information secure and do not share it with anyone.</p>
+                <br>
+                <p>Best regards,<br>The Schedule System Team</p>
+              `
+            })
+          });
+
+          if (!resendResponse.ok) {
+            console.error('Failed to send welcome email:', await resendResponse.text());
+          } else {
+            console.log('Welcome email sent successfully to:', email);
+          }
+        } catch (emailError) {
+          console.error('Error sending welcome email:', emailError);
+          // Don't fail user creation if email fails
+        }
+      } else {
+        console.warn('RESEND_API_KEY not configured, skipping email notification');
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        user: user.user,
+        user: createdUser,
         message: 'User created successfully'
       }),
       { 
