@@ -3,6 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 }
 
 interface Holiday {
@@ -47,7 +49,10 @@ const holidayFilters: Record<string, string[]> = {
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -116,18 +121,36 @@ Deno.serve(async (req) => {
       .eq('region_code', region_code || null)
       .maybeSingle();
 
+    // Reset stale pending imports (older than 10 minutes)
     if (existingStatus && existingStatus.status === 'pending') {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Import already in progress',
-          status: 'pending',
-          started_at: existingStatus.started_at
-        }),
-        { 
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      const startedAt = new Date(existingStatus.started_at);
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      
+      if (startedAt < tenMinutesAgo) {
+        console.log('Resetting stale pending import:', { country_code, year, region_code, started_at: existingStatus.started_at });
+        await supabaseClient
+          .from('holiday_import_status')
+          .update({
+            status: 'failed',
+            error_message: 'Import timed out after 10 minutes',
+            completed_at: new Date().toISOString()
+          })
+          .eq('country_code', country_code)
+          .eq('year', year)
+          .eq('region_code', region_code || null);
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Import already in progress',
+            status: 'pending',
+            started_at: existingStatus.started_at
+          }),
+          { 
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
     }
 
     // Create or update import status record

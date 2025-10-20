@@ -216,6 +216,53 @@ const AdminHolidayManager = () => {
     console.log('Holidays are automatically displayed from holidays table');
   }, []);
 
+  const resetStuckImports = useCallback(async () => {
+    if (!user || !hasPermission) return;
+
+    try {
+      // Find stuck imports (pending for more than 10 minutes)
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+      const stuckImports = importStatuses.filter(s => 
+        s.status === 'pending' && 
+        new Date(s.started_at) < tenMinutesAgo
+      );
+
+      if (stuckImports.length === 0) {
+        toast({
+          title: "No stuck imports",
+          description: "All pending imports are recent and should complete soon.",
+        });
+        return;
+      }
+
+      // Update stuck imports to failed status
+      const { error } = await supabase
+        .from('holiday_import_status')
+        .update({
+          status: 'failed',
+          error_message: 'Import timed out - reset for retry',
+          completed_at: new Date().toISOString()
+        })
+        .in('id', stuckImports.map(s => s.id));
+
+      if (error) throw error;
+
+      toast({
+        title: "Stuck imports reset",
+        description: `${stuckImports.length} stuck import(s) have been reset. You can now retry them.`,
+      });
+
+      await fetchImportStatuses();
+    } catch (error) {
+      console.error('Error resetting stuck imports:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset stuck imports. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [user, hasPermission, importStatuses, fetchImportStatuses, toast]);
+
   const importHolidays = useCallback(async () => {
     if (!user || !hasPermission) return;
 
@@ -552,15 +599,46 @@ const AdminHolidayManager = () => {
         </CardHeader>
         <CardContent>
           {/* Show pending imports */}
-          {importStatuses.filter(s => s.status === 'pending').length > 0 && (
-            <Alert className="mb-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertDescription>
-                <strong>Syncing in progress:</strong> {importStatuses.filter(s => s.status === 'pending').length} import(s) running in the background. 
-                The page will automatically refresh when complete.
-              </AlertDescription>
-            </Alert>
-          )}
+          {(() => {
+            const pendingImports = importStatuses.filter(s => s.status === 'pending');
+            if (pendingImports.length === 0) return null;
+
+            const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+            const stuckImports = pendingImports.filter(s => new Date(s.started_at) < tenMinutesAgo);
+            
+            return (
+              <Alert className="mb-4" variant={stuckImports.length > 0 ? "destructive" : "default"}>
+                {stuckImports.length > 0 ? (
+                  <AlertCircle className="h-4 w-4" />
+                ) : (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                <AlertDescription>
+                  {stuckImports.length > 0 ? (
+                    <div className="space-y-2">
+                      <p>
+                        <strong>Import stuck:</strong> {stuckImports.length} import(s) have been pending for over 10 minutes. 
+                        These imports may have failed or timed out.
+                      </p>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={resetStuckImports}
+                        className="mt-2"
+                      >
+                        Reset Stuck Imports
+                      </Button>
+                    </div>
+                  ) : (
+                    <p>
+                      <strong>Syncing in progress:</strong> {pendingImports.length} import(s) running in the background. 
+                      The page will automatically refresh when complete.
+                    </p>
+                  )}
+                </AlertDescription>
+              </Alert>
+            );
+          })()}
           
           <div className="space-y-6">
             {Object.keys(groupedHolidays).length === 0 ? (
