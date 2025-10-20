@@ -95,13 +95,12 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="shift-type">Shift Type</Label>
+            <Label htmlFor="shift-type">Shift Type (optional)</Label>
             <Select value={shiftType} onValueChange={setShiftType}>
               <SelectTrigger id="shift-type">
                 <SelectValue placeholder="Keep existing" />
               </SelectTrigger>
               <SelectContent className="bg-background border z-50">
-                <SelectItem value="">Keep existing</SelectItem>
                 <SelectItem value="normal">Normal Shift</SelectItem>
                 <SelectItem value="early">Early Shift</SelectItem>
                 <SelectItem value="late">Late Shift</SelectItem>
@@ -110,13 +109,12 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="activity-type">Activity Type</Label>
+            <Label htmlFor="activity-type">Activity Type (optional)</Label>
             <Select value={activityType} onValueChange={setActivityType}>
               <SelectTrigger id="activity-type">
                 <SelectValue placeholder="Keep existing" />
               </SelectTrigger>
               <SelectContent className="bg-background border z-50">
-                <SelectItem value="">Keep existing</SelectItem>
                 <SelectItem value="work">Work</SelectItem>
                 <SelectItem value="vacation">Vacation</SelectItem>
                 <SelectItem value="training">Training</SelectItem>
