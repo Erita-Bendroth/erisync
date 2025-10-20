@@ -77,8 +77,8 @@ serve(async (req) => {
     );
 
     // Verify the user is authenticated
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    const { data: { user: authenticatedUser }, error: userError } = await supabase.auth.getUser();
+    if (userError || !authenticatedUser) {
       return new Response(JSON.stringify({ error: 'Unauthorized - Invalid JWT token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -89,7 +89,7 @@ serve(async (req) => {
     const { data: userRoles, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id);
+      .eq('user_id', authenticatedUser.id);
 
     if (roleError || !userRoles?.some(r => r.role === 'admin' || r.role === 'planner')) {
       return new Response(JSON.stringify({ error: 'Admin or planner access required' }), {
@@ -98,7 +98,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Admin/Planner ${user.email} is creating new user`);
+    console.log(`Admin/Planner ${authenticatedUser.email} is creating new user`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -180,15 +180,15 @@ serve(async (req) => {
     }
 
     // Assign role
-    const { error: roleError } = await supabaseAdmin
+    const { error: roleAssignmentError } = await supabaseAdmin
       .from('user_roles')
       .insert({
         user_id: createdUser.id,
         role: role
       });
 
-    if (roleError) {
-      console.error('Role assignment error:', roleError);
+    if (roleAssignmentError) {
+      console.error('Role assignment error:', roleAssignmentError);
     }
 
     // Assign to team if teamId is provided and not "no-team"
