@@ -100,21 +100,23 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     return (
       <div className={`w-full ${className}`}>
         <TooltipProvider>
-          <Tooltip>
+          <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
-              <Badge
-                variant="outline"
-                className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 block text-xs w-full cursor-default"
-              >
-                <div className="flex flex-col items-center py-1 w-full min-w-0">
-                  <span className="font-medium truncate max-w-full">
-                    🎉 {holidayName}
-                  </span>
-                </div>
-              </Badge>
+              <div className="w-full cursor-help">
+                <Badge
+                  variant="outline"
+                  className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 block text-xs w-full pointer-events-auto"
+                >
+                  <div className="flex flex-col items-center py-1 w-full min-w-0">
+                    <span className="font-medium truncate max-w-full">
+                      🎉 {holidayName}
+                    </span>
+                  </div>
+                </Badge>
+              </div>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>🎉 {holidayName}</p>
+            <TooltipContent className="z-[100]" side="top">
+              <p className="max-w-xs">🎉 {holidayName}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

@@ -1782,25 +1782,27 @@ const getActivityColor = (entry: ScheduleEntry) => {
                         >
                           <div className="space-y-1 min-h-16 flex flex-col justify-center">
                             {/* Show holidays first */}
-                            {dayHolidays.map((holiday) => (
-                              <TooltipProvider key={holiday.id}>
-                                <Tooltip>
+                            <TooltipProvider>
+                              {dayHolidays.map((holiday) => (
+                                <Tooltip key={holiday.id} delayDuration={200}>
                                   <TooltipTrigger asChild>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 max-w-full block"
-                                    >
-                                      <span className="truncate block">
-                                        🎉 {holiday.name}
-                                      </span>
-                                    </Badge>
+                                    <div className="w-full cursor-help">
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 max-w-full block pointer-events-auto"
+                                      >
+                                        <span className="truncate block">
+                                          🎉 {holiday.name}
+                                        </span>
+                                      </Badge>
+                                    </div>
                                   </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>🎉 {holiday.name}</p>
+                                  <TooltipContent className="z-[100]" side="top">
+                                    <p className="max-w-xs">🎉 {holiday.name}</p>
                                   </TooltipContent>
                                 </Tooltip>
-                              </TooltipProvider>
-                            ))}
+                              ))}
+                            </TooltipProvider>
                             
                             {/* Show work entries */}
                               {dayEntries.length === 0 ? (
