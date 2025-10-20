@@ -22,8 +22,10 @@ import { TeamAvailabilityView } from './TeamAvailabilityView';
 import { MonthlyScheduleView } from './MonthlyScheduleView';
 import { TeamFavoritesManager } from './TeamFavoritesManager';
 import { TeamFavoritesQuickAccess } from './TeamFavoritesQuickAccess';
+import { BulkEditShiftsModal } from './BulkEditShiftsModal';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ScheduleEntry {
   id: string;
@@ -98,6 +100,10 @@ const [showEditModal, setShowEditModal] = useState(false);
 const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
 // Managed users visibility cache
 const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
+// Multi-select mode state
+const [multiSelectMode, setMultiSelectMode] = useState(false);
+const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
+const [showBulkEditModal, setShowBulkEditModal] = useState(false);
 const [managedCacheLoading, setManagedCacheLoading] = useState(false);
 // Vacation request modal
 const [vacationModalOpen, setVacationModalOpen] = useState(false);
@@ -1266,6 +1272,37 @@ const getActivityColor = (entry: ScheduleEntry) => {
     else if (monthOffset === -2) setSelectedMonthValue("prev2");
   };
 
+  const toggleMultiSelectMode = () => {
+    setMultiSelectMode(!multiSelectMode);
+    setSelectedShiftIds([]); // Clear selections when toggling mode
+  };
+
+  const toggleShiftSelection = (shiftId: string) => {
+    setSelectedShiftIds(prev => 
+      prev.includes(shiftId) 
+        ? prev.filter(id => id !== shiftId)
+        : [...prev, shiftId]
+    );
+  };
+
+  const handleBulkEdit = () => {
+    if (selectedShiftIds.length === 0) {
+      toast({
+        title: 'No Shifts Selected',
+        description: 'Please select at least one shift to edit.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setShowBulkEditModal(true);
+  };
+
+  const handleBulkEditSuccess = () => {
+    setSelectedShiftIds([]);
+    setMultiSelectMode(false);
+    fetchScheduleEntries();
+  };
+
   const isCacheReady = !(isManager() && !isPlanner()) || !managedCacheLoading;
 
   if (!user) {
@@ -1339,6 +1376,29 @@ const getActivityColor = (entry: ScheduleEntry) => {
                   {pendingRequestsCount}
                 </Badge>
               )}
+            </Button>
+          )}
+
+          {/* Multi-Select Mode Toggle - For Managers/Planners */}
+          {(isManager() || isPlanner()) && timeView === "weekly" && (
+            <Button
+              onClick={toggleMultiSelectMode}
+              variant={multiSelectMode ? "default" : "outline"}
+              size="default"
+              className="gap-2"
+            >
+              {multiSelectMode ? "Cancel Selection" : "Edit Multiple"}
+            </Button>
+          )}
+
+          {/* Bulk Edit Button - Only shown when shifts are selected */}
+          {multiSelectMode && selectedShiftIds.length > 0 && (
+            <Button
+              onClick={handleBulkEdit}
+              size="default"
+              className="gap-2"
+            >
+              Edit {selectedShiftIds.length} Shift{selectedShiftIds.length !== 1 ? 's' : ''}
             </Button>
           )}
 
@@ -1674,6 +1734,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
               <Table>
               <TableHeader>
                 <TableRow>
+                  {multiSelectMode && <TableHead className="w-12"></TableHead>}
                   <TableHead className="w-48 font-semibold">Employee</TableHead>
                   {workDays.map((day, index) => (
                     <TableHead key={index} className="text-center font-semibold">
@@ -1690,6 +1751,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
                <TableBody>
                 {employees.map((employee) => (
                   <TableRow key={employee.user_id}>
+                    {multiSelectMode && (
+                      <TableCell className="w-12">
+                        {/* Checkbox column - empty for employee row */}
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
@@ -1709,9 +1775,9 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       return (
                         <TableCell
                           key={dayIndex} 
-                          className={`text-center ${isToday ? 'bg-primary/5' : ''} cursor-pointer hover:bg-muted/50 transition-colors`}
-                          onClick={() => (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
-                          title={dayEntries.length === 0 && dayHolidays.length === 0 ? "Click to add entry" : ""}
+                          className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors`}
+                          onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
+                          title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 ? "Click to add entry" : ""}
                         >
                           <div className="space-y-1 min-h-16 flex flex-col justify-center">
                             {/* Show holidays first */}
@@ -1729,11 +1795,19 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             {/* Show work entries */}
                               {dayEntries.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">
-                                  {(isManager() || isPlanner()) ? "+" : "-"}
+                                  {(isManager() || isPlanner()) && !multiSelectMode ? "+" : "-"}
                                 </span>
                               ) : (
                               dayEntries.map((entry) => (
                                 <div key={entry.id} className="space-y-1">
+                                  {multiSelectMode && (
+                                    <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
+                                      <Checkbox
+                                        checked={selectedShiftIds.includes(entry.id)}
+                                        onCheckedChange={() => toggleShiftSelection(entry.id)}
+                                      />
+                                    </div>
+                                  )}
                                   {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
                                     <TimeBlockDisplay
                                       entry={entry}
@@ -1741,7 +1815,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       showNotes={isTeamMember() && !isManager() && !isPlanner()}
                                       onClick={(e) => {
                                         e?.stopPropagation();
-                                        if (isManager() || isPlanner()) {
+                                        if (!multiSelectMode && (isManager() || isPlanner())) {
                                           // Additional check for managers - they can only edit users in their managed teams
                                           if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
                                             handleEditShift(entry);
@@ -1755,7 +1829,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       className={`${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity text-xs`}
                                       onClick={(e) => {
                                         e?.stopPropagation();
-                                        if (isManager() || isPlanner()) {
+                                        if (!multiSelectMode && (isManager() || isPlanner())) {
                                           // Additional check for managers - they can only edit users in their managed teams
                                           if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
                                             handleEditShift(entry);
@@ -1934,6 +2008,14 @@ const getActivityColor = (entry: ScheduleEntry) => {
         onRequestSubmitted={() => {
           fetchScheduleEntries();
         }}
+      />
+
+      {/* Bulk Edit Shifts Modal */}
+      <BulkEditShiftsModal
+        open={showBulkEditModal}
+        onOpenChange={setShowBulkEditModal}
+        selectedShiftIds={selectedShiftIds}
+        onSuccess={handleBulkEditSuccess}
       />
     </div>
   );
