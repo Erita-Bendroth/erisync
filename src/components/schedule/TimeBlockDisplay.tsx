@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TimeBlock {
   activity_type: string;
@@ -98,16 +99,25 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     const holidayName = entry.notes?.replace(/Public holiday:\s*/, '').trim() || 'Holiday';
     return (
       <div className={`w-full ${className}`}>
-        <Badge
-          variant="outline"
-          className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 block text-xs w-full cursor-default"
-        >
-          <div className="flex flex-col items-center py-1 w-full">
-            <span className="font-medium">
-              🎉 {holidayName}
-            </span>
-          </div>
-        </Badge>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 block text-xs w-full cursor-default"
+              >
+                <div className="flex flex-col items-center py-1 w-full min-w-0">
+                  <span className="font-medium truncate max-w-full">
+                    🎉 {holidayName}
+                  </span>
+                </div>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>🎉 {holidayName}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     );
   }
