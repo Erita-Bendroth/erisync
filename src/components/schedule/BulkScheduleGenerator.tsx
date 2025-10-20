@@ -902,6 +902,22 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
+        {/* Include Weekends Option for Rotation Mode */}
+        {bulkMode === 'rotation' && (
+          <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Include Weekends</Label>
+              <p className="text-xs text-muted-foreground">
+                Include Saturdays and Sundays in the rotation schedule
+              </p>
+            </div>
+            <Checkbox
+              checked={includeWeekends}
+              onCheckedChange={(checked) => setIncludeWeekends(checked === true)}
+            />
+          </div>
+        )}
+
         {/* Date Range Selection */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Select Date Range for This Shift</Label>
