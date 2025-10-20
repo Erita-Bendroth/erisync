@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth } from 'date-fns';
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText } from 'lucide-react';
@@ -1731,7 +1732,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
         <div className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <Table>
+              <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
                   {multiSelectMode && <TableHead className="w-12"></TableHead>}
@@ -1775,21 +1776,30 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       return (
                         <TableCell
                           key={dayIndex} 
-                          className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors`}
+                          className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[150px]`}
                           onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
                           title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 ? "Click to add entry" : ""}
                         >
                           <div className="space-y-1 min-h-16 flex flex-col justify-center">
                             {/* Show holidays first */}
                             {dayHolidays.map((holiday) => (
-                              <Badge
-                                key={holiday.id}
-                                variant="outline"
-                                className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800"
-                                title={`Public Holiday: ${holiday.name}`}
-                              >
-                                🎉 {holiday.name}
-                              </Badge>
+                              <TooltipProvider key={holiday.id}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 max-w-full block"
+                                    >
+                                      <span className="truncate block">
+                                        🎉 {holiday.name}
+                                      </span>
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>🎉 {holiday.name}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             ))}
                             
                             {/* Show work entries */}
