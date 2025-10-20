@@ -263,9 +263,9 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     
     const allDates = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
     
-    // For non-standard shifts with includeWeekends enabled, include all days
+    // For rotation mode or non-standard shifts with includeWeekends enabled, include all days
     // For standard shifts or when includeWeekends is false, exclude weekends
-    if (shiftTemplate !== 'standard' && includeWeekends) {
+    if ((bulkMode === 'rotation' || shiftTemplate !== 'standard') && includeWeekends) {
       return allDates; // Include all days including weekends
     }
     
@@ -303,7 +303,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       });
       setPerDateTimes(newPerDateTimes);
     }
-  }, [rangeStartDate, rangeEndDate, bulkMode]);
+  }, [rangeStartDate, rangeEndDate, bulkMode, includeWeekends]);
 
   const addShiftConfiguration = () => {
     // Rotation mode validation
@@ -978,7 +978,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
           {rangeStartDate && rangeEndDate && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-              {getDateRangeArray().length} {shiftTemplate !== 'standard' && includeWeekends ? 'days' : 'weekdays'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
+              {getDateRangeArray().length} {(bulkMode === 'rotation' || shiftTemplate !== 'standard') && includeWeekends ? 'days' : 'weekdays'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
             </div>
           )}
         </div>
