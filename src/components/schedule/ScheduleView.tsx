@@ -689,10 +689,12 @@ useEffect(() => {
     }
   };
 
-  const fetchScheduleEntries = async () => {
+  const fetchScheduleEntries = async (silent: boolean = false) => {
     try {
       console.log('🚀 fetchScheduleEntries START');
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const weekEnd = addDays(weekStart, 6);
       const dateStart = format(weekStart, "yyyy-MM-dd");
       const dateEnd = format(weekEnd, "yyyy-MM-dd");
@@ -967,7 +969,9 @@ useEffect(() => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -2127,8 +2131,9 @@ const getActivityColor = (entry: ScheduleEntry) => {
               <VacationRequestsList
                 isPlanner={isPlanner()}
                 onRequestProcessed={() => {
-                  fetchScheduleEntries();
-                  fetchPendingRequestsCount(); // Update badge count
+                  // Silent refresh to preserve view - don't show loading screen
+                  fetchScheduleEntries(true);
+                  fetchPendingRequestsCount();
                 }}
                 onEditRequest={(request) => {
                   setEditingVacationRequest(request);
