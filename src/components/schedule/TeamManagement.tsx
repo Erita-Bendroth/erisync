@@ -414,7 +414,7 @@ const TeamManagement = () => {
         });
         
           return {
-            name: formatUserName(member.profiles.first_name, member.profiles.last_name),
+            name: formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials),
             email: member.profiles.email || 'Email restricted',
             totalWorkDays,
             totalHours,
@@ -432,7 +432,7 @@ const TeamManagement = () => {
           const hours = calculateHoursFromScheduleEntry(entry);
           
           return [
-            member ? formatUserName(member.profiles.first_name, member.profiles.last_name) : 'Unknown',
+            member ? formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials) : 'Unknown',
             member?.profiles.email || 'Email restricted',
             entry.date,
             entry.activity_type.replace('_', ' '),
@@ -572,7 +572,7 @@ const TeamManagement = () => {
                     <SelectContent>
                        {profiles.map((profile) => (
                          <SelectItem key={profile.user_id} value={profile.user_id}>
-                           {formatUserName(profile.first_name, profile.last_name)} {profile.email ? `(${profile.email})` : ''}
+                           {formatUserName(profile.first_name, profile.last_name, profile.initials)} {profile.email ? `(${profile.email})` : ''}
                          </SelectItem>
                        ))}
                     </SelectContent>
@@ -763,12 +763,7 @@ const TeamManagement = () => {
                               {teamMembers[team.id].map((member) => (
                                 <TableRow key={member.id} className="hover:bg-muted/30">
                                   <TableCell className="font-medium">
-                                    {userRole === 'teammember' 
-                                      ? (member.profiles.last_name 
-                                          ? `${member.profiles.first_name.charAt(0)}${member.profiles.last_name.charAt(0)}`.toUpperCase()
-                                          : member.profiles.first_name) // For initials-only users, show as-is
-                                      : formatUserName(member.profiles.first_name, member.profiles.last_name)
-                                    }
+                                    {formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials)}
                                   </TableCell>
                                    <TableCell className="text-muted-foreground">
                                      {member.profiles.email || 'Email restricted'}

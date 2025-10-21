@@ -320,7 +320,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
                 <SelectContent className="bg-background z-50">
                   {planners.map((planner) => (
                     <SelectItem key={planner.user_id} value={planner.user_id}>
-                      {formatUserName(planner.first_name, planner.last_name)}
+                      {formatUserName(planner.first_name, planner.last_name, planner.initials)}
                       {planner.email && (
                         <span className="text-xs text-muted-foreground ml-2">
                           ({planner.email})

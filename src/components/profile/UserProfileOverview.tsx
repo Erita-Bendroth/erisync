@@ -218,7 +218,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
       // Prepare worksheet data
       const worksheetData = [
         ['Employee Schedule Report'],
-        [`Name: ${formatUserName(profile.first_name, profile.last_name)}`],
+        [`Name: ${formatUserName(profile.first_name, profile.last_name, profile.initials)}`],
         [`Year: ${currentYear}`],
         [''],
         ['Date', 'Activity Type', 'Shift Type', 'Availability Status', 'Hours', 'Notes'],
@@ -254,7 +254,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
       XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
       
       // Generate Excel file and download
-      const fileName = `${formatUserName(profile.first_name, profile.last_name).replace(/\s+/g, '_')}_Schedule_${currentYear}.xlsx`;
+      const fileName = `${formatUserName(profile.first_name, profile.last_name, profile.initials).replace(/\s+/g, '_')}_Schedule_${currentYear}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
       toast({
@@ -294,7 +294,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
           <body>
             <div class="header">
               <h1>Employee Schedule Report</h1>
-              <h2>${formatUserName(profile.first_name, profile.last_name)}</h2>
+              <h2>${formatUserName(profile.first_name, profile.last_name, profile.initials)}</h2>
               <p>Year: ${new Date().getFullYear()}</p>
             </div>
             <div class="summary">
@@ -375,7 +375,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
         <CardHeader>
             <CardTitle className="flex items-center">
               <User className="w-5 h-5 mr-2" />
-              Profile Overview - {formatUserName(profile.first_name, profile.last_name)}
+              Profile Overview - {formatUserName(profile.first_name, profile.last_name, profile.initials)}
             </CardTitle>
             <CardDescription>
               Work summary and time tracking for {new Date().getFullYear()}

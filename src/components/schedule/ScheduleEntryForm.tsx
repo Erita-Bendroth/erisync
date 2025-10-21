@@ -236,7 +236,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 <SelectContent>
                   {profiles.map((profile) => (
                     <SelectItem key={profile.user_id} value={profile.user_id}>
-                      {formatUserName(profile.first_name, profile.last_name)}
+                      {formatUserName(profile.first_name, profile.last_name, profile.initials)}
                     </SelectItem>
                   ))}
                 </SelectContent>

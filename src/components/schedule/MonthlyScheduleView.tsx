@@ -293,7 +293,7 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                             "text-sm",
                             isCurrentUser && "font-bold"
                           )}>
-                            {formatUserName(user.first_name, user.last_name)}
+                            {formatUserName(user.first_name, user.last_name, user.initials)}
                           </span>
                         </div>
                       </TableCell>

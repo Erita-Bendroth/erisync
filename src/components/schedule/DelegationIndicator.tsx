@@ -171,8 +171,8 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
               action: "cancelled",
               managerEmail: managerProfile.email,
               delegateEmail: delegateProfile.email,
-              managerName: formatUserName(managerProfile.first_name, managerProfile.last_name),
-              delegateName: formatUserName(delegateProfile.first_name, delegateProfile.last_name),
+              managerName: formatUserName(managerProfile.first_name, managerProfile.last_name, managerProfile.initials),
+              delegateName: formatUserName(delegateProfile.first_name, delegateProfile.last_name, delegateProfile.initials),
               startDate: format(new Date(delegation.start_date), "PPP"),
               endDate: format(new Date(delegation.end_date), "PPP"),
             },
@@ -232,7 +232,7 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {formatUserName(delegation.profiles.first_name, delegation.profiles.last_name)}
+                      {formatUserName(delegation.profiles.first_name, delegation.profiles.last_name, delegation.profiles.initials)}
                     </span>
                     <Badge variant="secondary" className="text-xs">
                       Delegate
@@ -279,7 +279,7 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      From: {formatUserName(delegation.profiles.first_name, delegation.profiles.last_name)}
+                      From: {formatUserName(delegation.profiles.first_name, delegation.profiles.last_name, delegation.profiles.initials)}
                     </span>
                     <Badge variant="default" className="text-xs">
                       Active

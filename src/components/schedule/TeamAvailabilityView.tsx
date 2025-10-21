@@ -287,7 +287,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                           {user.initials}
                         </div>
                         <span>
-                          {formatUserName(user.first_name, user.last_name)}
+                          {formatUserName(user.first_name, user.last_name, user.initials)}
                         </span>
                       </div>
                     </TableCell>

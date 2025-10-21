@@ -411,7 +411,7 @@ const AdminSetup = () => {
                   <div key={profile.user_id} className="flex items-center justify-between p-3 border rounded">
                      <div>
                       <p className="font-medium">
-                        {formatUserName(profile.first_name, profile.last_name)}
+                        {formatUserName(profile.first_name, profile.last_name, profile.initials)}
                         {isCurrentUser && <span className="text-muted-foreground"> (You)</span>}
                       </p>
                       <p className="text-sm text-muted-foreground">{profile.email}</p>

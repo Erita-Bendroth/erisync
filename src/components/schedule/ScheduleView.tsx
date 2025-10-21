@@ -1084,7 +1084,7 @@ const canViewFullDetailsSync = (userId: string) => {
     // If last_name is empty, first_name contains initials (already shown in avatar), so don't duplicate
     if (employee.last_name && employee.last_name.trim() !== '') {
       return (
-        <p className="font-medium">{formatUserName(employee.first_name, employee.last_name)}</p>
+        <p className="font-medium">{formatUserName(employee.first_name, employee.last_name, employee.initials)}</p>
       );
     }
     // For initials-only users, don't show anything (initials are already in the avatar bubble)

@@ -26,6 +26,7 @@ interface ScheduleEntry {
   profiles: {
     first_name: string;
     last_name: string;
+    initials?: string;
   };
   teams: {
     name: string;
@@ -230,7 +231,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           const { data: currentUserProfile } = await supabase
             .from('profiles')
-            .select('first_name, last_name')
+          .select('first_name, last_name, initials')
             .eq('user_id', currentUser?.id)
             .maybeSingle();
 
@@ -238,10 +239,10 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             await supabase.functions.invoke('send-schedule-notification', {
               body: {
                 userEmail: profileData.email,
-                userName: formatUserName(profileData.first_name, profileData.last_name),
+                userName: formatUserName(profileData.first_name, profileData.last_name, profileData.initials),
                 scheduleDate: format(new Date(entry.date), 'PPP'),
                 changeDetails: `Shift: ${formData.shift_type}, Activity: ${formData.activity_type}, Status: ${formData.availability_status}`,
-                changedBy: currentUserProfile ? formatUserName(currentUserProfile.first_name, currentUserProfile.last_name) : 'System',
+                changedBy: currentUserProfile ? formatUserName(currentUserProfile.first_name, currentUserProfile.last_name, currentUserProfile.initials) : 'System',
               },
             });
           }
@@ -250,7 +251,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           if (profileData) {
             const changeType = entry.id.startsWith('temp-') ? 'created' : 'updated';
             showScheduleChangeNotification({
-              employeeName: formatUserName(profileData.first_name, profileData.last_name),
+              employeeName: formatUserName(profileData.first_name, profileData.last_name, profileData.initials),
               date: format(new Date(entry.date), 'PPP'),
               changeType: changeType
             });
@@ -263,14 +264,14 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         try {
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('first_name, last_name')
+            .select('first_name, last_name, initials')
             .eq('user_id', entry.user_id)
-            .maybeSingle();
+            .maybeSingle() as any;
             
           if (profileData) {
             const changeType = entry.id.startsWith('temp-') ? 'created' : 'updated';
             showScheduleChangeNotification({
-              employeeName: formatUserName(profileData.first_name, profileData.last_name),
+              employeeName: formatUserName(profileData.first_name, profileData.last_name, profileData.initials),
               date: format(new Date(entry.date), 'PPP'),
               changeType: changeType
             });
@@ -330,7 +331,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         <DialogHeader>
           <DialogTitle>Edit Schedule Entry</DialogTitle>
           <DialogDescription>
-            Editing shift for {formatUserName(entry.profiles.first_name, entry.profiles.last_name)} on{" "}
+            Editing shift for {formatUserName(entry.profiles.first_name, entry.profiles.last_name, entry.profiles.initials)} on{" "}
             {format(new Date(entry.date), "EEEE, MMMM d, yyyy")}
           </DialogDescription>
         </DialogHeader>

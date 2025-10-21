@@ -101,7 +101,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back, {profile ? formatUserName(profile.first_name, profile.last_name) : 'Loading...'}
+            Welcome back, {profile ? formatUserName(profile.first_name, profile.last_name, profile.initials) : 'Loading...'}
           </p>
         </div>
         <div className="flex items-center space-x-2">

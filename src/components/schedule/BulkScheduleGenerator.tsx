@@ -217,6 +217,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         id: member.user_id,
         first_name: member.profiles.first_name,
         last_name: member.profiles.last_name,
+        initials: member.profiles.initials,
         email: member.profiles.email
       })) || [];
 
@@ -824,7 +825,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                     onCheckedChange={() => toggleRotationUserSelection(usr.id)}
                   />
                   <label className="text-sm cursor-pointer flex-1">
-                    {formatUserName(usr.first_name, usr.last_name)}
+                    {formatUserName(usr.first_name, usr.last_name, usr.initials)}
                   </label>
                 </div>
               ))}
@@ -1138,7 +1139,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                           <div className="font-medium text-sm">{config.shiftName}</div>
                           {assignedUser && (
                             <Badge variant="outline" className="text-xs">
-                              {formatUserName(assignedUser.first_name, assignedUser.last_name)}
+                              {formatUserName(assignedUser.first_name, assignedUser.last_name, assignedUser.initials)}
                             </Badge>
                           )}
                         </div>
@@ -1263,7 +1264,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                         onCheckedChange={() => toggleUserSelection(usr.id)}
                       />
                       <Label className="flex-1 cursor-pointer">
-                        {formatUserName(usr.first_name, usr.last_name)}
+                        {formatUserName(usr.first_name, usr.last_name, usr.initials)}
                       </Label>
                       {selectedUsers.includes(usr.id) && (
                         <CheckCircle2 className="w-4 w-4 text-primary" />

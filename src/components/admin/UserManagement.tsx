@@ -25,6 +25,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  initials?: string;
   country_code: string;
   requires_password_change: boolean;
   roles: Array<{ id: string; role: string; }>;
@@ -132,9 +133,10 @@ const UserManagement = () => {
           email,
           first_name,
           last_name,
+          initials,
           country_code,
           requires_password_change
-        `);
+        `) as any;
 
       console.log('Profiles query result:', { profiles, error: profilesError });
 
@@ -451,12 +453,12 @@ const UserManagement = () => {
                 {users.map((userData) => (
                   <TableRow key={userData.user_id}>
                     <TableCell className="font-medium">{userData.email}</TableCell>
-                    <TableCell>{formatUserName(userData.first_name, userData.last_name)}</TableCell>
+                    <TableCell>{formatUserName(userData.first_name, userData.last_name, userData.initials)}</TableCell>
                     <TableCell>{userData.country_code}</TableCell>
                     <TableCell>
                       <RoleManagement
                         userId={userData.user_id}
-                        userName={formatUserName(userData.first_name, userData.last_name)}
+                        userName={formatUserName(userData.first_name, userData.last_name, userData.initials)}
                         roles={userData.roles}
                         onRoleRemoved={fetchUsers}
                         canRemove={hasAdminAccess || 
@@ -526,7 +528,7 @@ const UserManagement = () => {
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This action cannot be undone. This will permanently delete the user account for {formatUserName(userData.first_name, userData.last_name)} ({userData.email}).
+                                      This action cannot be undone. This will permanently delete the user account for {formatUserName(userData.first_name, userData.last_name, userData.initials)} ({userData.email}).
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -569,7 +571,7 @@ const UserManagement = () => {
           isOpen={showTempPasswordModal}
           onClose={handleCloseTempPasswordModal}
           userId={tempPasswordUser.user_id}
-          userName={formatUserName(tempPasswordUser.first_name, tempPasswordUser.last_name)}
+          userName={formatUserName(tempPasswordUser.first_name, tempPasswordUser.last_name, tempPasswordUser.initials)}
           userEmail={tempPasswordUser.email}
           onSuccess={fetchUsers}
         />

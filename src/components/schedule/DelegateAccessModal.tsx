@@ -150,8 +150,8 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
           body: {
             action: "created",
             delegateEmail: selectedUser.email,
-            delegateName: formatUserName(selectedUser.first_name, selectedUser.last_name),
-            managerName: formatUserName(currentUserProfile.first_name, currentUserProfile.last_name),
+            delegateName: formatUserName(selectedUser.first_name, selectedUser.last_name, selectedUser.initials),
+            managerName: formatUserName(currentUserProfile.first_name, currentUserProfile.last_name, currentUserProfile.initials),
             startDate: format(startDate, "PPP"),
             endDate: format(endDate, "PPP"),
           },
@@ -225,7 +225,7 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
                 <SelectContent>
                   {users.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
-                      {formatUserName(user.first_name, user.last_name)} ({user.email})
+                      {formatUserName(user.first_name, user.last_name, user.initials)} ({user.email})
                     </SelectItem>
                   ))}
                 </SelectContent>
