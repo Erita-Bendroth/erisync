@@ -1,8 +1,26 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Input validation schema
+const importHolidaysSchema = z.object({
+  country_code: z.string().length(2).toUpperCase(),
+  year: z.number().int().min(1900).max(2100),
+  user_id: z.string().uuid().optional(),
+  region_code: z.string().max(10).optional(),
+});
+
+// Error sanitizer
+function sanitizeError(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return "Invalid input: " + error.errors.map(e => e.message).join(", ");
+  }
+  console.error("Internal error:", error);
+  return "Operation failed. Please try again.";
 }
 
 interface Holiday {
@@ -94,19 +112,10 @@ Deno.serve(async (req) => {
       }
     )
 
-    const { country_code, year, user_id, region_code } = await req.json()
+    const body = await req.json()
+    const { country_code, year, user_id, region_code } = importHolidaysSchema.parse(body);
+    
     console.log('Request received:', { country_code, year, user_id, region_code })
-
-    if (!country_code || !year) {
-      console.error('Missing required parameters:', { country_code, year, user_id })
-      return new Response(
-        JSON.stringify({ error: 'Country code and year are required' }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
 
     // Check if import is already in progress
     const { data: existingStatus } = await supabaseClient
@@ -329,6 +338,7 @@ Deno.serve(async (req) => {
     )
 
   } catch (error) {
+    const sanitized = sanitizeError(error);
     console.error('Error importing holidays:', error)
     
     // Update import status to failed
@@ -338,7 +348,7 @@ Deno.serve(async (req) => {
         .from('holiday_import_status')
         .update({
           status: 'failed',
-          error_message: error.message,
+          error_message: 'Import failed',
           completed_at: new Date().toISOString()
         })
         .eq('country_code', requestBody.country_code)
@@ -355,7 +365,7 @@ Deno.serve(async (req) => {
     }
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: sanitized }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

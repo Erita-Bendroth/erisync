@@ -1,8 +1,25 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
 import { Resend } from "npm:resend@2.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
+// Input validation schema
+const notificationSchema = z.object({
+  requestId: z.string().uuid(),
+  type: z.enum(["request", "approval", "rejection"]),
+  groupId: z.string().uuid().optional().nullable(),
+});
+
+// Error sanitizer
+function sanitizeError(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return "Invalid input: " + error.errors.map(e => e.message).join(", ");
+  }
+  console.error("Internal error:", error);
+  return "Operation failed. Please try again.";
+}
 
 const allowedOrigins = [
   'https://erisync.lovable.app',
@@ -49,7 +66,8 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { requestId, type, groupId }: VacationRequestNotification = await req.json();
+    const body = await req.json();
+    const { requestId, type, groupId } = notificationSchema.parse(body);
 
     console.log(`Processing vacation ${type} notification for request: ${requestId}${groupId ? ` (group: ${groupId})` : ''}`);
 
@@ -276,9 +294,10 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   } catch (error: any) {
+    const sanitized = sanitizeError(error);
     console.error("Error in vacation-request-notification:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: sanitized }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
