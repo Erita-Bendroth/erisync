@@ -92,32 +92,38 @@ export const ShiftCountsDisplay = ({
 
   // Inline variant
   return (
-    <div className={`flex items-center gap-2 text-xs ${className}`}>
-      <TooltipProvider>
+    <TooltipProvider>
+      <div className={`flex items-center gap-2 text-xs ${className}`}>
         <Tooltip>
-          <TooltipTrigger className="flex items-center gap-1">
-            <Calendar className="h-3 w-3 text-muted-foreground" />
-            <span>{weekend_shifts_count}</span>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 cursor-help">
+              <Calendar className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">{weekend_shifts_count}</span>
+            </div>
           </TooltipTrigger>
           <TooltipContent>Weekend Shifts</TooltipContent>
         </Tooltip>
         
         <Tooltip>
-          <TooltipTrigger className="flex items-center gap-1">
-            <Moon className="h-3 w-3 text-muted-foreground" />
-            <span>{night_shifts_count}</span>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 cursor-help">
+              <Moon className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">{night_shifts_count}</span>
+            </div>
           </TooltipTrigger>
-          <TooltipContent>Night Shifts</TooltipContent>
+          <TooltipContent>Night/Late Shifts</TooltipContent>
         </Tooltip>
         
         <Tooltip>
-          <TooltipTrigger className="flex items-center gap-1">
-            <PartyPopper className="h-3 w-3 text-muted-foreground" />
-            <span>{holiday_shifts_count}</span>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 cursor-help">
+              <PartyPopper className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">{holiday_shifts_count}</span>
+            </div>
           </TooltipTrigger>
           <TooltipContent>Holiday Shifts</TooltipContent>
         </Tooltip>
-      </TooltipProvider>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };
