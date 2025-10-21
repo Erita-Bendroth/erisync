@@ -492,41 +492,19 @@ const Dashboard = () => {
                 onClick={() => navigate("/schedule?tab=settings")}
               >
                 <Users className="w-4 h-4 mr-2" />
-                Location Settings
+                User Settings
               </Button>
               
-              
-              {userRoles.some(role => role.role === "planner" || role.role === "manager") && (
-                <ScheduleEntryForm onSuccess={() => {
-                  fetchTodaySchedule();
-                  fetchWeeklySchedule();
-                  toast({
-                    title: "Success",
-                    description: "Schedule entry added successfully - dashboard updated",
-                  });
-                }}>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline"
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Add Schedule Entry
-                  </Button>
-                </ScheduleEntryForm>
+              {userRoles.some(role => role.role === "planner") && (
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate("/schedule?tab=admin")}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Admin Settings
+                </Button>
               )}
-              
-              {/* Manual refresh button */}
-              <Button 
-                className="w-full justify-start" 
-                variant="outline"
-                onClick={() => {
-                  fetchTodaySchedule();
-                  fetchWeeklySchedule();
-                }}
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                Refresh Schedule
-              </Button>
 
               <Button 
                 className="w-full justify-start" 
