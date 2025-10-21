@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, differenceInDays, parseISO } from "date-fns";
 import * as XLSX from 'xlsx';
+import { formatUserName } from "@/lib/utils";
 
 interface UserProfileOverviewProps {
   userId: string;
@@ -216,7 +217,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
       // Prepare worksheet data
       const worksheetData = [
         ['Employee Schedule Report'],
-        [`Name: ${profile.first_name} ${profile.last_name}`],
+        [`Name: ${formatUserName(profile.first_name, profile.last_name)}`],
         [`Year: ${currentYear}`],
         [''],
         ['Date', 'Activity Type', 'Shift Type', 'Availability Status', 'Hours', 'Notes'],
@@ -252,7 +253,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
       XLSX.utils.book_append_sheet(wb, ws, 'Schedule');
       
       // Generate Excel file and download
-      const fileName = `${profile.first_name}_${profile.last_name}_Schedule_${currentYear}.xlsx`;
+      const fileName = `${formatUserName(profile.first_name, profile.last_name).replace(/\s+/g, '_')}_Schedule_${currentYear}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
       toast({
@@ -292,7 +293,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
           <body>
             <div class="header">
               <h1>Employee Schedule Report</h1>
-              <h2>${profile.first_name} ${profile.last_name}</h2>
+              <h2>${formatUserName(profile.first_name, profile.last_name)}</h2>
               <p>Year: ${new Date().getFullYear()}</p>
             </div>
             <div class="summary">
@@ -373,7 +374,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
         <CardHeader>
             <CardTitle className="flex items-center">
               <User className="w-5 h-5 mr-2" />
-              Profile Overview - {profile.first_name} {profile.last_name}
+              Profile Overview - {formatUserName(profile.first_name, profile.last_name)}
             </CardTitle>
             <CardDescription>
               Work summary and time tracking for {new Date().getFullYear()}

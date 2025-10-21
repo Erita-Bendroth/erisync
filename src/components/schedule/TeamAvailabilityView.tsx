@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay } from "date-fns";
 import { Phone, CheckCircle2, XCircle } from "lucide-react";
+import { formatUserName } from "@/lib/utils";
 
 interface TeamAvailabilityEntry {
   user_id: string;
@@ -286,7 +287,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                           {user.initials}
                         </div>
                         <span>
-                          {user.first_name} {user.last_name}
+                          {formatUserName(user.first_name, user.last_name)}
                         </span>
                       </div>
                     </TableCell>

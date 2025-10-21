@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { UserCheck, Clock, X, User } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { formatUserName } from "@/lib/utils";
 
 interface Delegation {
   id: string;
@@ -169,8 +170,8 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
               action: "cancelled",
               managerEmail: managerProfile.email,
               delegateEmail: delegateProfile.email,
-              managerName: `${managerProfile.first_name} ${managerProfile.last_name}`,
-              delegateName: `${delegateProfile.first_name} ${delegateProfile.last_name}`,
+              managerName: formatUserName(managerProfile.first_name, managerProfile.last_name),
+              delegateName: formatUserName(delegateProfile.first_name, delegateProfile.last_name),
               startDate: format(new Date(delegation.start_date), "PPP"),
               endDate: format(new Date(delegation.end_date), "PPP"),
             },
@@ -230,7 +231,7 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {delegation.profiles.first_name} {delegation.profiles.last_name}
+                      {formatUserName(delegation.profiles.first_name, delegation.profiles.last_name)}
                     </span>
                     <Badge variant="secondary" className="text-xs">
                       Delegate
@@ -277,7 +278,7 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      From: {delegation.profiles.first_name} {delegation.profiles.last_name}
+                      From: {formatUserName(delegation.profiles.first_name, delegation.profiles.last_name)}
                     </span>
                     <Badge variant="default" className="text-xs">
                       Active

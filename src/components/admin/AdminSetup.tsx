@@ -7,6 +7,7 @@ import { Shield, UserPlus, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { formatUserName } from "@/lib/utils";
 import BulkUserImport from "./BulkUserImport";
 import UserManagement from "./UserManagement";
 import UserCreation from "./UserCreation";
@@ -408,9 +409,9 @@ const AdminSetup = () => {
                 
                 return (
                   <div key={profile.user_id} className="flex items-center justify-between p-3 border rounded">
-                    <div>
+                     <div>
                       <p className="font-medium">
-                        {profile.first_name} {profile.last_name}
+                        {formatUserName(profile.first_name, profile.last_name)}
                         {isCurrentUser && <span className="text-muted-foreground"> (You)</span>}
                       </p>
                       <p className="text-sm text-muted-foreground">{profile.email}</p>

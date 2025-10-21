@@ -12,7 +12,7 @@ import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeeke
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, formatUserName } from "@/lib/utils";
 
 interface Team {
   id: string;
@@ -1132,15 +1132,15 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                     key={config.id}
                     className="flex items-center justify-between p-3 border rounded-lg bg-card"
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="font-medium text-sm">{config.shiftName}</div>
-                        {assignedUser && (
-                          <Badge variant="outline" className="text-xs">
-                            {assignedUser.first_name} {assignedUser.last_name}
-                          </Badge>
-                        )}
-                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium text-sm">{config.shiftName}</div>
+                          {assignedUser && (
+                            <Badge variant="outline" className="text-xs">
+                              {formatUserName(assignedUser.first_name, assignedUser.last_name)}
+                            </Badge>
+                          )}
+                        </div>
                       <div className="text-xs text-muted-foreground">
                         {config.perDateTimes ? 'Custom times per date' : `${config.startTime} - ${config.endTime}`}
                       </div>
@@ -1262,10 +1262,10 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                         onCheckedChange={() => toggleUserSelection(usr.id)}
                       />
                       <Label className="flex-1 cursor-pointer">
-                        {usr.first_name} {usr.last_name}
+                        {formatUserName(usr.first_name, usr.last_name)}
                       </Label>
                       {selectedUsers.includes(usr.id) && (
-                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                        <CheckCircle2 className="w-4 w-4 text-primary" />
                       )}
                     </div>
                   ))}

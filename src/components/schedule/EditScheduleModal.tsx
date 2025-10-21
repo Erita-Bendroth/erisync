@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { TimeSelect } from "@/components/ui/time-select";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
+import { formatUserName } from "@/lib/utils";
 
 interface ScheduleEntry {
   id: string;
@@ -237,10 +238,10 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             await supabase.functions.invoke('send-schedule-notification', {
               body: {
                 userEmail: profileData.email,
-                userName: `${profileData.first_name} ${profileData.last_name}`,
+                userName: formatUserName(profileData.first_name, profileData.last_name),
                 scheduleDate: format(new Date(entry.date), 'PPP'),
                 changeDetails: `Shift: ${formData.shift_type}, Activity: ${formData.activity_type}, Status: ${formData.availability_status}`,
-                changedBy: currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'System',
+                changedBy: currentUserProfile ? formatUserName(currentUserProfile.first_name, currentUserProfile.last_name) : 'System',
               },
             });
           }
@@ -249,7 +250,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           if (profileData) {
             const changeType = entry.id.startsWith('temp-') ? 'created' : 'updated';
             showScheduleChangeNotification({
-              employeeName: `${profileData.first_name} ${profileData.last_name}`,
+              employeeName: formatUserName(profileData.first_name, profileData.last_name),
               date: format(new Date(entry.date), 'PPP'),
               changeType: changeType
             });
@@ -269,7 +270,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           if (profileData) {
             const changeType = entry.id.startsWith('temp-') ? 'created' : 'updated';
             showScheduleChangeNotification({
-              employeeName: `${profileData.first_name} ${profileData.last_name}`,
+              employeeName: formatUserName(profileData.first_name, profileData.last_name),
               date: format(new Date(entry.date), 'PPP'),
               changeType: changeType
             });
@@ -329,7 +330,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         <DialogHeader>
           <DialogTitle>Edit Schedule Entry</DialogTitle>
           <DialogDescription>
-            Editing shift for {entry.profiles.first_name} {entry.profiles.last_name} on{" "}
+            Editing shift for {formatUserName(entry.profiles.first_name, entry.profiles.last_name)} on{" "}
             {format(new Date(entry.date), "EEEE, MMMM d, yyyy")}
           </DialogDescription>
         </DialogHeader>

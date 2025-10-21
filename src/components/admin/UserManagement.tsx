@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import EditUserModal from "./EditUserModal";
 import RoleManagement from "./RoleManagement";
 import SetTempPasswordModal from "./SetTempPasswordModal";
+import { formatUserName } from "@/lib/utils";
 
 export interface Team {
   id: string;
@@ -450,12 +451,12 @@ const UserManagement = () => {
                 {users.map((userData) => (
                   <TableRow key={userData.user_id}>
                     <TableCell className="font-medium">{userData.email}</TableCell>
-                    <TableCell>{userData.first_name} {userData.last_name}</TableCell>
+                    <TableCell>{formatUserName(userData.first_name, userData.last_name)}</TableCell>
                     <TableCell>{userData.country_code}</TableCell>
                     <TableCell>
                       <RoleManagement
                         userId={userData.user_id}
-                        userName={`${userData.first_name} ${userData.last_name}`}
+                        userName={formatUserName(userData.first_name, userData.last_name)}
                         roles={userData.roles}
                         onRoleRemoved={fetchUsers}
                         canRemove={hasAdminAccess || 
@@ -521,13 +522,13 @@ const UserManagement = () => {
                                   Delete User
                                 </DropdownMenuItem>
                               </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the user account for {userData.first_name} {userData.last_name} ({userData.email}).
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the user account for {formatUserName(userData.first_name, userData.last_name)} ({userData.email}).
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction 
@@ -568,7 +569,7 @@ const UserManagement = () => {
           isOpen={showTempPasswordModal}
           onClose={handleCloseTempPasswordModal}
           userId={tempPasswordUser.user_id}
-          userName={`${tempPasswordUser.first_name} ${tempPasswordUser.last_name}`}
+          userName={formatUserName(tempPasswordUser.first_name, tempPasswordUser.last_name)}
           userEmail={tempPasswordUser.email}
           onSuccess={fetchUsers}
         />

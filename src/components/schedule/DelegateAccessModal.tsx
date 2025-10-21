@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarIcon, UserCheck, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatUserName } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DelegateAccessModalProps {
@@ -149,8 +149,8 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
           body: {
             action: "created",
             delegateEmail: selectedUser.email,
-            delegateName: `${selectedUser.first_name} ${selectedUser.last_name}`,
-            managerName: `${currentUserProfile.first_name} ${currentUserProfile.last_name}`,
+            delegateName: formatUserName(selectedUser.first_name, selectedUser.last_name),
+            managerName: formatUserName(currentUserProfile.first_name, currentUserProfile.last_name),
             startDate: format(startDate, "PPP"),
             endDate: format(endDate, "PPP"),
           },
@@ -224,7 +224,7 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
                 <SelectContent>
                   {users.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.first_name} {user.last_name} ({user.email})
+                      {formatUserName(user.first_name, user.last_name)} ({user.email})
                     </SelectItem>
                   ))}
                 </SelectContent>

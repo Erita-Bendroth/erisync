@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, formatUserName } from "@/lib/utils";
 
 interface Team {
   id: string;
@@ -236,7 +236,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 <SelectContent>
                   {profiles.map((profile) => (
                     <SelectItem key={profile.user_id} value={profile.user_id}>
-                      {profile.first_name} {profile.last_name}
+                      {formatUserName(profile.first_name, profile.last_name)}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -13,6 +13,7 @@ import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { formatUserName } from "@/lib/utils";
 
 interface UserRole {
   role: string;
@@ -69,7 +70,7 @@ const Dashboard = () => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const entry = payload.new as any;
             showScheduleChangeNotification({
-              employeeName: profile?.first_name ? `${profile.first_name} ${profile.last_name}` : 'Your',
+              employeeName: profile?.first_name ? formatUserName(profile.first_name, profile.last_name) : 'Your',
               date: format(new Date(entry.date), 'MMM dd, yyyy'),
               changeType: payload.eventType === 'INSERT' ? 'added' : 'updated',
             });
@@ -265,7 +266,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-bold">Scheduler Dashboard</h1>
             <p className="text-muted-foreground">
-              Welcome back, {profile?.first_name} {profile?.last_name}
+              Welcome back, {profile ? formatUserName(profile.first_name, profile.last_name) : 'Loading...'}
             </p>
           </div>
           <div className="flex items-center space-x-3">

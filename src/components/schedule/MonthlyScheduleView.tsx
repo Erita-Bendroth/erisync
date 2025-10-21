@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWeekend, getDay } from "date-fns";
 import { Phone, CheckCircle2, XCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatUserName } from "@/lib/utils";
 
 interface MonthlyScheduleEntry {
   user_id: string;
@@ -293,7 +293,7 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                             "text-sm",
                             isCurrentUser && "font-bold"
                           )}>
-                            {user.first_name} {user.last_name}
+                            {formatUserName(user.first_name, user.last_name)}
                           </span>
                         </div>
                       </TableCell>
