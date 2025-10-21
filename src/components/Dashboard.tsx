@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { DelegationIndicator } from "@/components/schedule/DelegationIndicator";
+import { formatUserName } from "@/lib/utils";
 
 interface UserRole {
   role: string;
@@ -99,7 +100,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back, {profile?.first_name} {profile?.last_name}
+            Welcome back, {profile ? formatUserName(profile.first_name, profile.last_name) : 'Loading...'}
           </p>
         </div>
         <div className="flex items-center space-x-2">

@@ -15,6 +15,7 @@ import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shi
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { formatUserName } from "@/lib/utils";
 
 interface Team {
   id: string;
@@ -218,7 +219,7 @@ const EnhancedTeamManagement = () => {
 
       // Create data for export
       const exportData = members.map(member => ({
-        Name: `${member.profiles.first_name} ${member.profiles.last_name}`,
+        Name: formatUserName(member.profiles.first_name, member.profiles.last_name),
         Email: member.profiles.email,
         Role: member.user_roles.map(r => r.role).join(', '),
         'Team Manager': member.is_manager ? 'Yes' : 'No',
@@ -512,7 +513,7 @@ const EnhancedTeamManagement = () => {
                               <TableRow key={member.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2">
-                                    {member.profiles.first_name} {member.profiles.last_name}
+                                    {formatUserName(member.profiles.first_name, member.profiles.last_name)}
                                     {member.is_manager && (
                                       <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
                                         Manager
@@ -542,7 +543,7 @@ const EnhancedTeamManagement = () => {
                                         <AlertDialogHeader>
                                           <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
                                           <AlertDialogDescription>
-                                            Are you sure you want to remove {member.profiles.first_name} {member.profiles.last_name} from {team.name}?
+                                            Are you sure you want to remove {formatUserName(member.profiles.first_name, member.profiles.last_name)} from {team.name}?
                                           </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
