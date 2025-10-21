@@ -113,6 +113,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   const [vacationModalOpen, setVacationModalOpen] = useState(false);
   const [showVacationRequests, setShowVacationRequests] = useState(false);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [editingVacationRequest, setEditingVacationRequest] = useState<any>(null);
 
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 // Show Monday through Sunday (full week)
@@ -2119,6 +2120,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
                   fetchScheduleEntries();
                   fetchPendingRequestsCount(); // Update badge count
                 }}
+                onEditRequest={(request) => {
+                  setEditingVacationRequest(request);
+                  setVacationModalOpen(true);
+                  setShowVacationRequests(false);
+                }}
               />
             )}
           </div>
@@ -2136,10 +2142,15 @@ const getActivityColor = (entry: ScheduleEntry) => {
       {/* Vacation Request Modal */}
       <VacationRequestModal
         open={vacationModalOpen}
-        onOpenChange={setVacationModalOpen}
+        onOpenChange={(open) => {
+          setVacationModalOpen(open);
+          if (!open) setEditingVacationRequest(null);
+        }}
         onRequestSubmitted={() => {
           fetchScheduleEntries();
+          setEditingVacationRequest(null);
         }}
+        editRequest={editingVacationRequest}
       />
 
       {/* Bulk Edit Shifts Modal */}

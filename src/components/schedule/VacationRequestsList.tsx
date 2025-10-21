@@ -26,6 +26,7 @@ interface VacationRequest {
   rejection_reason: string | null;
   created_at: string;
   request_group_id: string | null;
+  selected_planner_id: string | null;
   requester: {
     user_id: string;
     first_name: string;
@@ -53,6 +54,7 @@ interface GroupedRequest {
   status: string;
   rejection_reason: string | null;
   created_at: string;
+  selected_planner_id: string | null;
   requester: {
     user_id: string;
     first_name: string;
@@ -68,11 +70,13 @@ interface GroupedRequest {
 interface VacationRequestsListProps {
   isPlanner: boolean;
   onRequestProcessed?: () => void;
+  onEditRequest?: (request: GroupedRequest) => void;
 }
 
 export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   isPlanner,
   onRequestProcessed,
+  onEditRequest,
 }) => {
   const { toast } = useToast();
   const [requests, setRequests] = useState<VacationRequest[]>([]);
@@ -82,8 +86,11 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<GroupedRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchRequests();
 
     // Subscribe to real-time updates
@@ -106,6 +113,11 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setCurrentUserId(user.id);
+  };
 
   const fetchRequests = async () => {
     try {
@@ -185,6 +197,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             status: req.status,
             rejection_reason: req.rejection_reason,
             created_at: req.created_at,
+            selected_planner_id: req.selected_planner_id,
             requester: req.requester,
             team: req.team,
             requestIds: groupRequests.map(r => r.id),
@@ -208,6 +221,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             status: req.status,
             rejection_reason: req.rejection_reason,
             created_at: req.created_at,
+            selected_planner_id: req.selected_planner_id,
             requester: req.requester,
             team: req.team,
             requestIds: [req.id],
@@ -373,6 +387,49 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     setRejectDialogOpen(true);
   };
 
+  const openCancelDialog = (request: GroupedRequest) => {
+    setSelectedRequest(request);
+    setCancelDialogOpen(true);
+  };
+
+  const handleCancel = async () => {
+    if (!selectedRequest) return;
+
+    setProcessingId(selectedRequest.id);
+
+    try {
+      // Delete all requests in the group
+      const { error } = await supabase
+        .from('vacation_requests')
+        .delete()
+        .in('id', selectedRequest.requestIds);
+
+      if (error) throw error;
+
+      toast({
+        title: "Request cancelled",
+        description: "Your vacation request has been cancelled successfully.",
+      });
+
+      setCancelDialogOpen(false);
+      setSelectedRequest(null);
+      onRequestProcessed?.();
+    } catch (error: any) {
+      console.error('Error cancelling request:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel request",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleEdit = (request: GroupedRequest) => {
+    onEditRequest?.(request);
+  };
+
   const renderRequest = (request: GroupedRequest) => {
     const isMultiDay = request.dates.length > 1;
     
@@ -466,6 +523,31 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                     >
                       <XCircle className="h-4 w-4" />
                       Reject
+                    </Button>
+                  </div>
+                )}
+
+                {!isPlanner && currentUserId === request.user_id && request.status === 'pending' && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEdit(request)}
+                      disabled={processingId === request.id}
+                      className="gap-1.5"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => openCancelDialog(request)}
+                      disabled={processingId === request.id}
+                      className="gap-1.5"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Cancel
                     </Button>
                   </div>
                 )}
@@ -657,6 +739,51 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             >
               {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Reject Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Vacation Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this vacation request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedRequest && (
+            <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
+              <p className="text-sm">
+                <strong>Dates:</strong> {format(new Date(selectedRequest.startDate), 'MMM d, yyyy')}
+                {selectedRequest.dates.length > 1 && ` - ${format(new Date(selectedRequest.endDate), 'MMM d, yyyy')}`}
+              </p>
+              <p className="text-sm">
+                <strong>Working days:</strong> {selectedRequest.dates.length}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelDialogOpen(false);
+                setSelectedRequest(null);
+              }}
+              disabled={processingId !== null}
+            >
+              Keep Request
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              disabled={processingId !== null}
+            >
+              {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Cancel Request
             </Button>
           </DialogFooter>
         </DialogContent>

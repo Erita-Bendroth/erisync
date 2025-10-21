@@ -25,12 +25,26 @@ interface VacationRequestModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRequestSubmitted: () => void;
+  editRequest?: {
+    id: string;
+    groupId: string | null;
+    startDate: string;
+    endDate: string;
+    dates: string[];
+    is_full_day: boolean;
+    start_time: string | null;
+    end_time: string | null;
+    notes: string | null;
+    requestIds: string[];
+    selected_planner_id?: string;
+  } | null;
 }
 
 export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
   open,
   onOpenChange,
   onRequestSubmitted,
+  editRequest,
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,8 +62,21 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
   useEffect(() => {
     if (open) {
       fetchPlanners();
+      
+      // Load edit data if editing
+      if (editRequest) {
+        setStartDate(new Date(editRequest.startDate));
+        setEndDate(new Date(editRequest.endDate));
+        setIsFullDay(editRequest.is_full_day);
+        setStartTime(editRequest.start_time || '08:00');
+        setEndTime(editRequest.end_time || '16:30');
+        setNotes(editRequest.notes || '');
+        if (editRequest.selected_planner_id) {
+          setSelectedPlannerId(editRequest.selected_planner_id);
+        }
+      }
     }
-  }, [open]);
+  }, [open, editRequest]);
 
   const fetchPlanners = async () => {
     try {
@@ -176,7 +203,17 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
         return;
       }
 
-      // Check for overlapping requests for each working day
+      if (editRequest) {
+        // DELETE old requests and CREATE new ones (simpler than trying to match dates)
+        const { error: deleteError } = await supabase
+          .from('vacation_requests')
+          .delete()
+          .in('id', editRequest.requestIds);
+
+        if (deleteError) throw deleteError;
+      }
+
+      // Check for overlapping requests for each working day (skip if editing same dates)
       for (const day of workingDays) {
         const { data: hasOverlap, error: overlapError } = await supabase
           .rpc('check_vacation_overlap', {
@@ -200,8 +237,8 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
         }
       }
 
-      // Generate a group ID for multi-day requests
-      const groupId = workingDays.length > 1 ? crypto.randomUUID() : null;
+      // Generate a group ID for multi-day requests (reuse if editing)
+      const groupId = workingDays.length > 1 ? (editRequest?.groupId || crypto.randomUUID()) : null;
 
       // Create vacation requests for all working days
       const requests = workingDays.map(day => ({
@@ -243,8 +280,8 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
       }
 
       toast({
-        title: "Request submitted",
-        description: `Your vacation request for ${workingDays.length} working day${workingDays.length > 1 ? 's' : ''} has been submitted for approval.`,
+        title: editRequest ? "Request updated" : "Request submitted",
+        description: `Your vacation request for ${workingDays.length} working day${workingDays.length > 1 ? 's' : ''} has been ${editRequest ? 'updated' : 'submitted for approval'}.`,
       });
 
       // Reset form
@@ -278,10 +315,12 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
             <div className="p-2 rounded-lg bg-primary/10">
               <Calendar className="h-5 w-5 text-primary" />
             </div>
-            Request Time Off
+            {editRequest ? 'Edit Vacation Request' : 'Request Time Off'}
           </DialogTitle>
           <DialogDescription className="text-base">
-            Submit your vacation request for manager approval. You'll receive an email notification once it's reviewed.
+            {editRequest 
+              ? 'Update your vacation request details. The request will remain pending for approval.'
+              : 'Submit your vacation request for manager approval. You\'ll receive an email notification once it\'s reviewed.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -444,7 +483,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
             className="w-full sm:w-auto gap-2"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'Submitting...' : 'Submit Request'}
+            {isSubmitting ? (editRequest ? 'Updating...' : 'Submitting...') : (editRequest ? 'Update Request' : 'Submit Request')}
           </Button>
         </DialogFooter>
       </DialogContent>
