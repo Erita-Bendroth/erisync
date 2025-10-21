@@ -92,9 +92,14 @@ const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeams, setUserTeams] = useState<Team[]>([]);
-  const [selectedTeams, setSelectedTeams] = useState<string[]>(["all"]);
+  // Initialize with initialTeamId if provided, otherwise default to "all"
+  const [selectedTeams, setSelectedTeams] = useState<string[]>(
+    initialTeamId && initialTeamId !== '' ? [initialTeamId] : ["all"]
+  );
   const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<string>("my-schedule");
+  const [viewMode, setViewMode] = useState<string>(
+    initialTeamId && initialTeamId !== '' ? "team-availability" : "my-schedule"
+  );
   const [timeView, setTimeView] = useState<"weekly" | "monthly">("weekly");
   const [employees, setEmployees] = useState<Employee[]>([]);
 const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -208,22 +213,17 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     }
   };
 
-  // Set initial team from prop
+  // Validate initial team exists once teams are loaded
   useEffect(() => {
     if (initialTeamId && initialTeamId !== '' && teams.length > 0) {
       const teamExists = teams.find(team => team.id === initialTeamId);
-      if (teamExists) {
-        setSelectedTeams([initialTeamId]);
-        // Also switch to team-availability view mode for team members
-        const isTeamMemberRole = userRoles.some(role => role.role === "teammember");
-        const isManagerRole = userRoles.some(role => role.role === "manager");
-        const isPlannerRole = userRoles.some(role => role.role === "planner");
-        if (isTeamMemberRole && !isManagerRole && !isPlannerRole) {
-          setViewMode("team-availability");
-        }
+      if (!teamExists) {
+        // If team doesn't exist, reset to "all"
+        setSelectedTeams(["all"]);
+        setViewMode("my-schedule");
       }
     }
-  }, [initialTeamId, teams, userRoles]);
+  }, [initialTeamId, teams]);
 
   useEffect(() => {
     if (user) {
