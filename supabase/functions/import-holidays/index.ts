@@ -279,26 +279,31 @@ Deno.serve(async (req) => {
 
     // Use upsert with ignoreDuplicates for faster operation - single DB call
     console.log('Upserting holidays into database...')
-    const { data, error, count } = await supabaseClient
+    const { error } = await supabaseClient
       .from('holidays')
       .upsert(holidayData, { 
         onConflict: 'date,country_code,region_code,user_id',
-        ignoreDuplicates: true,
-        count: 'exact'
+        ignoreDuplicates: true
       })
-      .select('id')
 
-    const importedCount = count || 0;
-    const existingCount = holidayData.length - importedCount;
+    if (error) {
+      console.error('Database error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      throw new Error(`Database error: ${error.message} (${error.code})`)
+    }
 
-    console.log(`Upserted ${importedCount} new holidays, ${existingCount} already existed`)
+    console.log(`Successfully upserted holidays for ${country_code} ${year}`)
 
-    // Update status to completed
+    // Update status to completed immediately
     const { error: statusUpdateError } = await supabaseClient
       .from('holiday_import_status')
       .update({
         status: 'completed',
-        imported_count: importedCount,
+        imported_count: holidayData.length,
         completed_at: new Date().toISOString()
       })
       .eq('country_code', country_code)
@@ -311,32 +316,12 @@ Deno.serve(async (req) => {
       console.log('✅ Import status updated to completed');
     }
 
-    console.log('Upsert result:', { 
-      success: !error, 
-      error: error ? { code: error.code, message: error.message, details: error.details } : null,
-      importedCount,
-      existingCount
-    });
-
-    if (error) {
-      console.error('Database error details:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      })
-      throw new Error(`Database error: ${error.message} (${error.code})`)
-    }
-
-    console.log(`Successfully imported ${importedCount} new holidays`)
-
     return new Response(
       JSON.stringify({ 
         success: true, 
-        imported: importedCount,
-        existing: existingCount,
-        total: holidayData.length,
-        holidays: data || []
+        imported: holidayData.length,
+        message: `Holidays upserted successfully for ${country_code} ${year}`,
+        total: holidayData.length
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
