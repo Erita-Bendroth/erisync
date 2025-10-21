@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getShiftTimes, doesShiftCrossMidnight } from '@/lib/utils';
 
 interface TimeBlock {
   activity_type: string;
@@ -22,6 +23,8 @@ interface TimeBlockDisplayProps {
   className?: string;
   showNotes?: boolean;
   userRole?: string;
+  isContinuation?: boolean; // Flag to indicate this is the continuation part of a night shift
+  originalStartTime?: string; // Original start time from previous day
 }
 
 const getActivityColor = (activityType: string, shiftType?: string) => {
@@ -89,7 +92,9 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   onClick, 
   className = "",
   showNotes = false,
-  userRole = ""
+  userRole = "",
+  isContinuation = false,
+  originalStartTime = ""
 }) => {
   // Check if this is a holiday entry (activity_type = 'other' with "Public holiday:" in notes)
   const isHoliday = entry.activity_type === 'other' && entry.notes?.includes('Public holiday:');
@@ -219,23 +224,88 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     );
   } else {
     // Display single block with default shift times
-    const defaultTimes = getDefaultTimes(entry.shift_type);
+    const times = getShiftTimes(entry.notes, entry.shift_type);
+    const crossesMidnight = doesShiftCrossMidnight(times.start, times.end);
+    
+    // If this is a continuation badge, show end time with start from previous day
+    if (isContinuation) {
+      return (
+        <div className={`w-full ${className}`}>
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <div className="w-full">
+                  <Badge
+                    variant="secondary"
+                    className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full bg-gradient-to-r from-transparent to-current`}
+                    style={{ 
+                      backgroundImage: `linear-gradient(90deg, transparent 0%, currentColor 20%)`,
+                      opacity: 0.7
+                    }}
+                    onClick={onClick}
+                  >
+                    <div className="flex flex-col items-center py-1 w-full">
+                      <span className="font-medium text-[10px]">
+                        ← {getActivityDisplayName(entry.activity_type, entry.shift_type)}
+                      </span>
+                      <span className="text-[10px]">
+                        ends {times.end}
+                      </span>
+                    </div>
+                  </Badge>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="z-[100]" side="top">
+                <p className="max-w-xs">
+                  <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type)}</strong>
+                  <br />
+                  Full shift: {originalStartTime || times.start} – {times.end}
+                  <br />
+                  <span className="text-xs text-muted-foreground">Continues from previous day</span>
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      );
+    }
+    
+    // Regular display - show indicator if shift crosses midnight
     return (
       <div className={`w-full ${className}`}>
-        <Badge
-          variant="secondary"
-          className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
-          onClick={onClick}
-        >
-          <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
-            <span className="font-medium">
-              {getActivityDisplayName(entry.activity_type, entry.shift_type)}
-            </span>
-            <span className="text-xs">
-              {defaultTimes.start}–{defaultTimes.end}
-            </span>
-          </div>
-        </Badge>
+        <TooltipProvider>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <div className="w-full">
+                <Badge
+                  variant="secondary"
+                  className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+                  onClick={onClick}
+                >
+                  <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
+                    <span className="font-medium">
+                      {getActivityDisplayName(entry.activity_type, entry.shift_type)} {crossesMidnight && '→'}
+                    </span>
+                    <span className="text-xs">
+                      {times.start}–{times.end}
+                    </span>
+                  </div>
+                </Badge>
+              </div>
+            </TooltipTrigger>
+            {crossesMidnight && (
+              <TooltipContent className="z-[100]" side="top">
+                <p className="max-w-xs">
+                  <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type)}</strong>
+                  <br />
+                  {times.start} – {times.end}
+                  <br />
+                  <span className="text-xs text-muted-foreground">⚠️ This shift continues into the next day</span>
+                </p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
         {/* Show notes for team members */}
         {isTeamMember && cleanNotes && expanded && (
           <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">

@@ -12,7 +12,7 @@ import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeeke
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
-import { cn, formatUserName } from "@/lib/utils";
+import { cn, formatUserName, doesShiftCrossMidnight } from "@/lib/utils";
 import { useShiftCounts, ShiftCounts } from "@/hooks/useShiftCounts";
 import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
 import { TimeSelect } from "@/components/ui/time-select";
@@ -1278,7 +1278,18 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                           )}
                         </div>
                       <div className="text-xs text-muted-foreground">
-                        {config.perDateTimes ? 'Custom times per date' : `${config.startTime} - ${config.endTime}`}
+                        {config.perDateTimes ? (
+                          'Custom times per date'
+                        ) : (
+                          <>
+                            {config.startTime} - {config.endTime}
+                            {doesShiftCrossMidnight(config.startTime, config.endTime) && (
+                              <span className="ml-1 text-orange-500" title="This shift continues into the next day">
+                                → Next day
+                              </span>
+                            )}
+                          </>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {config.dates.slice(0, 3).map((date, idx) => (

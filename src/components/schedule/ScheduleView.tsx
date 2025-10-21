@@ -25,7 +25,7 @@ import { TeamFavoritesManager } from './TeamFavoritesManager';
 import { TeamFavoritesQuickAccess } from './TeamFavoritesQuickAccess';
 import { BulkEditShiftsModal } from './BulkEditShiftsModal';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
-import { cn, formatUserName } from '@/lib/utils';
+import { cn, formatUserName, doesShiftCrossMidnight } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useShiftCounts } from '@/hooks/useShiftCounts';
 import { ShiftCountsDisplay } from './ShiftCountsDisplay';
@@ -1070,6 +1070,64 @@ useEffect(() => {
     return matchingEntries;
   };
 
+  const getContinuationEntriesForDay = (employeeId: string, date: Date) => {
+    // Check previous day for shifts that continue into this day
+    const previousDay = subDays(date, 1);
+    const previousDayStr = format(previousDay, "yyyy-MM-dd");
+    
+    const continuationEntries = scheduleEntries.filter(entry => {
+      const entryDateStr = typeof entry.date === 'string' 
+        ? entry.date.split('T')[0]
+        : format(new Date(entry.date), "yyyy-MM-dd");
+      
+      if (entry.user_id !== employeeId || entryDateStr !== previousDayStr) {
+        return false;
+      }
+      
+      // Extract times and check if shift crosses midnight
+      const times = getShiftTimesFromEntry(entry);
+      return doesShiftCrossMidnight(times.start, times.end);
+    });
+    
+    return continuationEntries;
+  };
+
+  const getShiftTimesFromEntry = (entry: ScheduleEntry) => {
+    // Try to extract from JSON format first
+    if (entry.notes) {
+      const timeSplitPattern = /Times:\s*(.+)/;
+      const match = entry.notes.match(timeSplitPattern);
+      
+      if (match) {
+        try {
+          const timesData = JSON.parse(match[1]);
+          if (Array.isArray(timesData) && timesData.length > 0) {
+            return { start: timesData[0].start_time, end: timesData[0].end_time };
+          }
+        } catch (e) {
+          // Continue to old format
+        }
+      }
+      
+      // Try old format
+      const oldTimePattern = /\((\d{2}:\d{2})-(\d{2}:\d{2})\)/;
+      const oldMatch = entry.notes.match(oldTimePattern);
+      if (oldMatch) {
+        return { start: oldMatch[1], end: oldMatch[2] };
+      }
+    }
+    
+    // Default times
+    switch (entry.shift_type) {
+      case 'early':
+        return { start: '06:00', end: '14:30' };
+      case 'late':
+        return { start: '13:00', end: '21:30' };
+      default:
+        return { start: '08:00', end: '16:30' };
+    }
+  };
+
   const isPlanner = () => userRoles.some(role => role.role === "planner");
   const isManager = () => userRoles.some(role => role.role === "manager");
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
@@ -1796,6 +1854,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     </TableCell>
                     {workDays.map((day, dayIndex) => {
                       const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
+                      const continuationEntries = getContinuationEntriesForDay(employee.user_id, day);
                       const dayHolidays = getHolidaysForEmployeeAndDay(employee.user_id, day);
                       const isToday = isSameDay(day, new Date());
                       
@@ -1804,10 +1863,36 @@ const getActivityColor = (entry: ScheduleEntry) => {
                           key={dayIndex} 
                           className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[150px]`}
                           onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
-                          title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 ? "Click to add entry" : ""}
+                          title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : ""}
                         >
                           <div className="space-y-1 min-h-16 flex flex-col justify-center">
-                            {/* Show holidays first */}
+                            {/* Show continuation from previous day first */}
+                            {continuationEntries.map((entry) => {
+                              const times = getShiftTimesFromEntry(entry);
+                              return (
+                                <div key={`continuation-${entry.id}`} className="space-y-1">
+                                  {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
+                                    <TimeBlockDisplay
+                                      entry={entry}
+                                      userRole={userRoles.length > 0 ? userRoles[0].role : ""}
+                                      showNotes={false}
+                                      isContinuation={true}
+                                      originalStartTime={times.start}
+                                      onClick={(e) => {
+                                        e?.stopPropagation();
+                                        if (!multiSelectMode && (isManager() || isPlanner())) {
+                                          if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
+                                            handleEditShift(entry);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                            
+                            {/* Show holidays */}
                             <TooltipProvider>
                               {dayHolidays.map((holiday) => (
                                 <Tooltip key={holiday.id} delayDuration={200}>
@@ -1831,7 +1916,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             </TooltipProvider>
                             
                             {/* Show work entries */}
-                              {dayEntries.length === 0 ? (
+                              {dayEntries.length === 0 && continuationEntries.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">
                                   {(isManager() || isPlanner()) && !multiSelectMode ? "+" : "-"}
                                 </span>
