@@ -233,6 +233,7 @@ export type Database = {
           email: string
           first_name: string
           id: string
+          initials: string | null
           last_name: string
           region_code: string | null
           requires_password_change: boolean | null
@@ -246,6 +247,7 @@ export type Database = {
           email: string
           first_name: string
           id?: string
+          initials?: string | null
           last_name: string
           region_code?: string | null
           requires_password_change?: boolean | null
@@ -259,6 +261,7 @@ export type Database = {
           email?: string
           first_name?: string
           id?: string
+          initials?: string | null
           last_name?: string
           region_code?: string | null
           requires_password_change?: boolean | null
