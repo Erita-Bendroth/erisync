@@ -552,8 +552,7 @@ const AdminHolidayManager = () => {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Important:</strong> Holidays imported here automatically appear for users based on their country and region settings. 
-              They display as informational badges in the schedule view, NOT as shifts.
+              <strong>Important:</strong> Holidays imported here automatically appear for users based on their country and region settings.
             </AlertDescription>
           </Alert>
           
