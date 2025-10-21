@@ -236,23 +236,20 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
               <TooltipTrigger asChild>
                 <div className="w-full">
                   <Badge
-                    variant="secondary"
-                    className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full border-2 border-dashed border-orange-400/50`}
+                    variant="outline"
+                    className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-90 transition-opacity text-xs w-full border-l-4 border-l-orange-500 dark:border-l-orange-400`}
                     style={{ 
-                      opacity: 0.85
+                      opacity: 0.90
                     }}
                     onClick={onClick}
                   >
                     <div className="flex flex-col items-center py-1 w-full">
-                      <span className="font-medium text-xs flex items-center gap-1">
-                        <span className="text-orange-600 dark:text-orange-400 font-bold">←</span>
-                        {getActivityDisplayName(entry.activity_type, entry.shift_type)}
-                      </span>
-                      <span className="text-[10px]">
-                        ends at {times.end}
+                      <span className="text-xs flex items-center gap-1">
+                        <span className="text-orange-600 dark:text-orange-400 font-bold text-base">←</span>
+                        <span className="font-medium">ends {times.end}</span>
                       </span>
                       <span className="text-[9px] text-muted-foreground italic">
-                        from previous day
+                        {getActivityDisplayName(entry.activity_type, entry.shift_type)} from {originalStartTime || times.start}
                       </span>
                     </div>
                   </Badge>
@@ -264,7 +261,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                   <br />
                   Full shift: {originalStartTime || times.start} – {times.end}
                   <br />
-                  <span className="text-xs text-orange-500">🌙 Continues from previous day</span>
+                  <span className="text-xs text-orange-500">🌙 Night shift from previous day</span>
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -276,7 +273,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     // Regular display - show indicator if shift crosses midnight
     return (
       <div className={`w-full ${className}`}>
-        {crossesMidnight && (
+        {crossesMidnight ? (
           <TooltipProvider>
             <Tooltip delayDuration={200}>
               <TooltipTrigger asChild>
@@ -289,13 +286,10 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                     <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
                       <span className="font-medium flex items-center gap-1">
                         {getActivityDisplayName(entry.activity_type, entry.shift_type)}
-                        <span className="text-orange-600 dark:text-orange-400 font-bold">→</span>
+                        <span className="text-orange-600 dark:text-orange-400 font-bold text-base">→</span>
                       </span>
-                      <span className="text-xs">
-                        {times.start}–{times.end}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        Continues next day
+                      <span className="text-xs font-semibold">
+                        {times.start} – next day
                       </span>
                     </div>
                   </Badge>
@@ -305,16 +299,14 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                 <p className="max-w-xs">
                   <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type)}</strong>
                   <br />
-                  {times.start} – {times.end}
+                  Full shift: {times.start} – {times.end} (next day)
                   <br />
-                  <span className="text-xs text-orange-500">⚠️ This shift continues into the next day</span>
+                  <span className="text-xs text-orange-500">🌙 Night shift continues into next day</span>
                 </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        )}
-        
-        {!crossesMidnight && (
+        ) : (
           <Badge
             variant="secondary"
             className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
