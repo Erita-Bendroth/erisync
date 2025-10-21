@@ -381,10 +381,11 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           });
           return;
         }
-        if (times.startTime >= times.endTime) {
+        // Allow night shifts that cross midnight (e.g., 21:00 to 06:00)
+        if (times.startTime === times.endTime) {
           toast({
             title: "Error",
-            description: `Start time must be before end time for ${format(date, 'PPP')}`,
+            description: `Start and end time cannot be the same for ${format(date, 'PPP')}`,
             variant: "destructive",
           });
           return;
@@ -400,10 +401,11 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         return;
       }
 
-      if (customStartTime >= customEndTime) {
+      // Allow night shifts that cross midnight (e.g., 21:00 to 06:00)
+      if (customStartTime === customEndTime) {
         toast({
           title: "Error",
-          description: "Start time must be before end time",
+          description: "Start and end time cannot be the same",
           variant: "destructive",
         });
         return;
