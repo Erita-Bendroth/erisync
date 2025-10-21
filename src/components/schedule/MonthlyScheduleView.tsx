@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWeekend, getDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWeekend, getDay, subMonths } from "date-fns";
 import { Phone, CheckCircle2, XCircle } from "lucide-react";
 import { cn, formatUserName } from "@/lib/utils";
+import { useShiftCounts } from "@/hooks/useShiftCounts";
+import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
 
 interface MonthlyScheduleEntry {
   user_id: string;
@@ -149,6 +151,13 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
     }))
     .sort((a, b) => a.first_name.localeCompare(b.first_name));
 
+  // Fetch shift counts for the last 6 months for all team members
+  const { shiftCounts } = useShiftCounts({
+    userIds: uniqueUsers.map(u => u.user_id),
+    startDate: subMonths(new Date(), 6).toISOString().split('T')[0],
+    enabled: uniqueUsers.length > 0,
+  });
+
   // Group days by week for better display
   const weeks: Date[][] = [];
   let currentWeek: Date[] = [];
@@ -289,12 +298,28 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                           )}>
                             {user.initials}
                           </div>
-                          <span className={cn(
-                            "text-sm",
-                            isCurrentUser && "font-bold"
-                          )}>
-                            {formatUserName(user.first_name, user.last_name, user.initials)}
-                          </span>
+                          <div className="flex-1">
+                            <span className={cn(
+                              "text-sm block",
+                              isCurrentUser && "font-bold"
+                            )}>
+                              {formatUserName(user.first_name, user.last_name, user.initials)}
+                            </span>
+                            {/* Show shift counters */}
+                            {shiftCounts.length > 0 && (
+                              <ShiftCountsDisplay
+                                shiftCounts={shiftCounts.find(c => c.user_id === user.user_id) || {
+                                  user_id: user.user_id,
+                                  weekend_shifts_count: 0,
+                                  night_shifts_count: 0,
+                                  holiday_shifts_count: 0,
+                                  total_shifts_count: 0,
+                                }}
+                                variant="inline"
+                                className="mt-1"
+                              />
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       {allDays.map((day, dayIndex) => {
