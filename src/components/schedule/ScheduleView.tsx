@@ -25,7 +25,7 @@ import { TeamFavoritesManager } from './TeamFavoritesManager';
 import { TeamFavoritesQuickAccess } from './TeamFavoritesQuickAccess';
 import { BulkEditShiftsModal } from './BulkEditShiftsModal';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
-import { cn } from '@/lib/utils';
+import { cn, formatUserName } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface ScheduleEntry {
@@ -1078,14 +1078,17 @@ const canViewFullDetailsSync = (userId: string) => {
   return managedUsersSet.has(userId);
 };
 
-  // Render employee name - everyone can see full names since initials are public info
+  // Render employee name - show full name if available, otherwise nothing (initials are in the avatar)
   const renderEmployeeName = (employee: Employee) => {
-    return (
-      <>
-        <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-        <p className="text-xs text-muted-foreground">{employee.initials}</p>
-      </>
-    );
+    // If last_name exists and is not empty, show full name
+    // If last_name is empty, first_name contains initials (already shown in avatar), so don't duplicate
+    if (employee.last_name && employee.last_name.trim() !== '') {
+      return (
+        <p className="font-medium">{formatUserName(employee.first_name, employee.last_name)}</p>
+      );
+    }
+    // For initials-only users, don't show anything (initials are already in the avatar bubble)
+    return null;
   };
 
 const getActivityDisplay = (entry: ScheduleEntry) => {
