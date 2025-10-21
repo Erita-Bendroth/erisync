@@ -225,15 +225,15 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         try {
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('email, first_name, last_name')
+            .select('email, first_name, last_name, initials')
             .eq('user_id', entry.user_id)
-            .maybeSingle();
+            .maybeSingle() as any;
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           const { data: currentUserProfile } = await supabase
             .from('profiles')
           .select('first_name, last_name, initials')
             .eq('user_id', currentUser?.id)
-            .maybeSingle();
+            .maybeSingle() as any;
 
           if (profileData?.email) {
             await supabase.functions.invoke('send-schedule-notification', {
