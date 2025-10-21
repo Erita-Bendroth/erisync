@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn, formatUserName, doesShiftCrossMidnight } from "@/lib/utils";
 import { useShiftCounts, ShiftCounts } from "@/hooks/useShiftCounts";
 import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
+import { FairnessAnalysis } from "./FairnessAnalysis";
 import { TimeSelect } from "@/components/ui/time-select";
 
 interface Team {
@@ -107,6 +108,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const effectiveUserIds = bulkMode === "users" ? selectedUsers : 
                            bulkMode === "rotation" ? selectedUsersForRotation :
                            [];
+  
+  const fairnessAnalysisUserIds = bulkMode === "team" ? undefined : effectiveUserIds;
   
   const { shiftCounts, loading: countsLoading } = useShiftCounts({
     userIds: selectedTeam && (bulkMode === "team" || effectiveUserIds.length > 0) ? 
@@ -1353,6 +1356,17 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                         ℹ️ When Fairness Mode is enabled, employees with fewer difficult shifts will be prioritized. Managers can override the generated schedule.
                       </p>
                     </div>
+                  </div>
+                )}
+                
+                {/* Comprehensive Fairness Analysis */}
+                {selectedTeam && (
+                  <div className="pt-4">
+                    <FairnessAnalysis 
+                      teamId={selectedTeam}
+                      userIds={fairnessAnalysisUserIds}
+                      historicalMonths={countsDateRange}
+                    />
                   </div>
                 )}
               </div>
