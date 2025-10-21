@@ -198,6 +198,47 @@ const AdminHolidayManager = () => {
     return 'pending';
   }, [importStatuses]);
 
+  // Check for timed out imports and mark them as failed
+  const checkTimedOutImports = useCallback(async () => {
+    const TIMEOUT_MINUTES = 15;
+    const now = new Date();
+    
+    for (const status of importStatuses) {
+      if (status.status === 'pending') {
+        const startedAt = new Date(status.started_at);
+        const minutesElapsed = (now.getTime() - startedAt.getTime()) / (1000 * 60);
+        
+        if (minutesElapsed > TIMEOUT_MINUTES) {
+          console.log(`⏰ Import timed out: ${status.country_code} ${status.year} (${minutesElapsed.toFixed(0)} minutes elapsed)`);
+          
+          try {
+            await supabase
+              .from('holiday_import_status')
+              .update({
+                status: 'failed',
+                error_message: `Import timed out - reset for retry`,
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', status.id);
+            
+            toast({
+              title: "Import Timeout",
+              description: `${status.country_code} ${status.year} import timed out and was reset. Please try again.`,
+              variant: "destructive"
+            });
+          } catch (error) {
+            console.error('Error updating timed out import:', error);
+          }
+        }
+      }
+    }
+  }, [importStatuses, toast]);
+
+  useEffect(() => {
+    // Check for timed out imports on mount and when statuses change
+    checkTimedOutImports();
+  }, [checkTimedOutImports]);
+
   useEffect(() => {
     // Poll for status updates while imports are pending
     const hasPending = importStatuses.some(s => s.status === 'pending');
@@ -351,6 +392,39 @@ const AdminHolidayManager = () => {
       });
     }
   }, [user, hasPermission, toast, fetchHolidays]);
+
+  const resetImportStatus = useCallback(async (countryCode: string, year: number, regionCode?: string | null) => {
+    if (!user || !hasPermission) return;
+    
+    try {
+      const { error } = await supabase
+        .from('holiday_import_status')
+        .update({
+          status: 'failed',
+          error_message: 'Manually reset by admin',
+          completed_at: new Date().toISOString()
+        })
+        .eq('country_code', countryCode)
+        .eq('year', year)
+        .eq('region_code', regionCode || null);
+
+      if (error) throw error;
+
+      toast({
+        title: "Import Reset",
+        description: `Import status reset for ${getCountryName(countryCode)} ${year}. You can now retry the import.`
+      });
+
+      fetchImportStatuses();
+    } catch (error: any) {
+      console.error('Error resetting import status:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reset import status",
+        variant: "destructive"
+      });
+    }
+  }, [user, hasPermission, toast, fetchImportStatuses]);
 
   const getCountryName = useCallback((code: string) => {
     return countries.find(c => c.code === code)?.name || code;
@@ -556,8 +630,32 @@ const AdminHolidayManager = () => {
             <Alert className="mb-4">
               <Loader2 className="h-4 w-4 animate-spin" />
               <AlertDescription>
-                <strong>Syncing in progress:</strong> {importStatuses.filter(s => s.status === 'pending').length} import(s) running in the background. 
-                The page will automatically refresh when complete.
+                <div className="flex items-center justify-between">
+                  <div>
+                    <strong>Syncing in progress:</strong> {importStatuses.filter(s => s.status === 'pending').length} import(s) running in the background. 
+                    The page will automatically refresh when complete.
+                  </div>
+                  <div className="flex flex-wrap gap-2 ml-4">
+                    {importStatuses.filter(s => s.status === 'pending').map(status => {
+                      const startedAt = new Date(status.started_at);
+                      const minutesElapsed = (new Date().getTime() - startedAt.getTime()) / (1000 * 60);
+                      const isStuck = minutesElapsed > 15;
+                      
+                      return (
+                        <Button
+                          key={status.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resetImportStatus(status.country_code, status.year, status.region_code)}
+                          className={isStuck ? "border-destructive text-destructive" : ""}
+                        >
+                          Reset {getCountryName(status.country_code)} {status.year}
+                          {isStuck && " (Stuck)"}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
               </AlertDescription>
             </Alert>
           )}
@@ -581,20 +679,44 @@ const AdminHolidayManager = () => {
                           {(() => {
                             const countryStatus = getCountryYearStatus(countryCode, parseInt(year));
                             if (countryStatus === 'pending') {
+                              const pendingStatuses = importStatuses.filter(
+                                s => s.country_code === countryCode && s.year === parseInt(year) && s.status === 'pending'
+                              );
+                              const oldestStatus = pendingStatuses[0];
+                              const startedAt = oldestStatus ? new Date(oldestStatus.started_at) : new Date();
+                              const minutesElapsed = (new Date().getTime() - startedAt.getTime()) / (1000 * 60);
+                              const isStuck = minutesElapsed > 15;
+                              
                               return (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Badge variant="outline" className="gap-1">
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                        Syncing
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Holidays are being imported in the background</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <div className="flex items-center gap-2">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Badge variant="outline" className={`gap-1 ${isStuck ? 'border-destructive text-destructive' : ''}`}>
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                          Syncing {isStuck && '(Stuck)'}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>
+                                          {isStuck 
+                                            ? `Import stuck for ${Math.floor(minutesElapsed)} minutes. Click reset to retry.`
+                                            : 'Holidays are being imported in the background'}
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  {isStuck && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => resetImportStatus(countryCode, parseInt(year), null)}
+                                      className="h-6 px-2 text-xs"
+                                    >
+                                      Reset
+                                    </Button>
+                                  )}
+                                </div>
                               );
                             }
                             if (countryStatus === 'completed' || holidayGroup.length > 0) {

@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    
     // Create Supabase client with proper auth
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -107,7 +108,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if import is already in progress or completed
+    // Check if import is already in progress
     const { data: existingStatus } = await supabaseClient
       .from('holiday_import_status')
       .select('*')
@@ -117,17 +118,34 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existingStatus && existingStatus.status === 'pending') {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Import already in progress',
-          status: 'pending',
-          started_at: existingStatus.started_at
-        }),
-        { 
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      // Check if the existing pending import is stuck (older than 15 minutes)
+      const startedAt = new Date(existingStatus.started_at);
+      const minutesElapsed = (new Date().getTime() - startedAt.getTime()) / (1000 * 60);
+      
+      if (minutesElapsed < 15) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Import already in progress',
+            status: 'pending',
+            started_at: existingStatus.started_at
+          }),
+          { 
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      } else {
+        // Auto-reset stuck import
+        console.log(`⏰ Auto-resetting stuck import (${minutesElapsed.toFixed(0)} minutes old)`);
+        await supabaseClient
+          .from('holiday_import_status')
+          .update({
+            status: 'failed',
+            error_message: `Import timed out after ${Math.floor(minutesElapsed)} minutes - auto-reset for retry`,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', existingStatus.id);
+      }
     }
 
     // Create or update import status record
