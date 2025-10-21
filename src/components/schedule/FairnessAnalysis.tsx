@@ -191,16 +191,25 @@ export const FairnessAnalysis: React.FC<FairnessAnalysisProps> = ({
           // Fairness score: 100 = least burden, 0 = most burden
           score.fairnessScore = 100 - ((score.totalWeighted - minWeighted) / range * 100);
           
-          // Determine imbalance level based on deviation from average
+          // Determine imbalance level based on actual burden relative to the group
+          // High burden = high imbalance (needs more fair treatment)
+          // Low burden = balanced (has capacity for more shifts)
           const avgWeighted = scores.reduce((sum, s) => sum + s.totalWeighted, 0) / scores.length;
-          const deviation = Math.abs(score.totalWeighted - avgWeighted);
-          const deviationPercent = (deviation / avgWeighted) * 100;
           
-          if (deviationPercent > 40) {
-            score.imbalanceLevel = 'high';
-          } else if (deviationPercent > 20) {
-            score.imbalanceLevel = 'medium';
+          // Only mark as high/medium imbalance if they have ABOVE average burden
+          if (score.totalWeighted > avgWeighted) {
+            const deviation = score.totalWeighted - avgWeighted;
+            const deviationPercent = avgWeighted > 0 ? (deviation / avgWeighted) * 100 : 0;
+            
+            if (deviationPercent > 40) {
+              score.imbalanceLevel = 'high';
+            } else if (deviationPercent > 20) {
+              score.imbalanceLevel = 'medium';
+            } else {
+              score.imbalanceLevel = 'low';
+            }
           } else {
+            // Below or equal to average burden = balanced
             score.imbalanceLevel = 'low';
           }
         });
