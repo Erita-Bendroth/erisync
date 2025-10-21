@@ -144,21 +144,35 @@ const AdminHolidayManager = () => {
   }, [user, hasPermission]);
 
   const fetchImportStatuses = useCallback(async () => {
-    if (!user || !hasPermission) return;
+    if (!user || !hasPermission) {
+      console.log('⚠️ fetchImportStatuses skipped - user:', !!user, 'hasPermission:', hasPermission);
+      return;
+    }
     
-    console.log('🔄 Fetching import statuses...');
+    console.log('🔄 Fetching import statuses... (forced fresh query)');
     try {
       const { data, error } = await supabase
         .from('holiday_import_status')
         .select('*')
         .order('started_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching import statuses:', error);
+        throw error;
+      }
       
       console.log('📊 Import statuses fetched:', data?.length || 0, 'records');
+      
+      // Log Austria 2026 specifically
+      const austriaStatus = data?.filter(d => d.country_code === 'AT' && d.year === 2026);
+      console.log('🇦🇹 Austria 2026 status in DB:', austriaStatus);
+      
+      console.log('💾 Setting importStatuses state with:', data?.length, 'records');
       setImportStatuses((data || []) as ImportStatus[]);
+      
+      console.log('✅ importStatuses state updated');
     } catch (error) {
-      console.error('Error fetching import statuses:', error);
+      console.error('❌ Error fetching import statuses:', error);
     }
   }, [user, hasPermission]);
 
@@ -169,7 +183,10 @@ const AdminHolidayManager = () => {
   }, [user, fetchUserRoles]);
 
   useEffect(() => {
+    console.log('🎯 Main useEffect triggered - user:', !!user, 'hasPermission:', hasPermission);
+    
     if (user && hasPermission) {
+      console.log('✅ Calling initial fetch functions...');
       fetchHolidays();
       fetchImportStatuses();
       
@@ -192,12 +209,16 @@ const AdminHolidayManager = () => {
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('📡 Realtime subscription status:', status);
+        });
       
       return () => {
         console.log('🔕 Cleaning up realtime subscription');
         supabase.removeChannel(channel);
       };
+    } else {
+      console.log('⚠️ Skipping setup - missing user or permissions');
     }
   }, [user, hasPermission, fetchHolidays, fetchImportStatuses]);
 
@@ -669,50 +690,59 @@ const AdminHolidayManager = () => {
         </CardHeader>
         <CardContent>
           {/* Show pending imports */}
-          {importStatuses.filter(s => s.status === 'pending').length > 0 && (
-            <Alert className="mb-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertDescription>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <strong>Syncing in progress:</strong> {importStatuses.filter(s => s.status === 'pending').length} import(s) running in the background. 
-                    The page will automatically refresh when complete.
+          {(() => {
+            const pendingStatuses = importStatuses.filter(s => s.status === 'pending');
+            console.log('🔍 Rendering - Total import statuses:', importStatuses.length);
+            console.log('🔍 Rendering - Pending statuses:', pendingStatuses.length, pendingStatuses);
+            console.log('🔍 Rendering - All Austria statuses:', importStatuses.filter(s => s.country_code === 'AT' && s.year === 2026));
+            
+            if (pendingStatuses.length === 0) return null;
+            
+            return (
+              <Alert className="mb-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong>Syncing in progress:</strong> {pendingStatuses.length} import(s) running in the background. 
+                      The page will automatically refresh when complete.
+                    </div>
+                    <div className="flex flex-wrap gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          fetchImportStatuses();
+                          fetchHolidays();
+                          toast({ title: "Refreshed", description: "Status updated" });
+                        }}
+                      >
+                        Force Refresh
+                      </Button>
+                      {pendingStatuses.map(status => {
+                        const startedAt = new Date(status.started_at);
+                        const minutesElapsed = (new Date().getTime() - startedAt.getTime()) / (1000 * 60);
+                        const isStuck = minutesElapsed > 15;
+                        
+                        return (
+                          <Button
+                            key={status.id}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => resetImportStatus(status.country_code, status.year, status.region_code)}
+                            className={isStuck ? "border-destructive text-destructive" : ""}
+                          >
+                            Reset {getCountryName(status.country_code)} {status.year}
+                            {isStuck && " (Stuck)"}
+                          </Button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        fetchImportStatuses();
-                        fetchHolidays();
-                        toast({ title: "Refreshed", description: "Status updated" });
-                      }}
-                    >
-                      Force Refresh
-                    </Button>
-                    {importStatuses.filter(s => s.status === 'pending').map(status => {
-                      const startedAt = new Date(status.started_at);
-                      const minutesElapsed = (new Date().getTime() - startedAt.getTime()) / (1000 * 60);
-                      const isStuck = minutesElapsed > 15;
-                      
-                      return (
-                        <Button
-                          key={status.id}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => resetImportStatus(status.country_code, status.year, status.region_code)}
-                          className={isStuck ? "border-destructive text-destructive" : ""}
-                        >
-                          Reset {getCountryName(status.country_code)} {status.year}
-                          {isStuck && " (Stuck)"}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+                </AlertDescription>
+              </Alert>
+            );
+          })()}
           
           <div className="space-y-6">
             {Object.keys(groupedHolidays).length === 0 ? (
