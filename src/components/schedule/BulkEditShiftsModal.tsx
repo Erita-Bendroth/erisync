@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 
 interface BulkEditShiftsModalProps {
   open: boolean;
@@ -19,6 +20,7 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
   const [shiftType, setShiftType] = useState<string>('');
   const [activityType, setActivityType] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSubmit = async () => {
     if (!shiftType && !activityType) {
@@ -82,7 +84,63 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
     }
   };
 
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('schedule_entries')
+        .delete()
+        .in('id', selectedShiftIds);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `Deleted ${selectedShiftIds.length} shift${selectedShiftIds.length !== 1 ? 's' : ''} successfully.`,
+      });
+
+      onSuccess();
+      onOpenChange(false);
+      setShowDeleteConfirm(false);
+      
+      // Reset form
+      setShiftType('');
+      setActivityType('');
+    } catch (error: any) {
+      console.error('Error deleting shifts:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete shifts',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
+    <>
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedShiftIds.length} shift{selectedShiftIds.length !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected shifts from the schedule.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
@@ -128,7 +186,16 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-row gap-2">
+          <Button
+            variant="destructive"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={loading}
+            className="mr-auto"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete All
+          </Button>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -146,5 +213,6 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
