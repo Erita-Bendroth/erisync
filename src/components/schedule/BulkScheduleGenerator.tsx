@@ -7,8 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2, Repeat, X, TrendingUp, Moon, PartyPopper } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, subMonths } from "date-fns";
+import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2, Repeat, X, TrendingUp, Moon, PartyPopper, RefreshCw } from "lucide-react";
+import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, subMonths, getDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -100,6 +100,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   // Fairness mode states
   const [fairnessMode, setFairnessMode] = useState(false);
   const [showDistributionSummary, setShowDistributionSummary] = useState(false);
+  const [countsDateRange, setCountsDateRange] = useState<number>(6); // months
+  const [countsRefreshKey, setCountsRefreshKey] = useState(0);
   
   // Fetch shift counts for fairness mode
   const effectiveUserIds = bulkMode === "users" ? selectedUsers : 
@@ -110,9 +112,45 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     userIds: selectedTeam && (bulkMode === "team" || effectiveUserIds.length > 0) ? 
              (bulkMode === "team" ? [] : effectiveUserIds) : [], // Empty array will fetch all team members in effect
     teamIds: selectedTeam ? [selectedTeam] : undefined,
-    startDate: subMonths(new Date(), 6).toISOString().split('T')[0], // Last 6 months
+    startDate: subMonths(new Date(), countsDateRange).toISOString().split('T')[0],
     enabled: (bulkMode === "team" || bulkMode === "users" || bulkMode === "rotation") && !!selectedTeam && fairnessMode,
   });
+  
+  // Detect what type of shift is being scheduled to show relevant counts
+  const getRelevantShiftType = (): 'night' | 'weekend' | 'holiday' | 'all' => {
+    if (!rangeStartDate || !rangeEndDate) return 'all';
+    
+    const dateRange = getDateRangeArray();
+    if (dateRange.length === 0) return 'all';
+    
+    // Check if any dates are weekends (Saturday=6, Sunday=0)
+    const hasWeekends = dateRange.some(date => {
+      const day = getDay(date);
+      return day === 0 || day === 6;
+    });
+    
+    // Check if times indicate night shift (crosses midnight or starts after 18:00 or ends before 08:00)
+    let isNightShift = false;
+    if (bulkMode === 'rotation' && Object.keys(perDateTimes).length > 0) {
+      isNightShift = Object.values(perDateTimes).some(times => 
+        doesShiftCrossMidnight(times.startTime, times.endTime) || 
+        times.startTime >= '18:00' ||
+        times.endTime <= '08:00'
+      );
+    } else if (shiftTemplate !== 'standard') {
+      isNightShift = doesShiftCrossMidnight(customStartTime, customEndTime) ||
+                     customStartTime >= '18:00' ||
+                     customEndTime <= '08:00';
+    }
+    
+    if (hasWeekends) return 'weekend';
+    if (isNightShift) return 'night';
+    return 'all';
+  };
+  
+  const refreshCounts = () => {
+    setCountsRefreshKey(prev => prev + 1);
+  };
 
   useEffect(() => {
     fetchUserRoles();
@@ -1168,19 +1206,61 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             
             {fairnessMode && (
               <div className="pt-3 border-t space-y-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDistributionSummary(!showDistributionSummary)}
-                  className="w-full"
-                >
-                  {showDistributionSummary ? "Hide" : "Show"} Distribution Summary
-                </Button>
+                {/* Date Range Selector */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Count Shifts From</Label>
+                  <Select 
+                    value={countsDateRange.toString()} 
+                    onValueChange={(value) => {
+                      setCountsDateRange(parseInt(value));
+                      refreshCounts();
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Past 1 Month</SelectItem>
+                      <SelectItem value="3">Past 3 Months</SelectItem>
+                      <SelectItem value="6">Past 6 Months</SelectItem>
+                      <SelectItem value="12">Past 12 Months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDistributionSummary(!showDistributionSummary)}
+                    className="flex-1"
+                  >
+                    {showDistributionSummary ? "Hide" : "Show"} Distribution Summary
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshCounts}
+                    disabled={countsLoading}
+                    className="px-3"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", countsLoading && "animate-spin")} />
+                  </Button>
+                </div>
                 
                 {showDistributionSummary && (
                   <div className="space-y-2 p-3 bg-background rounded-lg border">
-                    <div className="text-xs font-semibold text-muted-foreground mb-2">
-                      Current Shift Distribution (Last 6 Months)
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-semibold text-muted-foreground">
+                        Current Shift Distribution (Last {countsDateRange} {countsDateRange === 1 ? 'Month' : 'Months'})
+                      </div>
+                      {rangeStartDate && rangeEndDate && getRelevantShiftType() !== 'all' && (
+                        <Badge variant="secondary" className="text-xs">
+                          {getRelevantShiftType() === 'night' && '🌙 Night Shifts'}
+                          {getRelevantShiftType() === 'weekend' && '📅 Weekend Shifts'}
+                          {getRelevantShiftType() === 'holiday' && '🎉 Holiday Shifts'}
+                        </Badge>
+                      )}
                     </div>
                     {countsLoading ? (
                       <div className="text-xs text-muted-foreground text-center py-4">
@@ -1188,20 +1268,37 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                       </div>
                     ) : shiftCounts.length === 0 ? (
                       <div className="text-xs text-muted-foreground text-center py-4">
-                        No shift data available
+                        No shift data available. Select team/users and configure shift times above.
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {shiftCounts
                           .sort((a, b) => {
-                            // Sort by total unfair shifts (weekend + night + holiday)
-                            const aTotal = a.weekend_shifts_count + a.night_shifts_count + a.holiday_shifts_count;
-                            const bTotal = b.weekend_shifts_count + b.night_shifts_count + b.holiday_shifts_count;
-                            return aTotal - bTotal;
+                            const relevantType = getRelevantShiftType();
+                            let aValue = 0, bValue = 0;
+                            
+                            if (relevantType === 'night') {
+                              aValue = a.night_shifts_count;
+                              bValue = b.night_shifts_count;
+                            } else if (relevantType === 'weekend') {
+                              aValue = a.weekend_shifts_count;
+                              bValue = b.weekend_shifts_count;
+                            } else if (relevantType === 'holiday') {
+                              aValue = a.holiday_shifts_count;
+                              bValue = b.holiday_shifts_count;
+                            } else {
+                              // Sort by total unfair shifts
+                              aValue = a.weekend_shifts_count + a.night_shifts_count + a.holiday_shifts_count;
+                              bValue = b.weekend_shifts_count + b.night_shifts_count + b.holiday_shifts_count;
+                            }
+                            
+                            return aValue - bValue;
                           })
                           .map((counts) => {
                             const user = users.find(u => u.id === counts.user_id);
                             if (!user) return null;
+                            
+                            const relevantType = getRelevantShiftType();
                             const totalUnfair = counts.weekend_shifts_count + counts.night_shifts_count + counts.holiday_shifts_count;
                             
                             return (
@@ -1211,22 +1308,40 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                                     {formatUserName(user.first_name, user.last_name, user.initials)}
                                   </div>
                                   <div className="flex items-center gap-3 mt-1">
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <CalendarIcon className="h-3 w-3" />
-                                      {counts.weekend_shifts_count}
-                                    </div>
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <Moon className="h-3 w-3" />
-                                      {counts.night_shifts_count}
-                                    </div>
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <PartyPopper className="h-3 w-3" />
-                                      {counts.holiday_shifts_count}
-                                    </div>
+                                    {(relevantType === 'all' || relevantType === 'weekend') && (
+                                      <div className={cn(
+                                        "flex items-center gap-1 text-xs",
+                                        relevantType === 'weekend' ? "text-foreground font-semibold" : "text-muted-foreground"
+                                      )}>
+                                        <CalendarIcon className="h-3 w-3" />
+                                        {counts.weekend_shifts_count}
+                                      </div>
+                                    )}
+                                    {(relevantType === 'all' || relevantType === 'night') && (
+                                      <div className={cn(
+                                        "flex items-center gap-1 text-xs",
+                                        relevantType === 'night' ? "text-foreground font-semibold" : "text-muted-foreground"
+                                      )}>
+                                        <Moon className="h-3 w-3" />
+                                        {counts.night_shifts_count}
+                                      </div>
+                                    )}
+                                    {(relevantType === 'all' || relevantType === 'holiday') && (
+                                      <div className={cn(
+                                        "flex items-center gap-1 text-xs",
+                                        relevantType === 'holiday' ? "text-foreground font-semibold" : "text-muted-foreground"
+                                      )}>
+                                        <PartyPopper className="h-3 w-3" />
+                                        {counts.holiday_shifts_count}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <Badge variant={totalUnfair === 0 ? "secondary" : totalUnfair < 5 ? "outline" : "default"}>
-                                  {totalUnfair} total
+                                  {relevantType === 'night' && `${counts.night_shifts_count} night`}
+                                  {relevantType === 'weekend' && `${counts.weekend_shifts_count} weekend`}
+                                  {relevantType === 'holiday' && `${counts.holiday_shifts_count} holiday`}
+                                  {relevantType === 'all' && `${totalUnfair} total`}
                                 </Badge>
                               </div>
                             );
