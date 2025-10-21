@@ -170,6 +170,14 @@ const AdminHolidayManager = () => {
     if (user && hasPermission) {
       fetchHolidays();
       fetchImportStatuses();
+      
+      // Set up polling every 5 seconds to catch status updates
+      const pollInterval = setInterval(() => {
+        fetchImportStatuses();
+        fetchHolidays();
+      }, 5000);
+      
+      return () => clearInterval(pollInterval);
     }
   }, [user, hasPermission, fetchHolidays, fetchImportStatuses]);
 
@@ -619,10 +627,25 @@ const AdminHolidayManager = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Centrally Managed Holidays</CardTitle>
-          <CardDescription>
-            Public holidays available to all users based on their location settings
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Centrally Managed Holidays</CardTitle>
+              <CardDescription>
+                Public holidays available to all users based on their location settings
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                fetchImportStatuses();
+                fetchHolidays();
+                toast({ title: "Refreshed", description: "Status and holidays updated" });
+              }}
+            >
+              🔄 Refresh Status
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Show pending imports */}
