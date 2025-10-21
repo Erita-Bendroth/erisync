@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -7,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { formatUserName } from '@/lib/utils';
-import { Calendar, Moon, PartyPopper, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Calendar, Moon, PartyPopper, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { ShiftCounts } from '@/hooks/useShiftCounts';
 
 interface User {
@@ -48,16 +49,18 @@ export const FairnessAnalysis: React.FC<FairnessAnalysisProps> = ({
   const [users, setUsers] = useState<User[]>([]);
   const [avgScore, setAvgScore] = useState(0);
   const [imbalances, setImbalances] = useState<string[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (teamId) {
       fetchFairnessData();
     }
-  }, [teamId, userIds, historicalMonths]);
+  }, [teamId, JSON.stringify(userIds), historicalMonths, refreshKey]);
 
   const fetchFairnessData = async () => {
     try {
       setLoading(true);
+      console.log('FairnessAnalysis: Fetching data for team:', teamId, 'users:', userIds, 'months:', historicalMonths);
       
       // Fetch team members
       const { data: teamMembers, error: membersError } = await supabase
@@ -102,6 +105,8 @@ export const FairnessAnalysis: React.FC<FairnessAnalysisProps> = ({
 
       if (historicalError) throw historicalError;
 
+      console.log('FairnessAnalysis: Historical data:', historicalData);
+
       // Fetch future shift counts
       const futureStartDate = new Date();
       futureStartDate.setDate(futureStartDate.getDate() + 1);
@@ -117,6 +122,8 @@ export const FairnessAnalysis: React.FC<FairnessAnalysisProps> = ({
       );
 
       if (futureError) throw futureError;
+
+      console.log('FairnessAnalysis: Future data:', futureData);
 
       // Create maps for easier lookup
       const historicalMap = new Map(historicalData?.map((d: any) => [d.user_id, d]) || []);
@@ -264,13 +271,26 @@ export const FairnessAnalysis: React.FC<FairnessAnalysisProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Shift Distribution Fairness Analysis
-        </CardTitle>
-        <CardDescription>
-          Weighted analysis of past {historicalMonths} months and all future scheduled shifts
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Shift Distribution Fairness Analysis
+            </CardTitle>
+            <CardDescription>
+              Weighted analysis of past {historicalMonths} months and all future scheduled shifts
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRefreshKey(prev => prev + 1)}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Overall Statistics */}
