@@ -146,6 +146,7 @@ const AdminHolidayManager = () => {
   const fetchImportStatuses = useCallback(async () => {
     if (!user || !hasPermission) return;
     
+    console.log('🔄 Fetching import statuses...');
     try {
       const { data, error } = await supabase
         .from('holiday_import_status')
@@ -154,6 +155,7 @@ const AdminHolidayManager = () => {
 
       if (error) throw error;
       
+      console.log('📊 Import statuses fetched:', data?.length || 0, 'records');
       setImportStatuses((data || []) as ImportStatus[]);
     } catch (error) {
       console.error('Error fetching import statuses:', error);
@@ -171,13 +173,31 @@ const AdminHolidayManager = () => {
       fetchHolidays();
       fetchImportStatuses();
       
-      // Set up polling every 5 seconds to catch status updates
-      const pollInterval = setInterval(() => {
-        fetchImportStatuses();
-        fetchHolidays();
-      }, 5000);
+      // Set up realtime subscription for import status updates
+      console.log('🔔 Setting up realtime subscription for holiday_import_status');
+      const channel = supabase
+        .channel('holiday-import-status-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'holiday_import_status'
+          },
+          (payload) => {
+            console.log('⚡ Realtime update received:', payload);
+            fetchImportStatuses();
+            if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+              fetchHolidays();
+            }
+          }
+        )
+        .subscribe();
       
-      return () => clearInterval(pollInterval);
+      return () => {
+        console.log('🔕 Cleaning up realtime subscription');
+        supabase.removeChannel(channel);
+      };
     }
   }, [user, hasPermission, fetchHolidays, fetchImportStatuses]);
 
