@@ -431,7 +431,7 @@ const Schedule = () => {
               </div>
               <BulkScheduleGenerator onScheduleGenerated={() => setScheduleRefreshKey(prev => prev + 1)} />
             </div>
-            <ScheduleView key={scheduleRefreshKey} initialTeamId={teamFromUrl} />
+            <ScheduleView refreshTrigger={scheduleRefreshKey} initialTeamId={teamFromUrl} />
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">

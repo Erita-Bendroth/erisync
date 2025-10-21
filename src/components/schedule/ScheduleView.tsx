@@ -79,9 +79,10 @@ interface Holiday {
 
 interface ScheduleViewProps {
   initialTeamId?: string;
+  refreshTrigger?: number;
 }
 
-const ScheduleView = ({ initialTeamId }: ScheduleViewProps) => {
+const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { favorites } = useTeamFavorites();
@@ -248,6 +249,14 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchHolidays();
     }
   }, [selectedTeams, viewMode]);
+
+  // Refresh data when external trigger changes (without resetting view state)
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0 && user && userRoles.length > 0) {
+      console.log('🔄 External refresh triggered, preserving current view');
+      fetchScheduleEntries();
+    }
+  }, [refreshTrigger]);
 
 // Pre-populate managed users set for performance and deterministic rendering
 useEffect(() => {
