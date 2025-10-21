@@ -58,6 +58,19 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
   const [selectedPlannerId, setSelectedPlannerId] = useState<string>('');
   const [loadingPlanners, setLoadingPlanners] = useState(true);
 
+  // Reset form when modal closes to prevent state issues
+  useEffect(() => {
+    if (!open) {
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setIsFullDay(true);
+      setStartTime('08:00');
+      setEndTime('16:30');
+      setNotes('');
+      setSelectedPlannerId('');
+    }
+  }, [open]);
+
   // Fetch planners when modal opens
   useEffect(() => {
     if (open) {

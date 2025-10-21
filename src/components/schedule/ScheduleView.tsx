@@ -312,10 +312,20 @@ useEffect(() => {
 // Fetch pending vacation requests count for notification badge
 const fetchPendingRequestsCount = async () => {
   try {
-    const { count, error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    let query = supabase
       .from('vacation_requests')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
+    
+    // If not a planner, only count own requests
+    if (!isPlanner()) {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { count, error } = await query;
     
     if (error) throw error;
     setPendingRequestsCount(count || 0);
