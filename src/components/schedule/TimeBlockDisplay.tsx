@@ -196,30 +196,121 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     // Display time blocks with specific times
     return (
       <div className={`space-y-1 ${className}`}>
-        {timeBlocks.map((block, index) => (
-          <div key={index} className="w-full">
-            <Badge
-              variant="secondary"
-              className={`${getActivityColor(block.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
-              onClick={onClick}
-            >
-              <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
-                <span className="font-medium">
-                  {getActivityDisplayName(block.activity_type, entry.shift_type)}
-                </span>
-                <span className="text-xs">
-                  {block.start_time}–{block.end_time}
-                </span>
+        {timeBlocks.map((block, index) => {
+          const blockCrossesMidnight = doesShiftCrossMidnight(block.start_time, block.end_time);
+          
+          // If this is a continuation badge
+          if (isContinuation) {
+            return (
+              <div key={index} className="w-full">
+                <TooltipProvider>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <div className="w-full">
+                        <Badge
+                          variant="outline"
+                          className={`${getActivityColor(block.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-90 transition-opacity text-xs w-full border-l-4 border-l-orange-500 dark:border-l-orange-400`}
+                          onClick={onClick}
+                        >
+                          <div className="flex flex-col items-center py-1 w-full">
+                            <span className="text-xs flex items-center gap-1">
+                              <span className="text-orange-600 dark:text-orange-400 font-bold text-base">←</span>
+                              <span className="font-medium">ends {block.end_time}</span>
+                            </span>
+                            <span className="text-[9px] text-muted-foreground italic">
+                              {getActivityDisplayName(block.activity_type, entry.shift_type)} from {originalStartTime || block.start_time}
+                            </span>
+                          </div>
+                        </Badge>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100]" side="top">
+                      <p className="max-w-xs">
+                        <strong>{getActivityDisplayName(block.activity_type, entry.shift_type)}</strong>
+                        <br />
+                        Full shift: {originalStartTime || block.start_time} – {block.end_time}
+                        <br />
+                        <span className="text-xs text-orange-500">🌙 Night shift from previous day</span>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-            </Badge>
-            {/* Show notes for team members */}
-            {isTeamMember && cleanNotes && index === 0 && expanded && (
-              <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
-                <strong>Notes:</strong> {cleanNotes}
+            );
+          }
+          
+          // Regular display - check if crosses midnight
+          if (blockCrossesMidnight) {
+            return (
+              <div key={index} className="w-full">
+                <TooltipProvider>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <div className="w-full">
+                        <Badge
+                          variant="secondary"
+                          className={`${getActivityColor(block.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+                          onClick={onClick}
+                        >
+                          <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
+                            <span className="font-medium flex items-center gap-1">
+                              {getActivityDisplayName(block.activity_type, entry.shift_type)}
+                              <span className="text-orange-600 dark:text-orange-400 font-bold text-base">→</span>
+                            </span>
+                            <span className="text-xs font-semibold">
+                              {block.start_time} – next day
+                            </span>
+                          </div>
+                        </Badge>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100]" side="top">
+                      <p className="max-w-xs">
+                        <strong>{getActivityDisplayName(block.activity_type, entry.shift_type)}</strong>
+                        <br />
+                        Full shift: {block.start_time} – {block.end_time} (next day)
+                        <br />
+                        <span className="text-xs text-orange-500">🌙 Night shift continues into next day</span>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* Show notes for team members */}
+                {isTeamMember && cleanNotes && index === 0 && expanded && (
+                  <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
+                    <strong>Notes:</strong> {cleanNotes}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          }
+          
+          // Normal shift that doesn't cross midnight
+          return (
+            <div key={index} className="w-full">
+              <Badge
+                variant="secondary"
+                className={`${getActivityColor(block.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+                onClick={onClick}
+              >
+                <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
+                  <span className="font-medium">
+                    {getActivityDisplayName(block.activity_type, entry.shift_type)}
+                  </span>
+                  <span className="text-xs">
+                    {block.start_time}–{block.end_time}
+                  </span>
+                </div>
+              </Badge>
+              {/* Show notes for team members */}
+              {isTeamMember && cleanNotes && index === 0 && expanded && (
+                <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
+                  <strong>Notes:</strong> {cleanNotes}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   } else {
