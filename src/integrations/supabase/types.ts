@@ -800,6 +800,14 @@ export type Database = {
         Args: { _manager_id: string; _target_user_id: string }
         Returns: boolean
       }
+      mark_pending_imports_complete: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          country_code: string
+          holiday_count: number
+          updated_status: string
+        }[]
+      }
       revoke_manager_delegation: {
         Args: { _delegation_id: string; _revoked_by: string }
         Returns: Json
