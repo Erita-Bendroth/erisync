@@ -277,77 +277,45 @@ Deno.serve(async (req) => {
 
     console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
 
-    // Check for existing holidays first
-    console.log('Checking for existing holidays...')
-    let existingQuery = supabaseClient
+    // Use upsert with ignoreDuplicates for faster operation - single DB call
+    console.log('Upserting holidays into database...')
+    const { data, error, count } = await supabaseClient
       .from('holidays')
-      .select('date, region_code')
+      .upsert(holidayData, { 
+        onConflict: 'date,country_code,region_code,user_id',
+        ignoreDuplicates: true,
+        count: 'exact'
+      })
+      .select('id')
+
+    const importedCount = count || 0;
+    const existingCount = holidayData.length - importedCount;
+
+    console.log(`Upserted ${importedCount} new holidays, ${existingCount} already existed`)
+
+    // Update status to completed
+    const { error: statusUpdateError } = await supabaseClient
+      .from('holiday_import_status')
+      .update({
+        status: 'completed',
+        imported_count: importedCount,
+        completed_at: new Date().toISOString()
+      })
       .eq('country_code', country_code)
       .eq('year', year)
-      .is('user_id', null); // Check centrally managed holidays
+      .eq('region_code', region_code || null);
     
-    const { data: existingHolidays, error: checkError } = await existingQuery;
-
-    if (checkError) {
-      console.error('Error checking existing holidays:', checkError)
-      throw new Error(`Database error: ${checkError.message}`)
+    if (statusUpdateError) {
+      console.error('Failed to update import status:', statusUpdateError);
+    } else {
+      console.log('✅ Import status updated to completed');
     }
 
-    // Create a set of existing holiday keys (date + region_code combination)
-    const existingKeys = new Set(existingHolidays?.map(h => `${h.date}-${h.region_code || 'national'}`) || [])
-    const newHolidays = holidayData.filter(holiday => {
-      const key = `${holiday.date}-${holiday.region_code || 'national'}`;
-      return !existingKeys.has(key);
-    });
-
-    console.log(`Found ${existingHolidays?.length || 0} existing holidays, ${newHolidays.length} new holidays to insert`)
-
-    if (newHolidays.length === 0) {
-      console.log('All holidays already exist')
-      
-      // Update status to completed even if no new holidays
-      const { error: statusUpdateError } = await supabaseClient
-        .from('holiday_import_status')
-        .update({
-          status: 'completed',
-          imported_count: 0,
-          completed_at: new Date().toISOString()
-        })
-        .eq('country_code', country_code)
-        .eq('year', year)
-        .eq('region_code', region_code || null);
-      
-      if (statusUpdateError) {
-        console.error('Failed to update import status:', statusUpdateError);
-      } else {
-        console.log('✅ Import status updated to completed (no new holidays)');
-      }
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: `All holidays for ${country_code} ${year} already exist`,
-          imported: 0,
-          existing: existingHolidays?.length || 0,
-          total: holidayData.length
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      )
-    }
-
-    // Insert only new holidays
-    console.log('Inserting new holidays into database...')
-    const { data, error } = await supabaseClient
-      .from('holidays')
-      .insert(newHolidays)
-
-    console.log('Insert result:', { 
+    console.log('Upsert result:', { 
       success: !error, 
       error: error ? { code: error.code, message: error.message, details: error.details } : null,
-      insertedCount: data?.length || 0 
+      importedCount,
+      existingCount
     });
 
     if (error) {
@@ -360,33 +328,15 @@ Deno.serve(async (req) => {
       throw new Error(`Database error: ${error.message} (${error.code})`)
     }
 
-    console.log(`Successfully imported ${newHolidays.length} holidays`)
-
-    // Update import status to completed
-    const { error: finalStatusError } = await supabaseClient
-      .from('holiday_import_status')
-      .update({
-        status: 'completed',
-        imported_count: newHolidays.length,
-        completed_at: new Date().toISOString()
-      })
-      .eq('country_code', country_code)
-      .eq('year', year)
-      .eq('region_code', region_code || null);
-
-    if (finalStatusError) {
-      console.error('Failed to update final import status:', finalStatusError);
-    } else {
-      console.log('✅ Import status updated to completed');
-    }
+    console.log(`Successfully imported ${importedCount} new holidays`)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        imported: newHolidays.length,
-        existing: existingHolidays?.length || 0,
+        imported: importedCount,
+        existing: existingCount,
         total: holidayData.length,
-        holidays: newHolidays 
+        holidays: data || []
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
