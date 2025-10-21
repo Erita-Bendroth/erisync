@@ -13,18 +13,18 @@ export function cn(...inputs: ClassValue[]) {
  * This ensures compatibility with both initials-only users and full-name users
  */
 export function formatUserName(firstName: string, lastName?: string | null, initials?: string | null): string {
-  // Priority 1: Use dedicated initials field if available
+  // If we have both first and last name, show full name (not initials)
+  if (lastName && lastName.trim() !== '') {
+    return `${firstName} ${lastName}`.trim();
+  }
+  
+  // If we only have initials field and no last name, use initials
   if (initials && initials.trim() !== '') {
     return initials;
   }
   
-  // Priority 2: If last_name is empty, first_name might contain initials
-  if (!lastName || lastName.trim() === '') {
-    return firstName || '';
-  }
-  
-  // Priority 3: For users with full names
-  return `${firstName} ${lastName}`.trim();
+  // Fallback to first_name (which might be initials)
+  return firstName || '';
 }
 
 /**

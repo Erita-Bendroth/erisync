@@ -235,10 +235,8 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchEmployees();
       fetchScheduleEntries();
       fetchHolidays();
-      // Fetch pending requests count for managers/planners
-      if (isManager() || isPlanner()) {
-        fetchPendingRequestsCount();
-      }
+      // Fetch pending requests count for all authenticated users
+      fetchPendingRequestsCount();
     }
   }, [user, currentWeek, userRoles]);
 
@@ -320,8 +318,8 @@ const fetchPendingRequestsCount = async () => {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
     
-    // If not a planner, only count own requests
-    if (!isPlanner()) {
+    // If not a planner/manager, only count own requests
+    if (!isPlanner() && !isManager()) {
       query = query.eq('user_id', user.id);
     }
 
@@ -334,9 +332,9 @@ const fetchPendingRequestsCount = async () => {
   }
 };
 
-// Subscribe to vacation request changes for real-time badge updates
+// Subscribe to vacation request changes for real-time badge updates (all users)
 useEffect(() => {
-  if (!user || (!isManager() && !isPlanner())) return;
+  if (!user) return;
 
   const channel = supabase
     .channel('vacation-requests-badge')
@@ -1453,26 +1451,24 @@ const getActivityColor = (entry: ScheduleEntry) => {
             Request Time Off
           </Button>
 
-          {/* Vacation Requests Toggle - For Managers/Planners */}
-          {(isManager() || isPlanner()) && (
-            <Button
-              onClick={() => setShowVacationRequests(true)}
-              variant={pendingRequestsCount > 0 ? "destructive" : "outline"}
-              size="default"
-              className="gap-2 relative"
-            >
-              <FileText className="h-4 w-4" />
-              Show Requests
-              {pendingRequestsCount > 0 && (
-                <Badge 
-                  variant="secondary" 
-                  className="ml-2 bg-white text-destructive font-bold px-2"
-                >
-                  {pendingRequestsCount}
-                </Badge>
-              )}
-            </Button>
-          )}
+          {/* Vacation Requests Toggle - For all authenticated users */}
+          <Button
+            onClick={() => setShowVacationRequests(true)}
+            variant={pendingRequestsCount > 0 ? "destructive" : "outline"}
+            size="default"
+            className="gap-2 relative"
+          >
+            <FileText className="h-4 w-4" />
+            {(isManager() || isPlanner()) ? 'Show Requests' : 'My Requests'}
+            {pendingRequestsCount > 0 && (
+              <Badge 
+                variant="secondary" 
+                className="ml-2 bg-white text-destructive font-bold px-2"
+              >
+                {pendingRequestsCount}
+              </Badge>
+            )}
+          </Button>
 
           {/* Multi-Select Mode Toggle - For Managers/Planners */}
           {(isManager() || isPlanner()) && timeView === "weekly" && (
@@ -2121,27 +2117,29 @@ const getActivityColor = (entry: ScheduleEntry) => {
       <Sheet open={showVacationRequests} onOpenChange={setShowVacationRequests}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Vacation Requests</SheetTitle>
+            <SheetTitle>
+              {(isManager() || isPlanner()) ? 'Vacation Requests' : 'My Vacation Requests'}
+            </SheetTitle>
             <SheetDescription>
-              Review and manage vacation requests from your team members.
+              {(isManager() || isPlanner()) 
+                ? 'Review and manage vacation requests from your team members.'
+                : 'View and manage your vacation requests.'}
             </SheetDescription>
           </SheetHeader>
           <div className="mt-6">
-            {(isManager() || isPlanner()) && (
-              <VacationRequestsList
-                isPlanner={isPlanner()}
-                onRequestProcessed={() => {
-                  // Silent refresh to preserve view - don't show loading screen
-                  fetchScheduleEntries(true);
-                  fetchPendingRequestsCount();
-                }}
-                onEditRequest={(request) => {
-                  setEditingVacationRequest(request);
-                  setVacationModalOpen(true);
-                  setShowVacationRequests(false);
-                }}
-              />
-            )}
+            <VacationRequestsList
+              isPlanner={isPlanner()}
+              onRequestProcessed={() => {
+                // Silent refresh to preserve view - don't show loading screen
+                fetchScheduleEntries(true);
+                fetchPendingRequestsCount();
+              }}
+              onEditRequest={(request) => {
+                setEditingVacationRequest(request);
+                setVacationModalOpen(true);
+                setShowVacationRequests(false);
+              }}
+            />
           </div>
         </SheetContent>
       </Sheet>

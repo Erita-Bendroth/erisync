@@ -527,6 +527,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                   </div>
                 )}
 
+                {/* Show Edit/Cancel buttons for request owner (even if they're a planner) */}
                 {currentUserId === request.user_id && request.status === 'pending' && (
                   <div className="flex gap-2">
                     <Button
