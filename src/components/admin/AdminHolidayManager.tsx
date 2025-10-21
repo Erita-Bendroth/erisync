@@ -636,6 +636,17 @@ const AdminHolidayManager = () => {
                     The page will automatically refresh when complete.
                   </div>
                   <div className="flex flex-wrap gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        fetchImportStatuses();
+                        fetchHolidays();
+                        toast({ title: "Refreshed", description: "Status updated" });
+                      }}
+                    >
+                      Force Refresh
+                    </Button>
                     {importStatuses.filter(s => s.status === 'pending').map(status => {
                       const startedAt = new Date(status.started_at);
                       const minutesElapsed = (new Date().getTime() - startedAt.getTime()) / (1000 * 60);

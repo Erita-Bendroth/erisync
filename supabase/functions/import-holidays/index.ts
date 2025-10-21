@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
       console.log('All holidays already exist')
       
       // Update status to completed even if no new holidays
-      await supabaseClient
+      const { error: statusUpdateError } = await supabaseClient
         .from('holiday_import_status')
         .update({
           status: 'completed',
@@ -316,6 +316,12 @@ Deno.serve(async (req) => {
         .eq('country_code', country_code)
         .eq('year', year)
         .eq('region_code', region_code || null);
+      
+      if (statusUpdateError) {
+        console.error('Failed to update import status:', statusUpdateError);
+      } else {
+        console.log('✅ Import status updated to completed (no new holidays)');
+      }
       
       return new Response(
         JSON.stringify({
@@ -357,7 +363,7 @@ Deno.serve(async (req) => {
     console.log(`Successfully imported ${newHolidays.length} holidays`)
 
     // Update import status to completed
-    await supabaseClient
+    const { error: finalStatusError } = await supabaseClient
       .from('holiday_import_status')
       .update({
         status: 'completed',
@@ -367,6 +373,12 @@ Deno.serve(async (req) => {
       .eq('country_code', country_code)
       .eq('year', year)
       .eq('region_code', region_code || null);
+
+    if (finalStatusError) {
+      console.error('Failed to update final import status:', finalStatusError);
+    } else {
+      console.log('✅ Import status updated to completed');
+    }
 
     return new Response(
       JSON.stringify({ 
@@ -387,7 +399,7 @@ Deno.serve(async (req) => {
     // Update import status to failed
     try {
       const requestBody = await req.clone().json();
-      await supabaseClient
+      const { error: failStatusError } = await supabaseClient
         .from('holiday_import_status')
         .update({
           status: 'failed',
@@ -397,6 +409,12 @@ Deno.serve(async (req) => {
         .eq('country_code', requestBody.country_code)
         .eq('year', requestBody.year)
         .eq('region_code', requestBody.region_code || null);
+      
+      if (failStatusError) {
+        console.error('Failed to update error status:', failStatusError);
+      } else {
+        console.log('❌ Import status updated to failed');
+      }
     } catch (updateError) {
       console.error('Error updating import status:', updateError);
     }
