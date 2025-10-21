@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn, formatUserName } from "@/lib/utils";
 import { useShiftCounts, ShiftCounts } from "@/hooks/useShiftCounts";
 import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
+import { TimeSelect } from "@/components/ui/time-select";
 
 interface Team {
   id: string;
@@ -906,24 +907,18 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="start-time" className="text-xs text-muted-foreground">Start Time (24h)</Label>
-                <input
-                  id="start-time"
-                  type="time"
-                  step="60"
+                <TimeSelect
                   value={customStartTime}
-                  onChange={(e) => setCustomStartTime(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
+                  onValueChange={setCustomStartTime}
+                  placeholder="Select start time"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="end-time" className="text-xs text-muted-foreground">End Time (24h)</Label>
-                <input
-                  id="end-time"
-                  type="time"
-                  step="60"
+                <TimeSelect
                   value={customEndTime}
-                  onChange={(e) => setCustomEndTime(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
+                  onValueChange={setCustomEndTime}
+                  placeholder="Select end time"
                 />
               </div>
             </div>
@@ -1046,36 +1041,30 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                         <Label htmlFor={`start-${dateStr}`} className="text-xs text-muted-foreground">
                           Start Time (24h)
                         </Label>
-                        <input
-                          id={`start-${dateStr}`}
-                          type="time"
-                          step="60"
+                        <TimeSelect
                           value={times.startTime}
-                          onChange={(e) => {
+                          onValueChange={(value) => {
                             setPerDateTimes(prev => ({
                               ...prev,
-                              [dateStr]: { ...prev[dateStr], startTime: e.target.value }
+                              [dateStr]: { ...prev[dateStr], startTime: value }
                             }));
                           }}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
+                          placeholder="Select start time"
                         />
                       </div>
                       <div className="space-y-1">
                         <Label htmlFor={`end-${dateStr}`} className="text-xs text-muted-foreground">
                           End Time (24h)
                         </Label>
-                        <input
-                          id={`end-${dateStr}`}
-                          type="time"
-                          step="60"
+                        <TimeSelect
                           value={times.endTime}
-                          onChange={(e) => {
+                          onValueChange={(value) => {
                             setPerDateTimes(prev => ({
                               ...prev,
-                              [dateStr]: { ...prev[dateStr], endTime: e.target.value }
+                              [dateStr]: { ...prev[dateStr], endTime: value }
                             }));
                           }}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
+                          placeholder="Select end time"
                         />
                       </div>
                     </div>
