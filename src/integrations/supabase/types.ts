@@ -393,6 +393,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
+          {
+            foreignKeyName: "team_members_user_id_profiles_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_safe"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       team_view_favorites: {
@@ -587,7 +594,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_safe: {
+        Row: {
+          country_code: string | null
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          initials: string | null
+          last_name: string | null
+          region_code: string | null
+          requires_password_change: boolean | null
+          theme_preference: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          country_code?: string | null
+          created_at?: string | null
+          email?: never
+          first_name?: string | null
+          id?: string | null
+          initials?: string | null
+          last_name?: string | null
+          region_code?: string | null
+          requires_password_change?: boolean | null
+          theme_preference?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          country_code?: string | null
+          created_at?: string | null
+          email?: never
+          first_name?: string | null
+          id?: string | null
+          initials?: string | null
+          last_name?: string | null
+          region_code?: string | null
+          requires_password_change?: boolean | null
+          theme_preference?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_view_sensitive_profile_data: {
@@ -751,6 +802,18 @@ export type Database = {
           team_name: string
         }[]
       }
+      get_team_members_safe: {
+        Args: { _team_id: string }
+        Returns: {
+          country_code: string
+          email: string
+          first_name: string
+          initials: string
+          last_name: string
+          region_code: string
+          user_id: string
+        }[]
+      }
       get_top_level_approver_for_team: {
         Args: { _team_id: string }
         Returns: {
@@ -822,6 +885,10 @@ export type Database = {
           holiday_count: number
           updated_status: string
         }[]
+      }
+      mask_email: {
+        Args: { email: string }
+        Returns: string
       }
       revoke_manager_delegation: {
         Args: { _delegation_id: string; _revoked_by: string }
