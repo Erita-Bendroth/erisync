@@ -70,8 +70,8 @@ export function getShiftTimes(notes: string | null | undefined, shiftType: strin
  * Check if a shift crosses midnight or ends in early morning
  * Examples: 
  * - 22:00 to 06:00 (crosses midnight)
- * - 01:00 to 07:30 (night shift ending in morning)
- * - 00:00 to 08:00 (midnight to morning)
+ * - 23:00 to 07:30 (crosses midnight)
+ * - 01:00 to 09:00 (early morning shift, does NOT cross midnight)
  */
 export function doesShiftCrossMidnight(startTime: string, endTime: string): boolean {
   const [startHour, startMin] = startTime.split(':').map(Number);
@@ -80,9 +80,9 @@ export function doesShiftCrossMidnight(startTime: string, endTime: string): bool
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;
   
-  // Shift crosses midnight if end time is earlier than start time
-  // OR if shift starts after midnight (00:00-06:00) and ends in early morning
-  return endMinutes < startMinutes || (startHour >= 0 && startHour < 6 && endHour >= 0 && endHour < 12);
+  // Shift crosses midnight if end time is earlier than start time in clock terms
+  // This catches shifts like 21:00 -> 06:00, 23:00 -> 07:30, etc.
+  return endMinutes < startMinutes;
 }
 
 /**

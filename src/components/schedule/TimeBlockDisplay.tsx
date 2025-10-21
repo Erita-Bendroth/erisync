@@ -237,19 +237,22 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                 <div className="w-full">
                   <Badge
                     variant="secondary"
-                    className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full bg-gradient-to-r from-transparent to-current`}
+                    className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full border-2 border-dashed border-orange-400/50`}
                     style={{ 
-                      backgroundImage: `linear-gradient(90deg, transparent 0%, currentColor 20%)`,
-                      opacity: 0.7
+                      opacity: 0.85
                     }}
                     onClick={onClick}
                   >
                     <div className="flex flex-col items-center py-1 w-full">
-                      <span className="font-medium text-[10px]">
-                        ← {getActivityDisplayName(entry.activity_type, entry.shift_type)}
+                      <span className="font-medium text-xs flex items-center gap-1">
+                        <span className="text-orange-600 dark:text-orange-400 font-bold">←</span>
+                        {getActivityDisplayName(entry.activity_type, entry.shift_type)}
                       </span>
                       <span className="text-[10px]">
-                        ends {times.end}
+                        ends at {times.end}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground italic">
+                        from previous day
                       </span>
                     </div>
                   </Badge>
@@ -261,7 +264,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                   <br />
                   Full shift: {originalStartTime || times.start} – {times.end}
                   <br />
-                  <span className="text-xs text-muted-foreground">Continues from previous day</span>
+                  <span className="text-xs text-orange-500">🌙 Continues from previous day</span>
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -273,39 +276,61 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
     // Regular display - show indicator if shift crosses midnight
     return (
       <div className={`w-full ${className}`}>
-        <TooltipProvider>
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <div className="w-full">
-                <Badge
-                  variant="secondary"
-                  className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
-                  onClick={onClick}
-                >
-                  <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
-                    <span className="font-medium">
-                      {getActivityDisplayName(entry.activity_type, entry.shift_type)} {crossesMidnight && '→'}
-                    </span>
-                    <span className="text-xs">
-                      {times.start}–{times.end}
-                    </span>
-                  </div>
-                </Badge>
-              </div>
-            </TooltipTrigger>
-            {crossesMidnight && (
+        {crossesMidnight && (
+          <TooltipProvider>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <div className="w-full">
+                  <Badge
+                    variant="secondary"
+                    className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+                    onClick={onClick}
+                  >
+                    <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
+                      <span className="font-medium flex items-center gap-1">
+                        {getActivityDisplayName(entry.activity_type, entry.shift_type)}
+                        <span className="text-orange-600 dark:text-orange-400 font-bold">→</span>
+                      </span>
+                      <span className="text-xs">
+                        {times.start}–{times.end}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Continues next day
+                      </span>
+                    </div>
+                  </Badge>
+                </div>
+              </TooltipTrigger>
               <TooltipContent className="z-[100]" side="top">
                 <p className="max-w-xs">
                   <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type)}</strong>
                   <br />
                   {times.start} – {times.end}
                   <br />
-                  <span className="text-xs text-muted-foreground">⚠️ This shift continues into the next day</span>
+                  <span className="text-xs text-orange-500">⚠️ This shift continues into the next day</span>
                 </p>
               </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        
+        {!crossesMidnight && (
+          <Badge
+            variant="secondary"
+            className={`${getActivityColor(entry.activity_type, entry.shift_type)} block cursor-pointer hover:opacity-80 transition-opacity text-xs w-full`}
+            onClick={onClick}
+          >
+            <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
+              <span className="font-medium">
+                {getActivityDisplayName(entry.activity_type, entry.shift_type)}
+              </span>
+              <span className="text-xs">
+                {times.start}–{times.end}
+              </span>
+            </div>
+          </Badge>
+        )}
+        
         {/* Show notes for team members */}
         {isTeamMember && cleanNotes && expanded && (
           <div className="mt-1 p-2 bg-muted rounded text-xs text-muted-foreground">
