@@ -243,8 +243,9 @@ const AdminHolidayManager = () => {
     
     if (statuses.length === 0) return 'none';
     if (statuses.some(s => s.status === 'pending')) return 'pending';
-    if (statuses.every(s => s.status === 'completed')) return 'completed';
-    return 'pending';
+    // If all imports are completed or failed (i.e., finished), show as completed
+    if (statuses.every(s => s.status === 'completed' || s.status === 'failed')) return 'completed';
+    return 'none';
   }, [importStatuses]);
 
   // Check for timed out imports and mark them as failed
