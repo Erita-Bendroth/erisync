@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, Clock, UserCheck, Settings } from "lucide-react";
+import { Calendar, Users, Clock, UserCheck, Settings, Shield, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { DelegationIndicator } from "@/components/schedule/DelegationIndicator";
 import { formatUserName } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface UserRole {
   role: string;
@@ -24,9 +25,11 @@ interface Profile {
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userTeamId, setUserTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -61,6 +64,18 @@ const Dashboard = () => {
         // User might not have a role assigned yet
       } else {
         setUserRole(roleData.role);
+      }
+
+      // Fetch user's first team
+      const { data: teamData, error: teamError } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user?.id)
+        .limit(1)
+        .single();
+
+      if (teamData && !teamError) {
+        setUserTeamId(teamData.team_id);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -132,6 +147,52 @@ const Dashboard = () => {
       {userRole === 'manager' && user && (
         <DelegationIndicator userId={user.id} isManager={true} />
       )}
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common scheduling tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-3"
+              onClick={() => navigate('/schedule?tab=schedule')}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              View Schedule
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-3"
+              onClick={() => navigate('/schedule?tab=settings')}
+            >
+              <User className="w-4 h-4 mr-2" />
+              User Settings
+            </Button>
+            {userRole === 'planner' && (
+              <Button
+                variant="outline"
+                className="justify-start h-auto py-3"
+                onClick={() => navigate('/schedule?tab=admin')}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Admin Settings
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="justify-start h-auto py-3"
+              onClick={() => navigate(userTeamId ? `/schedule?tab=schedule&team=${userTeamId}` : '/schedule?tab=schedule')}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              View Team Availability
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
