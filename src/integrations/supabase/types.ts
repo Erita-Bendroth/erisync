@@ -761,6 +761,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_user_shift_counts: {
+        Args: {
+          _end_date?: string
+          _start_date?: string
+          _team_ids?: string[]
+          _user_ids: string[]
+        }
+        Returns: {
+          holiday_shifts_count: number
+          night_shifts_count: number
+          total_shifts_count: number
+          user_id: string
+          weekend_shifts_count: number
+        }[]
+      }
       get_user_teams: {
         Args: { _user_id: string }
         Returns: string[]

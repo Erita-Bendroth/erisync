@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { DatePicker } from '@/components/ui/date-picker';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth } from 'date-fns';
+import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths } from 'date-fns';
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -27,6 +27,8 @@ import { BulkEditShiftsModal } from './BulkEditShiftsModal';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { cn, formatUserName } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useShiftCounts } from '@/hooks/useShiftCounts';
+import { ShiftCountsDisplay } from './ShiftCountsDisplay';
 
 interface ScheduleEntry {
   id: string;
@@ -101,15 +103,15 @@ const [showEditModal, setShowEditModal] = useState(false);
 const [selectedMonthValue, setSelectedMonthValue] = useState<string>("current");
 // Managed users visibility cache
 const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
-// Multi-select mode state
-const [multiSelectMode, setMultiSelectMode] = useState(false);
-const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
-const [showBulkEditModal, setShowBulkEditModal] = useState(false);
-const [managedCacheLoading, setManagedCacheLoading] = useState(false);
-// Vacation request modal
-const [vacationModalOpen, setVacationModalOpen] = useState(false);
-const [showVacationRequests, setShowVacationRequests] = useState(false);
-const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  // Multi-select mode state
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [managedCacheLoading, setManagedCacheLoading] = useState(false);
+  // Vacation request modal
+  const [vacationModalOpen, setVacationModalOpen] = useState(false);
+  const [showVacationRequests, setShowVacationRequests] = useState(false);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 // Show Monday through Sunday (full week)
@@ -1071,6 +1073,13 @@ useEffect(() => {
   const isPlanner = () => userRoles.some(role => role.role === "planner");
   const isManager = () => userRoles.some(role => role.role === "manager");
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
+  
+  // Shift counts for managers (last 6 months) - must be after isManager/isPlanner definitions
+  const { shiftCounts } = useShiftCounts({
+    userIds: employees.map(e => e.user_id),
+    startDate: dateFnsSubMonths(new Date(), 6).toISOString().split('T')[0],
+    enabled: (isManager() || isPlanner()) && employees.length > 0 && timeView === "weekly",
+  });
 
 // Helper: can manager view full details for a user synchronously
 const canViewFullDetailsSync = (userId: string) => {
@@ -1765,9 +1774,23 @@ const getActivityColor = (entry: ScheduleEntry) => {
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
                           {employee.initials}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           {/* Show full name or initials based on management rights */}
                           {renderEmployeeName(employee)}
+                          {/* Show shift counters for managers/planners */}
+                          {(isManager() || isPlanner()) && shiftCounts.length > 0 && (
+                            <ShiftCountsDisplay
+                              shiftCounts={shiftCounts.find(c => c.user_id === employee.user_id) || {
+                                user_id: employee.user_id,
+                                weekend_shifts_count: 0,
+                                night_shifts_count: 0,
+                                holiday_shifts_count: 0,
+                                total_shifts_count: 0,
+                              }}
+                              variant="inline"
+                              className="mt-1"
+                            />
+                          )}
                         </div>
                       </div>
                     </TableCell>

@@ -7,12 +7,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2, Repeat, X } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
+import { CalendarIcon, Clock, Users, Zap, User, CheckCircle2, Repeat, X, TrendingUp, Moon, PartyPopper } from "lucide-react";
+import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, subMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { cn, formatUserName } from "@/lib/utils";
+import { useShiftCounts, ShiftCounts } from "@/hooks/useShiftCounts";
+import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
 
 interface Team {
   id: string;
@@ -93,6 +95,23 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     cycles: 1
   });
   const [perDateTimes, setPerDateTimes] = useState<{ [dateStr: string]: { startTime: string; endTime: string } }>({});
+  
+  // Fairness mode states
+  const [fairnessMode, setFairnessMode] = useState(false);
+  const [showDistributionSummary, setShowDistributionSummary] = useState(false);
+  
+  // Fetch shift counts for fairness mode
+  const effectiveUserIds = bulkMode === "users" ? selectedUsers : 
+                           bulkMode === "rotation" ? selectedUsersForRotation :
+                           [];
+  
+  const { shiftCounts, loading: countsLoading } = useShiftCounts({
+    userIds: selectedTeam && (bulkMode === "team" || effectiveUserIds.length > 0) ? 
+             (bulkMode === "team" ? [] : effectiveUserIds) : [], // Empty array will fetch all team members in effect
+    teamIds: selectedTeam ? [selectedTeam] : undefined,
+    startDate: subMonths(new Date(), 6).toISOString().split('T')[0], // Last 6 months
+    enabled: (bulkMode === "team" || bulkMode === "users" || bulkMode === "rotation") && !!selectedTeam && fairnessMode,
+  });
 
   useEffect(() => {
     fetchUserRoles();
@@ -556,6 +575,27 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             targetUsers = await getTeamMemberIds(selectedTeam);
           } else {
             targetUsers = selectedUsers;
+          }
+
+          // Apply fairness sorting if enabled (only for team/users modes)
+          if (fairnessMode && (bulkMode === "team" || bulkMode === "users") && shiftCounts.length > 0) {
+            const countsMap = new Map(shiftCounts.map(c => [c.user_id, c]));
+            targetUsers = [...targetUsers].sort((a, b) => {
+              const aCounts = countsMap.get(a);
+              const bCounts = countsMap.get(b);
+              if (!aCounts && !bCounts) return 0;
+              if (!aCounts) return 1;
+              if (!bCounts) return -1;
+              
+              // Calculate total "unfair" shifts (weekend + night + holiday)
+              const aTotal = aCounts.weekend_shifts_count + aCounts.night_shifts_count + aCounts.holiday_shifts_count;
+              const bTotal = bCounts.weekend_shifts_count + bCounts.night_shifts_count + bCounts.holiday_shifts_count;
+              
+              // Sort ascending: users with fewer unfair shifts come first
+              return aTotal - bTotal;
+            });
+            
+            console.log(`✨ Fairness mode: Sorted ${targetUsers.length} users by shift fairness`);
           }
 
           for (const userId of targetUsers) {
@@ -1108,6 +1148,107 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             onCheckedChange={(checked) => setExcludeHolidays(checked === true)}
           />
         </div>
+
+        {/* Fairness Mode Option - Only for team and users modes */}
+        {(bulkMode === "team" || bulkMode === "users") && (
+          <div className="space-y-3 p-4 border rounded-lg bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 flex-1">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <Label className="text-sm font-semibold">Fairness Mode</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Prioritize employees with fewer weekend, night, and holiday shifts
+                </p>
+              </div>
+              <Checkbox
+                checked={fairnessMode}
+                onCheckedChange={(checked) => {
+                  setFairnessMode(checked === true);
+                  if (checked) setShowDistributionSummary(true);
+                }}
+              />
+            </div>
+            
+            {fairnessMode && (
+              <div className="pt-3 border-t space-y-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDistributionSummary(!showDistributionSummary)}
+                  className="w-full"
+                >
+                  {showDistributionSummary ? "Hide" : "Show"} Distribution Summary
+                </Button>
+                
+                {showDistributionSummary && (
+                  <div className="space-y-2 p-3 bg-background rounded-lg border">
+                    <div className="text-xs font-semibold text-muted-foreground mb-2">
+                      Current Shift Distribution (Last 6 Months)
+                    </div>
+                    {countsLoading ? (
+                      <div className="text-xs text-muted-foreground text-center py-4">
+                        Loading distribution data...
+                      </div>
+                    ) : shiftCounts.length === 0 ? (
+                      <div className="text-xs text-muted-foreground text-center py-4">
+                        No shift data available
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {shiftCounts
+                          .sort((a, b) => {
+                            // Sort by total unfair shifts (weekend + night + holiday)
+                            const aTotal = a.weekend_shifts_count + a.night_shifts_count + a.holiday_shifts_count;
+                            const bTotal = b.weekend_shifts_count + b.night_shifts_count + b.holiday_shifts_count;
+                            return aTotal - bTotal;
+                          })
+                          .map((counts) => {
+                            const user = users.find(u => u.id === counts.user_id);
+                            if (!user) return null;
+                            const totalUnfair = counts.weekend_shifts_count + counts.night_shifts_count + counts.holiday_shifts_count;
+                            
+                            return (
+                              <div key={counts.user_id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium">
+                                    {formatUserName(user.first_name, user.last_name, user.initials)}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <CalendarIcon className="h-3 w-3" />
+                                      {counts.weekend_shifts_count}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Moon className="h-3 w-3" />
+                                      {counts.night_shifts_count}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <PartyPopper className="h-3 w-3" />
+                                      {counts.holiday_shifts_count}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Badge variant={totalUnfair === 0 ? "secondary" : totalUnfair < 5 ? "outline" : "default"}>
+                                  {totalUnfair} total
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                    <div className="pt-2 border-t mt-2">
+                      <p className="text-xs text-muted-foreground italic">
+                        ℹ️ When Fairness Mode is enabled, employees with fewer difficult shifts will be prioritized. Managers can override the generated schedule.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Add Shift Configuration Button */}
         <Button 
