@@ -905,23 +905,25 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             <Label className="text-sm font-medium">Shift Times</Label>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="start-time" className="text-xs text-muted-foreground">Start Time</Label>
+                <Label htmlFor="start-time" className="text-xs text-muted-foreground">Start Time (24h)</Label>
                 <input
                   id="start-time"
                   type="time"
+                  step="60"
                   value={customStartTime}
                   onChange={(e) => setCustomStartTime(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  className="w-full px-3 py-2 border rounded-md bg-background [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="end-time" className="text-xs text-muted-foreground">End Time</Label>
+                <Label htmlFor="end-time" className="text-xs text-muted-foreground">End Time (24h)</Label>
                 <input
                   id="end-time"
                   type="time"
+                  step="60"
                   value={customEndTime}
                   onChange={(e) => setCustomEndTime(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  className="w-full px-3 py-2 border rounded-md bg-background [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
                 />
               </div>
             </div>
@@ -1042,11 +1044,12 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label htmlFor={`start-${dateStr}`} className="text-xs text-muted-foreground">
-                          Start Time
+                          Start Time (24h)
                         </Label>
                         <input
                           id={`start-${dateStr}`}
                           type="time"
+                          step="60"
                           value={times.startTime}
                           onChange={(e) => {
                             setPerDateTimes(prev => ({
@@ -1054,16 +1057,17 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                               [dateStr]: { ...prev[dateStr], startTime: e.target.value }
                             }));
                           }}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
                         />
                       </div>
                       <div className="space-y-1">
                         <Label htmlFor={`end-${dateStr}`} className="text-xs text-muted-foreground">
-                          End Time
+                          End Time (24h)
                         </Label>
                         <input
                           id={`end-${dateStr}`}
                           type="time"
+                          step="60"
                           value={times.endTime}
                           onChange={(e) => {
                             setPerDateTimes(prev => ({
@@ -1071,7 +1075,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                               [dateStr]: { ...prev[dateStr], endTime: e.target.value }
                             }));
                           }}
-                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm [&::-webkit-calendar-picker-indicator]:invert-[.85] dark:[&::-webkit-calendar-picker-indicator]:invert-[.15]"
                         />
                       </div>
                     </div>
