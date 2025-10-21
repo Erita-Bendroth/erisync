@@ -4,6 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 }
 
 // Generate secure random password with complexity requirements
@@ -35,7 +37,7 @@ function generateSecurePassword(): string {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   // Validate request method
@@ -72,8 +74,8 @@ serve(async (req) => {
     );
 
     // Verify the user is authenticated
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    const { data: { user: authenticatedUser }, error: userError } = await supabase.auth.getUser();
+    if (userError || !authenticatedUser) {
       return new Response(JSON.stringify({ error: 'Unauthorized - Invalid JWT token' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -81,19 +83,19 @@ serve(async (req) => {
     }
 
     // Check if user has admin or planner role
-    const { data: userRoles, error: roleError } = await supabase
+    const { data: userRoles, error: roleCheckError } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id);
+      .eq('user_id', authenticatedUser.id);
 
-    if (roleError || !userRoles?.some(r => r.role === 'admin' || r.role === 'planner')) {
+    if (roleCheckError || !userRoles?.some(r => r.role === 'admin' || r.role === 'planner')) {
       return new Response(JSON.stringify({ error: 'Admin or planner access required' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
-    console.log(`Admin/Planner ${user.email} is creating new user`);
+    console.log(`Admin/Planner ${authenticatedUser.email} is creating new user`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -123,7 +125,7 @@ serve(async (req) => {
     const tempPassword = generateSecurePassword();
     
     // Create user
-    const { data: user, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: newUserData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
       email_confirm: true,
@@ -148,7 +150,7 @@ serve(async (req) => {
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
-        user_id: user.user!.id,
+        user_id: newUserData.user!.id,
         first_name: firstName,
         last_name: lastName,
         email: email,
@@ -161,15 +163,15 @@ serve(async (req) => {
     }
 
     // Assign role
-    const { error: roleError } = await supabaseAdmin
+    const { error: roleAssignmentError } = await supabaseAdmin
       .from('user_roles')
       .insert({
-        user_id: user.user!.id,
+        user_id: newUserData.user!.id,
         role: role
       });
 
-    if (roleError) {
-      console.error('Role assignment error:', roleError);
+    if (roleAssignmentError) {
+      console.error('Role assignment error:', roleAssignmentError);
     }
 
     // Assign to team if teamId is provided and not "no-team"
@@ -177,7 +179,7 @@ serve(async (req) => {
       const { error: teamError } = await supabaseAdmin
         .from('team_members')
         .insert({
-          user_id: user.user!.id,
+          user_id: newUserData.user!.id,
           team_id: teamId,
           is_manager: role === 'manager'
         });
@@ -190,7 +192,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        user: user.user,
+        user: newUserData.user,
         message: 'User created successfully'
       }),
       { 
