@@ -27,6 +27,7 @@ interface VacationRequest {
   created_at: string;
   request_group_id: string | null;
   selected_planner_id: string | null;
+  approver_id: string | null;
   requester: {
     user_id: string;
     first_name: string;
@@ -36,6 +37,11 @@ interface VacationRequest {
   };
   team: {
     name: string;
+  };
+  approver?: {
+    initials: string;
+    first_name: string;
+    last_name: string;
   };
 }
 
@@ -65,6 +71,11 @@ interface GroupedRequest {
     name: string;
   };
   requestIds: string[]; // All request IDs in the group
+  approver?: {
+    initials: string;
+    first_name: string;
+    last_name: string;
+  };
 }
 
 interface VacationRequestsListProps {
@@ -145,11 +156,17 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       // Fetch related profiles and teams
       const userIds = [...new Set(requestsData.map(r => r.user_id))];
       const teamIds = [...new Set(requestsData.map(r => r.team_id))];
+      const approverIds = [...new Set(requestsData.map(r => r.approver_id).filter(Boolean))];
 
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, first_name, last_name, email, initials')
         .in('user_id', userIds) as any;
+
+      const { data: approverProfiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, initials')
+        .in('user_id', approverIds) as any;
 
       const { data: teams } = await supabase
         .from('teams')
@@ -157,12 +174,14 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
         .in('id', teamIds);
 
       const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      const approverMap = new Map(approverProfiles?.map(p => [p.user_id, p]) || []);
       const teamsMap = new Map(teams?.map(t => [t.id, t]) || []);
 
       const enrichedRequests = requestsData.map(req => ({
         ...req,
         requester: profilesMap.get(req.user_id) || { user_id: req.user_id, first_name: '', last_name: '', email: '', initials: '' },
         team: teamsMap.get(req.team_id) || { name: '' },
+        approver: req.approver_id ? approverMap.get(req.approver_id) : undefined,
       }));
 
       setRequests(enrichedRequests as any);
@@ -201,6 +220,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             requester: req.requester,
             team: req.team,
             requestIds: groupRequests.map(r => r.id),
+            approver: req.approver,
           });
 
           processedGroups.add(req.request_group_id);
@@ -225,6 +245,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             requester: req.requester,
             team: req.team,
             requestIds: [req.id],
+            approver: req.approver,
           });
         }
       });
@@ -492,10 +513,17 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
               </div>
 
               <div className="flex flex-col items-end gap-3">
-                <Badge variant={config.variant} className="gap-1.5 px-3 py-1">
-                  <StatusIcon className="h-3.5 w-3.5" />
-                  {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                </Badge>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant={config.variant} className="gap-1.5 px-3 py-1">
+                    <StatusIcon className="h-3.5 w-3.5" />
+                    {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                  </Badge>
+                  {request.approver && (request.status === 'approved' || request.status === 'rejected') && (
+                    <span className="text-xs text-muted-foreground">
+                      by {request.approver.initials || formatUserName(request.approver.first_name, request.approver.last_name)}
+                    </span>
+                  )}
+                </div>
 
                 {isPlanner && request.status === 'pending' && (
                   <div className="flex gap-2">
