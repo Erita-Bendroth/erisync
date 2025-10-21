@@ -527,7 +527,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                   </div>
                 )}
 
-                {!isPlanner && currentUserId === request.user_id && request.status === 'pending' && (
+                {currentUserId === request.user_id && request.status === 'pending' && (
                   <div className="flex gap-2">
                     <Button
                       size="sm"
