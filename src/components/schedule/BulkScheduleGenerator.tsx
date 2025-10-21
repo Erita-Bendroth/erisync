@@ -24,6 +24,7 @@ interface User {
   first_name: string;
   last_name: string;
   email: string;
+  initials?: string;
 }
 
 interface ShiftTemplate {
@@ -206,9 +207,9 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         .from('team_members')
         .select(`
           user_id,
-          profiles!inner(first_name, last_name, email)
+          profiles!inner(first_name, last_name, email, initials)
         `)
-        .eq('team_id', selectedTeam);
+        .eq('team_id', selectedTeam) as any;
 
       if (error) throw error;
 
@@ -823,7 +824,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                     onCheckedChange={() => toggleRotationUserSelection(usr.id)}
                   />
                   <label className="text-sm cursor-pointer flex-1">
-                    {usr.first_name} {usr.last_name}
+                    {formatUserName(usr.first_name, usr.last_name)}
                   </label>
                 </div>
               ))}

@@ -24,6 +24,7 @@ interface User {
   first_name: string;
   last_name: string;
   email: string;
+  initials?: string;
 }
 
 export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }: DelegateAccessModalProps) {
@@ -140,9 +141,9 @@ export function DelegateAccessModal({ open, onOpenChange, managerId, onSuccess }
       const selectedUser = users.find(u => u.user_id === selectedUserId);
       const { data: currentUserProfile } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
+        .select("first_name, last_name, email, initials")
         .eq("user_id", managerId)
-        .single();
+        .single() as any;
 
       if (selectedUser && currentUserProfile) {
         await supabase.functions.invoke("send-delegation-notification", {

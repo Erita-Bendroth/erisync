@@ -20,6 +20,7 @@ interface Delegation {
     first_name: string;
     last_name: string;
     email: string;
+    initials?: string;
   };
 }
 
@@ -89,8 +90,8 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
 
         const { data: profiles, error: profilesError } = await supabase
           .from("profiles")
-          .select("user_id, first_name, last_name, email")
-          .in("user_id", uniqueUserIds);
+          .select("user_id, first_name, last_name, email, initials")
+          .in("user_id", uniqueUserIds) as any;
 
         if (profilesError) throw profilesError;
 
@@ -151,15 +152,15 @@ export function DelegationIndicator({ userId, isManager }: DelegationIndicatorPr
       // Get profiles for notification
       const { data: managerProfile } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
+        .select("first_name, last_name, email, initials")
         .eq("user_id", delegation.manager_id)
-        .single();
+        .single() as any;
 
       const { data: delegateProfile } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
+        .select("first_name, last_name, email, initials")
         .eq("user_id", delegation.delegate_id)
-        .single();
+        .single() as any;
 
       // Send cancellation notification to both parties
       if (managerProfile && delegateProfile) {

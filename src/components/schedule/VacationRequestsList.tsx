@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatUserName } from '@/lib/utils';
 
 interface VacationRequest {
   id: string;
@@ -30,6 +31,7 @@ interface VacationRequest {
     first_name: string;
     last_name: string;
     email: string;
+    initials?: string;
   };
   team: {
     name: string;
@@ -134,8 +136,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, first_name, last_name, email')
-        .in('user_id', userIds);
+        .select('user_id, first_name, last_name, email, initials')
+        .in('user_id', userIds) as any;
 
       const { data: teams } = await supabase
         .from('teams')
@@ -147,17 +149,17 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
       const enrichedRequests = requestsData.map(req => ({
         ...req,
-        requester: profilesMap.get(req.user_id) || { user_id: req.user_id, first_name: '', last_name: '', email: '' },
+        requester: profilesMap.get(req.user_id) || { user_id: req.user_id, first_name: '', last_name: '', email: '', initials: '' },
         team: teamsMap.get(req.team_id) || { name: '' },
       }));
 
-      setRequests(enrichedRequests as VacationRequest[]);
+      setRequests(enrichedRequests as any);
 
       // Group requests by request_group_id
       const grouped: GroupedRequest[] = [];
       const processedGroups = new Set<string>();
 
-      enrichedRequests.forEach((req: VacationRequest) => {
+      enrichedRequests.forEach((req: any) => {
         if (req.request_group_id && !processedGroups.has(req.request_group_id)) {
           // This is part of a multi-day request
           const groupRequests = enrichedRequests.filter(
@@ -405,7 +407,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                     </div>
                     <div>
                       <span className="font-semibold text-base">
-                        {request.requester.first_name} {request.requester.last_name}
+                        {formatUserName(request.requester.first_name, request.requester.last_name)}
                       </span>
                       <span className="text-sm text-muted-foreground ml-2">• {request.team.name}</span>
                     </div>

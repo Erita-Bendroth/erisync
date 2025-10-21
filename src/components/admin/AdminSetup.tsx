@@ -18,6 +18,7 @@ interface Profile {
   first_name: string;
   last_name: string;
   email: string;
+  initials?: string;
 }
 
 interface UserRole {
@@ -89,12 +90,11 @@ const AdminSetup = () => {
 
   const fetchProfiles = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("profiles")
-        .select("user_id, first_name, last_name, email")
-        .order("first_name");
-
-      const { data, error } = await query;
+        .select("user_id, first_name, last_name, email, initials")
+        .order("first_name") as any;
+      
       if (error) throw error;
 
       let filteredProfiles = data || [];

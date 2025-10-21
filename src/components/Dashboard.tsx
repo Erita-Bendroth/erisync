@@ -18,6 +18,7 @@ interface Profile {
   first_name: string;
   last_name: string;
   email: string;
+  initials?: string;
 }
 
 const Dashboard = () => {
@@ -38,9 +39,9 @@ const Dashboard = () => {
       // Fetch user profile
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email")
+        .select("first_name, last_name, email, initials")
         .eq("user_id", user?.id)
-        .single();
+        .single() as any;
 
       if (profileError) {
         console.error("Error fetching profile:", profileError);

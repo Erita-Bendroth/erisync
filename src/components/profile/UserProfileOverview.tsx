@@ -23,6 +23,7 @@ interface ProfileData {
   last_name: string;
   email: string;
   country_code: string;
+  initials?: string;
 }
 
 interface WorkSummary {
@@ -56,9 +57,9 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, last_name, email, country_code')
+        .select('first_name, last_name, email, country_code, initials')
         .eq('user_id', userId)
-        .single();
+        .single() as any;
 
       if (error) throw error;
       setProfile(data);

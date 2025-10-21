@@ -572,7 +572,7 @@ const TeamManagement = () => {
                     <SelectContent>
                        {profiles.map((profile) => (
                          <SelectItem key={profile.user_id} value={profile.user_id}>
-                           {profile.first_name} {profile.last_name} {profile.email ? `(${profile.email})` : ''}
+                           {formatUserName(profile.first_name, profile.last_name)} {profile.email ? `(${profile.email})` : ''}
                          </SelectItem>
                        ))}
                     </SelectContent>

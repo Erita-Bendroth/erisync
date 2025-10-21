@@ -32,6 +32,7 @@ interface TeamMember {
     first_name: string;
     last_name: string;
     email: string;
+    initials?: string;
   };
   user_roles: Array<{
     role: string;
@@ -135,8 +136,8 @@ const EnhancedTeamManagement = () => {
             .in('user_id', userIds),
           supabase
             .from('profiles')
-            .select('user_id, first_name, last_name, email')
-            .in('user_id', userIds)
+            .select('user_id, first_name, last_name, email, initials')
+            .in('user_id', userIds) as any
         ]);
 
         const rolesMap = (rolesResponse.data || []).reduce((acc, role) => {
