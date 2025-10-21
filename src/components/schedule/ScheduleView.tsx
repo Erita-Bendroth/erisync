@@ -214,9 +214,16 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       const teamExists = teams.find(team => team.id === initialTeamId);
       if (teamExists) {
         setSelectedTeams([initialTeamId]);
+        // Also switch to team-availability view mode for team members
+        const isTeamMemberRole = userRoles.some(role => role.role === "teammember");
+        const isManagerRole = userRoles.some(role => role.role === "manager");
+        const isPlannerRole = userRoles.some(role => role.role === "planner");
+        if (isTeamMemberRole && !isManagerRole && !isPlannerRole) {
+          setViewMode("team-availability");
+        }
       }
     }
-  }, [initialTeamId, teams]);
+  }, [initialTeamId, teams, userRoles]);
 
   useEffect(() => {
     if (user) {

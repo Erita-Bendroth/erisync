@@ -510,9 +510,18 @@ const Dashboard = () => {
                 className="w-full justify-start" 
                 variant="outline"
                 onClick={() => {
-                  const teamId = userTeams.length > 0 ? userTeams[0].id : '';
-                  navigate(`/schedule?tab=schedule&team=${teamId}`);
+                  if (userTeams.length > 0) {
+                    navigate(`/schedule?tab=schedule&team=${userTeams[0].id}`);
+                  } else {
+                    navigate('/schedule?tab=schedule');
+                    toast({
+                      title: "No team assigned",
+                      description: "You are not assigned to any team yet",
+                      variant: "destructive",
+                    });
+                  }
                 }}
+                disabled={userTeams.length === 0}
               >
                 <Users className="w-4 h-4 mr-2" />
                 View Team Availability
