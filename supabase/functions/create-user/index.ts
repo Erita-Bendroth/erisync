@@ -108,10 +108,10 @@ serve(async (req) => {
       }
     );
 
-    const { email, password, firstName, lastName, role, countryCode, teamId, requiresPasswordChange } = await req.json();
+    const { email, password, initials, role, countryCode, teamId, requiresPasswordChange } = await req.json();
 
     // Validate input
-    if (!email || !password || !firstName || !lastName || !role) {
+    if (!email || !password || !initials || !role) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { 
@@ -130,8 +130,7 @@ serve(async (req) => {
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
-        first_name: firstName,
-        last_name: lastName
+        initials: initials
       }
     });
 
@@ -146,13 +145,13 @@ serve(async (req) => {
       );
     }
 
-    // Create profile
+    // Create profile - store initials in first_name, leave last_name empty
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
         user_id: newUserData.user!.id,
-        first_name: firstName,
-        last_name: lastName,
+        first_name: initials,
+        last_name: '', // Empty for initials-only users
         email: email,
         country_code: countryCode || 'US',
         requires_password_change: true // Always require password change for new users
