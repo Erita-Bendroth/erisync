@@ -315,7 +315,7 @@ const fetchPendingRequestsCount = async () => {
 
     let query = supabase
       .from('vacation_requests')
-      .select('*', { count: 'exact', head: true })
+      .select('id, request_group_id')
       .eq('status', 'pending');
     
     // If not a planner/manager, only count own requests
@@ -323,10 +323,28 @@ const fetchPendingRequestsCount = async () => {
       query = query.eq('user_id', user.id);
     }
 
-    const { count, error } = await query;
+    const { data, error } = await query;
     
     if (error) throw error;
-    setPendingRequestsCount(count || 0);
+    
+    // Count unique request groups (multi-day requests) + individual requests
+    if (data) {
+      const groupIds = new Set<string>();
+      let individualCount = 0;
+      
+      data.forEach(request => {
+        if (request.request_group_id) {
+          groupIds.add(request.request_group_id);
+        } else {
+          individualCount++;
+        }
+      });
+      
+      const totalCount = groupIds.size + individualCount;
+      setPendingRequestsCount(totalCount);
+    } else {
+      setPendingRequestsCount(0);
+    }
   } catch (error) {
     console.error('Error fetching pending requests count:', error);
   }

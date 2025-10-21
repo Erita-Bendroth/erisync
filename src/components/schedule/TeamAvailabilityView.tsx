@@ -280,15 +280,12 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
               </TableHeader>
               <TableBody>
                 {uniqueUsers.map((user) => (
-                  <TableRow key={user.user_id}>
+                <TableRow key={user.user_id}>
                     <TableCell className="font-medium sticky left-0 bg-background">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
                           {user.initials}
                         </div>
-                        <span>
-                          {formatUserName(user.first_name, user.last_name, user.initials)}
-                        </span>
                       </div>
                     </TableCell>
                      {workDays.map((day, dayIndex) => {
