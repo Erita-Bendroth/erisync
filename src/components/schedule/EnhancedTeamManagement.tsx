@@ -58,8 +58,14 @@ const EnhancedTeamManagement = () => {
 
   useEffect(() => {
     fetchUserRoles();
-    fetchTeamsAndMembers();
   }, [user]);
+
+  useEffect(() => {
+    // Only fetch teams after user roles have been loaded
+    if (userRoles.length > 0) {
+      fetchTeamsAndMembers();
+    }
+  }, [user, userRoles]);
 
   const fetchUserRoles = async () => {
     if (!user) return;
@@ -84,13 +90,18 @@ const EnhancedTeamManagement = () => {
   const canEditTeams = () => isAdmin() || isPlanner();
 
   const fetchTeamsAndMembers = async () => {
+    if (!user || userRoles.length === 0) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       
       // Fetch teams based on user role
       let teamsQuery = supabase.from('teams').select('*').order('name');
       
-      if (isManager() && !isPlanner()) {
+      if (isManager() && !isPlanner() && !isAdmin()) {
         // Managers only see their assigned teams
         const { data: managerTeams } = await supabase
           .from('team_members')
