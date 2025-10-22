@@ -229,6 +229,7 @@ const Auth = () => {
                       id="signin-email"
                       type="email"
                       placeholder="Enter your email"
+                      autoComplete="username"
                       value={signInData.email}
                       onChange={(e) =>
                         setSignInData({ ...signInData, email: e.target.value })

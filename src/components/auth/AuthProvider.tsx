@@ -42,7 +42,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, session) => {
         if (!mounted) return;
         
-        console.log('Auth state changed:', event, session ? 'session exists' : 'no session');
+        // Only log significant auth events, not initialization
+        if (event === 'SIGNED_IN') {
+          console.log('Auth state changed:', event, 'session exists');
+        } else if (event === 'SIGNED_OUT') {
+          console.log('Auth state changed:', event, 'no session');
+        }
         
         // Handle token refresh errors
         if (event === 'TOKEN_REFRESHED' && !session) {
@@ -153,18 +158,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    // First check if user has temporary password
-    try {
-      const { data: tempCheckData } = await supabase.functions.invoke('check-temp-password', {
-        body: { email, password }
-      });
-      
-      console.log('Temporary password check result:', tempCheckData);
-    } catch (error) {
-      console.error('Error checking temporary password:', error);
-      // Continue with normal login even if temp check fails
-    }
-
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
