@@ -143,7 +143,6 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
     setExporting(true);
     try {
       const { start } = getRange();
-      // Prepare worksheet data for the current user
       const worksheetData = [
         ['My Schedule Export'],
         [`Week of ${format(start, 'MMM dd')} - ${exportRange === 'month' ? 'Full Month' : format(addDays(start, 6), 'MMM dd, yyyy')}`],
@@ -165,12 +164,8 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(worksheetData);
       ws['!cols'] = [
-        { width: 12 }, // Date
-        { width: 12 }, // Day
-        { width: 12 }, // Shift Type
-        { width: 16 }, // Activity
-        { width: 12 }, // Status
-        { width: 40 }  // Notes
+        { width: 12 }, { width: 12 }, { width: 12 }, 
+        { width: 16 }, { width: 12 }, { width: 40 }
       ];
       XLSX.utils.book_append_sheet(wb, ws, 'My Schedule');
       const fileName = `my-schedule-${format(currentWeek, 'yyyy-MM-dd')}.xlsx`;
@@ -180,6 +175,113 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
     } catch (error) {
       console.error('Error exporting as Excel:', error);
       toast({ title: 'Export Failed', description: 'Failed to export schedule as Excel.', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportAsJSON = () => {
+    setExporting(true);
+    try {
+      const { start, end } = getRange();
+      
+      const exportData = {
+        metadata: {
+          export_date: new Date().toISOString(),
+          user_id: user?.id,
+          date_range: {
+            start: format(start, 'yyyy-MM-dd'),
+            end: format(end, 'yyyy-MM-dd')
+          },
+          version: '1.0'
+        },
+        schedule_entries: entries.map(entry => ({
+          date: entry.date,
+          shift_type: entry.shift_type,
+          activity_type: entry.activity_type,
+          availability_status: entry.availability_status,
+          notes: entry.notes || null
+        }))
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `schedule-${format(start, 'yyyy-MM-dd')}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      toast({ title: 'Export Successful', description: 'Schedule exported as JSON successfully.' });
+    } catch (error) {
+      console.error('Error exporting JSON:', error);
+      toast({ title: 'Export Failed', description: 'Failed to export as JSON.', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportAsVisualCalendarPDF = async () => {
+    setExporting(true);
+    try {
+      const { start, end } = getRange();
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      
+      // Title
+      pdf.setFontSize(18);
+      pdf.text(`Schedule: ${format(start, 'MMM dd')} - ${format(end, 'MMM dd, yyyy')}`, 15, 20);
+      
+      // Calendar grid setup
+      let yPos = 35;
+      const colWidth = 38;
+      const rowHeight = 25;
+      
+      // Draw days of week headers
+      pdf.setFontSize(10);
+      pdf.setFont(undefined, 'bold');
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      days.forEach((day, idx) => {
+        pdf.text(day, 15 + (idx * colWidth) + 2, yPos);
+      });
+      
+      // Draw entries
+      yPos += 5;
+      pdf.setFont(undefined, 'normal');
+      pdf.setFontSize(8);
+      
+      let currentDate = new Date(start);
+      let row = 0;
+      
+      while (currentDate <= end) {
+        const dayIdx = (currentDate.getDay() + 6) % 7; // Mon=0, Sun=6
+        const entry = entries.find(e => e.date === format(currentDate, 'yyyy-MM-dd'));
+        
+        const xPos = 15 + (dayIdx * colWidth);
+        const cellY = yPos + (row * rowHeight);
+        
+        // Draw cell border
+        pdf.rect(xPos, cellY, colWidth, rowHeight);
+        
+        // Date number
+        pdf.setFontSize(10);
+        pdf.text(format(currentDate, 'd'), xPos + 2, cellY + 5);
+        
+        // Entry details if exists
+        if (entry) {
+          pdf.setFontSize(7);
+          pdf.text(entry.shift_type || '', xPos + 2, cellY + 11);
+          pdf.text(entry.activity_type || '', xPos + 2, cellY + 16);
+        }
+        
+        currentDate = addDays(currentDate, 1);
+        if (dayIdx === 6) row++;
+      }
+      
+      pdf.save(`calendar-${format(start, 'yyyy-MM-dd')}.pdf`);
+      toast({ title: 'Export Successful', description: 'Calendar exported as PDF successfully.' });
+    } catch (error) {
+      console.error('Error exporting calendar PDF:', error);
+      toast({ title: 'Export Failed', description: 'Failed to export calendar.', variant: 'destructive' });
     } finally {
       setExporting(false);
     }
@@ -234,32 +336,62 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
         </div>
 
         <div className="space-y-4">
-          <Button 
-            onClick={handleExport} 
-            disabled={exporting || loadingData}
-            className="flex items-center gap-2"
-          >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            Export as PDF
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Button 
+              onClick={handleExport} 
+              disabled={exporting || loadingData}
+              className="flex items-center gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              PDF (Screenshot)
+            </Button>
 
-          <Button 
-            onClick={exportAsExcel} 
-            disabled={exporting || loadingData}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            Export Excel
-          </Button>
+            <Button 
+              onClick={exportAsVisualCalendarPDF} 
+              disabled={exporting || loadingData}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Calendar className="w-4 h-4" />
+              )}
+              PDF (Calendar)
+            </Button>
+
+            <Button 
+              onClick={exportAsExcel} 
+              disabled={exporting || loadingData}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              Excel
+            </Button>
+
+            <Button 
+              onClick={exportAsJSON} 
+              disabled={exporting || loadingData}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              JSON
+            </Button>
+          </div>
           
           {entries.length > 0 && (
             <p className="text-sm text-muted-foreground">
@@ -269,14 +401,9 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
         </div>
 
         <div className="flex flex-wrap gap-2 pt-2">
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <FileText className="w-3 h-3" />
-            PDF: Printable document
-          </Badge>
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            Excel: Spreadsheet data
-          </Badge>
+          <Badge variant="secondary" className="text-xs">PDF: Screenshot or calendar view</Badge>
+          <Badge variant="secondary" className="text-xs">Excel: Spreadsheet format</Badge>
+          <Badge variant="secondary" className="text-xs">JSON: API integration</Badge>
         </div>
 
         {/* Hidden div to capture schedule for export - positioned off-screen but rendered */}

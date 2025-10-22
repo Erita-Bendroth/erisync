@@ -1,14 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { CapacityMetrics } from '@/hooks/useAnalytics';
+import { useTheme } from 'next-themes';
 
 interface WorkforceAnalyticsProps {
-  capacity?: any[]; // API returns { team_id, data } structure
+  capacity?: any[];
 }
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
-
 export const WorkforceAnalytics = ({ capacity }: WorkforceAnalyticsProps) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  
+  const COLORS = isDark 
+    ? ['hsl(217, 91%, 60%)', 'hsl(142, 71%, 45%)', 'hsl(48, 96%, 53%)', 'hsl(280, 87%, 65%)']
+    : ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
   if (!capacity || capacity.length === 0) {
     return (
       <Card>

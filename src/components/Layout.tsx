@@ -3,6 +3,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -54,6 +55,7 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
           
           <div className="flex items-center space-x-4">
+            <GlobalSearch />
             <div className="bg-primary/10 px-3 py-1 rounded-md border">
               <span className="text-sm font-medium">
                 Logged in as: <strong className="text-primary">{user?.email || 'Not logged in'}</strong>

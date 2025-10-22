@@ -347,6 +347,36 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_bookmarks: {
+        Row: {
+          bookmark_type: string
+          config: Json
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          bookmark_type: string
+          config: Json
+          created_at?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          bookmark_type?: string
+          config?: Json
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       schedule_change_log: {
         Row: {
           change_type: string
@@ -447,6 +477,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      search_history: {
+        Row: {
+          id: string
+          result_count: number | null
+          search_query: string
+          search_type: string
+          searched_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          result_count?: number | null
+          search_query: string
+          search_type: string
+          searched_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          result_count?: number | null
+          search_query?: string
+          search_type?: string
+          searched_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       team_audit_log: {
         Row: {
@@ -583,6 +640,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_favorites: {
+        Row: {
+          created_at: string | null
+          favorite_user_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          favorite_user_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          favorite_user_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_oauth_tokens: {
         Row: {
@@ -930,6 +1008,14 @@ export type Database = {
       get_user_teams: {
         Args: { _user_id: string }
         Returns: string[]
+      }
+      global_search: {
+        Args: {
+          _current_user_id: string
+          _limit?: number
+          _search_query: string
+        }
+        Returns: Json
       }
       has_manager_access: {
         Args: { _team_id: string; _user_id: string }

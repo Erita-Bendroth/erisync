@@ -1,22 +1,36 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { EfficiencyMetrics } from '@/hooks/useAnalytics';
+import { useTheme } from 'next-themes';
 
 interface EfficiencyAnalyticsProps {
   efficiency?: EfficiencyMetrics;
 }
 
-const COLORS = {
-  normal: 'hsl(var(--primary))',
-  early: 'hsl(var(--secondary))',
-  late: 'hsl(var(--accent))',
-  work: 'hsl(var(--primary))',
-  vacation: 'hsl(var(--secondary))',
-  sick: 'hsl(var(--destructive))',
-  other: 'hsl(var(--muted))',
-};
-
 export const EfficiencyAnalytics = ({ efficiency }: EfficiencyAnalyticsProps) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  
+  const COLORS_MAP = isDark 
+    ? {
+        normal: 'hsl(217, 91%, 60%)',
+        early: 'hsl(142, 71%, 45%)',
+        late: 'hsl(48, 96%, 53%)',
+        work: 'hsl(217, 91%, 60%)',
+        vacation: 'hsl(142, 71%, 45%)',
+        sick: 'hsl(0, 72%, 51%)',
+        other: 'hsl(280, 87%, 65%)',
+      }
+    : {
+        normal: 'hsl(var(--primary))',
+        early: 'hsl(var(--secondary))',
+        late: 'hsl(var(--accent))',
+        work: 'hsl(var(--primary))',
+        vacation: 'hsl(var(--secondary))',
+        sick: 'hsl(var(--destructive))',
+        other: 'hsl(var(--muted))',
+      };
+  
   if (!efficiency) {
     return (
       <Card>
@@ -32,14 +46,14 @@ export const EfficiencyAnalytics = ({ efficiency }: EfficiencyAnalyticsProps) =>
   const shiftData = Object.entries(efficiency.shift_distribution || {}).map(([type, count]) => ({
     type: type.charAt(0).toUpperCase() + type.slice(1),
     count,
-    fill: COLORS[type as keyof typeof COLORS] || COLORS.normal,
+    fill: COLORS_MAP[type as keyof typeof COLORS_MAP] || COLORS_MAP.normal,
   }));
 
   // Prepare activity distribution data
   const activityData = Object.entries(efficiency.activity_distribution || {}).map(([type, count]) => ({
     type: type.charAt(0).toUpperCase() + type.slice(1),
     count,
-    fill: COLORS[type as keyof typeof COLORS] || COLORS.work,
+    fill: COLORS_MAP[type as keyof typeof COLORS_MAP] || COLORS_MAP.work,
   }));
 
   return (
