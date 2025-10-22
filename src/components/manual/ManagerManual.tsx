@@ -1,10 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
-
 export const ManagerManual = () => {
-  return (
-    <div className="space-y-8">
+  return <div className="space-y-8">
       <section id="getting-started">
         <h2 className="text-2xl font-bold mb-4">1. Getting Started</h2>
         <p className="text-muted-foreground mb-4">
@@ -65,9 +63,9 @@ export const ManagerManual = () => {
           <li>Select the team member</li>
           <li>Choose date and time block:
             <ul className="list-disc list-inside ml-6 mt-2">
-              <li><strong>Day:</strong> 06:00 - 14:00</li>
-              <li><strong>Evening:</strong> 14:00 - 22:00</li>
-              <li><strong>Night:</strong> 22:00 - 06:00</li>
+              
+              
+              
             </ul>
           </li>
           <li>Select shift type: Working, Vacation, Sick, Training, or Other</li>
@@ -392,6 +390,5 @@ export const ManagerManual = () => {
           </AlertDescription>
         </Alert>
       </section>
-    </div>
-  );
+    </div>;
 };
