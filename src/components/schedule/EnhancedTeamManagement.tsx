@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatUserName } from "@/lib/utils";
+import { TeamCapacityConfig } from '@/components/admin/TeamCapacityConfig';
 
 interface Team {
   id: string;
@@ -499,7 +500,11 @@ const EnhancedTeamManagement = () => {
                     </CollapsibleTrigger>
                     
                     <CollapsibleContent>
-                      <div className="px-4 pb-4">
+                      <div className="px-4 pb-4 space-y-4">
+                        {/* Team Capacity Configuration */}
+                        <TeamCapacityConfig teamId={team.id} teamName={team.name} />
+                        
+                        {/* Team Members Table */}
                         <Table>
                           <TableHeader>
                             <TableRow>

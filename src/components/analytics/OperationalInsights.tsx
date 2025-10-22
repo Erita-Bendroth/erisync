@@ -78,6 +78,7 @@ export const OperationalInsights = ({ coverage, vacation }: OperationalInsightsP
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Scheduled</TableHead>
+                  <TableHead>Required</TableHead>
                   <TableHead>Gap</TableHead>
                 </TableRow>
               </TableHeader>
@@ -86,6 +87,7 @@ export const OperationalInsights = ({ coverage, vacation }: OperationalInsightsP
                   <TableRow key={idx}>
                     <TableCell>{format(new Date(gap.date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>{gap.scheduled_count}</TableCell>
+                    <TableCell className="font-medium">{gap.required || 1}</TableCell>
                     <TableCell className="text-destructive font-medium">{gap.gap} needed</TableCell>
                   </TableRow>
                 ))}
