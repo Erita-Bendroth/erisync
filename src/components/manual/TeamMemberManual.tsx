@@ -35,12 +35,12 @@ export const TeamMemberManual = () => {
           <li>Your team's schedule will be displayed</li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The top navigation bar highlighting the "Schedule" button between "Dashboard" 
-            and other navigation items, showing where to click to view schedules.
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/team-member-schedule.png" 
+            alt="Main navigation with Schedule tab highlighted, showing calendar view with color-coded shifts"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <h3 className="text-xl font-semibold mb-3">Calendar Views</h3>
@@ -107,12 +107,12 @@ export const TeamMemberManual = () => {
           <li>You'll receive a confirmation and the planner will be notified</li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The "Request Vacation" button on the Schedule page, and the vacation request 
-            form modal with date pickers, full day checkbox, planner dropdown, and notes field.
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/team-member-vacation-request.png" 
+            alt="Request Vacation button and form showing date range picker, notes field, and submit button"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <Alert>

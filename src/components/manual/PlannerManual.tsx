@@ -37,12 +37,12 @@ export const PlannerManual = () => {
           <li>The system will generate a temporary password and send it to the user's email</li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The Dashboard with tabs showing "Admin Setup" tab selected, the User Management 
-            section, and the "Create New User" button prominently displayed.
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/planner-user-management.png" 
+            alt="Dashboard showing Admin Setup tab, User Management section, and Create New User button"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <Alert className="mb-4">
@@ -117,12 +117,12 @@ export const PlannerManual = () => {
           <li>Click <strong>"Create Team"</strong></li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The Schedule page with the "Teams" tab selected, showing the "Create New Team" 
-            button and the team creation form with fields for name and description.
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/planner-team-creation.png" 
+            alt="Schedule page with Teams tab selected, showing Create New Team button and form"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <h3 className="text-xl font-semibold mb-3">Adding Team Members</h3>
@@ -226,12 +226,12 @@ export const PlannerManual = () => {
           <li>User receives approval notification</li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The Vacation Requests list with pending requests, showing user names, dates, 
-            status badges, and green "Approve" and red "Reject" buttons that only planners can see.
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/planner-vacation-approval.png" 
+            alt="Vacation Requests list showing pending requests with user names, dates, and Approve/Reject buttons"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <Alert>

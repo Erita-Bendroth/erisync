@@ -73,13 +73,12 @@ export const ManagerManual = () => {
           <li>Click <strong>"Create Schedule Entry"</strong></li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The "Add Entry" button in the schedule interface, showing the form with 
-            dropdowns for team member selection, date picker, time block radio buttons 
-            (Day/Evening/Night), and shift type dropdown (Working/Vacation/Sick/Training/Other).
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/manager-schedule-entry.png" 
+            alt="Schedule interface showing Add Entry form with team member selection, date picker, time blocks, and shift type dropdown"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <h3 className="text-xl font-semibold mb-3">Editing Schedule Entries</h3>
@@ -169,13 +168,12 @@ export const ManagerManual = () => {
           <li>Check team availability for the requested dates</li>
         </ol>
 
-        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
-          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
-          <p className="text-sm text-muted-foreground">
-            The Vacation Requests list showing team member names, requested dates, 
-            status badges (pending/approved/rejected), and the ability to view details 
-            but no approve/reject buttons for managers.
-          </p>
+        <div className="my-4">
+          <img 
+            src="/images/manual/manager-vacation-view.png" 
+            alt="Vacation Requests section showing team member requests with status badges but no approve/reject buttons for managers"
+            className="w-full rounded-lg border border-border shadow-sm"
+          />
         </div>
 
         <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
