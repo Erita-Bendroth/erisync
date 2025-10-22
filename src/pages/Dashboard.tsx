@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Users, LogOut, Mail, TrendingUp } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
@@ -271,6 +272,7 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center space-x-3">
+            <GlobalSearch />
             <ThemeToggle />
             <Button onClick={handleSignOut} variant="outline" size="sm">
               <LogOut className="w-4 h-4 mr-2" />

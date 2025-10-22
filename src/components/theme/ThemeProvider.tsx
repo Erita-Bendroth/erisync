@@ -5,7 +5,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 
 function ThemeSync() {
-  const { user } = useAuth();
+  const authContext = useAuth();
+  const user = authContext?.user;
 
   useEffect(() => {
     const loadUserTheme = async () => {

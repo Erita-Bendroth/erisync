@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import EnhancedTeamManagement from "@/components/schedule/EnhancedTeamManagement";
@@ -240,6 +241,7 @@ const Schedule = () => {
             <p className="text-muted-foreground">Manage your team's schedule</p>
           </div>
           <div className="flex items-center space-x-3">
+            <GlobalSearch />
             <Button 
               onClick={() => window.location.href = '/dashboard'} 
               variant="outline" 
