@@ -192,7 +192,7 @@ export const ManagerManual = () => {
         </p>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Review the request and check team coverage</li>
-          <li>Contact your Planner or Admin via the app or email</li>
+          <li>Contact your Planner or Admin</li>
           <li>Provide context: coverage status, business needs, urgency</li>
           <li>The Planner will make the final decision and notify the team member</li>
         </ol>
