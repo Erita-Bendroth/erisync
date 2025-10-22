@@ -19,6 +19,11 @@ export interface CapacityMetrics {
   sick_days: number;
   other_days: number;
   utilization_rate: number;
+  trend?: {
+    value: number;
+    isPositive: boolean;
+    hasPreviousData: boolean;
+  };
 }
 
 export interface EfficiencyMetrics {

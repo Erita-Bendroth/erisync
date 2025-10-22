@@ -40,6 +40,11 @@ interface MetricsOverviewProps {
     total_members: number;
     work_days: number;
     utilization_rate: number;
+    trend?: {
+      value: number;
+      isPositive: boolean;
+      hasPreviousData: boolean;
+    };
   };
   coverage?: {
     gaps: any[];
@@ -67,10 +72,10 @@ export const MetricsOverview = ({ capacity, coverage, vacation, efficiency }: Me
       <MetricCard
         title="Utilization Rate"
         value={`${utilizationRate.toFixed(1)}%`}
-        trend={{
-          value: 5.2,
-          isPositive: utilizationRate > 80,
-        }}
+        trend={capacity?.trend?.hasPreviousData ? {
+          value: capacity.trend.value,
+          isPositive: capacity.trend.isPositive,
+        } : undefined}
         icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
       />
       <MetricCard

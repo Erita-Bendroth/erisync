@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
     // Calculate capacity metrics for each team
     if (metrics.includes('capacity')) {
       const capacityPromises = team_ids.map(async (team_id) => {
+        // Calculate capacity for current period
         const { data, error } = await supabaseClient.rpc('get_team_capacity_metrics', {
           _team_id: team_id,
           _start_date: start_date,
@@ -66,6 +67,43 @@ Deno.serve(async (req) => {
         if (error) {
           console.error('Error calculating capacity for team', team_id, error);
           return null;
+        }
+
+        // Calculate previous period dates (same length as current period)
+        const startDateObj = new Date(start_date);
+        const endDateObj = new Date(end_date);
+        const periodLengthDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24));
+        
+        const prevEndDate = new Date(startDateObj);
+        prevEndDate.setDate(prevEndDate.getDate() - 1);
+        const prevStartDate = new Date(prevEndDate);
+        prevStartDate.setDate(prevStartDate.getDate() - periodLengthDays + 1);
+
+        // Fetch previous period capacity
+        const { data: prevData, error: prevError } = await supabaseClient.rpc('get_team_capacity_metrics', {
+          _team_id: team_id,
+          _start_date: prevStartDate.toISOString().split('T')[0],
+          _end_date: prevEndDate.toISOString().split('T')[0],
+        });
+
+        // Calculate trend if both current and previous data exist
+        if (!prevError && prevData && data) {
+          const currentRate = data.utilization_rate || 0;
+          const prevRate = prevData.utilization_rate || 0;
+          const trendValue = currentRate - prevRate;
+          
+          data.trend = {
+            value: Math.abs(trendValue),
+            isPositive: trendValue >= 0,
+            hasPreviousData: true,
+          };
+        } else {
+          // No previous data available
+          data.trend = {
+            value: 0,
+            isPositive: true,
+            hasPreviousData: false,
+          };
         }
 
         // Store snapshot
