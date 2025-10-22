@@ -1,10 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
-
 export const PlannerManual = () => {
-  return (
-    <div className="space-y-8">
+  return <div className="space-y-8">
       <section id="getting-started">
         <h2 className="text-2xl font-bold mb-4">1. Getting Started</h2>
         <p className="text-muted-foreground mb-4">
@@ -38,11 +36,7 @@ export const PlannerManual = () => {
         </ol>
 
         <div className="my-4">
-          <img 
-            src="/images/manual/planner-user-management.png" 
-            alt="Dashboard showing Admin Setup tab, User Management section, and Create New User button"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+          
         </div>
 
         <Alert className="mb-4">
@@ -118,11 +112,7 @@ export const PlannerManual = () => {
         </ol>
 
         <div className="my-4">
-          <img 
-            src="/images/manual/planner-team-creation.png" 
-            alt="Schedule page with Teams tab selected, showing Create New Team button and form"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+          
         </div>
 
         <h3 className="text-xl font-semibold mb-3">Adding Team Members</h3>
@@ -227,11 +217,7 @@ export const PlannerManual = () => {
         </ol>
 
         <div className="my-4">
-          <img 
-            src="/images/manual/planner-vacation-approval.png" 
-            alt="Vacation Requests list showing pending requests with user names, dates, and Approve/Reject buttons"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+          
         </div>
 
         <Alert>
@@ -454,6 +440,5 @@ export const PlannerManual = () => {
           </AlertDescription>
         </Alert>
       </section>
-    </div>
-  );
+    </div>;
 };
