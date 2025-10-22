@@ -500,12 +500,19 @@ const EnhancedTeamManagement = () => {
                     </CollapsibleTrigger>
                     
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 space-y-4">
+                      <div className="px-4 pb-4 space-y-6">
                         {/* Team Capacity Configuration */}
-                        <TeamCapacityConfig teamId={team.id} teamName={team.name} />
+                        <div className="border-b pb-4">
+                          <TeamCapacityConfig teamId={team.id} teamName={team.name} />
+                        </div>
                         
                         {/* Team Members Table */}
-                        <Table>
+                        <div>
+                          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Team Members
+                          </h4>
+                          <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Name</TableHead>
@@ -569,6 +576,7 @@ const EnhancedTeamManagement = () => {
                             ))}
                           </TableBody>
                         </Table>
+                        </div>
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
