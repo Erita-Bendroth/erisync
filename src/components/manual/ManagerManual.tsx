@@ -29,7 +29,7 @@ export const ManagerManual = () => {
         <p className="mb-4">Your dashboard provides quick access to:</p>
         <ul className="list-disc list-inside space-y-2 mb-4">
           <li><strong>Today's Schedule:</strong> Quick view of who's working today</li>
-          <li><strong>Pending Vacation Requests:</strong> Requests awaiting your approval</li>
+          
           <li><strong>Team Availability:</strong> Who's available and who's on leave</li>
           <li><strong>Quick Actions:</strong> Common tasks like creating schedule entries</li>
         </ul>
