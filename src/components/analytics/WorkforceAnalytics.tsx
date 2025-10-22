@@ -3,7 +3,7 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 import { CapacityMetrics } from '@/hooks/useAnalytics';
 
 interface WorkforceAnalyticsProps {
-  capacity?: CapacityMetrics[];
+  capacity?: any[]; // API returns { team_id, data } structure
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
@@ -20,7 +20,20 @@ export const WorkforceAnalytics = ({ capacity }: WorkforceAnalyticsProps) => {
     );
   }
 
-  const firstTeamCapacity = capacity[0] as any;
+  // Extract the actual capacity data from the API response structure
+  const firstTeamCapacity = capacity[0]?.data || capacity[0];
+  
+  // If still no data, show empty state
+  if (!firstTeamCapacity || typeof firstTeamCapacity !== 'object') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Workforce Analytics</CardTitle>
+          <CardDescription>No data available</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   // Prepare data for activity breakdown pie chart
   const activityData = [
@@ -31,11 +44,16 @@ export const WorkforceAnalytics = ({ capacity }: WorkforceAnalyticsProps) => {
   ].filter(item => item.value > 0);
 
   // Prepare data for utilization comparison
-  const utilizationData = capacity.map((item: any, idx: number) => ({
-    team: `Team ${idx + 1}`,
-    utilization: item.utilization_rate || 0,
-    available: 100 - (item.utilization_rate || 0),
-  }));
+  const utilizationData = capacity
+    .filter((item: any) => item && (item.data || item.utilization_rate !== undefined))
+    .map((item: any, idx: number) => {
+      const capacityData = item.data || item;
+      return {
+        team: `Team ${idx + 1}`,
+        utilization: capacityData.utilization_rate || 0,
+        available: 100 - (capacityData.utilization_rate || 0),
+      };
+    });
 
   return (
     <div className="space-y-4">
