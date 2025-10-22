@@ -16,6 +16,7 @@ interface TeamCapacityConfigProps {
 }
 
 export const TeamCapacityConfig = ({ teamId, teamName }: TeamCapacityConfigProps) => {
+  console.log('[TeamCapacityConfig] Component rendered for team:', teamId, teamName);
   const { toast } = useToast();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,7 @@ export const TeamCapacityConfig = ({ teamId, teamName }: TeamCapacityConfigProps
 
   const loadConfig = async () => {
     setLoading(true);
+    console.log('[TeamCapacityConfig] Loading config for team:', teamId, teamName);
     try {
       const { data, error } = await supabase
         .from('team_capacity_config')
@@ -41,11 +43,15 @@ export const TeamCapacityConfig = ({ teamId, teamName }: TeamCapacityConfigProps
         .eq('team_id', teamId)
         .single();
 
+      console.log('[TeamCapacityConfig] Query result:', { data, error });
+
       if (error && error.code !== 'PGRST116') {
+        console.error('[TeamCapacityConfig] Error loading config:', error);
         throw error;
       }
 
       if (data) {
+        console.log('[TeamCapacityConfig] Config loaded successfully:', data);
         setConfigId(data.id);
         setConfig({
           min_staff_required: data.min_staff_required,
@@ -53,9 +59,11 @@ export const TeamCapacityConfig = ({ teamId, teamName }: TeamCapacityConfigProps
           applies_to_weekends: data.applies_to_weekends,
           notes: data.notes || ''
         });
+      } else {
+        console.log('[TeamCapacityConfig] No config found for team, using defaults');
       }
     } catch (error) {
-      console.error('Error loading capacity config:', error);
+      console.error('[TeamCapacityConfig] Error in loadConfig:', error);
       toast({
         title: 'Error',
         description: 'Failed to load capacity configuration',
