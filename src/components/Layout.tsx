@@ -27,6 +27,18 @@ const Layout = ({ children }: LayoutProps) => {
               <h1 className="text-xl font-semibold">Employee Scheduler</h1>
             </Link>
             
+            <Link 
+              to="/manual" 
+              className={`flex items-center space-x-1.5 px-2 py-1 rounded-md text-sm transition-colors ${
+                isActiveRoute('/manual') 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              <span className="font-medium">Manual</span>
+            </Link>
+            
             <nav className="flex items-center space-x-4">
               <Link 
                 to="/dashboard" 
@@ -50,18 +62,6 @@ const Layout = ({ children }: LayoutProps) => {
               >
                 <Calendar className="h-4 w-4" />
                 <span>Schedule</span>
-              </Link>
-              
-              <Link 
-                to="/manual" 
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActiveRoute('/manual') 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                <BookOpen className="h-4 w-4" />
-                <span>Manual</span>
               </Link>
             </nav>
           </div>
