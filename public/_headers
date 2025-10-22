@@ -8,7 +8,7 @@
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://rdatyftacldjhgzsxzfw.supabase.co https://cdn.jsdelivr.net https://cdn.gpteng.co https://graph.microsoft.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; connect-src 'self' https://rdatyftacldjhgzsxzfw.supabase.co wss://rdatyftacldjhgzsxzfw.supabase.co https://login.microsoftonline.com https://graph.microsoft.com; font-src 'self' data: https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self' blob:; frame-ancestors 'self'; frame-src 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://rdatyftacldjhgzsxzfw.supabase.co https://cdn.jsdelivr.net https://cdn.gpteng.co https://graph.microsoft.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; connect-src 'self' https://rdatyftacldjhgzsxzfw.supabase.co wss://rdatyftacldjhgzsxzfw.supabase.co https://login.microsoftonline.com https://graph.microsoft.com; font-src 'self' data: https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self' blob:; frame-ancestors 'self'; frame-src 'self'; block-all-mixed-content
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()
   Cross-Origin-Embedder-Policy: credentialless  
   Cross-Origin-Opener-Policy: same-origin-allow-popups
