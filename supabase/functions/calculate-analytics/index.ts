@@ -111,11 +111,11 @@ Deno.serve(async (req) => {
     // Calculate coverage gaps for each team
     if (metrics.includes('coverage')) {
       const coveragePromises = team_ids.map(async (team_id) => {
+        // Don't pass _min_coverage, let the function use team config
         const { data, error } = await supabaseClient.rpc('identify_coverage_gaps', {
           _team_id: team_id,
           _start_date: start_date,
           _end_date: end_date,
-          _min_coverage: 1,
         });
 
         if (error) {

@@ -12,6 +12,7 @@ import BulkUserImport from "./BulkUserImport";
 import UserManagement from "./UserManagement";
 import UserCreation from "./UserCreation";
 import AdminHolidayManager from "./AdminHolidayManager";
+import { TeamCapacityConfig } from "./TeamCapacityConfig";
 
 interface Profile {
   user_id: string;
@@ -526,6 +527,9 @@ const AdminSetup = () => {
             </div>
         </CardContent>
       </Card>
+
+      {/* Team Capacity Configuration */}
+      <TeamCapacityConfig />
     </div>
   );
 };

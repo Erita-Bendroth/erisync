@@ -540,6 +540,50 @@ export type Database = {
           },
         ]
       }
+      team_capacity_config: {
+        Row: {
+          applies_to_weekends: boolean | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          max_staff_allowed: number | null
+          min_staff_required: number
+          notes: string | null
+          team_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_weekends?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          max_staff_allowed?: number | null
+          min_staff_required?: number
+          notes?: string | null
+          team_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_weekends?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          max_staff_allowed?: number | null
+          min_staff_required?: number
+          notes?: string | null
+          team_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_capacity_config_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string
