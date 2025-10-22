@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
 import Analytics from "./pages/Analytics";
+import Manual from "./pages/Manual";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import TestReset from "./pages/TestReset";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/manual" element={<Manual />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/test-reset" element={<TestReset />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3 } from "lucide-react";
+import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3, BookOpen } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
@@ -50,6 +50,18 @@ const Layout = ({ children }: LayoutProps) => {
               >
                 <Calendar className="h-4 w-4" />
                 <span>Schedule</span>
+              </Link>
+              
+              <Link 
+                to="/manual" 
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActiveRoute('/manual') 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Manual</span>
               </Link>
             </nav>
           </div>
