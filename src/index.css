@@ -125,4 +125,19 @@ All colors MUST be HSL.
     background-color: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
   }
+  
+  /* Hide Lovable branding */
+  [href*="lovable"],
+  [class*="lovable"],
+  [id*="lovable"],
+  iframe[src*="lovable"],
+  div:has([href*="lovable"]) {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
+  }
 }
