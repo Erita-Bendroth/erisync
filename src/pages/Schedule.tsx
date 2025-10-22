@@ -28,7 +28,7 @@ const Schedule = () => {
   const { signOut, user } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get('tab') || 'admin';
+  const tabFromUrl = searchParams.get('tab') || 'schedule';
   const teamFromUrl = searchParams.get('team') || '';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [userRoles, setUserRoles] = useState<string[]>([]);
