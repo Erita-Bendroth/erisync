@@ -39,6 +39,25 @@ const Contact = () => {
       return;
     }
 
+    // Client-side validation matching server-side limits
+    if (formData.name.length > 100) {
+      toast({
+        title: "Error",
+        description: "Name must be less than 100 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.message.length > 2000) {
+      toast({
+        title: "Error",
+        description: "Message must be less than 2000 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -114,7 +133,7 @@ const Contact = () => {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name *</Label>
+                    <Label htmlFor="name">Name * (max 100 characters)</Label>
                     <Input
                       id="name"
                       name="name"
@@ -122,6 +141,7 @@ const Contact = () => {
                       value={formData.name}
                       onChange={handleInputChange}
                       placeholder="Your full name"
+                      maxLength={100}
                       required
                     />
                   </div>
@@ -135,12 +155,13 @@ const Contact = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       placeholder="your.email@example.com"
+                      maxLength={254}
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="message">Message *</Label>
+                    <Label htmlFor="message">Message * (max 2000 characters)</Label>
                     <Textarea
                       id="message"
                       name="message"
@@ -148,8 +169,12 @@ const Contact = () => {
                       onChange={handleInputChange}
                       placeholder="Tell us how we can help you..."
                       rows={5}
+                      maxLength={2000}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {formData.message.length}/2000 characters
+                    </p>
                   </div>
 
                   <Button 
