@@ -31,11 +31,19 @@ export const PlannerManual = () => {
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Dashboard → Admin Setup → User Management</strong></li>
           <li>Click <strong>"Create New User"</strong></li>
-          <li>Enter the user's email address</li>
+          <li>Enter the user's email address and name</li>
           <li>Select the appropriate role(s): Admin, Planner, Manager, or Team Member</li>
           <li>Click <strong>"Create User"</strong></li>
           <li>The system will generate a temporary password and send it to the user's email</li>
         </ol>
+
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The Dashboard with tabs showing "Admin Setup" tab selected, the User Management 
+            section, and the "Create New User" button prominently displayed.
+          </p>
+        </div>
 
         <Alert className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -108,6 +116,14 @@ export const PlannerManual = () => {
           <li>Enter team name and description</li>
           <li>Click <strong>"Create Team"</strong></li>
         </ol>
+
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The Schedule page with the "Teams" tab selected, showing the "Create New Team" 
+            button and the team creation form with fields for name and description.
+          </p>
+        </div>
 
         <h3 className="text-xl font-semibold mb-3">Adding Team Members</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
@@ -209,6 +225,23 @@ export const PlannerManual = () => {
           <li>The system automatically creates vacation schedule entries</li>
           <li>User receives approval notification</li>
         </ol>
+
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The Vacation Requests list with pending requests, showing user names, dates, 
+            status badges, and green "Approve" and red "Reject" buttons that only planners can see.
+          </p>
+        </div>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Planner-Only Action</AlertTitle>
+          <AlertDescription>
+            Only Planners and Admins can approve or reject vacation requests. Managers can 
+            view requests but must contact you to have them processed.
+          </AlertDescription>
+        </Alert>
 
         <h3 className="text-xl font-semibold mb-3">Rejecting Requests</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">

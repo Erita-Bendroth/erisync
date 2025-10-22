@@ -31,9 +31,17 @@ export const TeamMemberManual = () => {
         <h3 className="text-xl font-semibold mb-3">Navigating to Your Schedule</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Log in to the Employee Scheduler</li>
-          <li>Click <strong>Schedule</strong> in the top navigation</li>
+          <li>Click <strong>Schedule</strong> in the top navigation bar</li>
           <li>Your team's schedule will be displayed</li>
         </ol>
+
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The top navigation bar highlighting the "Schedule" button between "Dashboard" 
+            and other navigation items, showing where to click to view schedules.
+          </p>
+        </div>
 
         <h3 className="text-xl font-semibold mb-3">Calendar Views</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
@@ -85,19 +93,36 @@ export const TeamMemberManual = () => {
         <h3 className="text-xl font-semibold mb-3">How to Submit a Vacation Request</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Schedule</strong></li>
-          <li>Click <strong>"Request Vacation"</strong> or the vacation icon</li>
+          <li>Click <strong>"Request Vacation"</strong> button</li>
           <li>Fill out the vacation request form:
             <ul className="list-disc list-inside ml-6 mt-2">
               <li><strong>Start Date:</strong> First day of vacation</li>
               <li><strong>End Date:</strong> Last day of vacation</li>
               <li><strong>Full Day:</strong> Check if taking full days off</li>
-              <li><strong>Planner:</strong> Select which manager to send the request to</li>
+              <li><strong>Planner:</strong> Select which planner/admin to send the request to</li>
               <li><strong>Notes:</strong> Add any context or special circumstances</li>
             </ul>
           </li>
           <li>Click <strong>"Submit Request"</strong></li>
-          <li>You'll receive a confirmation and your manager will be notified</li>
+          <li>You'll receive a confirmation and the planner will be notified</li>
         </ol>
+
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The "Request Vacation" button on the Schedule page, and the vacation request 
+            form modal with date pickers, full day checkbox, planner dropdown, and notes field.
+          </p>
+        </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Who Approves Requests?</AlertTitle>
+          <AlertDescription>
+            Only Planners and Admins can approve vacation requests. Your manager can view 
+            your request but cannot approve it - a Planner will review and make the decision.
+          </AlertDescription>
+        </Alert>
 
         <h3 className="text-xl font-semibold mb-3">Single Day vs. Multi-Day Requests</h3>
         <p className="mb-2"><strong>Single Day:</strong></p>
@@ -113,11 +138,11 @@ export const TeamMemberManual = () => {
           <li>Creates vacation entries for each working day in the range</li>
         </ul>
 
-        <h3 className="text-xl font-semibold mb-3">Choosing Which Manager to Send To</h3>
+        <h3 className="text-xl font-semibold mb-3">Choosing Which Planner to Send To</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
-          <li>Select from available planners/managers</li>
-          <li>Choose the manager most relevant to your team</li>
-          <li>If unsure, select your direct manager</li>
+          <li>Select from available planners/admins in the dropdown</li>
+          <li>Choose the planner who typically manages your team's schedule</li>
+          <li>If unsure, ask your manager which planner to select</li>
         </ul>
 
         <Alert>
@@ -415,9 +440,9 @@ export const TeamMemberManual = () => {
         
         <h3 className="text-xl font-semibold mb-3">What if my vacation request is rejected?</h3>
         <p className="mb-4">
-          Read the rejection reason provided by your manager. Consider alternative dates or 
-          discuss the situation with your manager directly. You can submit a new request 
-          for different dates.
+          Read the rejection reason provided by the planner. Consider alternative dates or 
+          discuss the situation with your manager or the planner directly. You can submit 
+          a new request for different dates.
         </p>
 
         <h3 className="text-xl font-semibold mb-3">Can I see other team members' schedules?</h3>

@@ -75,6 +75,15 @@ export const ManagerManual = () => {
           <li>Click <strong>"Create Schedule Entry"</strong></li>
         </ol>
 
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The "Add Entry" button in the schedule interface, showing the form with 
+            dropdowns for team member selection, date picker, time block radio buttons 
+            (Day/Evening/Night), and shift type dropdown (Working/Vacation/Sick/Training/Other).
+          </p>
+        </div>
+
         <h3 className="text-xl font-semibold mb-3">Editing Schedule Entries</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Click on any schedule entry in the calendar</li>
@@ -144,46 +153,58 @@ export const ManagerManual = () => {
       <section id="vacation-requests">
         <h2 className="text-2xl font-bold mb-4">5. Vacation Requests</h2>
         
-        <h3 className="text-xl font-semibold mb-3">Viewing Requests</h3>
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Important: Managers Cannot Approve Vacation Requests</AlertTitle>
+          <AlertDescription>
+            Only Planners and Admins have the authority to approve or reject vacation requests. 
+            As a Manager, you can view requests from your team members, but you must contact 
+            a Planner to have them approved or rejected.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3">Viewing Your Team's Requests</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Schedule → Vacation Requests</strong></li>
-          <li>View all pending requests from your team members</li>
+          <li>View pending requests from your team members</li>
           <li>See request details: dates, duration, notes</li>
           <li>Check team availability for the requested dates</li>
         </ol>
 
-        <h3 className="text-xl font-semibold mb-3">Approving Requests</h3>
-        <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Review the vacation request carefully</li>
-          <li>Check if there's adequate coverage for the period</li>
-          <li>Click <strong>"Approve"</strong></li>
-          <li>System automatically creates vacation schedule entries</li>
-          <li>Team member receives approval notification</li>
-        </ol>
+        <div className="bg-muted p-4 rounded-lg mb-4 border-l-4 border-primary">
+          <p className="text-sm font-medium mb-2">📸 Screenshot would show:</p>
+          <p className="text-sm text-muted-foreground">
+            The Vacation Requests list showing team member names, requested dates, 
+            status badges (pending/approved/rejected), and the ability to view details 
+            but no approve/reject buttons for managers.
+          </p>
+        </div>
 
-        <h3 className="text-xl font-semibold mb-3">Rejecting Requests</h3>
-        <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Click <strong>"Reject"</strong> on the request</li>
-          <li>Provide a clear reason for rejection (required)</li>
-          <li>Be professional and explain the circumstances (e.g., coverage issues)</li>
-          <li>Team member receives rejection notification with your reason</li>
-        </ol>
+        <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>View:</strong> See all vacation requests from your team members</li>
+          <li><strong>Monitor:</strong> Track pending, approved, and rejected requests</li>
+          <li><strong>Coordinate:</strong> Contact planners to expedite important requests</li>
+          <li><strong>Plan:</strong> Use request information to plan team coverage</li>
+        </ul>
 
-        <h3 className="text-xl font-semibold mb-3">Understanding the Vacation Workflow</h3>
+        <h3 className="text-xl font-semibold mb-3">Communicating with Planners</h3>
+        <p className="mb-4">
+          If you need a vacation request approved or have input on a request:
+        </p>
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Team member submits vacation request</li>
-          <li>You receive notification</li>
-          <li>You review and make decision (approve/reject)</li>
-          <li>Team member receives notification of decision</li>
-          <li>If approved, vacation appears on schedule automatically</li>
+          <li>Review the request and check team coverage</li>
+          <li>Contact your Planner or Admin via the app or email</li>
+          <li>Provide context: coverage status, business needs, urgency</li>
+          <li>The Planner will make the final decision and notify the team member</li>
         </ol>
 
         <Alert>
-          <CheckCircle className="h-4 w-4" />
+          <Info className="h-4 w-4" />
           <AlertTitle>Multi-Day Vacations</AlertTitle>
           <AlertDescription>
             Multi-day vacation requests automatically exclude weekends. The system calculates 
-            working days only and creates individual vacation entries for each day.
+            working days only and creates individual vacation entries for each day when approved.
           </AlertDescription>
         </Alert>
       </section>
@@ -191,29 +212,39 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="role-management">
-        <h2 className="text-2xl font-bold mb-4">6. Role Management (Limited)</h2>
+        <h2 className="text-2xl font-bold mb-4">6. Role Management</h2>
         
-        <h3 className="text-xl font-semibold mb-3">Assigning Roles</h3>
-        <p className="mb-4">As a manager, you can assign the following roles to users in your teams:</p>
-        <ul className="list-disc list-inside space-y-2 mb-4">
-          <li><strong>Manager:</strong> Can manage team schedules and approve vacation requests</li>
-          <li><strong>Team Member:</strong> Can view schedules and submit vacation requests</li>
-        </ul>
-
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Role Limitations</AlertTitle>
+          <AlertTitle>Managers Cannot Assign Roles</AlertTitle>
           <AlertDescription>
-            You cannot assign Planner or Admin roles. Contact your planner to assign higher-level roles.
+            As a Manager, you can view the roles of users in your teams, but you cannot 
+            assign or modify roles. Only Planners and Admins can manage user roles.
           </AlertDescription>
         </Alert>
 
-        <h3 className="text-xl font-semibold mb-3">How to Assign Roles</h3>
+        <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>View Roles:</strong> See which roles your team members have</li>
+          <li><strong>Understand Permissions:</strong> Know who can do what on your team</li>
+          <li><strong>Request Changes:</strong> Contact a Planner to request role changes</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Role Types in the System</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Admin/Planner:</strong> Full system access, can manage users and roles</li>
+          <li><strong>Manager:</strong> Can manage team schedules, view vacation requests</li>
+          <li><strong>Team Member:</strong> Can view schedules and submit vacation requests</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Requesting Role Changes</h3>
+        <p className="mb-4">
+          If you need to change a team member's role:
+        </p>
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Navigate to <strong>Dashboard → Role Management</strong></li>
-          <li>Select a user from your team</li>
-          <li>Choose the role (Manager or Team Member)</li>
-          <li>Click <strong>"Assign Role"</strong></li>
+          <li>Contact your Planner or Admin</li>
+          <li>Explain which user needs a role change and why</li>
+          <li>The Planner will make the change in the system</li>
         </ol>
       </section>
 
