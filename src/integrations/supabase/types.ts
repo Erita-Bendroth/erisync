@@ -393,13 +393,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
-          {
-            foreignKeyName: "team_members_user_id_profiles_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_safe"
-            referencedColumns: ["user_id"]
-          },
         ]
       }
       team_view_favorites: {
@@ -594,51 +587,7 @@ export type Database = {
       }
     }
     Views: {
-      profiles_safe: {
-        Row: {
-          country_code: string | null
-          created_at: string | null
-          email: string | null
-          first_name: string | null
-          id: string | null
-          initials: string | null
-          last_name: string | null
-          region_code: string | null
-          requires_password_change: boolean | null
-          theme_preference: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          country_code?: string | null
-          created_at?: string | null
-          email?: never
-          first_name?: string | null
-          id?: string | null
-          initials?: string | null
-          last_name?: string | null
-          region_code?: string | null
-          requires_password_change?: boolean | null
-          theme_preference?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          country_code?: string | null
-          created_at?: string | null
-          email?: never
-          first_name?: string | null
-          id?: string | null
-          initials?: string | null
-          last_name?: string | null
-          region_code?: string | null
-          requires_password_change?: boolean | null
-          theme_preference?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       can_view_sensitive_profile_data: {
