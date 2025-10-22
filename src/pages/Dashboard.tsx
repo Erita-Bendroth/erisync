@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, LogOut, Mail } from "lucide-react";
+import { Calendar, Clock, Users, LogOut, Mail, TrendingUp } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -494,6 +494,17 @@ const Dashboard = () => {
                 <Users className="w-4 h-4 mr-2" />
                 User Settings
               </Button>
+
+              {(userRoles.some(role => ['admin', 'planner', 'manager'].includes(role.role))) && (
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate("/analytics")}
+                >
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Analytics Dashboard
+                </Button>
+              )}
               
               {userRoles.some(role => role.role === "planner") && (
                 <Button 

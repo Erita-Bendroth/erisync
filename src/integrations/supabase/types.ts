@@ -10,10 +10,48 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
+      analytics_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          metric_data: Json
+          metric_type: string
+          snapshot_date: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric_data: Json
+          metric_type: string
+          snapshot_date: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric_data?: Json
+          metric_type?: string
+          snapshot_date?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_snapshots_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_job_logs: {
         Row: {
           error_message: string | null
@@ -40,6 +78,44 @@ export type Database = {
           status?: string | null
         }
         Relationships: []
+      }
+      dashboard_preferences: {
+        Row: {
+          created_at: string
+          default_date_range: string | null
+          default_team_id: string | null
+          favorite_metrics: string[] | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_date_range?: string | null
+          default_team_id?: string | null
+          favorite_metrics?: string[] | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_date_range?: string | null
+          default_team_id?: string | null
+          favorite_metrics?: string[] | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_preferences_default_team_id_fkey"
+            columns: ["default_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       delegation_audit_log: {
         Row: {
@@ -270,6 +346,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      schedule_change_log: {
+        Row: {
+          change_type: string
+          changed_at: string
+          changed_by: string
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          schedule_entry_id: string | null
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          change_type: string
+          changed_at?: string
+          changed_by: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          schedule_entry_id?: string | null
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          change_type?: string
+          changed_at?: string
+          changed_by?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          schedule_entry_id?: string | null
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_change_log_schedule_entry_id_fkey"
+            columns: ["schedule_entry_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_change_log_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       schedule_entries: {
         Row: {
@@ -590,6 +717,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analyze_vacation_patterns: {
+        Args: { _lookback_months?: number; _team_id: string }
+        Returns: Json
+      }
       can_view_sensitive_profile_data: {
         Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean
@@ -742,6 +873,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_scheduling_efficiency: {
+        Args: { _end_date: string; _start_date: string; _team_ids: string[] }
+        Returns: Json
+      }
+      get_team_capacity_metrics: {
+        Args: { _end_date: string; _start_date: string; _team_id: string }
+        Returns: Json
+      }
       get_team_hierarchy: {
         Args: { _team_id: string }
         Returns: {
@@ -802,6 +941,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      identify_coverage_gaps: {
+        Args: {
+          _end_date: string
+          _min_coverage?: number
+          _start_date: string
+          _team_id: string
+        }
+        Returns: Json
       }
       import_holidays_for_year: {
         Args: { _country_code: string; _year: number }
