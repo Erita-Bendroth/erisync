@@ -271,7 +271,7 @@ export const ManagerManual = () => {
         <ul className="list-disc list-inside space-y-2 mb-4">
           <li>You'll receive notifications when team members submit vacation requests</li>
           <li>Desktop notifications (if enabled) alert you immediately</li>
-          <li>Email notifications provide request details</li>
+          
         </ul>
 
         <h3 className="text-xl font-semibold mb-3">Desktop Notification Settings</h3>
