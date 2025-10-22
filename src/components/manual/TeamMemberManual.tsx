@@ -1,10 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
-
 export const TeamMemberManual = () => {
-  return (
-    <div className="space-y-8">
+  return <div className="space-y-8">
       <section id="getting-started">
         <h2 className="text-2xl font-bold mb-4">1. Getting Started</h2>
         <p className="text-muted-foreground mb-4">
@@ -36,11 +34,7 @@ export const TeamMemberManual = () => {
         </ol>
 
         <div className="my-4">
-          <img 
-            src="/images/manual/team-member-schedule.png" 
-            alt="Main navigation with Schedule tab highlighted, showing calendar view with color-coded shifts"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+          
         </div>
 
         <h3 className="text-xl font-semibold mb-3">Calendar Views</h3>
@@ -108,11 +102,7 @@ export const TeamMemberManual = () => {
         </ol>
 
         <div className="my-4">
-          <img 
-            src="/images/manual/team-member-vacation-request.png" 
-            alt="Request Vacation button and form showing date range picker, notes field, and submit button"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+          
         </div>
 
         <Alert>
@@ -488,6 +478,5 @@ export const TeamMemberManual = () => {
           </AlertDescription>
         </Alert>
       </section>
-    </div>
-  );
+    </div>;
 };
