@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, LogOut, Mail, TrendingUp } from "lucide-react";
+import { Calendar, Clock, Users, LogOut, Mail, TrendingUp, BookOpen } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { supabase } from "@/integrations/supabase/client";
@@ -500,6 +500,15 @@ const Dashboard = () => {
               >
                 <Users className="w-4 h-4 mr-2" />
                 User Settings
+              </Button>
+
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/manual")}
+              >
+                <BookOpen className="w-4 h-4 mr-2" />
+                View Manual
               </Button>
 
               {(userRoles.some(role => ['admin', 'planner', 'manager'].includes(role.role))) && (
