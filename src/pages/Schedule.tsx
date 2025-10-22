@@ -10,7 +10,7 @@ import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download } from 
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import ScheduleView from "@/components/schedule/ScheduleView";
 import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
-import TeamManagement from "@/components/schedule/TeamManagement";
+import EnhancedTeamManagement from "@/components/schedule/EnhancedTeamManagement";
 import AdminSetup from "@/components/admin/AdminSetup";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
@@ -435,7 +435,7 @@ const Schedule = () => {
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
-            <TeamManagement />
+            <EnhancedTeamManagement />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
