@@ -194,7 +194,7 @@ export const ManagerManual = () => {
           <li>Review the request and check team coverage</li>
           <li>Contact your Planner or Admin</li>
           <li>Provide context: coverage status, business needs, urgency</li>
-          <li>The Planner will make the final decision and notify the team member</li>
+          
         </ol>
 
         <Alert>
