@@ -273,6 +273,11 @@ const Dashboard = () => {
           </div>
           <div className="flex items-center space-x-3">
             <GlobalSearch />
+            <div className="bg-primary/10 px-3 py-1 rounded-md border">
+              <span className="text-sm font-medium">
+                Logged in as: <strong className="text-primary">{user?.email || 'Not logged in'}</strong>
+              </span>
+            </div>
             <ThemeToggle />
             <Button onClick={handleSignOut} variant="outline" size="sm">
               <LogOut className="w-4 h-4 mr-2" />
