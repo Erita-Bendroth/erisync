@@ -5,7 +5,7 @@ export interface ShiftTimeDefinition {
   team_id: string | null;
   region_code: string | null;
   shift_type: "normal" | "early" | "late";
-  day_of_week: number | null;
+  day_of_week: number[] | null;
   start_time: string;
   end_time: string;
   description: string | null;
@@ -56,7 +56,9 @@ export async function getApplicableShiftTimes({
     (def) =>
       def.team_id === teamId &&
       def.region_code === regionCode &&
-      def.day_of_week === dayOfWeek
+      def.day_of_week !== null &&
+      dayOfWeek !== undefined &&
+      def.day_of_week.includes(dayOfWeek)
   );
   if (teamRegionDay) {
     return {

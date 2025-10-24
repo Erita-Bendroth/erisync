@@ -21,10 +21,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TimeSelect } from "@/components/ui/time-select";
+import { MultiSelectDays } from "@/components/ui/multi-select-days";
 import { Plus, Trash2, Save } from "lucide-react";
 import { ShiftTimeDefinition } from "@/lib/shiftTimeUtils";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const REGIONS = ["DE", "UK", "SE", "FR", "CH", "AT"];
 
 export function ShiftTimeDefinitions() {
@@ -49,8 +49,7 @@ export function ShiftTimeDefinitions() {
     const query = supabase
       .from("shift_time_definitions")
       .select("*")
-      .order("shift_type")
-      .order("day_of_week", { ascending: true, nullsFirst: true });
+      .order("shift_type");
 
     if (selectedTeam !== "global") {
       query.eq("team_id", selectedTeam);
@@ -249,30 +248,12 @@ export function ShiftTimeDefinitions() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={
-                        def.day_of_week === null ? "all" : def.day_of_week.toString()
-                      }
+                    <MultiSelectDays
+                      value={def.day_of_week}
                       onValueChange={(value) =>
-                        updateDefinition(
-                          index,
-                          "day_of_week",
-                          value === "all" ? null : parseInt(value)
-                        )
+                        updateDefinition(index, "day_of_week", value)
                       }
-                    >
-                      <SelectTrigger className="w-[120px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Days</SelectItem>
-                        {DAYS.map((day, i) => (
-                          <SelectItem key={i} value={i.toString()}>
-                            {day}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </TableCell>
                   <TableCell>
                     <TimeSelect

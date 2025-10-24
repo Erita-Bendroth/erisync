@@ -562,7 +562,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
-          day_of_week: number | null
+          day_of_week: number[] | null
           description: string | null
           end_time: string
           id: string
@@ -575,7 +575,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
-          day_of_week?: number | null
+          day_of_week?: number[] | null
           description?: string | null
           end_time: string
           id?: string
@@ -588,7 +588,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
-          day_of_week?: number | null
+          day_of_week?: number[] | null
           description?: string | null
           end_time?: string
           id?: string
