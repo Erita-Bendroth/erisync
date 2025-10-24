@@ -311,7 +311,12 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching shift definitions:', error);
+        throw error;
+      }
+
+      console.log('Fetched shift definitions:', data);
 
       const templates: ShiftTemplate[] = [];
 
@@ -321,10 +326,20 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       for (const shiftType of shiftTypes) {
         const defs = data?.filter(d => d.shift_type === shiftType) || [];
         
+        console.log(`Definitions for ${shiftType}:`, defs);
+        
         if (defs.length > 0) {
-          // Prioritize team-specific definitions over global ones
+          // Selection priority:
+          // 1. Team-specific definition without region (most general for the team)
+          // 2. Global definition without region (most general)
+          // 3. Any team-specific definition
+          // 4. Any global definition
+          const teamDefNoRegion = selectedTeam ? defs.find(d => d.team_id === selectedTeam && !d.region_code) : null;
+          const globalDefNoRegion = defs.find(d => !d.team_id && !d.region_code);
           const teamDef = selectedTeam ? defs.find(d => d.team_id === selectedTeam) : null;
-          const primaryDef = teamDef || defs[0];
+          const primaryDef = teamDefNoRegion || globalDefNoRegion || teamDef || defs[0];
+          
+          console.log(`Selected definition for ${shiftType}:`, primaryDef);
           
           const displayName = shiftType === 'normal' ? 'Normal' :
                              shiftType === 'weekend' ? 'Weekend / National Holiday' :
@@ -349,11 +364,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         days: [1, 2, 3, 4, 5]
       });
 
+      console.log('Final templates:', templates);
+
       // If we got templates from database, use them; otherwise use defaults
       if (templates.length > 1) { // More than just 'custom'
         setShiftTemplates(templates);
       } else {
         // Fallback to defaults if no definitions found
+        console.log('Using fallback templates - no definitions found');
         setShiftTemplates([
           { id: 'normal', name: 'Normal Shift (08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
           { id: 'early', name: 'Early Shift (06:00-14:30)', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
