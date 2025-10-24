@@ -121,13 +121,9 @@ serve(async (req) => {
     console.log('Week range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
 
     // Fetch manual duty assignments (overrides) for this template and week
-    const { data: manualAssignments, error: assignmentsError } = await supabase
+    const { data: manualAssignmentsRaw, error: assignmentsError } = await supabase
       .from('duty_assignments')
-      .select(`
-        *,
-        user:user_id(first_name, last_name, initials),
-        substitute:substitute_user_id(first_name, last_name, initials)
-      `)
+      .select('*')
       .eq('week_number', week_number)
       .eq('year', year)
       .in('team_id', template.team_ids);
@@ -136,13 +132,41 @@ serve(async (req) => {
       console.error('Manual assignments fetch error:', assignmentsError);
     }
 
+    // Get all unique user IDs from manual assignments
+    const manualUserIds = new Set<string>();
+    if (manualAssignmentsRaw) {
+      manualAssignmentsRaw.forEach((assignment: any) => {
+        if (assignment.user_id) manualUserIds.add(assignment.user_id);
+        if (assignment.substitute_user_id) manualUserIds.add(assignment.substitute_user_id);
+      });
+    }
+
+    // Fetch profiles for manual assignment users
+    let manualProfiles: Record<string, any> = {};
+    if (manualUserIds.size > 0) {
+      const { data: profilesData } = await supabase
+        .rpc('get_multiple_basic_profile_info', { 
+          _user_ids: Array.from(manualUserIds) 
+        });
+      
+      if (profilesData) {
+        profilesData.forEach((profile: any) => {
+          manualProfiles[profile.user_id] = profile;
+        });
+      }
+    }
+
+    // Enrich manual assignments with profile data
+    const manualAssignments = manualAssignmentsRaw?.map((assignment: any) => ({
+      ...assignment,
+      user: manualProfiles[assignment.user_id] || null,
+      substitute: assignment.substitute_user_id ? manualProfiles[assignment.substitute_user_id] : null
+    })) || [];
+
     // Fetch schedule entries for auto-pull
-    const { data: scheduleEntries, error: scheduleError } = await supabase
+    const { data: scheduleEntriesRaw, error: scheduleError } = await supabase
       .from('schedule_entries')
-      .select(`
-        *,
-        user:user_id(first_name, last_name, initials)
-      `)
+      .select('*')
       .in('team_id', template.team_ids)
       .gte('date', startDate.toISOString().split('T')[0])
       .lte('date', endDate.toISOString().split('T')[0])
@@ -152,12 +176,41 @@ serve(async (req) => {
       console.error('Schedule entries fetch error:', scheduleError);
     }
 
-    console.log('Fetched schedule entries:', scheduleEntries?.length || 0);
+    // Get all unique user IDs from schedule entries
+    const scheduleUserIds = new Set<string>();
+    if (scheduleEntriesRaw) {
+      scheduleEntriesRaw.forEach((entry: any) => {
+        if (entry.user_id) scheduleUserIds.add(entry.user_id);
+      });
+    }
+
+    // Fetch profiles for schedule users
+    let scheduleProfiles: Record<string, any> = {};
+    if (scheduleUserIds.size > 0) {
+      const { data: profilesData } = await supabase
+        .rpc('get_multiple_basic_profile_info', { 
+          _user_ids: Array.from(scheduleUserIds) 
+        });
+      
+      if (profilesData) {
+        profilesData.forEach((profile: any) => {
+          scheduleProfiles[profile.user_id] = profile;
+        });
+      }
+    }
+
+    // Enrich schedule entries with profile data
+    const scheduleEntries = scheduleEntriesRaw?.map((entry: any) => ({
+      ...entry,
+      user: scheduleProfiles[entry.user_id] || null
+    })) || [];
+
+    console.log('Fetched schedule entries:', scheduleEntries.length);
 
     // Combine manual assignments and schedule-based assignments
     const combinedAssignments = getCombinedAssignments(
-      manualAssignments || [],
-      scheduleEntries || [],
+      manualAssignments,
+      scheduleEntries,
       template,
       startDate,
       endDate
