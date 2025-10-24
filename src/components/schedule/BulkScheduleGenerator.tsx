@@ -73,16 +73,13 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [generationResults, setGenerationResults] = useState<any[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [hasPermission, setHasPermission] = useState(false);
-  const [shiftTemplate, setShiftTemplate] = useState<string>('standard');
+  const [shiftTemplate, setShiftTemplate] = useState<string>('custom');
   const [customStartTime, setCustomStartTime] = useState<string>('08:00');
   const [customEndTime, setCustomEndTime] = useState<string>('16:30');
   const [rangeStartDate, setRangeStartDate] = useState<Date>();
   const [rangeEndDate, setRangeEndDate] = useState<Date>();
   const [shiftConfigurations, setShiftConfigurations] = useState<ShiftConfiguration[]>([]);
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([
-    { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-    { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-    { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
     { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
   ]);
   
@@ -139,7 +136,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         times.startTime >= '18:00' ||
         times.endTime <= '08:00'
       );
-    } else if (shiftTemplate !== 'standard') {
+    } else if (shiftTemplate !== 'custom') {
       isNightShift = doesShiftCrossMidnight(customStartTime, customEndTime) ||
                      customStartTime >= '18:00' ||
                      customEndTime <= '08:00';
@@ -320,36 +317,24 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
 
       const templates: ShiftTemplate[] = [];
 
-      // Group by shift type and get unique templates
-      const shiftTypes = ['normal', 'early', 'late', 'weekend'] as const;
-      
-      for (const shiftType of shiftTypes) {
-        const defs = data?.filter(d => d.shift_type === shiftType) || [];
-        
-        console.log(`Definitions for ${shiftType}:`, defs);
-        
-        if (defs.length > 0) {
-          // Selection priority:
-          // 1. Team-specific definition without region (most general for the team)
-          // 2. Global definition without region (most general)
-          // 3. Any team-specific definition
-          // 4. Any global definition
-          const teamDefNoRegion = selectedTeam ? defs.find(d => d.team_id === selectedTeam && !d.region_code) : null;
-          const globalDefNoRegion = defs.find(d => !d.team_id && !d.region_code);
-          const teamDef = selectedTeam ? defs.find(d => d.team_id === selectedTeam) : null;
-          const primaryDef = teamDefNoRegion || globalDefNoRegion || teamDef || defs[0];
-          
-          console.log(`Selected definition for ${shiftType}:`, primaryDef);
-          
+      // Create a template for each unique shift definition
+      if (data && data.length > 0) {
+        for (const def of data) {
+          const shiftType = def.shift_type;
           const displayName = shiftType === 'normal' ? 'Normal' :
                              shiftType === 'weekend' ? 'Weekend / National Holiday' :
                              shiftType.charAt(0).toUpperCase() + shiftType.slice(1);
           
+          // Use description if available, otherwise use generic name
+          const name = def.description 
+            ? `${def.description} (${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)})`
+            : `${displayName} Shift (${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)})`;
+          
           templates.push({
-            id: shiftType,
-            name: `${displayName} Shift (${primaryDef.start_time}-${primaryDef.end_time})`,
-            startTime: primaryDef.start_time,
-            endTime: primaryDef.end_time,
+            id: def.id, // Use the definition ID as the template ID
+            name: name,
+            startTime: def.start_time.substring(0, 5), // Remove seconds
+            endTime: def.end_time.substring(0, 5), // Remove seconds
             days: shiftType === 'weekend' ? [0, 6] : [1, 2, 3, 4, 5]
           });
         }
@@ -369,6 +354,15 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       // If we got templates from database, use them; otherwise use defaults
       if (templates.length > 1) { // More than just 'custom'
         setShiftTemplates(templates);
+        // Set default to first non-custom template if current selection is 'custom' or doesn't exist
+        if (shiftTemplate === 'custom' || !templates.find(t => t.id === shiftTemplate)) {
+          const firstNonCustom = templates.find(t => t.id !== 'custom');
+          if (firstNonCustom) {
+            setShiftTemplate(firstNonCustom.id);
+            setCustomStartTime(firstNonCustom.startTime);
+            setCustomEndTime(firstNonCustom.endTime);
+          }
+        }
       } else {
         // Fallback to defaults if no definitions found
         console.log('Using fallback templates - no definitions found');
@@ -426,9 +420,9 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     
     const allDates = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
     
-    // For rotation mode or non-standard shifts with includeWeekends enabled, include all days
-    // For standard shifts or when includeWeekends is false, exclude weekends
-    if ((bulkMode === 'rotation' || shiftTemplate !== 'standard') && includeWeekends) {
+    // For rotation mode or custom shifts with includeWeekends enabled, include all days
+    // For predefined shifts or when includeWeekends is false, exclude weekends
+    if ((bulkMode === 'rotation' || shiftTemplate === 'custom') && includeWeekends) {
       return allDates; // Include all days including weekends
     }
     
@@ -532,7 +526,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           return;
         }
       }
-    } else if (shiftTemplate !== 'standard') {
+    } else if (shiftTemplate === 'custom') {
       if (!customStartTime || !customEndTime) {
         toast({
           title: "Error",
@@ -564,8 +558,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           shiftType: shiftTemplate,
           shiftName: template?.name || 'Custom',
           dates: [...dateRange],
-          startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
-          endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
+          startTime: shiftTemplate === 'custom' ? customStartTime : template?.startTime || '08:00',
+          endTime: shiftTemplate === 'custom' ? customEndTime : template?.endTime || '16:30',
           userId: userId,
           perDateTimes: { ...perDateTimes } // Store individual times per date
         };
@@ -583,8 +577,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         shiftType: shiftTemplate,
         shiftName: template?.name || 'Custom',
         dates: [...dateRange],
-        startTime: shiftTemplate === 'standard' ? template?.startTime || '08:00' : customStartTime,
-        endTime: shiftTemplate === 'standard' ? template?.endTime || '16:30' : customEndTime,
+        startTime: shiftTemplate === 'custom' ? customStartTime : template?.startTime || '08:00',
+        endTime: shiftTemplate === 'custom' ? customEndTime : template?.endTime || '16:30',
         userId: undefined
       };
 
@@ -614,10 +608,11 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   };
 
   const getShiftTimes = () => {
-    if (shiftTemplate === 'standard') {
-      return { start: '08:00', end: '16:30' };
+    if (shiftTemplate === 'custom') {
+      return { start: customStartTime, end: customEndTime };
     }
-    return { start: customStartTime, end: customEndTime };
+    const template = shiftTemplates.find(t => t.id === shiftTemplate);
+    return { start: template?.startTime || '08:00', end: template?.endTime || '16:30' };
   };
 
   const generateSchedules = async () => {
@@ -1043,8 +1038,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
-        {/* Time Selection for non-Standard shifts - Only for non-rotation modes */}
-        {bulkMode !== 'rotation' && shiftTemplate !== 'standard' && (
+        {/* Time Selection for Custom shifts - Only for non-rotation modes */}
+        {bulkMode !== 'rotation' && shiftTemplate === 'custom' && (
           <div className="space-y-2 p-3 border rounded-lg bg-muted/20">
             <Label className="text-sm font-medium">Shift Times</Label>
             <div className="grid grid-cols-2 gap-4">
@@ -1068,8 +1063,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
-        {/* Include Weekends Option - Only for non-standard shifts in non-rotation modes */}
-        {bulkMode !== 'rotation' && shiftTemplate !== 'standard' && (
+        {/* Include Weekends Option - Only for custom shifts in non-rotation modes */}
+        {bulkMode !== 'rotation' && shiftTemplate === 'custom' && (
           <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
             <div className="space-y-0.5">
               <Label className="text-sm font-medium">Include Weekends</Label>
@@ -1160,7 +1155,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
           {rangeStartDate && rangeEndDate && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-              {getDateRangeArray().length} {(bulkMode === 'rotation' || shiftTemplate !== 'standard') && includeWeekends ? 'days' : 'weekdays'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
+              {getDateRangeArray().length} {(bulkMode === 'rotation' || shiftTemplate === 'custom') && includeWeekends ? 'days' : 'weekdays'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
             </div>
           )}
         </div>
