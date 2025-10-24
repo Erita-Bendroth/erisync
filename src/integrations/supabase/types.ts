@@ -558,6 +558,56 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_time_definitions: {
+        Row: {
+          created_at: string
+          created_by: string
+          day_of_week: number | null
+          description: string | null
+          end_time: string
+          id: string
+          region_code: string | null
+          shift_type: Database["public"]["Enums"]["shift_type"]
+          start_time: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          day_of_week?: number | null
+          description?: string | null
+          end_time: string
+          id?: string
+          region_code?: string | null
+          shift_type: Database["public"]["Enums"]["shift_type"]
+          start_time: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          day_of_week?: number | null
+          description?: string | null
+          end_time?: string
+          id?: string
+          region_code?: string | null
+          shift_type?: Database["public"]["Enums"]["shift_type"]
+          start_time?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_time_definitions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_audit_log: {
         Row: {
           action: string
@@ -636,6 +686,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      team_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          team_ids: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          team_ids: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          team_ids?: string[]
+          updated_at?: string
+        }
+        Relationships: []
       }
       team_members: {
         Row: {

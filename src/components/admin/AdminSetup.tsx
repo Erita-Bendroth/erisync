@@ -12,6 +12,9 @@ import BulkUserImport from "./BulkUserImport";
 import UserManagement from "./UserManagement";
 import UserCreation from "./UserCreation";
 import AdminHolidayManager from "./AdminHolidayManager";
+import { ShiftTimeDefinitions } from "../schedule/ShiftTimeDefinitions";
+import { TeamGroupManager } from "../schedule/TeamGroupManager";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
   user_id: string;
@@ -374,11 +377,19 @@ const AdminSetup = () => {
 
   return (
     <div className="space-y-6">
-      <UserCreation onUserCreated={() => { fetchProfiles(); fetchUserRoles(); }} />
-      <AdminHolidayManager />
-      <UserManagement />
-      
-      <Card>
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="holidays">Holidays</TabsTrigger>
+          <TabsTrigger value="shifts">Shift Times</TabsTrigger>
+          <TabsTrigger value="groups">Team Groups</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="users" className="space-y-6">
+          <UserCreation onUserCreated={() => { fetchProfiles(); fetchUserRoles(); }} />
+          <UserManagement />
+          
+          <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Shield className="w-5 h-5 mr-2" />
