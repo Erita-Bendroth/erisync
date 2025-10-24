@@ -5,18 +5,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatUserName } from "@/lib/utils";
 import { TeamCapacityConfig } from '@/components/admin/TeamCapacityConfig';
+import UserProfileOverview from "@/components/profile/UserProfileOverview";
 
 interface Team {
   id: string;
@@ -34,6 +35,7 @@ interface TeamMember {
     last_name: string;
     email: string;
     initials?: string;
+    user_id: string;
   };
   user_roles: Array<{
     role: string;
@@ -42,6 +44,14 @@ interface TeamMember {
 
 interface UserRole {
   role: string;
+}
+
+interface Profile {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+  email?: string;
 }
 
 const EnhancedTeamManagement = () => {
@@ -55,6 +65,13 @@ const EnhancedTeamManagement = () => {
   const [editTeamOpen, setEditTeamOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [editTeamForm, setEditTeamForm] = useState({ name: "", description: "" });
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [memberForm, setMemberForm] = useState({
+    user_id: "",
+    team_id: "",
+    is_manager: false,
+  });
 
   useEffect(() => {
     fetchUserRoles();
@@ -64,6 +81,7 @@ const EnhancedTeamManagement = () => {
     // Only fetch teams after user roles have been loaded
     if (userRoles.length > 0) {
       fetchTeamsAndMembers();
+      fetchProfiles();
     }
   }, [user, userRoles]);
 
@@ -88,6 +106,18 @@ const EnhancedTeamManagement = () => {
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
   const isAdmin = () => userRoles.some(role => role.role === "admin");
   const canEditTeams = () => isAdmin() || isPlanner();
+
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_all_basic_profiles');
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (error) {
+      console.error("Error fetching profiles:", error);
+    }
+  };
 
   const fetchTeamsAndMembers = async () => {
     if (!user || userRoles.length === 0) {
@@ -161,7 +191,7 @@ const EnhancedTeamManagement = () => {
         const profilesMap = (profilesResponse.data || []).reduce((acc, profile) => {
           acc[profile.user_id] = profile;
           return acc;
-        }, {} as { [key: string]: { first_name: string; last_name: string; email: string } });
+        }, {} as { [key: string]: { first_name: string; last_name: string; email: string; user_id: string; initials?: string } });
 
         // Filter out members with incomplete profile data and map them properly
         const membersWithRoles = (members || [])
@@ -328,6 +358,47 @@ const EnhancedTeamManagement = () => {
     setEditTeamOpen(true);
   };
 
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!memberForm.user_id || !memberForm.team_id) {
+      toast({
+        title: "Error",
+        description: "Please select both user and team",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("team_members")
+        .insert([{
+          user_id: memberForm.user_id,
+          team_id: memberForm.team_id,
+          is_manager: memberForm.is_manager,
+        }]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Team member added successfully",
+      });
+
+      setAddMemberOpen(false);
+      setMemberForm({ user_id: "", team_id: "", is_manager: false });
+      fetchTeamsAndMembers();
+    } catch (error: any) {
+      console.error("Error adding team member:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add team member",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleUpdateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -435,13 +506,96 @@ const EnhancedTeamManagement = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            Team Management
-          </CardTitle>
-          <CardDescription>
-            Manage teams and their members
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <Users className="w-5 h-5 mr-2" />
+                Team Management
+              </CardTitle>
+              <CardDescription>
+                Manage teams and their members
+              </CardDescription>
+            </div>
+            {canEditTeams() && (
+              <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Member
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Team Member</DialogTitle>
+                    <DialogDescription>
+                      Add a user to a team and set their role
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleAddMember} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="user">User</Label>
+                      <Select
+                        value={memberForm.user_id}
+                        onValueChange={(value) => setMemberForm({ ...memberForm, user_id: value })}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select user" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {profiles.map((profile) => (
+                            <SelectItem key={profile.user_id} value={profile.user_id}>
+                              {formatUserName(profile.first_name, profile.last_name, profile.initials)} {profile.email ? `(${profile.email})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="team">Team</Label>
+                      <Select
+                        value={memberForm.team_id}
+                        onValueChange={(value) => setMemberForm({ ...memberForm, team_id: value })}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select team" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="manager">Manager Role</Label>
+                      <Select
+                        value={memberForm.is_manager.toString()}
+                        onValueChange={(value) => setMemberForm({ ...memberForm, is_manager: value === "true" })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="false">Team Member</SelectItem>
+                          <SelectItem value="true">Team Manager</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => setAddMemberOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit">Add Member</Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {teams.length === 0 ? (
@@ -588,6 +742,27 @@ const EnhancedTeamManagement = () => {
                           </TableBody>
                         </Table>
                         </div>
+                        
+                        {/* Team Member Overview - Working and Vacation Days */}
+                        {canEditTeams() && members.length > 0 && (
+                          <div className="space-y-4 pt-4 border-t">
+                            <h4 className="text-lg font-medium flex items-center">
+                              <BarChart3 className="w-5 h-5 mr-2 text-primary" />
+                              Team Member Overview
+                            </h4>
+                            <div className="grid gap-4">
+                              {members.map((member) => (
+                                <UserProfileOverview
+                                  key={member.user_id}
+                                  userId={member.user_id}
+                                  teamId={team.id}
+                                  canView={true}
+                                  showTeamContext={false}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
