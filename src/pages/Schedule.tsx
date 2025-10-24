@@ -23,6 +23,7 @@ import OutlookIntegration from "@/components/integrations/OutlookIntegration";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { escapeHtml } from "@/lib/validation";
+import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -44,6 +45,7 @@ const Schedule = () => {
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showDutyCoverageModal, setShowDutyCoverageModal] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -310,13 +312,14 @@ const Schedule = () => {
                     Export Schedule
                   </Button>
                   {(isPlanner() || isManager()) && (
-                    <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" onClick={openNotify}>
-                          <Mail className="w-4 h-4 mr-2" />
-                          2-week Summary
-                        </Button>
-                      </DialogTrigger>
+                    <>
+                      <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" onClick={openNotify}>
+                            <Mail className="w-4 h-4 mr-2" />
+                            2-week Summary
+                          </Button>
+                        </DialogTrigger>
                         <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
                           <DialogHeader className="flex-shrink-0">
                             <DialogTitle className="flex items-center gap-2">
@@ -433,6 +436,11 @@ const Schedule = () => {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                    <Button variant="outline" onClick={() => setShowDutyCoverageModal(true)}>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Weekly Duty Coverage
+                    </Button>
+                  </>
                   )}
                 </div>
               </div>
@@ -456,6 +464,11 @@ const Schedule = () => {
           </TabsContent>
         </Tabs>
       </main>
+      
+      <WeeklyDutyCoverageManager
+        open={showDutyCoverageModal}
+        onOpenChange={setShowDutyCoverageModal}
+      />
     </div>
   );
 };

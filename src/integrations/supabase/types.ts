@@ -152,6 +152,59 @@ export type Database = {
           },
         ]
       }
+      duty_assignments: {
+        Row: {
+          created_at: string
+          created_by: string
+          date: string
+          duty_type: Database["public"]["Enums"]["duty_type"]
+          id: string
+          notes: string | null
+          substitute_user_id: string | null
+          team_id: string
+          updated_at: string
+          user_id: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          date: string
+          duty_type: Database["public"]["Enums"]["duty_type"]
+          id?: string
+          notes?: string | null
+          substitute_user_id?: string | null
+          team_id: string
+          updated_at?: string
+          user_id: string
+          week_number: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          date?: string
+          duty_type?: Database["public"]["Enums"]["duty_type"]
+          id?: string
+          notes?: string | null
+          substitute_user_id?: string | null
+          team_id?: string
+          updated_at?: string
+          user_id?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duty_assignments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holiday_import_status: {
         Row: {
           completed_at: string | null
@@ -278,7 +331,7 @@ export type Database = {
           access_type: string
           accessed_by: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           profile_user_id: string
           user_agent: string | null
         }
@@ -287,7 +340,7 @@ export type Database = {
           access_type?: string
           accessed_by: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           profile_user_id: string
           user_agent?: string | null
         }
@@ -296,7 +349,7 @@ export type Database = {
           access_type?: string
           accessed_by?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           profile_user_id?: string
           user_agent?: string | null
         }
@@ -834,6 +887,94 @@ export type Database = {
           },
         ]
       }
+      weekly_duty_templates: {
+        Row: {
+          created_at: string
+          created_by: string
+          distribution_list: string[]
+          id: string
+          include_earlyshift: boolean
+          include_lateshift: boolean
+          include_weekend_duty: boolean
+          team_id: string
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          distribution_list?: string[]
+          id?: string
+          include_earlyshift?: boolean
+          include_lateshift?: boolean
+          include_weekend_duty?: boolean
+          team_id: string
+          template_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          distribution_list?: string[]
+          id?: string
+          include_earlyshift?: boolean
+          include_lateshift?: boolean
+          include_weekend_duty?: boolean
+          team_id?: string
+          template_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_duty_templates_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_email_history: {
+        Row: {
+          id: string
+          recipient_count: number
+          sent_at: string
+          sent_by: string
+          status: string
+          template_id: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          id?: string
+          recipient_count?: number
+          sent_at?: string
+          sent_by: string
+          status?: string
+          template_id: string
+          week_number: number
+          year: number
+        }
+        Update: {
+          id?: string
+          recipient_count?: number
+          sent_at?: string
+          sent_by?: string
+          status?: string
+          template_id?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_email_history_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_duty_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -847,10 +988,7 @@ export type Database = {
         Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean
       }
-      check_and_expire_delegations: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      check_and_expire_delegations: { Args: never; Returns: undefined }
       check_vacation_overlap: {
         Args: {
           _end_time?: string
@@ -908,12 +1046,9 @@ export type Database = {
           user_id: string
         }[]
       }
-      expire_old_delegations: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      expire_old_delegations: { Args: never; Returns: undefined }
       get_all_basic_profiles: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           email: string
           first_name: string
@@ -922,10 +1057,7 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_all_subteam_ids: {
-        Args: { _team_id: string }
-        Returns: string[]
-      }
+      get_all_subteam_ids: { Args: { _team_id: string }; Returns: string[] }
       get_basic_profile_info: {
         Args: { _user_id: string }
         Returns: {
@@ -937,7 +1069,7 @@ export type Database = {
         }[]
       }
       get_cron_status: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           active: boolean
           jobid: number
@@ -959,10 +1091,7 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_managed_team_ids: {
-        Args: { _uid: string }
-        Returns: string[]
-      }
+      get_managed_team_ids: { Args: { _uid: string }; Returns: string[] }
       get_manager_accessible_teams: {
         Args: { _manager_id: string }
         Returns: string[]
@@ -1049,10 +1178,7 @@ export type Database = {
           weekend_shifts_count: number
         }[]
       }
-      get_user_teams: {
-        Args: { _user_id: string }
-        Returns: string[]
-      }
+      get_user_teams: { Args: { _user_id: string }; Returns: string[] }
       global_search: {
         Args: {
           _current_user_id: string
@@ -1106,25 +1232,19 @@ export type Database = {
         Returns: boolean
       }
       mark_pending_imports_complete: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           country_code: string
           holiday_count: number
           updated_status: string
         }[]
       }
-      mask_email: {
-        Args: { email: string }
-        Returns: string
-      }
+      mask_email: { Args: { email: string }; Returns: string }
       revoke_manager_delegation: {
         Args: { _delegation_id: string; _revoked_by: string }
         Returns: Json
       }
-      trigger_weekly_notifications: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      trigger_weekly_notifications: { Args: never; Returns: Json }
       validate_manager_team_access: {
         Args: { _manager_id: string; _target_user_id: string }
         Returns: boolean
@@ -1150,6 +1270,7 @@ export type Database = {
         | "working_from_home"
       app_role: "manager" | "planner" | "teammember" | "admin"
       availability_status: "available" | "unavailable"
+      duty_type: "weekend" | "lateshift" | "earlyshift"
       shift_type: "early" | "late" | "normal"
     }
     CompositeTypes: {
@@ -1290,6 +1411,7 @@ export const Constants = {
       ],
       app_role: ["manager", "planner", "teammember", "admin"],
       availability_status: ["available", "unavailable"],
+      duty_type: ["weekend", "lateshift", "earlyshift"],
       shift_type: ["early", "late", "normal"],
     },
   },
