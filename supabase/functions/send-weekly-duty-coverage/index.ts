@@ -1,13 +1,13 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.0";
-import { Resend } from "npm:resend@2.0.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Resend } from 'https://esm.sh/resend@2.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+const resend = new Resend(Deno.env.get('RESEND_API_KEY') || '');
 
 interface DutyCoverageRequest {
   template_id: string;
@@ -16,52 +16,67 @@ interface DutyCoverageRequest {
   preview?: boolean;
 }
 
+interface Assignment {
+  user_id: string;
+  substitute_user_id?: string;
+  user?: { first_name: string; last_name: string; initials: string };
+  substitute?: { first_name: string; last_name: string; initials: string };
+  team_id: string;
+  date?: string;
+  duty_type?: string;
+  source: 'manual' | 'schedule';
+}
+
+interface TeamData {
+  id: string;
+  name: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Authenticate user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: 'No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Check if user is manager, planner, or admin
-    const { data: roles } = await supabase
+    // Check if user has appropriate role
+    const { data: userRoles } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
-    const hasPermission = roles?.some(r => ['admin', 'planner', 'manager'].includes(r.role));
+    const hasPermission = userRoles?.some(r => ['admin', 'planner', 'manager'].includes(r.role));
     if (!hasPermission) {
-      return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: 'Insufficient permissions' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const { template_id, week_number, year, preview = false }: DutyCoverageRequest = await req.json();
+    const { template_id, week_number, year, preview }: DutyCoverageRequest = await req.json();
 
-    // Fetch template
+    // Fetch duty template
     const { data: template, error: templateError } = await supabase
       .from('weekly_duty_templates')
       .select('*')
@@ -69,92 +84,125 @@ serve(async (req) => {
       .single();
 
     if (templateError || !template) {
-      return new Response(JSON.stringify({ error: 'Template not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.error('Template fetch error:', templateError);
+      return new Response(
+        JSON.stringify({ error: 'Template not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Calculate week start and end dates
-    const firstDayOfYear = new Date(year, 0, 1);
-    const daysToFirstMonday = (8 - firstDayOfYear.getDay()) % 7;
-    const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
-    const weekStart = new Date(firstMonday.getTime() + (week_number - 1) * 7 * 24 * 60 * 60 * 1000);
-    const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+    console.log('Template fetched:', template.template_name);
 
-    // Fetch duty assignments for this week
-    const { data: assignments } = await supabase
+    // Fetch team names for all teams in the template
+    const { data: teamsData, error: teamsError } = await supabase
+      .from('teams')
+      .select('id, name')
+      .in('id', template.team_ids);
+
+    if (teamsError) {
+      console.error('Teams fetch error:', teamsError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch teams' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const teams: TeamData[] = teamsData || [];
+
+    // Calculate week date range
+    const startDate = new Date(year, 0, 1 + (week_number - 1) * 7);
+    const dayOfWeek = startDate.getDay();
+    const diff = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+    startDate.setDate(startDate.getDate() + diff);
+    
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 6);
+
+    console.log('Week range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+
+    // Fetch manual duty assignments (overrides) for this template and week
+    const { data: manualAssignments, error: assignmentsError } = await supabase
       .from('duty_assignments')
-      .select('*, user:user_id(first_name, last_name, initials), substitute:substitute_user_id(first_name, last_name, initials)')
-      .eq('team_id', template.team_id)
+      .select(`
+        *,
+        user:user_id(first_name, last_name, initials),
+        substitute:substitute_user_id(first_name, last_name, initials)
+      `)
+      .eq('week_number', week_number)
       .eq('year', year)
-      .eq('week_number', week_number);
+      .in('team_id', template.team_ids);
 
-    // Fetch schedule entries for context
-    const { data: scheduleEntries } = await supabase
+    if (assignmentsError) {
+      console.error('Manual assignments fetch error:', assignmentsError);
+    }
+
+    // Fetch schedule entries for auto-pull
+    const { data: scheduleEntries, error: scheduleError } = await supabase
       .from('schedule_entries')
-      .select('*, user:user_id(first_name, last_name, initials)')
-      .eq('team_id', template.team_id)
-      .gte('date', weekStart.toISOString().split('T')[0])
-      .lte('date', weekEnd.toISOString().split('T')[0]);
+      .select(`
+        *,
+        user:user_id(first_name, last_name, initials)
+      `)
+      .in('team_id', template.team_ids)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .lte('date', endDate.toISOString().split('T')[0])
+      .eq('activity_type', 'work');
 
-    // Build HTML email
-    const html = buildDutyCoverageEmail(template, assignments || [], scheduleEntries || [], week_number, year, weekStart, weekEnd);
+    if (scheduleError) {
+      console.error('Schedule entries fetch error:', scheduleError);
+    }
+
+    console.log('Fetched schedule entries:', scheduleEntries?.length || 0);
+
+    // Combine manual assignments and schedule-based assignments
+    const combinedAssignments = getCombinedAssignments(
+      manualAssignments || [],
+      scheduleEntries || [],
+      template,
+      startDate,
+      endDate
+    );
+
+    console.log('Combined assignments:', combinedAssignments.length);
 
     if (preview) {
-      return new Response(JSON.stringify({ html, success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams);
+      return new Response(
+        JSON.stringify({ html: htmlContent }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Send emails
-    const recipients = template.distribution_list;
-    if (!recipients || recipients.length === 0) {
-      return new Response(JSON.stringify({ error: 'No recipients configured' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // Generate email HTML
+    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams);
 
-    let successCount = 0;
-    let failCount = 0;
+    // Send email via Resend
+    const emailResult = await resend.emails.send({
+      from: 'Weekly Duty Coverage <duty@updates.yourdomain.com>',
+      to: template.distribution_list,
+      subject: `Weekly Duty Coverage - Week ${week_number}, ${year}`,
+      html: htmlContent,
+    });
 
-    for (const recipient of recipients) {
-      try {
-        await resend.emails.send({
-          from: 'Shift Management <onboarding@resend.dev>',
-          to: [recipient],
-          subject: `${template.template_name} Duty Coverage - Week ${week_number}, ${year}`,
-          html,
-        });
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to send to ${recipient}:`, error);
-        failCount++;
-      }
-    }
+    console.log('Email sent:', emailResult);
 
-    // Log to history
+    // Log email history
     await supabase.from('weekly_email_history').insert({
       template_id,
       week_number,
       year,
       sent_by: user.id,
-      recipient_count: recipients.length,
-      status: failCount === 0 ? 'success' : failCount === recipients.length ? 'failed' : 'partial',
+      recipient_count: template.distribution_list.length,
+      status: emailResult.error ? 'failed' : 'success',
     });
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        sent: successCount,
-        failed: failCount,
-        total: recipients.length,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, data: emailResult }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
-    console.error('Error in send-weekly-duty-coverage:', error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -162,146 +210,226 @@ serve(async (req) => {
   }
 });
 
-function buildDutyCoverageEmail(
-  template: any,
-  assignments: any[],
+// Combine manual assignments with schedule-based assignments
+function getCombinedAssignments(
+  manualAssignments: any[],
   scheduleEntries: any[],
-  weekNumber: number,
-  year: number,
-  weekStart: Date,
-  weekEnd: Date
-): string {
-  const weekendAssignments = assignments.filter(a => a.duty_type === 'weekend');
-  const lateshiftAssignments = assignments.filter(a => a.duty_type === 'lateshift');
-  const earlyshiftAssignments = assignments.filter(a => a.duty_type === 'earlyshift');
+  template: any,
+  startDate: Date,
+  endDate: Date
+): Assignment[] {
+  const combined: Assignment[] = [];
+  const manualMap = new Map<string, any>();
 
-  const days = [];
-  for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
-    days.push(new Date(d));
+  // Index manual assignments by key (date + team_id + duty_type)
+  manualAssignments.forEach(assignment => {
+    const key = `${assignment.date}_${assignment.team_id}_${assignment.duty_type}`;
+    manualMap.set(key, assignment);
+  });
+
+  // Process each day in the week for each team
+  const currentDate = new Date(startDate);
+  while (currentDate <= endDate) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    const dayOfWeek = currentDate.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    // Process each team
+    template.team_ids.forEach((teamId: string) => {
+      // Check weekend duty
+      if (template.include_weekend_duty && isWeekend) {
+        const key = `${dateStr}_${teamId}_weekend`;
+        if (manualMap.has(key)) {
+          const manual = manualMap.get(key);
+          combined.push({
+            ...manual,
+            source: 'manual'
+          });
+        } else {
+          // Auto-pull from schedule
+          const scheduleEntry = scheduleEntries.find(
+            e => e.date === dateStr && e.team_id === teamId
+          );
+          if (scheduleEntry) {
+            combined.push({
+              user_id: scheduleEntry.user_id,
+              user: scheduleEntry.user,
+              team_id: teamId,
+              date: dateStr,
+              duty_type: 'weekend',
+              source: 'schedule'
+            } as Assignment);
+          }
+        }
+      }
+
+      // Check lateshift
+      if (template.include_lateshift) {
+        const key = `${dateStr}_${teamId}_lateshift`;
+        if (manualMap.has(key)) {
+          const manual = manualMap.get(key);
+          combined.push({
+            ...manual,
+            source: 'manual'
+          });
+        } else {
+          const scheduleEntry = scheduleEntries.find(
+            e => e.date === dateStr && e.team_id === teamId && e.shift_type === 'late'
+          );
+          if (scheduleEntry) {
+            combined.push({
+              user_id: scheduleEntry.user_id,
+              user: scheduleEntry.user,
+              team_id: teamId,
+              date: dateStr,
+              duty_type: 'lateshift',
+              source: 'schedule'
+            } as Assignment);
+          }
+        }
+      }
+
+      // Check earlyshift
+      if (template.include_earlyshift) {
+        const key = `${dateStr}_${teamId}_earlyshift`;
+        if (manualMap.has(key)) {
+          const manual = manualMap.get(key);
+          combined.push({
+            ...manual,
+            source: 'manual'
+          });
+        } else {
+          const scheduleEntry = scheduleEntries.find(
+            e => e.date === dateStr && e.team_id === teamId && e.shift_type === 'early'
+          );
+          if (scheduleEntry) {
+            combined.push({
+              user_id: scheduleEntry.user_id,
+              user: scheduleEntry.user,
+              team_id: teamId,
+              date: dateStr,
+              duty_type: 'earlyshift',
+              source: 'schedule'
+            } as Assignment);
+          }
+        }
+      }
+    });
+
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return combined;
+}
+
+// Build the HTML email content with multi-team support
+function buildDutyCoverageEmail(
+  template: any,
+  assignments: Assignment[],
+  teams: TeamData[]
+): string {
+  const weekendDuty = assignments.filter(a => a.duty_type === 'weekend');
+  const lateshiftDuty = assignments.filter(a => a.duty_type === 'lateshift');
+  const earlyshiftDuty = assignments.filter(a => a.duty_type === 'earlyshift');
+
+  // Helper to build duty section with multi-team columns
+  const buildDutySection = (title: string, dutyAssignments: Assignment[]) => {
+    if (dutyAssignments.length === 0) return '';
+
+    // Group by date
+    const byDate: Record<string, Assignment[]> = {};
+    dutyAssignments.forEach(assignment => {
+      const date = assignment.date!;
+      if (!byDate[date]) byDate[date] = [];
+      byDate[date].push(assignment);
+    });
+
+    const days = Object.keys(byDate).sort();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    // Build header row with team columns
+    const headerCells = teams.map(team => `
+      <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;" colspan="2">${team.name}</th>
+    `).join('');
+
+    const subHeaderCells = teams.map(() => `
+      <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: left; font-size: 12px;">Assignment</th>
+      <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: left; font-size: 12px;">Substitute</th>
+    `).join('');
+
+    const rows = days.map(dateStr => {
+      const date = new Date(dateStr + 'T00:00:00Z');
+      const dayName = dayNames[date.getUTCDay()];
+      const dateAssignments = byDate[dateStr];
+      
+      // Create cells for each team
+      const teamCells = teams.map(team => {
+        const assignment = dateAssignments.find(a => a.team_id === team.id);
+        const primaryInitials = assignment?.user?.initials || '-';
+        const substituteInitials = assignment?.substitute?.initials || '-';
+        const sourceIndicator = assignment?.source === 'schedule' ? '📅' : '';
+
+        return `
+          <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">${sourceIndicator}${primaryInitials}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${substituteInitials}</td>
+        `;
+      }).join('');
+
+      return `
+        <tr>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${date.toLocaleDateString('en-GB')}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${dayName}</td>
+          ${teamCells}
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div style="margin-bottom: 32px;">
+        <h2 style="color: #1f2937; margin-bottom: 16px; font-size: 20px; font-weight: 600;">${title}</h2>
+        <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <thead>
+            <tr style="background: #f9fafb;">
+              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;" rowspan="2">Date</th>
+              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;" rowspan="2">Weekday</th>
+              ${headerCells}
+            </tr>
+            <tr style="background: #f9fafb;">
+              ${subHeaderCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+        <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">📅 = Auto-populated from schedule</p>
+      </div>
+    `;
+  };
+
+  const weekendSection = template.include_weekend_duty ? buildDutySection('Weekend/Public holiday duty', weekendDuty) : '';
+  const lateshiftSection = template.include_lateshift ? buildDutySection('Lateshift duty', lateshiftDuty) : '';
+  const earlyshiftSection = template.include_earlyshift ? buildDutySection('Earlyshift duty', earlyshiftDuty) : '';
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
-  <style>
-    body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-    table { border-collapse: collapse; margin: 15px 0; }
-    th, td { border: 1px solid #d0d0d0; padding: 6px 10px; text-align: left; }
-    th { background: #B4C7E7; font-weight: bold; }
-    .header { background: #4472C4; color: white; font-weight: bold; }
-    .weekend { background: #FFF2CC; }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weekly Duty Coverage</title>
 </head>
-<body>
-  <h3>Hi All,</h3>
-  <p>Below is the ${template.template_name} duty for week ${weekNumber}. The team are available, as shown below, to handle and support on stopped turbines:</p>
-  
-  <table style="width: 300px;">
-    <tr class="header">
-      <th colspan="2">Duty Overview ${year}</th>
-    </tr>
-    <tr>
-      <th>Year</th>
-      <th>Week</th>
-    </tr>
-    <tr>
-      <td>${year}</td>
-      <td>${weekNumber}</td>
-    </tr>
-  </table>
-
-  ${template.include_weekend_duty ? `
-  <h4>Weekend/Public holiday duty</h4>
-  <table style="width: 100%;">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Weekday</th>
-        <th>Duty Assignment</th>
-        <th>Substitute</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${days.filter(d => d.getDay() === 0 || d.getDay() === 6).map(day => {
-        const dateStr = day.toISOString().split('T')[0];
-        const assignment = weekendAssignments.find(a => a.date === dateStr);
-        return `
-        <tr class="weekend">
-          <td>${day.toLocaleDateString('en-GB')}</td>
-          <td>${dayNames[day.getDay()]}</td>
-          <td>${assignment ? (assignment.user?.initials || assignment.user?.first_name || '-') : '-'}</td>
-          <td>${assignment?.substitute ? (assignment.substitute.initials || assignment.substitute.first_name || '-') : '-'}</td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>
-  ` : ''}
-
-  ${template.include_lateshift ? `
-  <h4>Lateshift (14:00-20:00)</h4>
-  <table style="width: 100%;">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Weekday</th>
-        <th>Duty Assignment</th>
-        <th>Substitute</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${days.map(day => {
-        const dateStr = day.toISOString().split('T')[0];
-        const assignment = lateshiftAssignments.find(a => a.date === dateStr);
-        return `
-        <tr>
-          <td>${day.toLocaleDateString('en-GB')}</td>
-          <td>${dayNames[day.getDay()]}</td>
-          <td>${assignment ? (assignment.user?.initials || assignment.user?.first_name || '-') : '-'}</td>
-          <td>${assignment?.substitute ? (assignment.substitute.initials || assignment.substitute.first_name || '-') : '-'}</td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>
-  ` : ''}
-
-  ${template.include_earlyshift ? `
-  <h4>Earlyshift (06:00-14:00)</h4>
-  <table style="width: 100%;">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Weekday</th>
-        <th>Duty Assignment</th>
-        <th>Substitute</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${days.map(day => {
-        const dateStr = day.toISOString().split('T')[0];
-        const assignment = earlyshiftAssignments.find(a => a.date === dateStr);
-        return `
-        <tr>
-          <td>${day.toLocaleDateString('en-GB')}</td>
-          <td>${dayNames[day.getDay()]}</td>
-          <td>${assignment ? (assignment.user?.initials || assignment.user?.first_name || '-') : '-'}</td>
-          <td>${assignment?.substitute ? (assignment.substitute.initials || assignment.substitute.first_name || '-') : '-'}</td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>
-  ` : ''}
-
-  <h4>Time Legend</h4>
-  <table>
-    <tr><td>06:00-14:00</td><td>Early shift (DK, UK, IE, NO, PL)</td></tr>
-    <tr><td>06:00-14:30</td><td>Early shift (SE, FI)</td></tr>
-    <tr><td>14:00-20:00</td><td>Late shift</td></tr>
-  </table>
-
-  <p>Best regards,<br>Shift Management System</p>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #374151; background: #f3f4f6; margin: 0; padding: 0;">
+  <div style="max-width: 1000px; margin: 0 auto; padding: 24px;">
+    <div style="background: white; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <h1 style="color: #111827; margin-bottom: 24px; font-size: 28px; font-weight: 700;">Weekly Duty Coverage</h1>
+      <p style="color: #6b7280; margin-bottom: 32px;">Template: <strong>${template.template_name}</strong></p>
+      
+      ${weekendSection}
+      ${lateshiftSection}
+      ${earlyshiftSection}
+    </div>
+  </div>
 </body>
 </html>`;
 }

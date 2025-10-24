@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save } from "lucide-react";
 import { DutyAssignmentGrid } from "./DutyAssignmentGrid";
@@ -22,7 +23,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const { toast } = useToast();
   const [teams, setTeams] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [templateName, setTemplateName] = useState("");
   const [distributionList, setDistributionList] = useState<string[]>([]);
@@ -77,18 +78,19 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       .single();
 
     if (!error && data) {
-      setSelectedTeam(data.team_id);
+      setSelectedTeams(data.team_ids || []);
       setTemplateName(data.template_name);
       setDistributionList(data.distribution_list || []);
       setIncludeWeekend(data.include_weekend_duty);
       setIncludeLateshift(data.include_lateshift);
       setIncludeEarlyshift(data.include_earlyshift);
+      toast({ title: "Success", description: "Template loaded" });
     }
   };
 
   const saveTemplate = async () => {
-    if (!selectedTeam || !templateName) {
-      toast({ title: "Error", description: "Please select a team and enter a template name", variant: "destructive" });
+    if (selectedTeams.length === 0 || !templateName) {
+      toast({ title: "Error", description: "Please select at least one team and enter a template name", variant: "destructive" });
       return;
     }
 
@@ -96,7 +98,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     const { data: { user } } = await supabase.auth.getUser();
 
     const templateData = {
-      team_id: selectedTeam,
+      team_ids: selectedTeams,
       template_name: templateName,
       distribution_list: distributionList,
       include_weekend_duty: includeWeekend,
@@ -137,6 +139,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       setSelectedTemplate("");
       setTemplateName("");
       setDistributionList([]);
+      setSelectedTeams([]);
       fetchTemplates();
     }
   };
@@ -193,7 +196,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     } else {
       toast({
         title: "Success",
-        description: `Sent to ${data.sent} recipients (${data.failed} failed)`,
+        description: `Sent to ${data.sent || 0} recipients${data.failed ? ` (${data.failed} failed)` : ''}`,
       });
     }
   };
@@ -253,23 +256,52 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                     <Input
                       value={templateName}
                       onChange={(e) => setTemplateName(e.target.value)}
-                      placeholder="e.g., Troubleshooters North"
+                      placeholder="e.g., Troubleshooters Combined"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label>Team</Label>
-                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select team..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teams.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="teams">Teams *</Label>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {selectedTeams.map((teamId) => {
+                        const team = teams.find((t) => t.id === teamId);
+                        return (
+                          <Badge key={teamId} variant="secondary" className="gap-1">
+                            {team?.name}
+                            <button
+                              onClick={() => setSelectedTeams(selectedTeams.filter((id) => id !== teamId))}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                    <Select 
+                      value="" 
+                      onValueChange={(value) => {
+                        if (value && !selectedTeams.includes(value)) {
+                          setSelectedTeams([...selectedTeams, value]);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add team..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams
+                          .filter((team) => !selectedTeams.includes(team.id))
+                          .map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -310,19 +342,33 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           </TabsContent>
 
           <TabsContent value="assignments">
-            {selectedTeam ? (
-              <DutyAssignmentGrid
-                teamId={selectedTeam}
-                weekNumber={currentWeek}
-                year={currentYear}
-                includeWeekend={includeWeekend}
-                includeLateshift={includeLateshift}
-                includeEarlyshift={includeEarlyshift}
-              />
+            {selectedTeams.length > 0 && selectedTemplate ? (
+              <div className="space-y-6">
+                {selectedTeams.map((teamId) => {
+                  const team = teams.find((t) => t.id === teamId);
+                  return (
+                    <Card key={teamId}>
+                      <CardHeader>
+                        <CardTitle>{team?.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <DutyAssignmentGrid
+                          teamId={teamId}
+                          weekNumber={currentWeek}
+                          year={currentYear}
+                          includeWeekend={includeWeekend}
+                          includeLateshift={includeLateshift}
+                          includeEarlyshift={includeEarlyshift}
+                        />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             ) : (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
-                  Please select a team in the Template Setup tab first
+                  Please select teams and save a template first
                 </CardContent>
               </Card>
             )}

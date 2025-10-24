@@ -896,7 +896,7 @@ export type Database = {
           include_earlyshift: boolean
           include_lateshift: boolean
           include_weekend_duty: boolean
-          team_id: string
+          team_ids: string[]
           template_name: string
           updated_at: string
         }
@@ -908,7 +908,7 @@ export type Database = {
           include_earlyshift?: boolean
           include_lateshift?: boolean
           include_weekend_duty?: boolean
-          team_id: string
+          team_ids: string[]
           template_name: string
           updated_at?: string
         }
@@ -920,19 +920,11 @@ export type Database = {
           include_earlyshift?: boolean
           include_lateshift?: boolean
           include_weekend_duty?: boolean
-          team_id?: string
+          team_ids?: string[]
           template_name?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "weekly_duty_templates_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       weekly_email_history: {
         Row: {
