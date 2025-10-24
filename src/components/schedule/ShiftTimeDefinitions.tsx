@@ -249,7 +249,7 @@ export function ShiftTimeDefinitions() {
                   </TableCell>
                   <TableCell>
                     <MultiSelectDays
-                      value={def.day_of_week}
+                      value={def.day_of_week as number[] | null}
                       onValueChange={(value) =>
                         updateDefinition(index, "day_of_week", value)
                       }

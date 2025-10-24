@@ -16,40 +16,35 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+const DAYS = [
+  { label: "Monday", value: 0 },
+  { label: "Tuesday", value: 1 },
+  { label: "Wednesday", value: 2 },
+  { label: "Thursday", value: 3 },
+  { label: "Friday", value: 4 },
+  { label: "Saturday", value: 5 },
+  { label: "Sunday", value: 6 },
+];
+
 interface MultiSelectDaysProps {
   value?: number[] | null;
   onValueChange?: (value: number[] | null) => void;
   disabled?: boolean;
 }
 
-const DAYS = [
-  { value: 0, label: "Monday" },
-  { value: 1, label: "Tuesday" },
-  { value: 2, label: "Wednesday" },
-  { value: 3, label: "Thursday" },
-  { value: 4, label: "Friday" },
-  { value: 5, label: "Saturday" },
-  { value: 6, label: "Sunday" },
-];
-
 export function MultiSelectDays({ value, onValueChange, disabled = false }: MultiSelectDaysProps) {
   const [open, setOpen] = React.useState(false);
-
   const selectedDays = value || [];
   const isAllDays = !value || value.length === 0;
 
-  const toggleDay = (day: number) => {
-    if (isAllDays) {
-      // If "All Days" is selected, select just this day
-      onValueChange?.([day]);
+  const toggleDay = (dayValue: number) => {
+    let newSelection: number[];
+    if (selectedDays.includes(dayValue)) {
+      newSelection = selectedDays.filter((d) => d !== dayValue);
     } else {
-      const newSelection = selectedDays.includes(day)
-        ? selectedDays.filter((d) => d !== day)
-        : [...selectedDays, day].sort();
-      
-      // If all days deselected, set to null (All Days)
-      onValueChange?.(newSelection.length === 0 ? null : newSelection);
+      newSelection = [...selectedDays, dayValue].sort();
     }
+    onValueChange?.(newSelection.length === 0 ? null : newSelection);
   };
 
   const toggleAllDays = () => {
@@ -58,10 +53,28 @@ export function MultiSelectDays({ value, onValueChange, disabled = false }: Mult
 
   const getDisplayText = () => {
     if (isAllDays) return "All Days";
+    if (selectedDays.length === 7) return "All Days";
+    if (selectedDays.length === 0) return "All Days";
     if (selectedDays.length === 1) {
       return DAYS.find((d) => d.value === selectedDays[0])?.label || "Select days";
     }
-    if (selectedDays.length === DAYS.length) return "All Days";
+    
+    // Check for consecutive days
+    const sorted = [...selectedDays].sort((a, b) => a - b);
+    let isConsecutive = true;
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] !== sorted[i - 1] + 1) {
+        isConsecutive = false;
+        break;
+      }
+    }
+    
+    if (isConsecutive) {
+      const first = DAYS.find((d) => d.value === sorted[0])?.label;
+      const last = DAYS.find((d) => d.value === sorted[sorted.length - 1])?.label;
+      return `${first} - ${last}`;
+    }
+    
     return `${selectedDays.length} days selected`;
   };
 
@@ -72,7 +85,7 @@ export function MultiSelectDays({ value, onValueChange, disabled = false }: Mult
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[160px] justify-between"
+          className="w-[180px] justify-between"
           disabled={disabled}
         >
           {getDisplayText()}
@@ -84,7 +97,10 @@ export function MultiSelectDays({ value, onValueChange, disabled = false }: Mult
           <CommandList>
             <CommandEmpty>No day found.</CommandEmpty>
             <CommandGroup>
-              <CommandItem onSelect={toggleAllDays}>
+              <CommandItem
+                onSelect={toggleAllDays}
+                className="cursor-pointer"
+              >
                 <Check
                   className={cn(
                     "mr-2 h-4 w-4",
@@ -97,11 +113,14 @@ export function MultiSelectDays({ value, onValueChange, disabled = false }: Mult
                 <CommandItem
                   key={day.value}
                   onSelect={() => toggleDay(day.value)}
+                  className="cursor-pointer"
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      !isAllDays && selectedDays.includes(day.value) ? "opacity-100" : "opacity-0"
+                      selectedDays.includes(day.value) && !isAllDays
+                        ? "opacity-100"
+                        : "opacity-0"
                     )}
                   />
                   {day.label}

@@ -19,7 +19,7 @@ export interface ApplicableShiftTime {
 
 /**
  * Get applicable shift times with priority resolution:
- * 1. Team + region + day (highest priority)
+ * 1. Team + region + day(s) (highest priority)
  * 2. Team + region
  * 3. Team only
  * 4. Region only
@@ -51,29 +51,31 @@ export async function getApplicableShiftTimes({
     return getDefaultShiftTime(shiftType);
   }
 
-  // Priority 1: Team + region + day
-  const teamRegionDay = data.find(
-    (def) =>
-      def.team_id === teamId &&
-      def.region_code === regionCode &&
-      def.day_of_week !== null &&
-      dayOfWeek !== undefined &&
-      def.day_of_week.includes(dayOfWeek)
-  );
-  if (teamRegionDay) {
-    return {
-      startTime: teamRegionDay.start_time,
-      endTime: teamRegionDay.end_time,
-      description: teamRegionDay.description || "",
-    };
+  // Priority 1: Team + region + day(s)
+  if (dayOfWeek !== undefined) {
+    const teamRegionDay = data.find(
+      (def) =>
+        def.team_id === teamId &&
+        def.region_code === regionCode &&
+        def.day_of_week !== null &&
+        Array.isArray(def.day_of_week) &&
+        def.day_of_week.includes(dayOfWeek)
+    );
+    if (teamRegionDay) {
+      return {
+        startTime: teamRegionDay.start_time,
+        endTime: teamRegionDay.end_time,
+        description: teamRegionDay.description || "",
+      };
+    }
   }
 
-  // Priority 2: Team + region
+  // Priority 2: Team + region (no specific days)
   const teamRegion = data.find(
     (def) =>
       def.team_id === teamId &&
       def.region_code === regionCode &&
-      def.day_of_week === null
+      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
   );
   if (teamRegion) {
     return {
@@ -88,7 +90,7 @@ export async function getApplicableShiftTimes({
     (def) =>
       def.team_id === teamId &&
       def.region_code === null &&
-      def.day_of_week === null
+      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
   );
   if (teamOnly) {
     return {
@@ -103,7 +105,7 @@ export async function getApplicableShiftTimes({
     (def) =>
       def.team_id === null &&
       def.region_code === regionCode &&
-      def.day_of_week === null
+      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
   );
   if (regionOnly) {
     return {
@@ -118,7 +120,7 @@ export async function getApplicableShiftTimes({
     (def) =>
       def.team_id === null &&
       def.region_code === null &&
-      def.day_of_week === null
+      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
   );
   if (globalDefault) {
     return {
