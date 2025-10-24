@@ -55,13 +55,6 @@ interface RotationPattern {
   cycles: number;
 }
 
-const SHIFT_TEMPLATES: ShiftTemplate[] = [
-  { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-  { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-  { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
-  { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-];
-
 interface BulkScheduleGeneratorProps {
   onScheduleGenerated?: () => void;
 }
@@ -86,6 +79,12 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [rangeStartDate, setRangeStartDate] = useState<Date>();
   const [rangeEndDate, setRangeEndDate] = useState<Date>();
   const [shiftConfigurations, setShiftConfigurations] = useState<ShiftConfiguration[]>([]);
+  const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([
+    { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+    { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+    { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+    { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+  ]);
   
   // Rotation mode states
   const [selectedUsersForRotation, setSelectedUsersForRotation] = useState<string[]>([]);
@@ -171,6 +170,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
 
   useEffect(() => {
     fetchUsers();
+    fetchShiftDefinitions();
   }, [selectedTeam, bulkMode]);
 
   const fetchUserRoles = async () => {
@@ -293,6 +293,82 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     }
   };
 
+  const fetchShiftDefinitions = async () => {
+    if (!selectedTeam) {
+      // Reset to default templates when no team selected
+      setShiftTemplates([
+        { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+        { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+        { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+        { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+      ]);
+      return;
+    }
+
+    try {
+      // Fetch shift time definitions for the selected team
+      const { data, error } = await supabase
+        .from('shift_time_definitions')
+        .select('*')
+        .or(`team_id.eq.${selectedTeam},team_id.is.null`)
+        .order('shift_type');
+
+      if (error) throw error;
+
+      const templates: ShiftTemplate[] = [];
+
+      // Group by shift type
+      const shiftTypes = ['normal', 'early', 'late', 'weekend'] as const;
+      
+      for (const shiftType of shiftTypes) {
+        const defs = data?.filter(d => d.shift_type === shiftType) || [];
+        
+        if (defs.length > 0) {
+          // Use the first definition as the template
+          const primaryDef = defs[0];
+          templates.push({
+            id: shiftType,
+            name: `${shiftType.charAt(0).toUpperCase() + shiftType.slice(1)} Shift (${primaryDef.start_time}-${primaryDef.end_time})`,
+            startTime: primaryDef.start_time,
+            endTime: primaryDef.end_time,
+            days: [1, 2, 3, 4, 5] // Default to weekdays
+          });
+        }
+      }
+
+      // Add custom option if we have templates from database
+      if (templates.length > 0) {
+        templates.push({
+          id: 'custom',
+          name: 'Custom Shift',
+          startTime: '08:00',
+          endTime: '16:30',
+          days: [1, 2, 3, 4, 5]
+        });
+        setShiftTemplates(templates);
+      } else {
+        // Fallback to defaults if no definitions found
+        setShiftTemplates([
+          { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+          { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+          { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+          { id: 'weekend', name: 'Weekend / National Holiday', startTime: '08:00', endTime: '16:00', days: [0, 6] },
+          { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching shift definitions:', error);
+      // Use fallback on error
+      setShiftTemplates([
+        { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+        { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+        { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+        { id: 'weekend', name: 'Weekend / National Holiday', startTime: '08:00', endTime: '16:00', days: [0, 6] },
+        { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+      ]);
+    }
+  };
+
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers(prev => 
       prev.includes(userId) 
@@ -318,7 +394,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   };
 
   const getSelectedTemplate = () => {
-    return SHIFT_TEMPLATES.find(t => t.id === shiftTemplate) || SHIFT_TEMPLATES[0];
+    return shiftTemplates.find(t => t.id === shiftTemplate) || shiftTemplates[0];
   };
 
   const getDateRangeArray = (): Date[] => {
@@ -453,7 +529,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       }
     }
 
-    const template = SHIFT_TEMPLATES.find(t => t.id === shiftTemplate);
+    const template = shiftTemplates.find(t => t.id === shiftTemplate);
     
     // For rotation mode, create separate configs for each selected user
     if (bulkMode === 'rotation') {
@@ -923,7 +999,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             <label className="text-sm font-medium">Shift Type</label>
             <Select value={shiftTemplate} onValueChange={(value) => {
               setShiftTemplate(value);
-              const template = SHIFT_TEMPLATES.find(t => t.id === value);
+              const template = shiftTemplates.find(t => t.id === value);
               if (template) {
                 setCustomStartTime(template.startTime);
                 setCustomEndTime(template.endTime);
@@ -933,7 +1009,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SHIFT_TEMPLATES.map((template) => (
+                {shiftTemplates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.name}
                   </SelectItem>
