@@ -537,6 +537,20 @@ const AdminSetup = () => {
             </div>
         </CardContent>
       </Card>
+        </TabsContent>
+        
+        <TabsContent value="holidays" className="space-y-6">
+          <AdminHolidayManager />
+        </TabsContent>
+        
+        <TabsContent value="shifts" className="space-y-6">
+          <ShiftTimeDefinitions />
+        </TabsContent>
+        
+        <TabsContent value="groups" className="space-y-6">
+          <TeamGroupManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
