@@ -31,7 +31,6 @@ interface ScheduleEntry {
   activity_type: string;
 }
 
-
 export function MultiTeamScheduleView() {
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
@@ -173,7 +172,6 @@ export function MultiTeamScheduleView() {
     XLSX.writeFile(wb, `schedule-week-${weekNumber}-${year}.xlsx`);
   };
 
-
   return (
     <div className="space-y-4">
       <Card>
@@ -285,7 +283,7 @@ export function MultiTeamScheduleView() {
                                       {code}
                                     </td>
                                   </TooltipTrigger>
-                                   <TooltipContent>
+                                  <TooltipContent>
                                     <div className="text-sm">
                                       <div className="font-bold">
                                         {member.first_name} {member.last_name}
