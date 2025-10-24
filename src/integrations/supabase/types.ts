@@ -1340,7 +1340,7 @@ export type Database = {
       app_role: "manager" | "planner" | "teammember" | "admin"
       availability_status: "available" | "unavailable"
       duty_type: "weekend" | "lateshift" | "earlyshift"
-      shift_type: "early" | "late" | "normal"
+      shift_type: "early" | "late" | "normal" | "weekend"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1481,7 +1481,7 @@ export const Constants = {
       app_role: ["manager", "planner", "teammember", "admin"],
       availability_status: ["available", "unavailable"],
       duty_type: ["weekend", "lateshift", "earlyshift"],
-      shift_type: ["early", "late", "normal"],
+      shift_type: ["early", "late", "normal", "weekend"],
     },
   },
 } as const

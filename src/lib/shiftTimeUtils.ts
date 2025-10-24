@@ -4,7 +4,7 @@ export interface ShiftTimeDefinition {
   id: string;
   team_id: string | null;
   region_code: string | null;
-  shift_type: "normal" | "early" | "late";
+  shift_type: "normal" | "early" | "late" | "weekend";
   day_of_week: number[] | null;
   start_time: string;
   end_time: string;
@@ -33,7 +33,7 @@ export async function getApplicableShiftTimes({
 }: {
   teamId?: string;
   regionCode?: string;
-  shiftType: "normal" | "early" | "late";
+  shiftType: "normal" | "early" | "late" | "weekend";
   dayOfWeek?: number;
 }): Promise<ApplicableShiftTime> {
   const { data, error } = await supabase
@@ -134,12 +134,13 @@ export async function getApplicableShiftTimes({
 }
 
 function getDefaultShiftTime(
-  shiftType: "normal" | "early" | "late"
+  shiftType: "normal" | "early" | "late" | "weekend"
 ): ApplicableShiftTime {
   const defaults = {
     normal: { startTime: "08:00", endTime: "16:30", description: "Normal shift" },
     early: { startTime: "06:00", endTime: "14:00", description: "Early shift" },
     late: { startTime: "14:00", endTime: "22:00", description: "Late shift" },
+    weekend: { startTime: "08:00", endTime: "16:00", description: "Weekend / National Holiday shift" },
   };
   return defaults[shiftType];
 }

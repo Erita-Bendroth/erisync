@@ -220,6 +220,7 @@ export function ShiftTimeDefinitions() {
                         <SelectItem value="normal">Normal</SelectItem>
                         <SelectItem value="early">Early</SelectItem>
                         <SelectItem value="late">Late</SelectItem>
+                        <SelectItem value="weekend">Weekend / National Holiday</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>

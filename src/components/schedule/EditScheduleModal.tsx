@@ -50,7 +50,8 @@ interface EditScheduleModalProps {
 const shiftTypes = [
   { value: "normal", label: "Normal" },
   { value: "early", label: "Early" },
-  { value: "late", label: "Late" }
+  { value: "late", label: "Late" },
+  { value: "weekend", label: "Weekend / National Holiday" }
 ];
 
 const activityTypes = [
@@ -85,7 +86,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     { activity_type: "work", start_time: "09:00", end_time: "17:00" }
   ]);
   const [formData, setFormData] = useState<{
-    shift_type: "normal" | "early" | "late";
+    shift_type: "normal" | "early" | "late" | "weekend";
     activity_type: "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
     availability_status: "available" | "unavailable";
     notes: string;
@@ -129,7 +130,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
       }
 
       setFormData({
-        shift_type: (entry.shift_type as "normal" | "early" | "late") || "normal",
+        shift_type: (entry.shift_type as "normal" | "early" | "late" | "weekend") || "normal",
         activity_type: (entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
         availability_status: (entry.availability_status as "available" | "unavailable") || "available",
         notes: userNotes
@@ -341,7 +342,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             <Label htmlFor="shift_type">Shift Type</Label>
             <Select
               value={formData.shift_type}
-              onValueChange={(value: "normal" | "early" | "late") => setFormData({ ...formData, shift_type: value })}
+              onValueChange={(value: "normal" | "early" | "late" | "weekend") => setFormData({ ...formData, shift_type: value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select shift type" />
