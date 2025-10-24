@@ -294,65 +294,71 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   };
 
   const fetchShiftDefinitions = async () => {
-    if (!selectedTeam) {
-      // Reset to default templates when no team selected
-      setShiftTemplates([
-        { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-        { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-        { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
-        { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-      ]);
-      return;
-    }
-
     try {
-      // Fetch shift time definitions for the selected team
-      const { data, error } = await supabase
+      // Build query - fetch team-specific definitions if team is selected, otherwise global only
+      let query = supabase
         .from('shift_time_definitions')
         .select('*')
-        .or(`team_id.eq.${selectedTeam},team_id.is.null`)
         .order('shift_type');
+
+      if (selectedTeam) {
+        // Fetch both team-specific and global definitions
+        query = query.or(`team_id.eq.${selectedTeam},team_id.is.null`);
+      } else {
+        // Only fetch global definitions (no team selected yet)
+        query = query.is('team_id', null);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
       const templates: ShiftTemplate[] = [];
 
-      // Group by shift type
+      // Group by shift type and get unique templates
       const shiftTypes = ['normal', 'early', 'late', 'weekend'] as const;
       
       for (const shiftType of shiftTypes) {
         const defs = data?.filter(d => d.shift_type === shiftType) || [];
         
         if (defs.length > 0) {
-          // Use the first definition as the template
-          const primaryDef = defs[0];
+          // Prioritize team-specific definitions over global ones
+          const teamDef = selectedTeam ? defs.find(d => d.team_id === selectedTeam) : null;
+          const primaryDef = teamDef || defs[0];
+          
+          const displayName = shiftType === 'normal' ? 'Normal' :
+                             shiftType === 'weekend' ? 'Weekend / National Holiday' :
+                             shiftType.charAt(0).toUpperCase() + shiftType.slice(1);
+          
           templates.push({
             id: shiftType,
-            name: `${shiftType.charAt(0).toUpperCase() + shiftType.slice(1)} Shift (${primaryDef.start_time}-${primaryDef.end_time})`,
+            name: `${displayName} Shift (${primaryDef.start_time}-${primaryDef.end_time})`,
             startTime: primaryDef.start_time,
             endTime: primaryDef.end_time,
-            days: [1, 2, 3, 4, 5] // Default to weekdays
+            days: shiftType === 'weekend' ? [0, 6] : [1, 2, 3, 4, 5]
           });
         }
       }
 
-      // Add custom option if we have templates from database
-      if (templates.length > 0) {
-        templates.push({
-          id: 'custom',
-          name: 'Custom Shift',
-          startTime: '08:00',
-          endTime: '16:30',
-          days: [1, 2, 3, 4, 5]
-        });
+      // Always add custom option
+      templates.push({
+        id: 'custom',
+        name: 'Custom Shift',
+        startTime: '08:00',
+        endTime: '16:30',
+        days: [1, 2, 3, 4, 5]
+      });
+
+      // If we got templates from database, use them; otherwise use defaults
+      if (templates.length > 1) { // More than just 'custom'
         setShiftTemplates(templates);
       } else {
         // Fallback to defaults if no definitions found
         setShiftTemplates([
-          { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-          { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-          { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
-          { id: 'weekend', name: 'Weekend / National Holiday', startTime: '08:00', endTime: '16:00', days: [0, 6] },
+          { id: 'normal', name: 'Normal Shift (08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+          { id: 'early', name: 'Early Shift (06:00-14:30)', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+          { id: 'late', name: 'Late Shift (13:00-21:30)', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+          { id: 'weekend', name: 'Weekend / National Holiday (08:00-16:00)', startTime: '08:00', endTime: '16:00', days: [0, 6] },
           { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
         ]);
       }
@@ -360,10 +366,10 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       console.error('Error fetching shift definitions:', error);
       // Use fallback on error
       setShiftTemplates([
-        { id: 'standard', name: 'Standard Shift (Mon-Fri 08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-        { id: 'early', name: 'Early Shift', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-        { id: 'late', name: 'Late Shift', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
-        { id: 'weekend', name: 'Weekend / National Holiday', startTime: '08:00', endTime: '16:00', days: [0, 6] },
+        { id: 'normal', name: 'Normal Shift (08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+        { id: 'early', name: 'Early Shift (06:00-14:30)', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+        { id: 'late', name: 'Late Shift (13:00-21:30)', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+        { id: 'weekend', name: 'Weekend / National Holiday (08:00-16:00)', startTime: '08:00', endTime: '16:00', days: [0, 6] },
         { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
       ]);
     }
