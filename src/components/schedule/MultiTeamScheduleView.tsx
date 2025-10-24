@@ -31,10 +31,6 @@ interface ScheduleEntry {
   activity_type: string;
 }
 
-interface Holiday {
-  date: string;
-  name: string;
-}
 
 export function MultiTeamScheduleView() {
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
@@ -42,7 +38,6 @@ export function MultiTeamScheduleView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleEntry[]>>({});
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -119,17 +114,6 @@ export function MultiTeamScheduleView() {
       scheduleMap[key].push(entry);
     });
     setScheduleData(scheduleMap);
-
-    // Fetch holidays
-    const { data: holidayData } = await supabase
-      .from("holidays")
-      .select("date, name")
-      .gte("date", format(weekDays[0], "yyyy-MM-dd"))
-      .lte("date", format(weekDays[6], "yyyy-MM-dd"))
-      .eq("is_public", true)
-      .is("user_id", null);
-
-    setHolidays(holidayData || []);
     setLoading(false);
   };
 
@@ -189,10 +173,6 @@ export function MultiTeamScheduleView() {
     XLSX.writeFile(wb, `schedule-week-${weekNumber}-${year}.xlsx`);
   };
 
-  const isHoliday = (date: Date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
-    return holidays.some((h) => h.date === dateStr);
-  };
 
   return (
     <div className="space-y-4">
@@ -267,11 +247,10 @@ export function MultiTeamScheduleView() {
                     const dateStr = format(day, "yyyy-MM-dd");
                     const dayName = format(day, "EEE");
                     const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                    const holiday = isHoliday(day);
 
                     return (
                       <tr key={dateStr} className="border-b">
-                        <td className={`p-2 sticky left-0 bg-background z-10 font-medium ${holiday ? "bg-destructive/10" : ""}`}>
+                        <td className="p-2 sticky left-0 bg-background z-10 font-medium">
                           <div>{dayName}</div>
                           <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
                         </td>
@@ -284,8 +263,6 @@ export function MultiTeamScheduleView() {
 
                             const bgColor = entry
                               ? getShiftTypeColor(entry.shift_type, entry.activity_type)
-                              : holiday
-                              ? "hsl(var(--destructive))"
                               : isWeekend
                               ? "hsl(var(--muted))"
                               : "transparent";
@@ -302,13 +279,13 @@ export function MultiTeamScheduleView() {
                                       className="p-2 text-center font-bold cursor-pointer hover:opacity-80 transition-opacity"
                                       style={{
                                         backgroundColor: bgColor,
-                                        color: entry || holiday ? "white" : "inherit",
+                                        color: entry ? "white" : "inherit",
                                       }}
                                     >
                                       {code}
                                     </td>
                                   </TooltipTrigger>
-                                  <TooltipContent>
+                                   <TooltipContent>
                                     <div className="text-sm">
                                       <div className="font-bold">
                                         {member.first_name} {member.last_name}
@@ -318,7 +295,6 @@ export function MultiTeamScheduleView() {
                                           {entry.shift_type} - {entry.activity_type}
                                         </div>
                                       )}
-                                      {holiday && <div>Holiday</div>}
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
@@ -362,10 +338,6 @@ export function MultiTeamScheduleView() {
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "vacation") }} />
                 <span>U - Vacation</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "sick") }} />
-                <span>K - Sick</span>
               </div>
             </div>
           </div>
