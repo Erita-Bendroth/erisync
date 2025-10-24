@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { getShiftTypeColor, getShiftTypeCode } from "@/lib/shiftTimeUtils";
 import { format, startOfWeek, addDays, getWeek, getYear } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TeamFavoritesManager } from "./TeamFavoritesManager";
 import * as XLSX from "xlsx";
 
 interface TeamMember {
@@ -142,6 +143,10 @@ export function MultiTeamScheduleView() {
     );
   };
 
+  const handleApplyFavorite = (teamIds: string[], name: string) => {
+    setSelectedTeams(teamIds);
+  };
+
   const exportToExcel = () => {
     const exportData: any[] = [];
     
@@ -210,6 +215,11 @@ export function MultiTeamScheduleView() {
               <Button variant="outline" size="sm" onClick={() => changeWeek(1)}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
+              <TeamFavoritesManager
+                currentSelectedTeamIds={selectedTeams}
+                teams={teams}
+                onApplyFavorite={handleApplyFavorite}
+              />
               <Button variant="outline" size="sm" onClick={exportToExcel} disabled={selectedTeams.length === 0}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
@@ -331,26 +341,32 @@ export function MultiTeamScheduleView() {
           )}
 
           {/* Legend */}
-          <div className="flex flex-wrap gap-4 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("early") }} />
-              <span>F - Early Shift</span>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-4 text-xs">
+              <div className="font-semibold">Shifts:</div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("early") }} />
+                <span>F - Early Shift</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("late") }} />
+                <span>S - Late Shift</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("weekend") }} />
+                <span>W - Weekend Duty</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("late") }} />
-              <span>S - Late Shift</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("weekend") }} />
-              <span>W - Weekend Duty</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "vacation") }} />
-              <span>U - Vacation</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "sick") }} />
-              <span>K - Sick</span>
+            <div className="flex flex-wrap gap-4 text-xs">
+              <div className="font-semibold">Activities:</div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "vacation") }} />
+                <span>U - Vacation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "sick") }} />
+                <span>K - Sick</span>
+              </div>
             </div>
           </div>
         </CardContent>
