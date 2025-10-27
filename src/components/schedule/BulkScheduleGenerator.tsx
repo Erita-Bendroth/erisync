@@ -444,13 +444,12 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     
     const allDates = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
     
-    // For rotation mode or custom shifts with includeWeekends enabled, include all days
-    // For predefined shifts or when includeWeekends is false, exclude weekends
-    if ((bulkMode === 'rotation' || shiftTemplate === 'custom') && includeWeekends) {
-      return allDates; // Include all days including weekends
+    // If excludeWeekends is enabled, filter them out
+    if (excludeWeekends) {
+      return allDates.filter(date => !isWeekend(date)); // Only weekdays
     }
     
-    return allDates.filter(date => !isWeekend(date)); // Only weekdays
+    return allDates; // Include all days including weekends
   };
 
   // Update per-date times when date range changes (rotation mode only)
@@ -1308,7 +1307,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
           {rangeStartDate && rangeEndDate && (
             <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-              {getDateRangeArray().length} {(bulkMode === 'rotation' || shiftTemplate === 'custom') && includeWeekends ? 'days' : 'weekdays'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
+              {getDateRangeArray().length} {excludeWeekends ? 'weekdays' : 'days'} selected ({format(rangeStartDate, "MMM d")} - {format(rangeEndDate, "MMM d, yyyy")})
             </div>
           )}
         </div>
