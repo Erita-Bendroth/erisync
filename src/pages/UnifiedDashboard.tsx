@@ -129,10 +129,39 @@ export default function UnifiedDashboard() {
     enabled: selectedTeams.length > 0,
   });
 
-  // Fetch upcoming holidays
+  // Fetch upcoming holidays for selected teams' members
   const { data: upcomingHolidays = [] } = useQuery({
-    queryKey: ["upcoming-holidays"],
+    queryKey: ["upcoming-holidays", selectedTeams],
     queryFn: async () => {
+      if (selectedTeams.length === 0) return [];
+
+      // Get all team members from selected teams
+      const { data: teamMembers } = await supabase
+        .from("team_members")
+        .select("user_id")
+        .in("team_id", selectedTeams);
+
+      if (!teamMembers || teamMembers.length === 0) return [];
+
+      // Get their profiles to extract country codes
+      const userIds = [...new Set(teamMembers.map(tm => tm.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("country_code")
+        .in("user_id", userIds);
+
+      if (!profiles || profiles.length === 0) return [];
+
+      // Extract unique country codes
+      const countryCodes = [...new Set(
+        profiles
+          .map(p => p.country_code)
+          .filter(code => code !== null && code !== undefined)
+      )];
+
+      if (countryCodes.length === 0) return [];
+
+      // Fetch holidays only for those countries
       const { data } = await supabase
         .from("holidays")
         .select("*")
@@ -140,11 +169,13 @@ export default function UnifiedDashboard() {
         .lte("date", format(addWeeks(new Date(), 4), "yyyy-MM-dd"))
         .eq("is_public", true)
         .is("user_id", null)
+        .in("country_code", countryCodes)
         .order("date")
         .limit(5);
 
       return data || [];
     },
+    enabled: selectedTeams.length > 0,
   });
 
   // Calculate quick stats
@@ -293,9 +324,11 @@ export default function UnifiedDashboard() {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No upcoming holidays in the next 4 weeks
-                    </p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedTeams.length === 0 
+                      ? "Select teams to view relevant holidays"
+                      : "No upcoming holidays for your team members' countries in the next 4 weeks"}
+                  </p>
                   )}
                 </div>
               </CardContent>
