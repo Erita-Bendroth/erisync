@@ -307,31 +307,36 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
 
   const fetchShiftDefinitions = async () => {
     try {
-      // Build query - fetch team-specific definitions if team is selected, otherwise global only
-      let query = supabase
+      // Fetch all shift definitions
+      const { data, error } = await supabase
         .from('shift_time_definitions')
         .select('*')
         .order('shift_type');
-
-      if (selectedTeam) {
-        // Fetch definitions where:
-        // 1. team_ids array contains the selected team, OR
-        // 2. team_ids is null (global definitions), OR
-        // 3. team_id matches (for legacy single-team definitions)
-        query = query.or(`team_ids.cs.{${selectedTeam}},team_ids.is.null,team_id.eq.${selectedTeam},team_id.is.null`);
-      } else {
-        // Only fetch global definitions (no team selected yet)
-        query = query.or('team_ids.is.null,team_id.is.null');
-      }
-
-      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching shift definitions:', error);
         throw error;
       }
 
-      console.log('Fetched shift definitions:', data);
+      // Filter based on selected team
+      let filtered = data || [];
+      if (selectedTeam) {
+        filtered = data?.filter(def => {
+          // Global definitions (both fields null)
+          const isGlobal = def.team_ids === null && def.team_id === null;
+          
+          // Team-specific definitions
+          const matchesTeamIds = def.team_ids && def.team_ids.includes(selectedTeam);
+          const matchesTeamId = def.team_id === selectedTeam;
+          
+          return isGlobal || matchesTeamIds || matchesTeamId;
+        }) || [];
+      } else {
+        // Only global definitions when no team selected
+        filtered = data?.filter(def => def.team_ids === null && def.team_id === null) || [];
+      }
+
+      console.log('Filtered shift definitions:', filtered);
 
       const templates: ShiftTemplate[] = [];
 
