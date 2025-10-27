@@ -341,8 +341,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       const templates: ShiftTemplate[] = [];
 
       // Create a template for each unique shift definition
-      if (data && data.length > 0) {
-        for (const def of data) {
+      if (filtered && filtered.length > 0) {
+        for (const def of filtered) {
           const shiftType = def.shift_type;
           const displayName = shiftType === 'normal' ? 'Normal' :
                              shiftType === 'weekend' ? 'Weekend / National Holiday' :
