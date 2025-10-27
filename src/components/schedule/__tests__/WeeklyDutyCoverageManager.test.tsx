@@ -233,7 +233,7 @@ describe('WeeklyDutyCoverageManager', () => {
       });
     });
 
-    it('should close main dialog when opening preview and reopen after closing preview', async () => {
+    it('should transition from main dialog to preview and back', async () => {
       const mockInvoke = vi.fn().mockResolvedValue({
         data: { html: '<html><body>Test Preview</body></html>' },
         error: null,
@@ -242,8 +242,7 @@ describe('WeeklyDutyCoverageManager', () => {
 
       const mockOnOpenChange = vi.fn();
       render(<WeeklyDutyCoverageManager open={true} onOpenChange={mockOnOpenChange} />);
-      
-      // Select template
+
       await waitFor(() => {
         expect(screen.getByText('Test Template')).toBeInTheDocument();
       });
@@ -251,27 +250,56 @@ describe('WeeklyDutyCoverageManager', () => {
       const select = screen.getByRole('combobox');
       fireEvent.click(select);
       fireEvent.click(screen.getByText('Test Template'));
-      fireEvent.click(screen.getByText('Preview & Send'));
 
-      // Click preview button
+      fireEvent.click(screen.getByText('Preview & Send'));
+      
       const previewButton = screen.getByText('Preview Email').closest('button');
       fireEvent.click(previewButton!);
 
-      // Wait for preview to load with increased timeout for setTimeout delay
       await waitFor(() => {
         expect(screen.getByText('Email Preview - Weekly Duty Coverage')).toBeInTheDocument();
-      }, { timeout: 2000 }); // Increased to account for 200ms delay
+      });
 
-      // Verify onOpenChange was called with false to close main dialog
+      expect(screen.queryByText('Weekly Duty Coverage Manager')).not.toBeInTheDocument();
       expect(mockOnOpenChange).toHaveBeenCalledWith(false);
 
-      // Close preview
       fireEvent.click(screen.getByText('Close Preview'));
 
-      // Verify onOpenChange was called with true to reopen main dialog (with delay)
       await waitFor(() => {
         expect(mockOnOpenChange).toHaveBeenCalledWith(true);
-      }, { timeout: 2000 }); // Increased to account for 200ms delay
+      });
+
+      expect(screen.queryByText('Email Preview - Weekly Duty Coverage')).not.toBeInTheDocument();
+    });
+
+    it('should have proper ARIA attributes for accessibility', async () => {
+      const mockInvoke = vi.fn().mockResolvedValue({
+        data: { html: '<html><body>Accessible Content</body></html>' },
+        error: null,
+      });
+      (supabase.functions.invoke as any) = mockInvoke;
+
+      render(<WeeklyDutyCoverageManager open={true} onOpenChange={vi.fn()} />);
+
+      await waitFor(() => expect(screen.getByText('Test Template')).toBeInTheDocument());
+      
+      const select = screen.getByRole('combobox');
+      fireEvent.click(select);
+      fireEvent.click(screen.getByText('Test Template'));
+      fireEvent.click(screen.getByText('Preview & Send'));
+      
+      const previewButton = screen.getByText('Preview Email').closest('button');
+      fireEvent.click(previewButton!);
+
+      await waitFor(() => {
+        expect(screen.getByText('Email Preview - Weekly Duty Coverage')).toBeInTheDocument();
+      });
+
+      const description = screen.getByText(/Preview of the weekly duty coverage email/);
+      expect(description).toHaveAttribute('id', 'preview-description');
+
+      const dialogContent = description.closest('[role="dialog"]');
+      expect(dialogContent).toHaveAttribute('aria-describedby', 'preview-description');
     });
   });
 

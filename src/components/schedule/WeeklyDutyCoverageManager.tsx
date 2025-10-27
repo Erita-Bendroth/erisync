@@ -20,8 +20,11 @@ interface WeeklyDutyCoverageManagerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type DialogState = "closed" | "main" | "preview";
+
 export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCoverageManagerProps) {
   const { toast } = useToast();
+  const [dialogState, setDialogState] = useState<DialogState>("closed");
   const [teams, setTeams] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
@@ -35,16 +38,18 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [currentYear, setCurrentYear] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
-  const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState("template");
 
   useEffect(() => {
     if (open) {
+      setDialogState("main");
       fetchTeams();
       fetchTemplates();
       const now = new Date();
       setCurrentYear(now.getFullYear());
       setCurrentWeek(getWeekNumber(now));
+    } else if (dialogState === "main") {
+      setDialogState("closed");
     }
   }, [open]);
 
@@ -147,23 +152,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const handlePreview = async () => {
-    console.log('🎯 handlePreview called');
-    console.log('🎯 selectedTemplate:', selectedTemplate);
-    console.log('🎯 loading:', loading);
-    console.log('🎯 button should be disabled:', loading || !selectedTemplate);
-    
     if (!selectedTemplate) {
-      console.error('❌ No template selected, showing toast');
       toast({ title: "Error", description: "Please save the template first", variant: "destructive" });
       return;
     }
 
     setLoading(true);
-    console.log('📧 Preview request starting...', { 
-      template_id: selectedTemplate, 
-      week_number: currentWeek, 
-      year: currentYear 
-    });
 
     const { data, error } = await supabase.functions.invoke('send-weekly-duty-coverage', {
       body: {
@@ -174,26 +168,22 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       },
     });
 
-    console.log('📧 Preview response received:', { 
-      hasData: !!data, 
-      hasHtml: !!data?.html, 
-      htmlLength: data?.html?.length,
-      error: error?.message 
-    });
-
     setLoading(false);
+
     if (error || !data?.html) {
-      console.error('❌ Preview failed:', error);
       toast({ title: "Error", description: error?.message || "Failed to generate preview", variant: "destructive" });
-    } else {
-      console.log('✅ Setting preview HTML, length:', data.html.length);
-      setPreviewHtml(data.html);
-      console.log('✅ Closing main dialog and opening preview');
-      onOpenChange(false); // Close main dialog
-      setTimeout(() => {
-        setShowPreview(true); // Open preview after backdrop unmounts
-      }, 200); // 200ms matches Radix Dialog's animation duration
+      return;
     }
+
+    setPreviewHtml(data.html);
+    setDialogState("preview");
+    onOpenChange(false);
+  };
+
+  const handleClosePreview = () => {
+    setDialogState("main");
+    onOpenChange(true);
+    setPreviewHtml("");
   };
 
   const handleSend = async () => {
@@ -248,10 +238,21 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   return (
     <>
       {/* Main Dialog */}
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog 
+        open={dialogState === "main"} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogState("closed");
+            onOpenChange(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
+            <DialogDescription>
+              Configure and send weekly duty coverage reports
+            </DialogDescription>
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -430,15 +431,11 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
               <div className="flex gap-2 justify-center">
                 <Button 
-                  onClick={() => {
-                    console.log('🔘 Preview button clicked');
-                    console.log('🔘 Button state:', { loading, selectedTemplate, disabled: loading || !selectedTemplate });
-                    handlePreview();
-                  }} 
+                  onClick={handlePreview} 
                   disabled={loading || !selectedTemplate}
                 >
                   <Eye className="w-4 h-4 mr-2" />
-                  Preview Email
+                  {loading ? "Generating..." : "Preview Email"}
                 </Button>
                 <Button onClick={handleSend} disabled={loading || !selectedTemplate}>
                   <Mail className="w-4 h-4 mr-2" />
@@ -450,38 +447,34 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
         </DialogContent>
       </Dialog>
 
-      {/* Preview Modal - Radix Dialog */}
-      <Dialog open={showPreview} onOpenChange={(open) => {
-        setShowPreview(open);
-        if (!open) {
-          // Reopen main dialog after animation completes
-          setTimeout(() => {
-            onOpenChange(true);
-          }, 200);
-        }
-      }}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+      {/* Preview Dialog */}
+      <Dialog 
+        open={dialogState === "preview"} 
+        onOpenChange={(open) => {
+          if (!open) {
+            handleClosePreview();
+          }
+        }}
+      >
+        <DialogContent 
+          className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col"
+          aria-describedby="preview-description"
+        >
           <DialogHeader>
             <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="preview-description">
               Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
             </DialogDescription>
           </DialogHeader>
           
-          {/* Content */}
           <div 
             className="flex-1 overflow-y-auto bg-muted/30 p-6 rounded border"
-            dangerouslySetInnerHTML={{ __html: previewHtml }} 
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
+            style={{ contain: 'layout style paint' }}
           />
           
-          {/* Footer */}
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => {
-              setShowPreview(false);
-              setTimeout(() => {
-                onOpenChange(true);
-              }, 200);
-            }}>
+            <Button variant="outline" onClick={handleClosePreview}>
               Close Preview
             </Button>
           </div>
