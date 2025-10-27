@@ -236,8 +236,9 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {!showPreview ? (
+    <>
+      {/* Main Dialog */}
+      <Dialog open={open && !showPreview} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
@@ -426,7 +427,10 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
             </TabsContent>
           </Tabs>
         </DialogContent>
-      ) : (
+      </Dialog>
+
+      {/* Preview Dialog - Completely Separate */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
@@ -435,7 +439,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
             </DialogDescription>
           </DialogHeader>
           <div 
-            className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded"
+            className="flex-1 overflow-y-auto bg-background p-4 rounded border"
             dangerouslySetInnerHTML={{ __html: previewHtml }} 
           />
           <div className="flex justify-end pt-4 border-t">
@@ -444,7 +448,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
             </Button>
           </div>
         </DialogContent>
-      )}
-    </Dialog>
+      </Dialog>
+    </>
   );
 }
