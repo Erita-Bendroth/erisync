@@ -237,7 +237,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
   return (
     <>
-    <Dialog open={open && !showPreview} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
@@ -431,8 +431,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
     {/* Separate preview dialog to avoid nesting issues */}
     {showPreview && previewHtml && (
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+      <Dialog open={showPreview} onOpenChange={setShowPreview} modal={true}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col z-[100]">
           <DialogHeader>
             <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
             <DialogDescription>
