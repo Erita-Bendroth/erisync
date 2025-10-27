@@ -579,6 +579,7 @@ export type Database = {
           shift_type: Database["public"]["Enums"]["shift_type"]
           start_time: string
           team_id: string | null
+          team_ids: string[] | null
           updated_at: string
         }
         Insert: {
@@ -592,6 +593,7 @@ export type Database = {
           shift_type: Database["public"]["Enums"]["shift_type"]
           start_time: string
           team_id?: string | null
+          team_ids?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -605,6 +607,7 @@ export type Database = {
           shift_type?: Database["public"]["Enums"]["shift_type"]
           start_time?: string
           team_id?: string | null
+          team_ids?: string[] | null
           updated_at?: string
         }
         Relationships: [

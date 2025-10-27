@@ -119,6 +119,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   const [showVacationRequests, setShowVacationRequests] = useState(false);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [editingVacationRequest, setEditingVacationRequest] = useState<any>(null);
+  const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
 
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 // Show Monday through Sunday (full week)
@@ -242,6 +243,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchEmployees();
       fetchScheduleEntries();
       fetchHolidays();
+      fetchShiftTimeDefinitions();
       // Fetch pending requests count for all authenticated users
       fetchPendingRequestsCount();
     }
@@ -710,6 +712,66 @@ useEffect(() => {
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
+  };
+
+  const fetchShiftTimeDefinitions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shift_time_definitions')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching shift time definitions:', error);
+      } else {
+        setShiftTimeDefinitions(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching shift time definitions:', error);
+    }
+  };
+
+  const getShiftDescription = (entry: ScheduleEntry, employeeData?: Employee): string => {
+    if (entry.activity_type !== 'work') return '';
+    
+    // Find applicable shift time definition
+    const teamId = entry.team_id;
+    const regionCode = employeeData?.region_code;
+    const date = new Date(entry.date);
+    const dayOfWeek = (date.getDay() + 6) % 7; // Convert to ISO format (0=Monday, 6=Sunday)
+    
+    // Priority matching (same as shiftTimeUtils.ts)
+    const applicableDef = shiftTimeDefinitions.find(def => {
+      if (def.shift_type !== entry.shift_type) return false;
+      
+      // Check team match (team_ids array or old team_id)
+      const teamMatch = (def.team_ids && def.team_ids.includes(teamId)) || 
+                        (def.team_id === teamId);
+      const noTeam = !def.team_ids && !def.team_id;
+      
+      // Check region match
+      const regionMatch = def.region_code === regionCode;
+      const noRegion = !def.region_code;
+      
+      // Check day match
+      const dayMatch = def.day_of_week && Array.isArray(def.day_of_week) && 
+                      def.day_of_week.includes(dayOfWeek);
+      const noDay = !def.day_of_week || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0);
+      
+      // Priority 1: Team + region + day
+      if (teamMatch && regionMatch && dayMatch) return true;
+      // Priority 2: Team + region (no day)
+      if (teamMatch && regionMatch && noDay) return true;
+      // Priority 3: Team only (no region, no day)
+      if (teamMatch && noRegion && noDay) return true;
+      // Priority 4: Region only (no team, no day)
+      if (noTeam && regionMatch && noDay) return true;
+      // Priority 5: Global (no team, no region, no day)
+      if (noTeam && noRegion && noDay) return true;
+      
+      return false;
+    });
+    
+    return applicableDef?.description || '';
   };
 
   const fetchScheduleEntries = async (silent: boolean = false) => {
@@ -1916,13 +1978,14 @@ const getActivityColor = (entry: ScheduleEntry) => {
                               const times = getShiftTimesFromEntry(entry);
                               return (
                                 <div key={`continuation-${entry.id}`} className="space-y-1">
-                                  {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
+                                   {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
                                     <TimeBlockDisplay
                                       entry={entry}
                                       userRole={userRoles.length > 0 ? userRoles[0].role : ""}
                                       showNotes={false}
                                       isContinuation={true}
                                       originalStartTime={times.start}
+                                      shiftDescription={getShiftDescription(entry, employee)}
                                       onClick={(e) => {
                                         e?.stopPropagation();
                                         if (!multiSelectMode && (isManager() || isPlanner())) {
@@ -1981,6 +2044,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       entry={entry}
                                       userRole={userRoles.length > 0 ? userRoles[0].role : ""}
                                       showNotes={isTeamMember() && !isManager() && !isPlanner()}
+                                      shiftDescription={getShiftDescription(entry, employee)}
                                       onClick={(e) => {
                                         e?.stopPropagation();
                                         if (!multiSelectMode && (isManager() || isPlanner())) {

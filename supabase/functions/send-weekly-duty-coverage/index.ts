@@ -219,7 +219,7 @@ serve(async (req) => {
     console.log('Combined assignments:', combinedAssignments.length);
 
     if (preview) {
-      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams);
+      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
       return new Response(
         JSON.stringify({ html: htmlContent }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -379,8 +379,14 @@ function getCombinedAssignments(
 function buildDutyCoverageEmail(
   template: any,
   assignments: Assignment[],
-  teams: TeamData[]
+  teams: TeamData[],
+  shiftDefs: any[]
 ): string {
+  const getShiftDesc = (shiftType: string) => {
+    const def = shiftDefs.find(d => d.shift_type === shiftType);
+    return def?.description ? ` (${def.description})` : '';
+  };
+  
   const weekendDuty = assignments.filter(a => a.duty_type === 'weekend');
   const lateshiftDuty = assignments.filter(a => a.duty_type === 'lateshift');
   const earlyshiftDuty = assignments.filter(a => a.duty_type === 'earlyshift');

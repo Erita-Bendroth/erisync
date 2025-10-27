@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TimeSelect } from "@/components/ui/time-select";
 import { MultiSelectDays } from "@/components/ui/multi-select-days";
+import { MultiSelectTeams } from "@/components/ui/multi-select-teams";
 import { Plus, Trash2, Save } from "lucide-react";
 import { ShiftTimeDefinition } from "@/lib/shiftTimeUtils";
 
@@ -30,14 +31,13 @@ const REGIONS = ["DE", "UK", "SE", "FR", "CH", "AT"];
 export function ShiftTimeDefinitions() {
   const [definitions, setDefinitions] = useState<ShiftTimeDefinition[]>([]);
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedTeam, setSelectedTeam] = useState<string>("global");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchTeams();
     fetchDefinitions();
-  }, [selectedTeam]);
+  }, []);
 
   const fetchTeams = async () => {
     const { data } = await supabase.from("teams").select("id, name").order("name");
@@ -46,18 +46,11 @@ export function ShiftTimeDefinitions() {
 
   const fetchDefinitions = async () => {
     setLoading(true);
-    const query = supabase
+    const { data, error } = await supabase
       .from("shift_time_definitions")
       .select("*")
       .order("shift_type");
 
-    if (selectedTeam !== "global") {
-      query.eq("team_id", selectedTeam);
-    } else {
-      query.is("team_id", null);
-    }
-
-    const { data, error } = await query;
     if (error) {
       toast({
         title: "Error",
@@ -72,7 +65,8 @@ export function ShiftTimeDefinitions() {
 
   const addDefinition = () => {
     const newDef: Partial<ShiftTimeDefinition> = {
-      team_id: selectedTeam === "global" ? null : selectedTeam,
+      team_id: null,
+      team_ids: null,
       region_code: null,
       shift_type: "normal",
       day_of_week: null,
@@ -96,7 +90,8 @@ export function ShiftTimeDefinitions() {
     const saveData = {
       ...def,
       created_by: user.user.id,
-      team_id: def.team_id || null,
+      team_id: null,
+      team_ids: def.team_ids && def.team_ids.length > 0 ? def.team_ids : null,
       region_code: def.region_code || null,
       day_of_week: def.day_of_week,
     };
@@ -170,20 +165,6 @@ export function ShiftTimeDefinitions() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
-          <Label>Team Scope:</Label>
-          <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="global">Global (All Teams)</SelectItem>
-              {teams.map((team) => (
-                <SelectItem key={team.id} value={team.id}>
-                  {team.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Button onClick={addDefinition} size="sm">
             <Plus className="w-4 h-4 mr-2" />
             Add Override
@@ -195,6 +176,7 @@ export function ShiftTimeDefinitions() {
             <TableHeader>
               <TableRow>
                 <TableHead>Shift Type</TableHead>
+                <TableHead>Teams</TableHead>
                 <TableHead>Region</TableHead>
                 <TableHead>Day</TableHead>
                 <TableHead>Start Time</TableHead>
@@ -223,6 +205,16 @@ export function ShiftTimeDefinitions() {
                         <SelectItem value="weekend">Weekend / National Holiday</SelectItem>
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    <MultiSelectTeams
+                      teams={teams}
+                      selectedTeamIds={def.team_ids || []}
+                      onValueChange={(value) =>
+                        updateDefinition(index, "team_ids", value.length > 0 ? value : null)
+                      }
+                      placeholder="All Teams"
+                    />
                   </TableCell>
                   <TableCell>
                     <Select
@@ -303,7 +295,7 @@ export function ShiftTimeDefinitions() {
               ))}
               {definitions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No shift time definitions. Click "Add Override" to create one.
                   </TableCell>
                 </TableRow>

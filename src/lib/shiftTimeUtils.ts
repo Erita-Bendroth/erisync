@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ShiftTimeDefinition {
   id: string;
   team_id: string | null;
+  team_ids: string[] | null;
   region_code: string | null;
   shift_type: "normal" | "early" | "late" | "weekend";
   day_of_week: number[] | null;
@@ -55,7 +56,7 @@ export async function getApplicableShiftTimes({
   if (dayOfWeek !== undefined) {
     const teamRegionDay = data.find(
       (def) =>
-        def.team_id === teamId &&
+        ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId) &&
         def.region_code === regionCode &&
         def.day_of_week !== null &&
         Array.isArray(def.day_of_week) &&
@@ -73,7 +74,7 @@ export async function getApplicableShiftTimes({
   // Priority 2: Team + region (no specific days)
   const teamRegion = data.find(
     (def) =>
-      def.team_id === teamId &&
+      ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId) &&
       def.region_code === regionCode &&
       (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
   );
@@ -88,7 +89,7 @@ export async function getApplicableShiftTimes({
   // Priority 3: Team only
   const teamOnly = data.find(
     (def) =>
-      def.team_id === teamId &&
+      ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId) &&
       def.region_code === null &&
       (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
   );

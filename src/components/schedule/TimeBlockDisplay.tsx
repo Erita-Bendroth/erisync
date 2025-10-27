@@ -25,6 +25,7 @@ interface TimeBlockDisplayProps {
   userRole?: string;
   isContinuation?: boolean; // Flag to indicate this is the continuation part of a night shift
   originalStartTime?: string; // Original start time from previous day
+  shiftDescription?: string; // Custom shift description from shift_time_definitions
 }
 
 const getActivityColor = (activityType: string, shiftType?: string) => {
@@ -62,9 +63,15 @@ const getActivityColor = (activityType: string, shiftType?: string) => {
   }
 };
 
-const getActivityDisplayName = (activityType: string, shiftType?: string) => {
-  // If activity is work, show the shift type instead
+const getActivityDisplayName = (activityType: string, shiftType?: string, customDescription?: string) => {
+  // If activity is work, show custom description or shift type
   if (activityType === 'work' && shiftType) {
+    // Use custom description if available
+    if (customDescription) {
+      return customDescription;
+    }
+    
+    // Otherwise use default shift type names
     switch (shiftType) {
       case 'early': return 'Early Shift';
       case 'late': return 'Late Shift';
@@ -94,7 +101,8 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   showNotes = false,
   userRole = "",
   isContinuation = false,
-  originalStartTime = ""
+  originalStartTime = "",
+  shiftDescription = ""
 }) => {
   // Check if this is a holiday entry (activity_type = 'other' with "Public holiday:" in notes)
   const isHoliday = entry.activity_type === 'other' && entry.notes?.includes('Public holiday:');
@@ -218,7 +226,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                               <span className="font-medium">ends {block.end_time}</span>
                             </span>
                             <span className="text-[9px] text-muted-foreground italic">
-                              {getActivityDisplayName(block.activity_type, entry.shift_type)} from {originalStartTime || block.start_time}
+                              {getActivityDisplayName(block.activity_type, entry.shift_type, shiftDescription)} from {originalStartTime || block.start_time}
                             </span>
                           </div>
                         </Badge>
@@ -226,7 +234,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                     </TooltipTrigger>
                     <TooltipContent className="z-[100]" side="top">
                       <p className="max-w-xs">
-                        <strong>{getActivityDisplayName(block.activity_type, entry.shift_type)}</strong>
+                        <strong>{getActivityDisplayName(block.activity_type, entry.shift_type, shiftDescription)}</strong>
                         <br />
                         Full shift: {originalStartTime || block.start_time} – {block.end_time}
                         <br />
@@ -254,7 +262,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                         >
                           <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
                             <span className="font-medium flex items-center gap-1">
-                              {getActivityDisplayName(block.activity_type, entry.shift_type)}
+                              {getActivityDisplayName(block.activity_type, entry.shift_type, shiftDescription)}
                               <span className="text-orange-600 dark:text-orange-400 font-bold text-base">→</span>
                             </span>
                             <span className="text-xs font-semibold">
@@ -266,7 +274,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                     </TooltipTrigger>
                     <TooltipContent className="z-[100]" side="top">
                       <p className="max-w-xs">
-                        <strong>{getActivityDisplayName(block.activity_type, entry.shift_type)}</strong>
+                        <strong>{getActivityDisplayName(block.activity_type, entry.shift_type, shiftDescription)}</strong>
                         <br />
                         Full shift: {block.start_time} – {block.end_time} (next day)
                         <br />
@@ -295,7 +303,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
               >
                 <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
                   <span className="font-medium">
-                    {getActivityDisplayName(block.activity_type, entry.shift_type)}
+                    {getActivityDisplayName(block.activity_type, entry.shift_type, shiftDescription)}
                   </span>
                   <span className="text-xs">
                     {block.start_time}–{block.end_time}
@@ -340,7 +348,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                         <span className="font-medium">ends {times.end}</span>
                       </span>
                       <span className="text-[9px] text-muted-foreground italic">
-                        {getActivityDisplayName(entry.activity_type, entry.shift_type)} from {originalStartTime || times.start}
+                        {getActivityDisplayName(entry.activity_type, entry.shift_type, shiftDescription)} from {originalStartTime || times.start}
                       </span>
                     </div>
                   </Badge>
@@ -348,7 +356,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
               </TooltipTrigger>
               <TooltipContent className="z-[100]" side="top">
                 <p className="max-w-xs">
-                  <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type)}</strong>
+                  <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type, shiftDescription)}</strong>
                   <br />
                   Full shift: {originalStartTime || times.start} – {times.end}
                   <br />
@@ -376,7 +384,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
                   >
                     <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
                       <span className="font-medium flex items-center gap-1">
-                        {getActivityDisplayName(entry.activity_type, entry.shift_type)}
+                        {getActivityDisplayName(entry.activity_type, entry.shift_type, shiftDescription)}
                         <span className="text-orange-600 dark:text-orange-400 font-bold text-base">→</span>
                       </span>
                       <span className="text-xs font-semibold">
@@ -388,7 +396,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
               </TooltipTrigger>
               <TooltipContent className="z-[100]" side="top">
                 <p className="max-w-xs">
-                  <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type)}</strong>
+                  <strong>{getActivityDisplayName(entry.activity_type, entry.shift_type, shiftDescription)}</strong>
                   <br />
                   Full shift: {times.start} – {times.end} (next day)
                   <br />
@@ -405,7 +413,7 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
           >
             <div className="flex flex-col items-center py-1 w-full" onClick={() => setExpanded(!expanded)}>
               <span className="font-medium">
-                {getActivityDisplayName(entry.activity_type, entry.shift_type)}
+                {getActivityDisplayName(entry.activity_type, entry.shift_type, shiftDescription)}
               </span>
               <span className="text-xs">
                 {times.start}–{times.end}
