@@ -218,6 +218,13 @@ serve(async (req) => {
 
     console.log('Combined assignments:', combinedAssignments.length);
 
+    // Fetch shift time definitions for descriptions
+    const { data: shiftDefs } = await supabase
+      .from('shift_time_definitions')
+      .select('*');
+
+    console.log('Fetched shift time definitions:', shiftDefs?.length || 0);
+
     if (preview) {
       const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
       return new Response(
@@ -227,7 +234,7 @@ serve(async (req) => {
     }
 
     // Generate email HTML
-    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams);
+    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
 
     // Send email via Resend
     const emailResult = await resend.emails.send({
@@ -466,9 +473,9 @@ function buildDutyCoverageEmail(
     `;
   };
 
-  const weekendSection = template.include_weekend_duty ? buildDutySection('Weekend/Public holiday duty', weekendDuty) : '';
-  const lateshiftSection = template.include_lateshift ? buildDutySection('Lateshift duty', lateshiftDuty) : '';
-  const earlyshiftSection = template.include_earlyshift ? buildDutySection('Earlyshift duty', earlyshiftDuty) : '';
+  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftDesc('weekend')}`, weekendDuty) : '';
+  const lateshiftSection = template.include_lateshift ? buildDutySection(`Lateshift duty${getShiftDesc('late')}`, lateshiftDuty) : '';
+  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Earlyshift duty${getShiftDesc('early')}`, earlyshiftDuty) : '';
 
   return `
 <!DOCTYPE html>
