@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save, X } from "lucide-react";
 import { DutyAssignmentGrid } from "./DutyAssignmentGrid";
 import { DistributionListManager } from "./DistributionListManager";
 
@@ -238,7 +239,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   return (
     <>
       {/* Main Dialog */}
-      <Dialog open={open && !showPreview} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
@@ -429,26 +430,51 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
         </DialogContent>
       </Dialog>
 
-      {/* Preview Dialog - Completely Separate */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
-            <DialogDescription>
-              Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
-            </DialogDescription>
-          </DialogHeader>
+      {/* Preview Modal - Custom Portal */}
+      {showPreview && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          {/* Backdrop */}
           <div 
-            className="flex-1 overflow-y-auto bg-background p-4 rounded border"
-            dangerouslySetInnerHTML={{ __html: previewHtml }} 
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm" 
+            onClick={() => setShowPreview(false)} 
           />
-          <div className="flex justify-end pt-4 border-t">
-            <Button onClick={() => setShowPreview(false)}>
-              Close Preview
-            </Button>
+          
+          {/* Modal Container */}
+          <div className="relative z-[101] max-w-5xl max-h-[85vh] w-full mx-4 bg-background rounded-lg shadow-2xl flex flex-col border">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h2 className="text-lg font-semibold">Email Preview - Weekly Duty Coverage</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowPreview(false)}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Content */}
+            <div 
+              className="flex-1 overflow-y-auto bg-muted/30 p-6 m-4 rounded border"
+              dangerouslySetInnerHTML={{ __html: previewHtml }} 
+            />
+            
+            {/* Footer */}
+            <div className="flex justify-end gap-2 p-6 border-t">
+              <Button variant="outline" onClick={() => setShowPreview(false)}>
+                Close Preview
+              </Button>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>,
+        document.body
+      )}
     </>
   );
 }
