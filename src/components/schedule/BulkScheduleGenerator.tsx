@@ -987,14 +987,36 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       e.shift_type === 'early' || e.shift_type === 'late'
     ).length;
     
-    // Fetch holidays to count holiday shifts
+    // Fetch user profiles to get their country/region for holiday matching
+    const uniqueUserIds = Array.from(new Set(entries.map(e => e.user_id)));
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, country_code, region_code')
+      .in('user_id', uniqueUserIds);
+    
+    const userCountryMap = new Map(
+      profiles?.map(p => [p.user_id, { country: p.country_code || 'US', region: p.region_code }]) || []
+    );
+    
+    // Fetch holidays - we need country and region info
     const { data: holidays } = await supabase
       .from('holidays')
-      .select('date')
-      .eq('is_public', true);
+      .select('date, country_code, region_code')
+      .eq('is_public', true)
+      .is('user_id', null); // Only centrally managed holidays
     
-    const holidayDates = new Set(holidays?.map(h => h.date) || []);
-    const holidayShifts = entries.filter(e => holidayDates.has(e.date)).length;
+    // Count holiday shifts: only if date has holiday matching user's country/region
+    const holidayShifts = entries.filter(e => {
+      const userInfo = userCountryMap.get(e.user_id);
+      if (!userInfo) return false;
+      
+      return holidays?.some(h => 
+        h.date === e.date && 
+        h.country_code === userInfo.country &&
+        // Either holiday has no region (national) or matches user's region (for countries like Germany)
+        (h.region_code === null || h.region_code === userInfo.region || userInfo.region === null)
+      ) || false;
+    }).length;
     
     // Simple fairness score calculation
     const userShiftCounts = new Map<string, number>();
