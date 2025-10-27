@@ -219,6 +219,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -408,17 +409,23 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           </TabsContent>
         </Tabs>
 
-        {showPreview && (
-          <Dialog open={showPreview} onOpenChange={setShowPreview}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Email Preview</DialogTitle>
-              </DialogHeader>
-              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-            </DialogContent>
-          </Dialog>
-        )}
       </DialogContent>
     </Dialog>
+
+    {/* Separate preview dialog to avoid nesting issues */}
+    {showPreview && (
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
+          </DialogHeader>
+          <div 
+            className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded"
+            dangerouslySetInnerHTML={{ __html: previewHtml }} 
+          />
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }
