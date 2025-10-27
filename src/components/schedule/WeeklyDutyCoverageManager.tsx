@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogPortal, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save } from "lucide-react";
@@ -432,21 +432,18 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     {/* Separate preview dialog to avoid nesting issues */}
     {showPreview && previewHtml && (
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogPortal>
-          <DialogOverlay />
-          <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
-              <DialogDescription>
-                Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
-              </DialogDescription>
-            </DialogHeader>
-            <div 
-              className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded"
-              dangerouslySetInnerHTML={{ __html: previewHtml }} 
-            />
-          </DialogContent>
-        </DialogPortal>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
+            <DialogDescription>
+              Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
+            </DialogDescription>
+          </DialogHeader>
+          <div 
+            className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded"
+            dangerouslySetInnerHTML={{ __html: previewHtml }} 
+          />
+        </DialogContent>
       </Dialog>
     )}
     </>
