@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -23,8 +24,9 @@ import { Label } from "@/components/ui/label";
 import { TimeSelect } from "@/components/ui/time-select";
 import { MultiSelectDays } from "@/components/ui/multi-select-days";
 import { MultiSelectTeams } from "@/components/ui/multi-select-teams";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2, Save, Users } from "lucide-react";
 import { ShiftTimeDefinition } from "@/lib/shiftTimeUtils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const REGIONS = ["DE", "UK", "SE", "FR", "CH", "AT"];
 
@@ -175,12 +177,12 @@ export function ShiftTimeDefinitions() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Shift Type</TableHead>
-                <TableHead>Teams</TableHead>
-                <TableHead>Region</TableHead>
-                <TableHead>Day</TableHead>
-                <TableHead>Start Time</TableHead>
-                <TableHead>End Time</TableHead>
+                <TableHead className="w-[120px]">Shift Type</TableHead>
+                <TableHead className="w-[100px]">Teams</TableHead>
+                <TableHead className="w-[100px]">Region</TableHead>
+                <TableHead className="w-[140px]">Day</TableHead>
+                <TableHead className="w-[110px]">Start</TableHead>
+                <TableHead className="w-[110px]">End</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
@@ -207,14 +209,71 @@ export function ShiftTimeDefinitions() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <MultiSelectTeams
-                      teams={teams}
-                      selectedTeamIds={def.team_ids || []}
-                      onValueChange={(value) =>
-                        updateDefinition(index, "team_ids", value.length > 0 ? value : null)
-                      }
-                      placeholder="All Teams"
-                    />
+                    {def.team_ids && def.team_ids.length > 0 ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 w-full justify-start"
+                          >
+                            <Users className="w-4 h-4 mr-2" />
+                            {def.team_ids.length} team{def.team_ids.length !== 1 ? 's' : ''}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px]" align="start">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Selected Teams</p>
+                            <div className="flex flex-wrap gap-1">
+                              {def.team_ids.map((teamId) => {
+                                const team = teams.find(t => t.id === teamId);
+                                return team ? (
+                                  <Badge key={teamId} variant="secondary" className="text-xs">
+                                    {team.name}
+                                  </Badge>
+                                ) : null;
+                              })}
+                            </div>
+                            <MultiSelectTeams
+                              teams={teams}
+                              selectedTeamIds={def.team_ids}
+                              onValueChange={(value) =>
+                                updateDefinition(index, "team_ids", value.length > 0 ? value : null)
+                              }
+                              placeholder="Select teams"
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 w-full justify-start text-muted-foreground"
+                          >
+                            All Teams
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px]" align="start">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Select Teams</p>
+                            <p className="text-xs text-muted-foreground">
+                              No teams selected = applies to all teams globally
+                            </p>
+                            <MultiSelectTeams
+                              teams={teams}
+                              selectedTeamIds={[]}
+                              onValueChange={(value) =>
+                                updateDefinition(index, "team_ids", value.length > 0 ? value : null)
+                              }
+                              placeholder="Select teams"
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Select
