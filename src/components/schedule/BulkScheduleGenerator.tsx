@@ -349,10 +349,8 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                              shiftType === 'weekend' ? 'Weekend / National Holiday' :
                              shiftType.charAt(0).toUpperCase() + shiftType.slice(1);
           
-          // Use description if available, otherwise use generic name
-          const name = def.description 
-            ? `${def.description} (${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)})`
-            : `${displayName} Shift (${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)})`;
+          // Use description if available, otherwise use generic name (WITHOUT times - they'll be shown separately)
+          const name = def.description || `${displayName} Shift`;
           
           templates.push({
             id: def.id, // Use the definition ID as the template ID

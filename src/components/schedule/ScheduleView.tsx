@@ -739,7 +739,8 @@ useEffect(() => {
       // NEW FORMAT: "Shift: {name}"
       const newFormatMatch = entry.notes.match(/Shift:\s*(.+?)(?:\n|$)/);
       if (newFormatMatch && newFormatMatch[1]) {
-        return newFormatMatch[1].trim();
+        // Remove times in parentheses at the end if present, since they're shown separately
+        return newFormatMatch[1].trim().replace(/\s*\(\d{2}:\d{2}-\d{2}:\d{2}\)\s*$/, '');
       }
       
       // OLD FORMAT: "Auto-generated {name} shift" or "Auto-generated {name}"
@@ -748,7 +749,8 @@ useEffect(() => {
         // Extract the full name including times in parentheses if present
         const fullNameMatch = entry.notes.match(/Auto-generated\s+(.+?)(?:\n|$)/);
         if (fullNameMatch && fullNameMatch[1]) {
-          return fullNameMatch[1].trim();
+          // Remove times in parentheses at the end if present, since they're shown separately
+          return fullNameMatch[1].trim().replace(/\s*\(\d{2}:\d{2}-\d{2}:\d{2}\)\s*$/, '');
         }
       }
     }
