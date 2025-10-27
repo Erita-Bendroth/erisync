@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save } from "lucide-react";
@@ -152,6 +152,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     }
 
     setLoading(true);
+    console.log('📧 Preview request starting...', { 
+      template_id: selectedTemplate, 
+      week_number: currentWeek, 
+      year: currentYear 
+    });
+
     const { data, error } = await supabase.functions.invoke('send-weekly-duty-coverage', {
       body: {
         template_id: selectedTemplate,
@@ -161,12 +167,22 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       },
     });
 
+    console.log('📧 Preview response received:', { 
+      hasData: !!data, 
+      hasHtml: !!data?.html, 
+      htmlLength: data?.html?.length,
+      error: error?.message 
+    });
+
     setLoading(false);
     if (error || !data?.html) {
+      console.error('❌ Preview failed:', error);
       toast({ title: "Error", description: error?.message || "Failed to generate preview", variant: "destructive" });
     } else {
+      console.log('✅ Setting preview HTML, length:', data.html.length);
       setPreviewHtml(data.html);
       setShowPreview(true);
+      console.log('✅ Preview dialog should now be visible');
     }
   };
 
@@ -414,11 +430,14 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     </Dialog>
 
     {/* Separate preview dialog to avoid nesting issues */}
-    {showPreview && (
+    {showPreview && previewHtml && (
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
+            <DialogDescription>
+              Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
+            </DialogDescription>
           </DialogHeader>
           <div 
             className="flex-1 overflow-y-auto bg-gray-100 p-4 rounded"
