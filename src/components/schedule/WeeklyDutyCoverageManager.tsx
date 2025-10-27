@@ -35,6 +35,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [loading, setLoading] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState("template");
 
   useEffect(() => {
     if (open) {
@@ -226,7 +227,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="template">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="template">Template Setup</TabsTrigger>
             <TabsTrigger value="assignments">Duty Assignments</TabsTrigger>
@@ -346,7 +347,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           <TabsContent value="assignments">
             {selectedTeams.length > 0 && selectedTemplate ? (
               <div className="space-y-6">
-                {selectedTeams.map((teamId) => {
+                {activeTab === "assignments" && selectedTeams.map((teamId) => {
                   const team = teams.find((t) => t.id === teamId);
                   return (
                     <Card key={teamId}>
