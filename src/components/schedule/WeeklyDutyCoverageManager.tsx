@@ -177,12 +177,10 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
     setPreviewHtml(data.html);
     setDialogState("preview");
-    onOpenChange(false);
   };
 
   const handleClosePreview = () => {
     setDialogState("main");
-    onOpenChange(true);
     setPreviewHtml("");
   };
 
@@ -236,24 +234,27 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   return (
-    <>
-      {/* Main Dialog */}
-      <Dialog 
-        open={dialogState === "main"} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialogState("closed");
-            onOpenChange(false);
-          }
-        }}
+    <Dialog 
+      open={dialogState !== "closed"} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setDialogState("closed");
+          onOpenChange(false);
+        }
+      }}
+    >
+      <DialogContent 
+        className={dialogState === "preview" ? "max-w-5xl max-h-[85vh] overflow-hidden flex flex-col" : "max-w-6xl max-h-[90vh] overflow-y-auto"}
+        aria-describedby={dialogState === "preview" ? "preview-description" : undefined}
       >
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
-            <DialogDescription>
-              Configure and send weekly duty coverage reports
-            </DialogDescription>
-          </DialogHeader>
+        {dialogState === "main" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
+              <DialogDescription>
+                Configure and send weekly duty coverage reports
+              </DialogDescription>
+            </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
@@ -444,42 +445,32 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
               </div>
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
+          </>
+        )}
 
-      {/* Preview Dialog */}
-      <Dialog 
-        open={dialogState === "preview"} 
-        onOpenChange={(open) => {
-          if (!open) {
-            handleClosePreview();
-          }
-        }}
-      >
-        <DialogContent 
-          className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col"
-          aria-describedby="preview-description"
-        >
-          <DialogHeader>
-            <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
-            <DialogDescription id="preview-description">
-              Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div 
-            className="flex-1 overflow-y-auto bg-muted/30 p-6 rounded border"
-            dangerouslySetInnerHTML={{ __html: previewHtml }}
-            style={{ contain: 'layout style paint' }}
-          />
-          
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={handleClosePreview}>
-              Close Preview
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        {dialogState === "preview" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
+              <DialogDescription id="preview-description">
+                Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div 
+              className="preview-content flex-1 overflow-y-auto bg-muted/30 p-6 rounded border"
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+              style={{ contain: 'layout style paint' }}
+            />
+            
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={handleClosePreview}>
+                Close Preview
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

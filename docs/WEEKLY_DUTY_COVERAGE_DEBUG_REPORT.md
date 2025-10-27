@@ -123,21 +123,21 @@ const loadTemplate = async (templateId: string) => {
 8. Button is enabled
 9. User clicks "Preview Email" → `handlePreview` executes successfully
 
-### 5. Dialog State Machine Architecture
+### 5. Single Dialog Architecture with State Machine
 
-**Problem: Simultaneous Dialog Rendering**
+**Problem: Dual Dialog Approach**
 
-The original implementation used two independent boolean states (`open` prop and `showPreview` state) to control two separate Radix Dialog components. This created several issues:
+The original implementation used two separate Radix Dialog components, which created several issues:
 
 1. **Z-Index Conflicts**: Both dialogs rendered simultaneously during state transitions
-2. **React State Batching**: `onOpenChange(false)` and `setShowPreview(true)` executed in the same tick
-3. **Backdrop Blocking**: Main dialog's backdrop remained during unmount animation, blocking preview
-4. **Timing Brittleness**: `setTimeout` hacks added 200ms delays but couldn't handle edge cases
+2. **Backdrop Stacking**: Main dialog's backdrop blocked preview dialog
+3. **React State Batching**: Multiple state updates in the same tick caused race conditions
+4. **Accessibility Warnings**: Multiple dialog overlays confused screen readers
 5. **Performance Issues**: Forced reflows from simultaneous DOM manipulations
 
-**Solution: Dialog State Machine**
+**Solution: Single Dialog with Conditional Content**
 
-Replaced independent boolean states with a single state machine:
+Replaced two separate `<Dialog>` components with one `<Dialog>` instance that renders different content based on state:
 
 ```tsx
 type DialogState = "closed" | "main" | "preview";
@@ -154,49 +154,106 @@ main → closed     (user closes manager)
 
 **Implementation:**
 ```tsx
-// Clean preview handler - no setTimeout
+return (
+  <Dialog 
+    open={dialogState !== "closed"} 
+    onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        setDialogState("closed");
+        onOpenChange(false);
+      }
+    }}
+  >
+    <DialogContent 
+      className={dialogState === "preview" ? "max-w-5xl ..." : "max-w-6xl ..."}
+      aria-describedby={dialogState === "preview" ? "preview-description" : undefined}
+    >
+      {dialogState === "main" && (
+        <>
+          <DialogHeader>
+            <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
+            <DialogDescription>Configure and send weekly duty coverage reports</DialogDescription>
+          </DialogHeader>
+          {/* Main content with tabs */}
+        </>
+      )}
+
+      {dialogState === "preview" && (
+        <>
+          <DialogHeader>
+            <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
+            <DialogDescription id="preview-description">
+              Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div 
+            className="preview-content flex-1 overflow-y-auto"
+            dangerouslySetInnerHTML={{ __html: previewHtml }}
+            style={{ contain: 'layout style paint' }}
+          />
+          
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleClosePreview}>
+              Close Preview
+            </Button>
+          </div>
+        </>
+      )}
+    </DialogContent>
+  </Dialog>
+);
+```
+
+**Clean Handler Functions:**
+```tsx
+// Preview handler - no setTimeout, no parent notification
 const handlePreview = async () => {
   const { data, error } = await supabase.functions.invoke(...);
   if (data?.html) {
     setPreviewHtml(data.html);
-    setDialogState("preview");  // Just change state
-    onOpenChange(false);         // Notify parent
+    setDialogState("preview"); // Instant content swap
   }
 };
 
-// Clean close handler
+// Close handler - just change state, free memory
 const handleClosePreview = () => {
-  setDialogState("main");
-  onOpenChange(true);
+  setDialogState("main"); // Return to main content
   setPreviewHtml(""); // Free memory
 };
-
-// Mutually exclusive rendering
-<Dialog open={dialogState === "main"} onOpenChange={...}>
-  {/* Main dialog content */}
-</Dialog>
-
-<Dialog open={dialogState === "preview"} onOpenChange={...}>
-  {/* Preview dialog content */}
-</Dialog>
 ```
 
+**Why This Approach Eliminates All Issues:**
+
+1. **Single Dialog Instance** - Only one `<Dialog>` component in React tree
+2. **No Z-Index Conflicts** - No multiple backdrops competing for stacking order
+3. **Instant Transitions** - Content swaps immediately, no animation delays
+4. **Clean State Flow** - Simple state machine, no race conditions
+5. **One Focus Trap** - Screen readers never confused by multiple modals
+6. **Better Performance** - No unmount/remount of entire Dialog component
+7. **Simpler Code** - Conditional rendering instead of managing two dialog lifecycles
+
 **Benefits:**
-✅ **Mutually Exclusive Rendering** - Only one dialog renders at a time
-✅ **No setTimeout Hacks** - Clean state transitions, no timing dependencies
-✅ **Eliminates Z-Index Conflicts** - Single dialog in DOM at any time
-✅ **Better Performance** - No forced reflows from simultaneous renders
-✅ **Easier Testing** - Predictable state flow
-✅ **Improved Accessibility** - One modal focus trap at a time
+✅ **Zero Backdrop Conflicts** - Only one backdrop ever exists
+✅ **No setTimeout Hacks** - Instant state-based content swapping
+✅ **Perfect Accessibility** - Single modal context, proper ARIA attributes
+✅ **Better Performance** - CSS containment prevents forced reflows
+✅ **Easier Testing** - One dialog to query, predictable content changes
+✅ **Simpler Architecture** - Conditional rendering vs. dual component management
 
 **User Experience:**
 1. User clicks "Preview Email" in main dialog
-2. Main dialog smoothly unmounts
-3. Preview modal opens with email content
-4. User reviews preview
-5. User closes preview (ESC, close button, or backdrop click)
-6. Main dialog reopens automatically
-7. User can continue editing or send email
+2. Main content instantly replaced with preview content (same dialog)
+3. User reviews preview HTML
+4. User closes preview (ESC, close button, or backdrop click)
+5. Preview content instantly replaced with main content (same dialog)
+6. User can continue editing or send email
+
+**Technical Advantages:**
+- **React Reconciliation**: Reuses same Dialog DOM node, just swaps children
+- **CSS Transitions**: Smooth content fade without dialog remount
+- **Memory Efficient**: Single portal mount point
+- **Event Handling**: One set of keyboard/focus listeners
 
 ## 6. Accessibility & Performance Optimizations
 
