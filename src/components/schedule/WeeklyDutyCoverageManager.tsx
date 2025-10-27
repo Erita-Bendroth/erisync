@@ -237,7 +237,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
   return (
     <>
-    <Dialog open={open && !showPreview} onOpenChange={onOpenChange}>
+    <Dialog open={open && !showPreview} onOpenChange={(isOpen) => {
+      // If we're showing preview, don't propagate the close event to parent
+      if (!showPreview) {
+        onOpenChange(isOpen);
+      }
+    }}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
