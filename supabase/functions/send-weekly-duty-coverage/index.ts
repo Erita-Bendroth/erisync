@@ -237,8 +237,9 @@ serve(async (req) => {
     const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
 
     // Send email via Resend
+    // Using Resend's test domain - to use your own domain, verify it at https://resend.com/domains
     const emailResult = await resend.emails.send({
-      from: 'Weekly Duty Coverage <duty@updates.yourdomain.com>',
+      from: 'Weekly Duty Coverage <onboarding@resend.dev>',
       to: template.distribution_list,
       subject: `Weekly Duty Coverage - Week ${week_number}, ${year}`,
       html: htmlContent,
