@@ -90,6 +90,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [selectedUsersForRotation, setSelectedUsersForRotation] = useState<string[]>([]);
   const [enableRecurring, setEnableRecurring] = useState(false);
   const [excludeHolidays, setExcludeHolidays] = useState(true); // Default to excluding holidays
+  const [excludeWeekends, setExcludeWeekends] = useState(false); // Default to including weekends
   const [includeWeekends, setIncludeWeekends] = useState(false); // For non-standard shifts
   const [rotationPattern, setRotationPattern] = useState<RotationPattern>({
     intervalWeeks: 4,
@@ -755,6 +756,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       bulkMode,
       selectedTeam,
       excludeHolidays,
+      excludeWeekends,
       configurationsCount: shiftConfigurations.length,
       cycles: enableRecurring ? rotationPattern.cycles : 1,
       fairnessWeight,
@@ -893,6 +895,12 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
               // Check for consecutive weekend shifts if rule is enabled
               const dayOfWeek = date.getDay();
               const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+              
+              // Check if it's a weekend (only if excludeWeekends is enabled)
+              if (excludeWeekends && isWeekendDay) {
+                console.log(`📅 Skipping weekend: ${dateStr} (user: ${userId.substring(0,8)})`);
+                continue;
+              }
               if (avoidConsecutiveWeekends && isWeekendDay) {
                 const lastWeekend = userLastWeekendMap.get(userId);
                 if (lastWeekend) {
@@ -1422,6 +1430,20 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           <Checkbox
             checked={excludeHolidays}
             onCheckedChange={(checked) => setExcludeHolidays(checked === true)}
+          />
+        </div>
+
+        {/* Exclude Weekends Option */}
+        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/10">
+          <div className="space-y-0.5">
+            <Label className="text-sm font-medium">Exclude Weekends</Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically skip Saturdays and Sundays when generating schedules
+            </p>
+          </div>
+          <Checkbox
+            checked={excludeWeekends}
+            onCheckedChange={(checked) => setExcludeWeekends(checked === true)}
           />
         </div>
 
