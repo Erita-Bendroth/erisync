@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3 } from "lucide-react";
+import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3, Grid3x3 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
@@ -38,6 +38,18 @@ const Layout = ({ children }: LayoutProps) => {
               >
                 <BarChart3 className="h-4 w-4" />
                 <span>Dashboard</span>
+              </Link>
+              
+              <Link 
+                to="/unified-dashboard" 
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActiveRoute('/unified-dashboard') 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                <Grid3x3 className="h-4 w-4" />
+                <span>Unified View</span>
               </Link>
               
               <Link 

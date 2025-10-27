@@ -17,6 +17,7 @@ import TestReset from "./pages/TestReset";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import SecurityPolicy from "./pages/SecurityPolicy";
 import Contact from "./pages/Contact";
+import UnifiedDashboard from "./pages/UnifiedDashboard";
 
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/unified-dashboard" element={<UnifiedDashboard />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/manual" element={<Manual />} />
