@@ -25,7 +25,6 @@ interface Assignment {
   date?: string;
   duty_type?: string;
   source: 'manual' | 'schedule';
-  shift_description?: string; // Extracted from schedule entry notes
 }
 
 interface TeamData {
@@ -109,23 +108,6 @@ serve(async (req) => {
     }
 
     const teams: TeamData[] = teamsData || [];
-
-    // Fetch team members to get region codes for teams
-    const { data: teamMembersData } = await supabase
-      .from('team_members')
-      .select('team_id, user_id, profiles!inner(region_code)')
-      .in('team_id', template.team_ids)
-      .limit(1);
-
-    // Map team_id to region_code (use first member's region as representative)
-    const teamRegions: Record<string, string> = {};
-    if (teamMembersData) {
-      teamMembersData.forEach((tm: any) => {
-        if (!teamRegions[tm.team_id] && tm.profiles?.region_code) {
-          teamRegions[tm.team_id] = tm.profiles.region_code;
-        }
-      });
-    }
 
     // Calculate week date range
     const startDate = new Date(year, 0, 1 + (week_number - 1) * 7);
@@ -244,26 +226,15 @@ serve(async (req) => {
     console.log('Fetched shift time definitions:', shiftDefs?.length || 0);
 
     if (preview) {
-      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams);
+      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
       return new Response(
         JSON.stringify({ html: htmlContent }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate distribution list before sending
-    if (!template.distribution_list || template.distribution_list.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No recipients in distribution list. Please add email addresses to the template.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Sending to recipients:', template.distribution_list);
-
-    // Generate email HTML and plain text
-    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams);
-    const textContent = buildPlainTextEmail(template, combinedAssignments, teams);
+    // Generate email HTML
+    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
 
     // Send email via Resend using your verified domain
     const emailResult = await resend.emails.send({
@@ -271,13 +242,9 @@ serve(async (req) => {
       to: template.distribution_list,
       subject: `Weekly Duty Coverage - Week ${week_number}, ${year}`,
       html: htmlContent,
-      text: textContent,
     });
 
     console.log('Email sent:', emailResult);
-
-    // Get actual recipient count from result
-    const actualRecipientCount = emailResult.error ? 0 : template.distribution_list.length;
 
     // Log email history
     await supabase.from('weekly_email_history').insert({
@@ -285,16 +252,12 @@ serve(async (req) => {
       week_number,
       year,
       sent_by: user.id,
-      recipient_count: actualRecipientCount,
+      recipient_count: template.distribution_list.length,
       status: emailResult.error ? 'failed' : 'success',
     });
 
     return new Response(
-      JSON.stringify({ 
-        success: !emailResult.error, 
-        recipient_count: actualRecipientCount,
-        data: emailResult 
-      }),
+      JSON.stringify({ success: true, data: emailResult }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
@@ -306,20 +269,6 @@ serve(async (req) => {
     );
   }
 });
-
-// Helper function to extract shift description from schedule entry notes
-function extractShiftDescription(notes: string | null | undefined): string | undefined {
-  if (!notes) return undefined;
-  
-  // Pattern: "Auto-generated [Description] (HH:MM-HH:MM)"
-  // Extract everything between "Auto-generated " and the time pattern
-  const match = notes.match(/Auto-generated\s+(.+?)\s+\((\d{2}:\d{2}-\d{2}:\d{2})\)/);
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-  
-  return undefined;
-}
 
 // Combine manual assignments with schedule-based assignments
 function getCombinedAssignments(
@@ -368,8 +317,7 @@ function getCombinedAssignments(
               team_id: teamId,
               date: dateStr,
               duty_type: 'weekend',
-              source: 'schedule',
-              shift_description: extractShiftDescription(scheduleEntry.notes)
+              source: 'schedule'
             } as Assignment);
           }
         }
@@ -395,8 +343,7 @@ function getCombinedAssignments(
               team_id: teamId,
               date: dateStr,
               duty_type: 'lateshift',
-              source: 'schedule',
-              shift_description: extractShiftDescription(scheduleEntry.notes)
+              source: 'schedule'
             } as Assignment);
           }
         }
@@ -422,8 +369,7 @@ function getCombinedAssignments(
               team_id: teamId,
               date: dateStr,
               duty_type: 'earlyshift',
-              source: 'schedule',
-              shift_description: extractShiftDescription(scheduleEntry.notes)
+              source: 'schedule'
             } as Assignment);
           }
         }
@@ -440,23 +386,12 @@ function getCombinedAssignments(
 function buildDutyCoverageEmail(
   template: any,
   assignments: Assignment[],
-  teams: TeamData[]
+  teams: TeamData[],
+  shiftDefs: any[]
 ): string {
-  // Get shift description for section title from actual assignments
-  const getShiftDescForSection = (dutyAssignments: Assignment[]) => {
-    const descriptions = new Set<string>();
-    
-    // Extract unique descriptions from assignments
-    dutyAssignments.forEach(assignment => {
-      if (assignment.shift_description) {
-        descriptions.add(assignment.shift_description);
-      }
-    });
-
-    if (descriptions.size === 0) return '';
-    if (descriptions.size === 1) return ` - ${Array.from(descriptions)[0]}`;
-    // Multiple descriptions - list them all
-    return ` - ${Array.from(descriptions).join(', ')}`;
+  const getShiftDesc = (shiftType: string) => {
+    const def = shiftDefs.find(d => d.shift_type === shiftType);
+    return def?.description ? ` (${def.description})` : '';
   };
   
   const weekendDuty = assignments.filter(a => a.duty_type === 'weekend');
@@ -538,9 +473,9 @@ function buildDutyCoverageEmail(
     `;
   };
 
-  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftDescForSection(weekendDuty)}`, weekendDuty) : '';
-  const lateshiftSection = template.include_lateshift ? buildDutySection(`Lateshift duty${getShiftDescForSection(lateshiftDuty)}`, lateshiftDuty) : '';
-  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Earlyshift duty${getShiftDescForSection(earlyshiftDuty)}`, earlyshiftDuty) : '';
+  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftDesc('weekend')}`, weekendDuty) : '';
+  const lateshiftSection = template.include_lateshift ? buildDutySection(`Lateshift duty${getShiftDesc('late')}`, lateshiftDuty) : '';
+  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Earlyshift duty${getShiftDesc('early')}`, earlyshiftDuty) : '';
 
   return `
 <!DOCTYPE html>
@@ -559,81 +494,8 @@ function buildDutyCoverageEmail(
       ${weekendSection}
       ${lateshiftSection}
       ${earlyshiftSection}
-      
-      <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
-        <p style="font-size: 12px; color: #9ca3af; text-align: center;">
-          This is an automated email from EriSync Duty Coverage System.<br>
-          <a href="mailto:support@erisync.xyz" style="color: #3b82f6; text-decoration: none;">Contact Support</a> | 
-          <a href="https://ec7ff24a-66f9-44d2-a941-6025cf65938a.lovableproject.com" style="color: #3b82f6; text-decoration: none;">Manage Preferences</a>
-        </p>
-      </div>
     </div>
   </div>
 </body>
 </html>`;
-}
-
-// Build plain text version of the email for better deliverability
-function buildPlainTextEmail(
-  template: any,
-  assignments: Assignment[],
-  teams: TeamData[]
-): string {
-  const weekendDuty = assignments.filter(a => a.duty_type === 'weekend');
-  const lateshiftDuty = assignments.filter(a => a.duty_type === 'lateshift');
-  const earlyshiftDuty = assignments.filter(a => a.duty_type === 'earlyshift');
-
-  const buildPlainSection = (title: string, dutyAssignments: Assignment[]) => {
-    if (dutyAssignments.length === 0) return '';
-
-    const byDate: Record<string, Assignment[]> = {};
-    dutyAssignments.forEach(assignment => {
-      const date = assignment.date!;
-      if (!byDate[date]) byDate[date] = [];
-      byDate[date].push(assignment);
-    });
-
-    const days = Object.keys(byDate).sort();
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    let text = `\n${title}\n${'='.repeat(title.length)}\n\n`;
-    
-    days.forEach(dateStr => {
-      const date = new Date(dateStr + 'T00:00:00Z');
-      const dayName = dayNames[date.getUTCDay()];
-      text += `${date.toLocaleDateString('en-GB')} (${dayName})\n`;
-      
-      teams.forEach(team => {
-        const assignment = byDate[dateStr].find(a => a.team_id === team.id);
-        if (assignment) {
-          const primary = assignment.user?.initials || '-';
-          const substitute = assignment.substitute?.initials || '-';
-          const source = assignment.source === 'schedule' ? ' [Auto]' : '';
-          text += `  ${team.name}: ${primary} (Sub: ${substitute})${source}\n`;
-        }
-      });
-      text += '\n';
-    });
-
-    return text;
-  };
-
-  let plainText = `WEEKLY DUTY COVERAGE\nTemplate: ${template.template_name}\n\n`;
-  
-  if (template.include_weekend_duty) {
-    plainText += buildPlainSection('WEEKEND/PUBLIC HOLIDAY DUTY', weekendDuty);
-  }
-  if (template.include_lateshift) {
-    plainText += buildPlainSection('LATESHIFT DUTY', lateshiftDuty);
-  }
-  if (template.include_earlyshift) {
-    plainText += buildPlainSection('EARLYSHIFT DUTY', earlyshiftDuty);
-  }
-
-  plainText += '\n[Auto] = Auto-populated from schedule\n\n';
-  plainText += '---\n';
-  plainText += 'This is an automated email from EriSync Duty Coverage System.\n';
-  plainText += 'Contact: support@erisync.xyz\n';
-
-  return plainText;
 }

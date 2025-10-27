@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save } from "lucide-react";
 import { DutyAssignmentGrid } from "./DutyAssignmentGrid";
 import { DistributionListManager } from "./DistributionListManager";
 
@@ -20,11 +19,8 @@ interface WeeklyDutyCoverageManagerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type DialogState = "closed" | "main" | "preview";
-
 export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCoverageManagerProps) {
   const { toast } = useToast();
-  const [dialogState, setDialogState] = useState<DialogState>("closed");
   const [teams, setTeams] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
@@ -38,21 +34,23 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [currentYear, setCurrentYear] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
-  const [activeTab, setActiveTab] = useState("template");
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setDialogState("main");
       fetchTeams();
       fetchTemplates();
       const now = new Date();
       setCurrentYear(now.getFullYear());
       setCurrentWeek(getWeekNumber(now));
-    } else if (dialogState === "main") {
-      setDialogState("closed");
     }
   }, [open]);
 
+  useEffect(() => {
+    if (selectedTemplate) {
+      loadTemplate(selectedTemplate);
+    }
+  }, [selectedTemplate]);
 
   const getWeekNumber = (date: Date): number => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -73,8 +71,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const loadTemplate = async (templateId: string) => {
-    console.log('📋 Loading template:', templateId);
-    
     const { data, error } = await supabase
       .from('weekly_duty_templates')
       .select('*')
@@ -88,10 +84,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       setIncludeWeekend(data.include_weekend_duty);
       setIncludeLateshift(data.include_lateshift);
       setIncludeEarlyshift(data.include_earlyshift);
-      console.log('✅ Template loaded successfully:', data.template_name);
       toast({ title: "Success", description: "Template loaded" });
-    } else {
-      console.error('❌ Failed to load template:', error);
     }
   };
 
@@ -158,7 +151,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     }
 
     setLoading(true);
-
     const { data, error } = await supabase.functions.invoke('send-weekly-duty-coverage', {
       body: {
         template_id: selectedTemplate,
@@ -169,19 +161,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     });
 
     setLoading(false);
-
     if (error || !data?.html) {
       toast({ title: "Error", description: error?.message || "Failed to generate preview", variant: "destructive" });
-      return;
+    } else {
+      setPreviewHtml(data.html);
+      setShowPreview(true);
     }
-
-    setPreviewHtml(data.html);
-    setDialogState("preview");
-  };
-
-  const handleClosePreview = () => {
-    setDialogState("main");
-    setPreviewHtml("");
   };
 
   const handleSend = async () => {
@@ -209,10 +194,9 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      const recipientCount = data.recipient_count || 0;
       toast({
-        title: "Email sent successfully",
-        description: `Sent to ${recipientCount} recipient${recipientCount !== 1 ? 's' : ''}`,
+        title: "Success",
+        description: `Sent to ${data.sent || 0} recipients${data.failed ? ` (${data.failed} failed)` : ''}`,
       });
     }
   };
@@ -234,241 +218,204 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   return (
-    <Dialog 
-      open={dialogState !== "closed"} 
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setDialogState("closed");
-          onOpenChange(false);
-        }
-      }}
-    >
-      <DialogContent 
-        className={dialogState === "preview" ? "max-w-5xl max-h-[85vh] overflow-hidden flex flex-col" : "max-w-6xl max-h-[90vh] overflow-y-auto"}
-        aria-describedby={dialogState === "preview" ? "preview-description" : undefined}
-      >
-        {dialogState === "main" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
-              <DialogDescription>
-                Configure and send weekly duty coverage reports
-              </DialogDescription>
-            </DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Weekly Duty Coverage Manager</DialogTitle>
+        </DialogHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              <TabsTrigger value="template">Template Setup</TabsTrigger>
-              <TabsTrigger value="assignments">Duty Assignments</TabsTrigger>
-              <TabsTrigger value="send">Preview & Send</TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="template">
+          <TabsList>
+            <TabsTrigger value="template">Template Setup</TabsTrigger>
+            <TabsTrigger value="assignments">Duty Assignments</TabsTrigger>
+            <TabsTrigger value="send">Preview & Send</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="template" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Template Configuration</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Load Existing Template</Label>
-                      <Select value={selectedTemplate} onValueChange={(value) => {
-                        console.log('📋 Template selected from dropdown:', value);
-                        setSelectedTemplate(value);
-                        loadTemplate(value);
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select template..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {templates.map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.template_name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Template Name</Label>
-                      <Input
-                        value={templateName}
-                        onChange={(e) => setTemplateName(e.target.value)}
-                        placeholder="e.g., Troubleshooters Combined"
-                      />
-                    </div>
-                  </div>
-
+          <TabsContent value="template" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Template Configuration</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="teams">Teams *</Label>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {selectedTeams.map((teamId) => {
-                          const team = teams.find((t) => t.id === teamId);
-                          return (
-                            <Badge key={teamId} variant="secondary" className="gap-1">
-                              {team?.name}
-                              <button
-                                onClick={() => setSelectedTeams(selectedTeams.filter((id) => id !== teamId))}
-                                className="ml-1 hover:text-destructive"
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                      <Select 
-                        value="" 
-                        onValueChange={(value) => {
-                          if (value && !selectedTeams.includes(value)) {
-                            setSelectedTeams([...selectedTeams, value]);
-                          }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Add team..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {teams
-                            .filter((team) => !selectedTeams.includes(team.id))
-                            .map((team) => (
-                              <SelectItem key={team.id} value={team.id}>
-                                {team.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Label>Load Existing Template</Label>
+                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select template..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map(t => (
+                          <SelectItem key={t.id} value={t.id}>{t.template_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Include Sections</Label>
-                    <div className="flex items-center space-x-2">
-                      <Switch checked={includeWeekend} onCheckedChange={setIncludeWeekend} />
-                      <Label>Weekend/Holiday Duty</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch checked={includeLateshift} onCheckedChange={setIncludeLateshift} />
-                      <Label>Lateshift (14:00-20:00)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch checked={includeEarlyshift} onCheckedChange={setIncludeEarlyshift} />
-                      <Label>Earlyshift (06:00-14:00)</Label>
-                    </div>
+                  <div>
+                    <Label>Template Name</Label>
+                    <Input
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      placeholder="e.g., Troubleshooters Combined"
+                    />
                   </div>
-
-                  <DistributionListManager
-                    distributionList={distributionList}
-                    onUpdate={setDistributionList}
-                  />
-
-                  <div className="flex gap-2">
-                    <Button onClick={saveTemplate} disabled={loading}>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Template
-                    </Button>
-                    {selectedTemplate && (
-                      <Button onClick={deleteTemplate} variant="destructive" disabled={loading}>
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="assignments">
-              {selectedTeams.length > 0 && selectedTemplate ? (
-                <div className="space-y-6">
-                  {activeTab === "assignments" && selectedTeams.map((teamId) => {
-                    const team = teams.find((t) => t.id === teamId);
-                    return (
-                      <Card key={teamId}>
-                        <CardHeader>
-                          <CardTitle>{team?.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <DutyAssignmentGrid
-                            teamId={teamId}
-                            weekNumber={currentWeek}
-                            year={currentYear}
-                            includeWeekend={includeWeekend}
-                            includeLateshift={includeLateshift}
-                            includeEarlyshift={includeEarlyshift}
-                          />
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
                 </div>
-              ) : (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    Please select teams and save a template first
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
 
-            <TabsContent value="send" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Week Selection</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-center gap-4">
-                    <Button onClick={() => changeWeek(-1)} variant="outline">
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <div className="text-lg font-semibold">
-                      Week {currentWeek}, {currentYear}
+                <div>
+                  <Label htmlFor="teams">Teams *</Label>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {selectedTeams.map((teamId) => {
+                        const team = teams.find((t) => t.id === teamId);
+                        return (
+                          <Badge key={teamId} variant="secondary" className="gap-1">
+                            {team?.name}
+                            <button
+                              onClick={() => setSelectedTeams(selectedTeams.filter((id) => id !== teamId))}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        );
+                      })}
                     </div>
-                    <Button onClick={() => changeWeek(1)} variant="outline">
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
+                    <Select 
+                      value="" 
+                      onValueChange={(value) => {
+                        if (value && !selectedTeams.includes(value)) {
+                          setSelectedTeams([...selectedTeams, value]);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Add team..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams
+                          .filter((team) => !selectedTeams.includes(team.id))
+                          .map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Include Sections</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch checked={includeWeekend} onCheckedChange={setIncludeWeekend} />
+                    <Label>Weekend/Holiday Duty</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch checked={includeLateshift} onCheckedChange={setIncludeLateshift} />
+                    <Label>Lateshift (14:00-20:00)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch checked={includeEarlyshift} onCheckedChange={setIncludeEarlyshift} />
+                    <Label>Earlyshift (06:00-14:00)</Label>
+                  </div>
+                </div>
+
+                <DistributionListManager
+                  distributionList={distributionList}
+                  onUpdate={setDistributionList}
+                />
+
+                <div className="flex gap-2">
+                  <Button onClick={saveTemplate} disabled={loading}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Template
+                  </Button>
+                  {selectedTemplate && (
+                    <Button onClick={deleteTemplate} variant="destructive" disabled={loading}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="assignments">
+            {selectedTeams.length > 0 && selectedTemplate ? (
+              <div className="space-y-6">
+                {selectedTeams.map((teamId) => {
+                  const team = teams.find((t) => t.id === teamId);
+                  return (
+                    <Card key={teamId}>
+                      <CardHeader>
+                        <CardTitle>{team?.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <DutyAssignmentGrid
+                          teamId={teamId}
+                          weekNumber={currentWeek}
+                          year={currentYear}
+                          includeWeekend={includeWeekend}
+                          includeLateshift={includeLateshift}
+                          includeEarlyshift={includeEarlyshift}
+                        />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  Please select teams and save a template first
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
 
-              <div className="flex gap-2 justify-center">
-                <Button 
-                  onClick={handlePreview} 
-                  disabled={loading || !selectedTemplate}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  {loading ? "Generating..." : "Preview Email"}
-                </Button>
-                <Button onClick={handleSend} disabled={loading || !selectedTemplate}>
-                  <Mail className="w-4 h-4 mr-2" />
-                  Send to Distribution List
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-          </>
-        )}
+          <TabsContent value="send" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Week Selection</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center gap-4">
+                  <Button onClick={() => changeWeek(-1)} variant="outline">
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="text-lg font-semibold">
+                    Week {currentWeek}, {currentYear}
+                  </div>
+                  <Button onClick={() => changeWeek(1)} variant="outline">
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-        {dialogState === "preview" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
-              <DialogDescription id="preview-description">
-                Preview of the weekly duty coverage email for Week {currentWeek}, {currentYear}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div 
-              className="preview-content flex-1 overflow-y-auto bg-muted/30 p-6 rounded border"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-              style={{ contain: 'layout style paint' }}
-            />
-            
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={handleClosePreview}>
-                Close Preview
+            <div className="flex gap-2 justify-center">
+              <Button onClick={handlePreview} disabled={loading || !selectedTemplate}>
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Email
+              </Button>
+              <Button onClick={handleSend} disabled={loading || !selectedTemplate}>
+                <Mail className="w-4 h-4 mr-2" />
+                Send to Distribution List
               </Button>
             </div>
-          </>
+          </TabsContent>
+        </Tabs>
+
+        {showPreview && (
+          <Dialog open={showPreview} onOpenChange={setShowPreview}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Email Preview</DialogTitle>
+              </DialogHeader>
+              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            </DialogContent>
+          </Dialog>
         )}
       </DialogContent>
     </Dialog>
