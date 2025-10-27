@@ -194,9 +194,10 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
+      const recipientCount = data.recipient_count || 0;
       toast({
-        title: "Success",
-        description: `Sent to ${data.sent || 0} recipients${data.failed ? ` (${data.failed} failed)` : ''}`,
+        title: "Email sent successfully",
+        description: `Sent to ${recipientCount} recipient${recipientCount !== 1 ? 's' : ''}`,
       });
     }
   };
