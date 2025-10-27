@@ -186,10 +186,11 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   const getCleanNotes = () => {
     if (!entry.notes) return "";
     
-    // Remove JSON time data and auto-generated text
+    // Remove JSON time data, shift name, and auto-generated text
     let cleanNotes = entry.notes
       .replace(/Times:\s*\[.*?\]/g, "")
-      .replace(/Auto-generated shift.*?\)/g, "")
+      .replace(/Shift:\s*.+?(?:\n|$)/g, "")
+      .replace(/Auto-generated.*?\)/g, "")
       .replace(/^\s*\n+/g, "")
       .trim();
     

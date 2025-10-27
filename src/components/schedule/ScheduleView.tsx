@@ -734,6 +734,14 @@ useEffect(() => {
   const getShiftDescription = (entry: ScheduleEntry, employeeData?: Employee): string => {
     if (entry.activity_type !== 'work') return '';
     
+    // First, check if shift name is stored in notes (from bulk generator)
+    if (entry.notes) {
+      const shiftNameMatch = entry.notes.match(/Shift:\s*(.+?)(?:\n|$)/);
+      if (shiftNameMatch && shiftNameMatch[1]) {
+        return shiftNameMatch[1].trim();
+      }
+    }
+    
     // Find applicable shift time definition
     const teamId = entry.team_id;
     const regionCode = employeeData?.region_code;

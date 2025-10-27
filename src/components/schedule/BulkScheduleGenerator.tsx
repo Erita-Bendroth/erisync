@@ -928,14 +928,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 endTime: config.endTime
               };
 
-              // Format notes with time block data for proper display
+              // Format notes with time block data and shift name for proper display
               const timeBlockData = [{
                 activity_type: 'work',
                 start_time: dateTimes.startTime,
                 end_time: dateTimes.endTime
               }];
               const cycleInfo = cycles > 1 ? ` (Cycle ${cycle + 1}/${cycles})` : '';
-              const notes = `Times: ${JSON.stringify(timeBlockData)}\nAuto-generated ${config.shiftName}${cycleInfo}`;
+              const notes = `Times: ${JSON.stringify(timeBlockData)}\nShift: ${config.shiftName}\nAuto-generated${cycleInfo}`;
 
               // Create entry object (in-memory for preview)
               entries.push({
