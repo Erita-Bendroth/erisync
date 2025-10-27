@@ -17,6 +17,9 @@ import { useShiftCounts, ShiftCounts } from "@/hooks/useShiftCounts";
 import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
 import { FairnessAnalysis } from "./FairnessAnalysis";
 import { TimeSelect } from "@/components/ui/time-select";
+import { BulkSchedulePreviewModal } from "./BulkSchedulePreviewModal";
+import { FairnessParameters } from "./FairnessParameters";
+import { useCoverageAnalysis } from "@/hooks/useCoverageAnalysis";
 
 interface Team {
   id: string;
@@ -99,6 +102,18 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   const [showDistributionSummary, setShowDistributionSummary] = useState(false);
   const [countsDateRange, setCountsDateRange] = useState<number>(6); // months
   const [countsRefreshKey, setCountsRefreshKey] = useState(0);
+  
+  // Preview mode states
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewEntries, setPreviewEntries] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  
+  // Adjustable fairness parameters
+  const [fairnessWeight, setFairnessWeight] = useState(50); // 0-100%
+  const [historicalWindow, setHistoricalWindow] = useState(6); // months
+  const [avoidConsecutiveWeekends, setAvoidConsecutiveWeekends] = useState(true);
+  const [balanceHolidayShifts, setBalanceHolidayShifts] = useState(true);
   
   // Fetch shift counts for fairness mode
   const effectiveUserIds = bulkMode === "users" ? selectedUsers : 
@@ -615,7 +630,72 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
     return { start: template?.startTime || '08:00', end: template?.endTime || '16:30' };
   };
 
-  const generateSchedules = async () => {
+  const generateSchedulesPreview = async () => {
+    // First, generate schedules in memory (preview mode)
+    const entries = await generateSchedulesInMemory();
+    if (!entries || entries.length === 0) return;
+    
+    // Calculate coverage and fairness on preview
+    const analysis = await calculatePreviewMetrics(entries);
+    
+    setPreviewEntries(entries);
+    setPreviewData(analysis);
+    setShowPreview(true);
+  };
+
+  const confirmAndSaveSchedules = async () => {
+    if (!previewEntries || previewEntries.length === 0) return;
+    
+    setConfirmLoading(true);
+    try {
+      // Save all entries to database
+      for (const entry of previewEntries) {
+        const { error } = await supabase
+          .from('schedule_entries')
+          .upsert({
+            user_id: entry.user_id,
+            team_id: entry.team_id,
+            date: entry.date,
+            shift_type: entry.shift_type,
+            activity_type: entry.activity_type,
+            availability_status: entry.availability_status,
+            notes: entry.notes,
+            created_by: user!.id,
+          }, {
+            onConflict: 'user_id,date,team_id',
+          });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: `Generated ${previewEntries.length} shifts successfully`,
+      });
+
+      // Clear state and close modal
+      setShowPreview(false);
+      setPreviewEntries([]);
+      setPreviewData(null);
+      setShiftConfigurations([]);
+      setEnableRecurring(false);
+      setRotationPattern({ intervalWeeks: 4, cycles: 1 });
+
+      // Notify parent to refresh
+      onScheduleGenerated?.();
+    } catch (error: any) {
+      console.error('Error saving schedules:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save schedules",
+        variant: "destructive",
+      });
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const generateSchedulesInMemory = async (): Promise<any[]> => {
     if (bulkMode === "team" && (!selectedTeam || selectedTeam === "")) {
       toast({
         title: "Error",
@@ -663,13 +743,17 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
 
     setLoading(true);
     
-    console.log(`🚀 Starting bulk schedule generation:`, {
+    console.log(`🚀 Starting bulk schedule preview generation:`, {
       bulkMode,
       selectedTeam,
       excludeHolidays,
       configurationsCount: shiftConfigurations.length,
-      cycles: enableRecurring ? rotationPattern.cycles : 1
+      cycles: enableRecurring ? rotationPattern.cycles : 1,
+      fairnessWeight,
+      historicalWindow
     });
+    
+    const entries: any[] = [];
     
     try {
       // Additional permission check for managers
@@ -693,9 +777,9 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         }
       }
 
-      let totalGenerated = 0;
       let totalSkippedHolidays = 0;
       const cycles = enableRecurring ? rotationPattern.cycles : 1;
+      const userLastWeekendMap = new Map<string, string>(); // Track last weekend shift per user
       
       console.log(`📊 Processing ${cycles} cycle(s) with ${shiftConfigurations.length} shift configuration(s)`);
       
@@ -716,7 +800,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
             targetUsers = selectedUsers;
           }
 
-          // Apply fairness sorting if enabled (only for team/users modes)
+          // Apply fairness sorting with weighted scoring
           if (fairnessMode && (bulkMode === "team" || bulkMode === "users") && shiftCounts.length > 0) {
             const countsMap = new Map(shiftCounts.map(c => [c.user_id, c]));
             targetUsers = [...targetUsers].sort((a, b) => {
@@ -726,15 +810,23 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
               if (!aCounts) return 1;
               if (!bCounts) return -1;
               
-              // Calculate total "unfair" shifts (weekend + night + holiday)
-              const aTotal = aCounts.weekend_shifts_count + aCounts.night_shifts_count + aCounts.holiday_shifts_count;
-              const bTotal = bCounts.weekend_shifts_count + bCounts.night_shifts_count + bCounts.holiday_shifts_count;
+              // Weighted fairness calculation
+              const holidayWeight = balanceHolidayShifts ? 3 : 2;
+              const aScore = (aCounts.weekend_shifts_count * 1.5) + 
+                           (aCounts.night_shifts_count * 2) + 
+                           (aCounts.holiday_shifts_count * holidayWeight);
+              const bScore = (bCounts.weekend_shifts_count * 1.5) + 
+                           (bCounts.night_shifts_count * 2) + 
+                           (bCounts.holiday_shifts_count * holidayWeight);
               
-              // Sort ascending: users with fewer unfair shifts come first
-              return aTotal - bTotal;
+              // Apply fairness weight: lower score = prioritize for shifts
+              const weightedA = aScore * (fairnessWeight / 100);
+              const weightedB = bScore * (fairnessWeight / 100);
+              
+              return weightedA - weightedB;
             });
             
-            console.log(`✨ Fairness mode: Sorted ${targetUsers.length} users by shift fairness`);
+            console.log(`✨ Fairness mode: Sorted ${targetUsers.length} users (weight: ${fairnessWeight}%)`);
           }
 
           for (const userId of targetUsers) {
@@ -787,7 +879,23 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 const holiday = applicableHolidays.find(h => h.date === dateStr);
                 console.log(`🎉 Skipping holiday: ${dateStr} - ${holiday?.name} (user: ${userId.substring(0,8)})`);
                 totalSkippedHolidays++;
-                continue; // Skip if it's a holiday
+                continue;
+              }
+
+              // Check for consecutive weekend shifts if rule is enabled
+              const dayOfWeek = date.getDay();
+              const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+              if (avoidConsecutiveWeekends && isWeekendDay) {
+                const lastWeekend = userLastWeekendMap.get(userId);
+                if (lastWeekend) {
+                  const lastDate = new Date(lastWeekend);
+                  const daysDiff = Math.abs((date.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+                  if (daysDiff <= 7) {
+                    console.log(`⏭️ Skipping consecutive weekend for user ${userId.substring(0,8)}`);
+                    continue;
+                  }
+                }
+                userLastWeekendMap.set(userId, dateStr);
               }
 
 
@@ -814,60 +922,88 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
               const cycleInfo = cycles > 1 ? ` (Cycle ${cycle + 1}/${cycles})` : '';
               const notes = `Times: ${JSON.stringify(timeBlockData)}\nAuto-generated ${config.shiftName}${cycleInfo}`;
 
-              // Insert or update the schedule entry
-              const { error } = await supabase
-                .from('schedule_entries')
-                .upsert({
-                  user_id: userId,
-                  team_id: selectedTeam,
-                  date: dateStr,
-                  shift_type: shiftType,
-                  activity_type: 'work',
-                  availability_status: 'available',
-                  notes: notes,
-                  created_by: user.id,
-                }, {
-                  onConflict: 'user_id,date,team_id',
-                });
-
-              if (!error) totalGenerated++;
+              // Create entry object (in-memory for preview)
+              entries.push({
+                user_id: userId,
+                team_id: selectedTeam,
+                date: dateStr,
+                shift_type: shiftType,
+                activity_type: 'work',
+                availability_status: 'available',
+                notes: notes,
+                user_name: `User ${userId.substring(0, 8)}`, // Will be enriched later
+              });
             }
           }
         }
       }
       
-      const cycleMsg = cycles > 1 ? ` across ${cycles} cycle(s)` : '';
-      const holidayMsg = totalSkippedHolidays > 0 ? ` (${totalSkippedHolidays} holidays excluded)` : '';
-      
-      console.log(`✅ Bulk schedule generation complete:`, {
-        totalGenerated,
-        totalSkippedHolidays,
-        cycles
-      });
-      
-      toast({
-        title: "Success",
-        description: `Generated ${totalGenerated} shifts${cycleMsg}${holidayMsg}`,
-      });
-      
-      // Clear configurations after successful generation
-      setShiftConfigurations([]);
-      setEnableRecurring(false);
-      setRotationPattern({ intervalWeeks: 4, cycles: 1 });
-      
-      // Notify parent to refresh
-      onScheduleGenerated?.();
+      console.log(`✅ Preview generation complete: ${entries.length} entries`);
+      return entries;
 
     } catch (error: any) {
-      console.error('Error generating schedules:', error);
+      console.error('Error generating preview:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to generate schedules",
+        description: error.message || "Failed to generate preview",
         variant: "destructive",
       });
+      return [];
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculatePreviewMetrics = async (entries: any[]) => {
+    // Calculate coverage and fairness metrics
+    const totalDays = new Set(entries.map(e => e.date)).size;
+    const threshold = 90;
+    
+    // Simple coverage calculation (can be enhanced)
+    const coveragePercentage = Math.min(100, Math.round((entries.length / (totalDays * 2)) * 100));
+    
+    // Count shift types
+    const weekendShifts = entries.filter(e => {
+      const day = new Date(e.date).getDay();
+      return day === 0 || day === 6;
+    }).length;
+    
+    const nightShifts = entries.filter(e => 
+      e.shift_type === 'early' || e.shift_type === 'late'
+    ).length;
+    
+    // Fetch holidays to count holiday shifts
+    const { data: holidays } = await supabase
+      .from('holidays')
+      .select('date')
+      .eq('is_public', true);
+    
+    const holidayDates = new Set(holidays?.map(h => h.date) || []);
+    const holidayShifts = entries.filter(e => holidayDates.has(e.date)).length;
+    
+    // Simple fairness score calculation
+    const userShiftCounts = new Map<string, number>();
+    entries.forEach(e => {
+      userShiftCounts.set(e.user_id, (userShiftCounts.get(e.user_id) || 0) + 1);
+    });
+    
+    const counts = Array.from(userShiftCounts.values());
+    const avgShifts = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+    const variance = counts.reduce((sum, c) => sum + Math.pow(c - avgShifts, 2), 0) / counts.length;
+    const fairnessScore = Math.max(0, 100 - (variance * 5)); // Lower variance = higher fairness
+    
+    return {
+      entries,
+      coveragePercentage,
+      gaps: [], // Would need team capacity config to calculate
+      fairnessScore,
+      totalDays,
+      coveredDays: totalDays,
+      threshold,
+      weekendShifts,
+      nightShifts,
+      holidayShifts,
+    };
   };
 
   const quickSetMonth = (monthsAhead: number) => {
@@ -1648,8 +1784,25 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         ) : null}
         
+        {/* Fairness Parameters (when fairness mode is enabled) */}
+        {fairnessMode && (bulkMode === "team" || bulkMode === "users") && (
+          <FairnessParameters
+            fairnessWeight={fairnessWeight}
+            onFairnessWeightChange={setFairnessWeight}
+            historicalWindow={historicalWindow}
+            onHistoricalWindowChange={(value) => {
+              setHistoricalWindow(value);
+              setCountsDateRange(value);
+            }}
+            avoidConsecutiveWeekends={avoidConsecutiveWeekends}
+            onAvoidConsecutiveWeekendsChange={setAvoidConsecutiveWeekends}
+            balanceHolidayShifts={balanceHolidayShifts}
+            onBalanceHolidayShiftsChange={setBalanceHolidayShifts}
+          />
+        )}
+
         <Button 
-          onClick={generateSchedules} 
+          onClick={generateSchedulesPreview} 
           disabled={loading || 
             (bulkMode === "team" && (!selectedTeam || selectedTeam === "")) ||
             (bulkMode === "rotation" && (!selectedTeam || selectedTeam === "")) ||
@@ -1658,7 +1811,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           className="w-full"
         >
           <Zap className="w-4 h-4 mr-2" />
-          {loading ? "Generating..." : `Generate ${bulkMode === 'rotation' && enableRecurring ? `Rotation (${rotationPattern.cycles} cycle${rotationPattern.cycles > 1 ? 's' : ''})` : `All Shifts`} (${shiftConfigurations.length} config${shiftConfigurations.length !== 1 ? 's' : ''})`}
+          {loading ? "Generating Preview..." : `Preview & Generate ${bulkMode === 'rotation' && enableRecurring ? `Rotation (${rotationPattern.cycles} cycle${rotationPattern.cycles > 1 ? 's' : ''})` : `Shifts`} (${shiftConfigurations.length} config${shiftConfigurations.length !== 1 ? 's' : ''})`}
         </Button>
 
         {/* Info */}
@@ -1686,6 +1839,20 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         </div>
       </CardContent>
     </Card>
+
+    {/* Preview Modal */}
+    <BulkSchedulePreviewModal
+      open={showPreview}
+      onClose={() => setShowPreview(false)}
+      onConfirm={confirmAndSaveSchedules}
+      onRegenerate={() => {
+        setShowPreview(false);
+        setTimeout(() => generateSchedulesPreview(), 100);
+      }}
+      previewData={previewData}
+      loading={confirmLoading}
+    />
+    </>
   );
 };
 
