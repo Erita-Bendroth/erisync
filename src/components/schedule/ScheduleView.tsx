@@ -736,9 +736,20 @@ useEffect(() => {
     
     // First, check if shift name is stored in notes (from bulk generator)
     if (entry.notes) {
-      const shiftNameMatch = entry.notes.match(/Shift:\s*(.+?)(?:\n|$)/);
-      if (shiftNameMatch && shiftNameMatch[1]) {
-        return shiftNameMatch[1].trim();
+      // NEW FORMAT: "Shift: {name}"
+      const newFormatMatch = entry.notes.match(/Shift:\s*(.+?)(?:\n|$)/);
+      if (newFormatMatch && newFormatMatch[1]) {
+        return newFormatMatch[1].trim();
+      }
+      
+      // OLD FORMAT: "Auto-generated {name} shift" or "Auto-generated {name}"
+      const oldFormatMatch = entry.notes.match(/Auto-generated\s+(.+?)(?:\s+shift|\s+\(|\n|$)/);
+      if (oldFormatMatch && oldFormatMatch[1]) {
+        // Extract the full name including times in parentheses if present
+        const fullNameMatch = entry.notes.match(/Auto-generated\s+(.+?)(?:\n|$)/);
+        if (fullNameMatch && fullNameMatch[1]) {
+          return fullNameMatch[1].trim();
+        }
       }
     }
     
