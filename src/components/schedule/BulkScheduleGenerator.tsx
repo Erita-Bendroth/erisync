@@ -314,11 +314,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         .order('shift_type');
 
       if (selectedTeam) {
-        // Fetch both team-specific and global definitions
-        query = query.or(`team_id.eq.${selectedTeam},team_id.is.null`);
+        // Fetch definitions where:
+        // 1. team_ids array contains the selected team, OR
+        // 2. team_ids is null (global definitions), OR
+        // 3. team_id matches (for legacy single-team definitions)
+        query = query.or(`team_ids.cs.{${selectedTeam}},team_ids.is.null,team_id.eq.${selectedTeam},team_id.is.null`);
       } else {
         // Only fetch global definitions (no team selected yet)
-        query = query.is('team_id', null);
+        query = query.or('team_ids.is.null,team_id.is.null');
       }
 
       const { data, error } = await query;
