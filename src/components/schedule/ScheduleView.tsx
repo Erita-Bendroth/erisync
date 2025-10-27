@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -1251,7 +1252,9 @@ useEffect(() => {
 // Helper: can manager view full details for a user synchronously
 const canViewFullDetailsSync = (userId: string) => {
   if (!isManager() || isPlanner()) return true;
-  return managedUsersSet.has(userId);
+  const hasAccess = managedUsersSet.has(userId);
+  console.log('[ScheduleView] Access check for user:', userId, 'hasAccess:', hasAccess, 'managedUsersSet size:', managedUsersSet.size);
+  return hasAccess;
 };
 
   // Render employee name - show full name if available, otherwise nothing (initials are in the avatar)
@@ -1509,6 +1512,20 @@ const getActivityColor = (entry: ScheduleEntry) => {
 
   return (
     <div className="schedule-view-container space-y-6">
+      {/* Availability-Only Mode Warning */}
+      {!userRoles.some(r => r.role === 'admin') && 
+       !userRoles.some(r => r.role === 'planner') && 
+       userRoles.some(r => r.role === 'manager') && 
+       selectedTeams.length > 0 && 
+       !selectedTeams.includes("all") &&
+       managedUsersSet.size === 0 && (
+        <Alert className="border-muted-foreground/20">
+          <AlertDescription>
+            You are viewing availability only for this team. Full schedule details are restricted to your managed teams.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">
@@ -1910,10 +1927,23 @@ const getActivityColor = (entry: ScheduleEntry) => {
           <Card>
             <CardContent className="p-0">
               <Table className="table-fixed w-full">
-              <TableHeader>
+               <TableHeader>
                 <TableRow>
                   {multiSelectMode && <TableHead className="w-12"></TableHead>}
-                  <TableHead className="w-48 font-semibold">Employee</TableHead>
+                  <TableHead className="w-48 font-semibold">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Employee</span>
+                      {!userRoles.some(r => r.role === 'admin') && 
+                       !userRoles.some(r => r.role === 'planner') && 
+                       userRoles.some(r => r.role === 'manager') && 
+                       selectedTeams.length > 0 && 
+                       !selectedTeams.includes("all") && (
+                        <Badge variant="outline" className="text-xs">
+                          {managedUsersSet.size > 0 ? 'Mixed View' : 'Availability Only'}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableHead>
                   {workDays.map((day, index) => (
                     <TableHead key={index} className="text-center font-semibold">
                       <div className="flex flex-col">
