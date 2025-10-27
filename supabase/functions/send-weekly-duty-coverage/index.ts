@@ -474,8 +474,8 @@ function buildDutyCoverageEmail(
   };
 
   const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftDesc('weekend')}`, weekendDuty) : '';
-  const lateshiftSection = template.include_lateshift ? buildDutySection(`Lateshift duty${getShiftDesc('late')}`, lateshiftDuty) : '';
-  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Earlyshift duty${getShiftDesc('early')}`, earlyshiftDuty) : '';
+  const lateshiftSection = template.include_lateshift ? buildDutySection(`Late Shift Central${getShiftDesc('late')}`, lateshiftDuty) : '';
+  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Early Shift Central${getShiftDesc('early')}`, earlyshiftDuty) : '';
 
   return `
 <!DOCTYPE html>
