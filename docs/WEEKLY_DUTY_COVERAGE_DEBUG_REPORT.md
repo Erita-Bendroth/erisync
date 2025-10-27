@@ -158,21 +158,51 @@ Both Radix UI Dialog components use `z-50` for their overlays and content. When 
 
 **Implementation:**
 ```tsx
-// In handlePreview - close main dialog before opening preview
+// In handlePreview - close main dialog before opening preview with delay
 if (data?.html) {
   setPreviewHtml(data.html);
   onOpenChange(false); // Close main dialog
-  setShowPreview(true); // Open preview dialog
+  setTimeout(() => {
+    setShowPreview(true); // Open preview after backdrop unmounts
+  }, 200); // 200ms matches Radix Dialog's animation duration
 }
 
-// In preview dialog - reopen main dialog on close
+// In preview dialog - reopen main dialog on close with delay
 <Dialog open={showPreview} onOpenChange={(open) => {
   setShowPreview(open);
   if (!open) {
-    onOpenChange(true); // Reopen main dialog
+    setTimeout(() => {
+      onOpenChange(true); // Reopen main dialog after animation
+    }, 200);
   }
 }}>
+
+// In "Close Preview" button - ensure delay on explicit close
+<Button variant="outline" onClick={() => {
+  setShowPreview(false);
+  setTimeout(() => {
+    onOpenChange(true);
+  }, 200);
+}}>
 ```
+
+**Timing Issue with Simultaneous State Updates:**
+
+Even with sequential calls (`onOpenChange(false)` then `setShowPreview(true)`), React batches state updates in the same event loop tick. This causes both dialogs to render simultaneously during their transition animations, creating a z-index conflict where the main dialog's backdrop blocks the preview modal.
+
+**Solution: setTimeout Delays**
+
+Add 200ms delay between closing the main dialog and opening the preview. This ensures:
+- Main dialog's exit animation completes (Radix uses 200ms duration)
+- Backdrop is fully removed from DOM
+- Preview dialog mounts in clean slate
+- No z-index conflicts
+
+**Why 200ms?**
+- Matches Radix Dialog's default animation duration (`duration-200` class)
+- Ensures backdrop fade-out completes before next dialog opens
+- Provides smooth visual transition without feeling laggy
+- Total transition time: ~400ms (200ms close + 200ms delay + 200ms open) - feels natural and intentional
 
 **Why This Works:**
 1. Only one dialog is open at any time

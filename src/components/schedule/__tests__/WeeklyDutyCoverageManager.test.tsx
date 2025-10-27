@@ -257,10 +257,10 @@ describe('WeeklyDutyCoverageManager', () => {
       const previewButton = screen.getByText('Preview Email').closest('button');
       fireEvent.click(previewButton!);
 
-      // Wait for preview to load and verify main dialog closes
+      // Wait for preview to load with increased timeout for setTimeout delay
       await waitFor(() => {
         expect(screen.getByText('Email Preview - Weekly Duty Coverage')).toBeInTheDocument();
-      });
+      }, { timeout: 2000 }); // Increased to account for 200ms delay
 
       // Verify onOpenChange was called with false to close main dialog
       expect(mockOnOpenChange).toHaveBeenCalledWith(false);
@@ -268,10 +268,10 @@ describe('WeeklyDutyCoverageManager', () => {
       // Close preview
       fireEvent.click(screen.getByText('Close Preview'));
 
-      // Verify onOpenChange was called with true to reopen main dialog
+      // Verify onOpenChange was called with true to reopen main dialog (with delay)
       await waitFor(() => {
         expect(mockOnOpenChange).toHaveBeenCalledWith(true);
-      });
+      }, { timeout: 2000 }); // Increased to account for 200ms delay
     });
   });
 

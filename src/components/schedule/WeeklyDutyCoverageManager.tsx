@@ -190,7 +190,9 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       setPreviewHtml(data.html);
       console.log('✅ Closing main dialog and opening preview');
       onOpenChange(false); // Close main dialog
-      setShowPreview(true); // Open preview dialog
+      setTimeout(() => {
+        setShowPreview(true); // Open preview after backdrop unmounts
+      }, 200); // 200ms matches Radix Dialog's animation duration
     }
   };
 
@@ -452,8 +454,10 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       <Dialog open={showPreview} onOpenChange={(open) => {
         setShowPreview(open);
         if (!open) {
-          // Reopen main dialog when preview closes
-          onOpenChange(true);
+          // Reopen main dialog after animation completes
+          setTimeout(() => {
+            onOpenChange(true);
+          }, 200);
         }
       }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
@@ -472,7 +476,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           
           {/* Footer */}
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setShowPreview(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowPreview(false);
+              setTimeout(() => {
+                onOpenChange(true);
+              }, 200);
+            }}>
               Close Preview
             </Button>
           </div>
