@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState("template");
-  const isLoadingTemplate = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -50,11 +49,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   }, [open]);
 
   useEffect(() => {
-    if (selectedTemplate && !isLoadingTemplate.current) {
-      isLoadingTemplate.current = true;
-      loadTemplate(selectedTemplate).finally(() => {
-        isLoadingTemplate.current = false;
-      });
+    if (selectedTemplate) {
+      loadTemplate(selectedTemplate);
     }
   }, [selectedTemplate]);
 
@@ -84,7 +80,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       .single();
 
     if (!error && data) {
-      setSelectedTemplate(templateId);
       setSelectedTeams(data.team_ids || []);
       setTemplateName(data.template_name);
       setDistributionList(data.distribution_list || []);
