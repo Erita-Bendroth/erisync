@@ -13,6 +13,11 @@ import { CoverageOverview } from "./CoverageOverview";
 import { CoverageAlerts } from "./CoverageAlerts";
 import { CoverageHeatmap } from "./CoverageHeatmap";
 import { useCoverageAnalysis } from "@/hooks/useCoverageAnalysis";
+import { useHolidayVisibility } from "@/hooks/useHolidayVisibility";
+import { HolidayBadge } from "./HolidayBadge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/components/auth/AuthProvider";
 import * as XLSX from "xlsx";
 
 interface TeamMember {
@@ -29,14 +34,26 @@ interface ScheduleEntry {
   activity_type: string;
 }
 
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  country_code: string;
+  region_code?: string;
+  is_public: boolean;
+}
+
 export function MultiTeamScheduleView() {
+  const { user } = useAuth();
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleEntry[]>>({});
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"schedule" | "coverage">("schedule");
+  const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -59,12 +76,37 @@ export function MultiTeamScheduleView() {
   useEffect(() => {
     if (selectedTeams.length > 0) {
       fetchTeamData();
+      fetchHolidays();
     }
   }, [selectedTeams, currentDate]);
 
   const fetchTeams = async () => {
     const { data } = await supabase.from("teams").select("id, name").order("name");
     if (data) setTeams(data);
+  };
+
+  const fetchHolidays = async () => {
+    try {
+      const startDate = format(weekDays[0], "yyyy-MM-dd");
+      const endDate = format(weekDays[6], "yyyy-MM-dd");
+
+      const { data, error } = await supabase
+        .from("holidays")
+        .select("*")
+        .gte("date", startDate)
+        .lte("date", endDate)
+        .eq("is_public", true);
+
+      if (error) throw error;
+      setHolidays(data || []);
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+    }
+  };
+
+  const getHolidayForDate = (date: Date): Holiday | undefined => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return holidays.find((h) => h.date === dateStr);
   };
 
   const fetchTeamData = async () => {
@@ -255,8 +297,9 @@ export function MultiTeamScheduleView() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm font-medium">Teams:</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap gap-2">
+              <span className="text-sm font-medium">Teams:</span>
             {teams.map((team) => (
               <Badge
                 key={team.id}
@@ -266,7 +309,14 @@ export function MultiTeamScheduleView() {
               >
                 {team.name}
               </Badge>
-            ))}
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="show-holidays" checked={showHolidays} onCheckedChange={toggleHolidays} />
+              <Label htmlFor="show-holidays" className="text-sm cursor-pointer">
+                Show holidays/weekends
+              </Label>
+            </div>
           </div>
 
           {selectedTeams.length > 0 && (
@@ -304,12 +354,23 @@ export function MultiTeamScheduleView() {
                     const dateStr = format(day, "yyyy-MM-dd");
                     const dayName = format(day, "EEE");
                     const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                    const holiday = showHolidays ? getHolidayForDate(day) : undefined;
 
                     return (
-                      <tr key={dateStr} className="border-b">
+                      <tr
+                        key={dateStr}
+                        className={`border-b ${isWeekend && showHolidays ? "bg-muted/30" : ""} ${
+                          holiday && showHolidays ? "bg-purple-50 dark:bg-purple-950/20" : ""
+                        }`}
+                      >
                         <td className="p-2 sticky left-0 bg-background z-10 font-medium">
-                          <div>{dayName}</div>
-                          <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div>{dayName}</div>
+                              <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
+                            </div>
+                            {holiday && showHolidays && <HolidayBadge holidayName={holiday.name} size="sm" />}
+                          </div>
                         </td>
                         {selectedTeams.map((teamId) => {
                           const members = teamMembers[teamId] || [];

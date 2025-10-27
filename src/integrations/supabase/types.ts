@@ -81,29 +81,38 @@ export type Database = {
       }
       dashboard_preferences: {
         Row: {
+          coverage_threshold: number | null
           created_at: string
           default_date_range: string | null
           default_team_id: string | null
+          fairness_weight: number | null
           favorite_metrics: string[] | null
           id: string
+          show_holidays_default: boolean | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          coverage_threshold?: number | null
           created_at?: string
           default_date_range?: string | null
           default_team_id?: string | null
+          fairness_weight?: number | null
           favorite_metrics?: string[] | null
           id?: string
+          show_holidays_default?: boolean | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          coverage_threshold?: number | null
           created_at?: string
           default_date_range?: string | null
           default_team_id?: string | null
+          fairness_weight?: number | null
           favorite_metrics?: string[] | null
           id?: string
+          show_holidays_default?: boolean | null
           updated_at?: string
           user_id?: string
         }
@@ -713,6 +722,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      team_holiday_settings: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          exclude_from_coverage: boolean | null
+          id: string
+          include_weekends_in_coverage: boolean | null
+          team_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          exclude_from_coverage?: boolean | null
+          id?: string
+          include_weekends_in_coverage?: boolean | null
+          team_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          exclude_from_coverage?: boolean | null
+          id?: string
+          include_weekends_in_coverage?: boolean | null
+          team_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_holiday_settings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_members: {
         Row: {
