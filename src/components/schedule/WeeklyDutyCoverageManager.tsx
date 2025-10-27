@@ -165,7 +165,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       toast({ title: "Error", description: error?.message || "Failed to generate preview", variant: "destructive" });
     } else {
       setPreviewHtml(data.html);
-      setShowPreview(true);
+      // Close the main dialog first to ensure all Select components are closed
+      onOpenChange(false);
+      // Small delay to let the dialog and its children fully unmount
+      setTimeout(() => {
+        setShowPreview(true);
+      }, 100);
     }
   };
 
