@@ -80,7 +80,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       .single();
 
     if (!error && data) {
-      setSelectedTemplate(templateId);
       setSelectedTeams(data.team_ids || []);
       setTemplateName(data.template_name);
       setDistributionList(data.distribution_list || []);
