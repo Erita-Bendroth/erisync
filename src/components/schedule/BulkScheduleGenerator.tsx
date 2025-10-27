@@ -983,8 +983,9 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       return day === 0 || day === 6;
     }).length;
     
+    // Only 'late' shifts are night shifts, not 'early' shifts
     const nightShifts = entries.filter(e => 
-      e.shift_type === 'early' || e.shift_type === 'late'
+      e.shift_type === 'late'
     ).length;
     
     // Fetch user profiles to get their country/region for holiday matching
