@@ -109,6 +109,23 @@ serve(async (req) => {
 
     const teams: TeamData[] = teamsData || [];
 
+    // Fetch team members to get region codes for teams
+    const { data: teamMembersData } = await supabase
+      .from('team_members')
+      .select('team_id, user_id, profiles!inner(region_code)')
+      .in('team_id', template.team_ids)
+      .limit(1);
+
+    // Map team_id to region_code (use first member's region as representative)
+    const teamRegions: Record<string, string> = {};
+    if (teamMembersData) {
+      teamMembersData.forEach((tm: any) => {
+        if (!teamRegions[tm.team_id] && tm.profiles?.region_code) {
+          teamRegions[tm.team_id] = tm.profiles.region_code;
+        }
+      });
+    }
+
     // Calculate week date range
     const startDate = new Date(year, 0, 1 + (week_number - 1) * 7);
     const dayOfWeek = startDate.getDay();
@@ -226,7 +243,7 @@ serve(async (req) => {
     console.log('Fetched shift time definitions:', shiftDefs?.length || 0);
 
     if (preview) {
-      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || [], teamRegions);
       return new Response(
         JSON.stringify({ html: htmlContent }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -234,7 +251,7 @@ serve(async (req) => {
     }
 
     // Generate email HTML
-    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || [], teamRegions);
 
     // Send email via Resend using your verified domain
     const emailResult = await resend.emails.send({
@@ -387,11 +404,87 @@ function buildDutyCoverageEmail(
   template: any,
   assignments: Assignment[],
   teams: TeamData[],
-  shiftDefs: any[]
+  shiftDefs: any[],
+  teamRegions: Record<string, string>
 ): string {
-  const getShiftDesc = (shiftType: string) => {
-    const def = shiftDefs.find(d => d.shift_type === shiftType);
-    return def?.description ? ` (${def.description})` : '';
+  // Get applicable shift definition using priority logic
+  const getApplicableShiftDef = (teamId: string, shiftType: string, date?: string) => {
+    const regionCode = teamRegions[teamId];
+    const dayOfWeek = date ? new Date(date + 'T00:00:00Z').getUTCDay() : undefined;
+
+    // Priority 1: Team + Region + Day
+    if (dayOfWeek !== undefined && regionCode) {
+      const match = shiftDefs.find(d => 
+        d.shift_type === shiftType &&
+        d.team_id === teamId &&
+        d.region_code === regionCode &&
+        d.day_of_week?.includes(dayOfWeek)
+      );
+      if (match) return match;
+    }
+
+    // Priority 2: Team + Region (no specific day)
+    if (regionCode) {
+      const match = shiftDefs.find(d => 
+        d.shift_type === shiftType &&
+        d.team_id === teamId &&
+        d.region_code === regionCode &&
+        (!d.day_of_week || d.day_of_week.length === 0)
+      );
+      if (match) return match;
+    }
+
+    // Priority 3: Team only (no region, no day)
+    const match = shiftDefs.find(d => 
+      d.shift_type === shiftType &&
+      d.team_id === teamId &&
+      !d.region_code &&
+      (!d.day_of_week || d.day_of_week.length === 0)
+    );
+    if (match) return match;
+
+    // Priority 4: Region only (no team, no day)
+    if (regionCode) {
+      const match = shiftDefs.find(d => 
+        d.shift_type === shiftType &&
+        !d.team_id &&
+        d.region_code === regionCode &&
+        (!d.day_of_week || d.day_of_week.length === 0)
+      );
+      if (match) return match;
+    }
+
+    // Priority 5: Global default (no team, no region, no day)
+    const match = shiftDefs.find(d => 
+      d.shift_type === shiftType &&
+      !d.team_id &&
+      !d.region_code &&
+      (!d.day_of_week || d.day_of_week.length === 0)
+    );
+    return match;
+  };
+
+  // Get shift description for section title - find most common or list all unique
+  const getShiftDescForSection = (shiftType: string, dutyAssignments: Assignment[]) => {
+    const descriptions = new Set<string>();
+    
+    // Get descriptions for all teams that have assignments
+    teams.forEach(team => {
+      const hasAssignment = dutyAssignments.some(a => a.team_id === team.id);
+      if (hasAssignment) {
+        // Use first assignment date for context
+        const sampleDate = dutyAssignments.find(a => a.team_id === team.id)?.date;
+        const def = getApplicableShiftDef(team.id, shiftType, sampleDate);
+        if (def?.description) {
+          descriptions.add(def.description);
+        }
+      }
+    });
+
+    if (descriptions.size === 0) return '';
+    if (descriptions.size === 1) return ` (${Array.from(descriptions)[0]})`;
+    // Multiple descriptions - list them all
+    return ` (${Array.from(descriptions).join(', ')})`;
   };
   
   const weekendDuty = assignments.filter(a => a.duty_type === 'weekend');
@@ -473,9 +566,9 @@ function buildDutyCoverageEmail(
     `;
   };
 
-  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftDesc('weekend')}`, weekendDuty) : '';
-  const lateshiftSection = template.include_lateshift ? buildDutySection(`Lateshift duty${getShiftDesc('late')}`, lateshiftDuty) : '';
-  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Earlyshift duty${getShiftDesc('early')}`, earlyshiftDuty) : '';
+  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftDescForSection('weekend', weekendDuty)}`, weekendDuty) : '';
+  const lateshiftSection = template.include_lateshift ? buildDutySection(`Lateshift duty${getShiftDescForSection('late', lateshiftDuty)}`, lateshiftDuty) : '';
+  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Earlyshift duty${getShiftDescForSection('early', earlyshiftDuty)}`, earlyshiftDuty) : '';
 
   return `
 <!DOCTYPE html>
