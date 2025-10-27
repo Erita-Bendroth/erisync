@@ -389,9 +389,18 @@ function buildDutyCoverageEmail(
   teams: TeamData[],
   shiftDefs: any[]
 ): string {
-  const getShiftDesc = (shiftType: string) => {
+  const getShiftTimes = (shiftType: string) => {
     const def = shiftDefs.find(d => d.shift_type === shiftType);
-    return def?.description ? ` (${def.description})` : '';
+    if (def) {
+      return ` (${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)})`;
+    }
+    // Fallback to default times if no definition found
+    const defaults: Record<string, string> = {
+      weekend: ' (08:00-16:00)',
+      late: ' (14:00-22:00)',
+      early: ' (06:00-14:00)'
+    };
+    return defaults[shiftType] || '';
   };
   
   const weekendDuty = assignments.filter(a => a.duty_type === 'weekend');
@@ -473,9 +482,9 @@ function buildDutyCoverageEmail(
     `;
   };
 
-  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty`, weekendDuty) : '';
-  const lateshiftSection = template.include_lateshift ? buildDutySection(`Late Shift Central`, lateshiftDuty) : '';
-  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Early Shift Central`, earlyshiftDuty) : '';
+  const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftTimes('weekend')}`, weekendDuty) : '';
+  const lateshiftSection = template.include_lateshift ? buildDutySection(`Late Shift Central${getShiftTimes('late')}`, lateshiftDuty) : '';
+  const earlyshiftSection = template.include_earlyshift ? buildDutySection(`Early Shift Central${getShiftTimes('early')}`, earlyshiftDuty) : '';
 
   return `
 <!DOCTYPE html>
