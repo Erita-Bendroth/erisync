@@ -414,54 +414,54 @@ function buildDutyCoverageEmail(
 
     // Priority 1: Team + Region + Day
     if (dayOfWeek !== undefined && regionCode) {
-      const match = shiftDefs.find(d => 
+      const match1 = shiftDefs.find(d => 
         d.shift_type === shiftType &&
         d.team_id === teamId &&
         d.region_code === regionCode &&
         d.day_of_week?.includes(dayOfWeek)
       );
-      if (match) return match;
+      if (match1) return match1;
     }
 
     // Priority 2: Team + Region (no specific day)
     if (regionCode) {
-      const match = shiftDefs.find(d => 
+      const match2 = shiftDefs.find(d => 
         d.shift_type === shiftType &&
         d.team_id === teamId &&
         d.region_code === regionCode &&
         (!d.day_of_week || d.day_of_week.length === 0)
       );
-      if (match) return match;
+      if (match2) return match2;
     }
 
     // Priority 3: Team only (no region, no day)
-    const match = shiftDefs.find(d => 
+    const match3 = shiftDefs.find(d => 
       d.shift_type === shiftType &&
       d.team_id === teamId &&
       !d.region_code &&
       (!d.day_of_week || d.day_of_week.length === 0)
     );
-    if (match) return match;
+    if (match3) return match3;
 
     // Priority 4: Region only (no team, no day)
     if (regionCode) {
-      const match = shiftDefs.find(d => 
+      const match4 = shiftDefs.find(d => 
         d.shift_type === shiftType &&
         !d.team_id &&
         d.region_code === regionCode &&
         (!d.day_of_week || d.day_of_week.length === 0)
       );
-      if (match) return match;
+      if (match4) return match4;
     }
 
     // Priority 5: Global default (no team, no region, no day)
-    const match = shiftDefs.find(d => 
+    const match5 = shiftDefs.find(d => 
       d.shift_type === shiftType &&
       !d.team_id &&
       !d.region_code &&
       (!d.day_of_week || d.day_of_week.length === 0)
     );
-    return match;
+    return match5;
   };
 
   // Get shift description for section title - find most common or list all unique
