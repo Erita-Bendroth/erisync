@@ -1049,6 +1049,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center">
