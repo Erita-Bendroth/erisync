@@ -52,9 +52,11 @@ Preview HTML is returned and displayed in modal
    - Disabled when no template selected
    - Calls `handlePreview` on click
 
-4. **Preview Modal** (Custom portal)
-   - Rendered conditionally based on `showPreview`
+4. **Preview Modal** (Radix Dialog)
+   - Rendered using Radix UI Dialog component for proper accessibility
    - Displays `previewHtml` via dangerouslySetInnerHTML
+   - Automatically manages z-index and focus trapping
+   - Closes main dialog when opened, reopens when closed
 
 5. **Edge Function** (send-weekly-duty-coverage)
    - Receives template_id, week_number, year, preview flag
@@ -120,6 +122,81 @@ const loadTemplate = async (templateId: string) => {
 7. `selectedTemplate` stays set to the UUID
 8. Button is enabled
 9. User clicks "Preview Email" → `handlePreview` executes successfully
+
+### 5. Dialog Stacking Conflict Issue
+
+**Problem:**
+When both the main Weekly Duty Coverage dialog and the preview modal were open simultaneously, the preview modal became invisible or non-interactive due to z-index stacking conflicts.
+
+**Root Cause:**
+Both Radix UI Dialog components use `z-50` for their overlays and content. When nested or rendered in the same stacking context:
+- The main dialog's backdrop (z-50) renders on top of the preview dialog content (z-50)
+- User cannot interact with the preview modal
+- Preview appears to "not render" even though it's in the DOM
+
+**Why Nested Dialogs Cause Issues:**
+1. **Z-Index Parity**: Both dialogs use the same z-index values
+2. **DOM Order**: Later elements in DOM with same z-index appear on top
+3. **Stacking Context**: The main dialog creates a new stacking context
+4. **Portal Limitations**: Even with React portals, z-index conflicts persist
+
+**Solutions Considered:**
+
+1. **Custom Z-Index (Not Recommended)**
+   - Increase preview modal z-index to z-[100] or higher
+   - ❌ Breaks Radix UI's stacking architecture
+   - ❌ Can cause issues with other UI elements
+   - ❌ Not maintainable long-term
+
+2. **Close Main Dialog (Implemented ✅)**
+   - Close main dialog when opening preview
+   - Reopen main dialog when preview closes
+   - ✅ Cleanest UX - no overlapping modals
+   - ✅ No z-index conflicts
+   - ✅ Better accessibility - one modal at a time
+   - ✅ Follows standard modal patterns
+
+**Implementation:**
+```tsx
+// In handlePreview - close main dialog before opening preview
+if (data?.html) {
+  setPreviewHtml(data.html);
+  onOpenChange(false); // Close main dialog
+  setShowPreview(true); // Open preview dialog
+}
+
+// In preview dialog - reopen main dialog on close
+<Dialog open={showPreview} onOpenChange={(open) => {
+  setShowPreview(open);
+  if (!open) {
+    onOpenChange(true); // Reopen main dialog
+  }
+}}>
+```
+
+**Why This Works:**
+1. Only one dialog is open at any time
+2. No z-index conflicts
+3. Clear visual hierarchy
+4. Proper focus management (Radix handles this automatically)
+5. Better screen reader experience
+6. Follows ARIA best practices for modal workflows
+
+**Accessibility Benefits:**
+- ✅ Single focus trap at a time
+- ✅ Proper ESC key handling
+- ✅ Clear modal announcement to screen readers
+- ✅ No confusing nested modal context
+- ✅ Correct `aria-describedby` and `aria-labelledby` attributes
+
+**User Experience:**
+1. User clicks "Preview Email" in main dialog
+2. Main dialog smoothly closes
+3. Preview modal opens with email content
+4. User reviews preview
+5. User closes preview (ESC, close button, or backdrop click)
+6. Main dialog reopens automatically
+7. User can continue editing or send email
 
 ## Testing Coverage
 
@@ -252,8 +329,8 @@ All tests are located in `src/components/schedule/__tests__/WeeklyDutyCoverageMa
 ### Critical Dependencies
 - **React 18.3+**: Required for concurrent features
 - **Supabase Client**: Database and edge function access
-- **@radix-ui/react-dialog**: Modal implementation
-- **react-dom**: Portal rendering for custom modal
+- **@radix-ui/react-dialog**: Modal implementation with proper accessibility
+- **@radix-ui/react-tabs**: Tab navigation in main dialog
 
 ### Testing Dependencies
 - **Vitest**: Test runner and framework

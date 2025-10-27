@@ -232,6 +232,47 @@ describe('WeeklyDutyCoverageManager', () => {
         expect(screen.queryByText('Email Preview - Weekly Duty Coverage')).not.toBeInTheDocument();
       });
     });
+
+    it('should close main dialog when opening preview and reopen after closing preview', async () => {
+      const mockInvoke = vi.fn().mockResolvedValue({
+        data: { html: '<html><body>Test Preview</body></html>' },
+        error: null,
+      });
+      (supabase.functions.invoke as any) = mockInvoke;
+
+      const mockOnOpenChange = vi.fn();
+      render(<WeeklyDutyCoverageManager open={true} onOpenChange={mockOnOpenChange} />);
+      
+      // Select template
+      await waitFor(() => {
+        expect(screen.getByText('Test Template')).toBeInTheDocument();
+      });
+
+      const select = screen.getByRole('combobox');
+      fireEvent.click(select);
+      fireEvent.click(screen.getByText('Test Template'));
+      fireEvent.click(screen.getByText('Preview & Send'));
+
+      // Click preview button
+      const previewButton = screen.getByText('Preview Email').closest('button');
+      fireEvent.click(previewButton!);
+
+      // Wait for preview to load and verify main dialog closes
+      await waitFor(() => {
+        expect(screen.getByText('Email Preview - Weekly Duty Coverage')).toBeInTheDocument();
+      });
+
+      // Verify onOpenChange was called with false to close main dialog
+      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+
+      // Close preview
+      fireEvent.click(screen.getByText('Close Preview'));
+
+      // Verify onOpenChange was called with true to reopen main dialog
+      await waitFor(() => {
+        expect(mockOnOpenChange).toHaveBeenCalledWith(true);
+      });
+    });
   });
 
   describe('Error Handling Tests', () => {

@@ -188,8 +188,9 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     } else {
       console.log('✅ Setting preview HTML, length:', data.html.length);
       setPreviewHtml(data.html);
-      setShowPreview(true);
-      console.log('✅ Preview dialog should now be visible');
+      console.log('✅ Closing main dialog and opening preview');
+      onOpenChange(false); // Close main dialog
+      setShowPreview(true); // Open preview dialog
     }
   };
 
@@ -448,7 +449,13 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       </Dialog>
 
       {/* Preview Modal - Radix Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+      <Dialog open={showPreview} onOpenChange={(open) => {
+        setShowPreview(open);
+        if (!open) {
+          // Reopen main dialog when preview closes
+          onOpenChange(true);
+        }
+      }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Email Preview - Weekly Duty Coverage</DialogTitle>
