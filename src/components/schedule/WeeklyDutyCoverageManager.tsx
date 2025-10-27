@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState("template");
-  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -49,11 +48,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     }
   }, [open]);
 
-  useEffect(() => {
-    if (selectedTemplate && !isLoadingRef.current) {
-      loadTemplate(selectedTemplate);
-    }
-  }, [selectedTemplate]);
 
   const getWeekNumber = (date: Date): number => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -74,7 +68,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const loadTemplate = async (templateId: string) => {
-    isLoadingRef.current = true;
+    console.log('📋 Loading template:', templateId);
     
     const { data, error } = await supabase
       .from('weekly_duty_templates')
@@ -83,17 +77,17 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       .single();
 
     if (!error && data) {
-      setSelectedTemplate(templateId);
       setSelectedTeams(data.team_ids || []);
       setTemplateName(data.template_name);
       setDistributionList(data.distribution_list || []);
       setIncludeWeekend(data.include_weekend_duty);
       setIncludeLateshift(data.include_lateshift);
       setIncludeEarlyshift(data.include_earlyshift);
+      console.log('✅ Template loaded successfully:', data.template_name);
       toast({ title: "Success", description: "Template loaded" });
+    } else {
+      console.error('❌ Failed to load template:', error);
     }
-    
-    isLoadingRef.current = false;
   };
 
   const saveTemplate = async () => {
@@ -273,7 +267,11 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Load Existing Template</Label>
-                      <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                      <Select value={selectedTemplate} onValueChange={(value) => {
+                        console.log('📋 Template selected from dropdown:', value);
+                        setSelectedTemplate(value);
+                        loadTemplate(value);
+                      }}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select template..." />
                         </SelectTrigger>
@@ -428,7 +426,14 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
               </Card>
 
               <div className="flex gap-2 justify-center">
-                <Button onClick={handlePreview} disabled={loading || !selectedTemplate}>
+                <Button 
+                  onClick={() => {
+                    console.log('🔘 Preview button clicked');
+                    console.log('🔘 Button state:', { loading, selectedTemplate, disabled: loading || !selectedTemplate });
+                    handlePreview();
+                  }} 
+                  disabled={loading || !selectedTemplate}
+                >
                   <Eye className="w-4 h-4 mr-2" />
                   Preview Email
                 </Button>
@@ -443,7 +448,10 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       </Dialog>
 
       {/* Preview Modal - Custom Portal */}
-      {showPreview && createPortal(
+      {showPreview && (() => {
+        console.log('🎨 Rendering preview modal, showPreview:', showPreview);
+        console.log('🎨 Preview HTML length:', previewHtml?.length || 0);
+        return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           {/* Backdrop */}
           <div 
@@ -486,7 +494,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           </div>
         </div>,
         document.body
-      )}
+      );
+      })()}
     </>
   );
 }
