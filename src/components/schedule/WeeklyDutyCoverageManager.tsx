@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
   const [activeTab, setActiveTab] = useState("template");
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -49,7 +50,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   }, [open]);
 
   useEffect(() => {
-    if (selectedTemplate) {
+    if (selectedTemplate && !isLoadingRef.current) {
       loadTemplate(selectedTemplate);
     }
   }, [selectedTemplate]);
@@ -73,6 +74,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const loadTemplate = async (templateId: string) => {
+    isLoadingRef.current = true;
+    
     const { data, error } = await supabase
       .from('weekly_duty_templates')
       .select('*')
@@ -80,6 +83,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       .single();
 
     if (!error && data) {
+      setSelectedTemplate(templateId);
       setSelectedTeams(data.team_ids || []);
       setTemplateName(data.template_name);
       setDistributionList(data.distribution_list || []);
@@ -88,6 +92,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       setIncludeEarlyshift(data.include_earlyshift);
       toast({ title: "Success", description: "Template loaded" });
     }
+    
+    isLoadingRef.current = false;
   };
 
   const saveTemplate = async () => {
@@ -147,7 +153,13 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const handlePreview = async () => {
+    console.log('🎯 handlePreview called');
+    console.log('🎯 selectedTemplate:', selectedTemplate);
+    console.log('🎯 loading:', loading);
+    console.log('🎯 button should be disabled:', loading || !selectedTemplate);
+    
     if (!selectedTemplate) {
+      console.error('❌ No template selected, showing toast');
       toast({ title: "Error", description: "Please save the template first", variant: "destructive" });
       return;
     }
