@@ -141,13 +141,13 @@ serve(async (req) => {
       });
     }
 
-    // Fetch profiles for manual assignment users
+    // Fetch profiles for manual assignment users with country codes
     let manualProfiles: Record<string, any> = {};
     if (manualUserIds.size > 0) {
       const { data: profilesData } = await supabase
-        .rpc('get_multiple_basic_profile_info', { 
-          _user_ids: Array.from(manualUserIds) 
-        });
+        .from('profiles')
+        .select('user_id, first_name, last_name, initials, country_code')
+        .in('user_id', Array.from(manualUserIds));
       
       if (profilesData) {
         profilesData.forEach((profile: any) => {
@@ -178,19 +178,17 @@ serve(async (req) => {
 
     // Get all unique user IDs from schedule entries
     const scheduleUserIds = new Set<string>();
-    if (scheduleEntriesRaw) {
-      scheduleEntriesRaw.forEach((entry: any) => {
-        if (entry.user_id) scheduleUserIds.add(entry.user_id);
-      });
-    }
+    scheduleEntriesRaw?.forEach((entry: any) => {
+      if (entry.user_id) scheduleUserIds.add(entry.user_id);
+    });
 
-    // Fetch profiles for schedule users
+    // Fetch profiles for schedule assignment users with country codes
     let scheduleProfiles: Record<string, any> = {};
     if (scheduleUserIds.size > 0) {
       const { data: profilesData } = await supabase
-        .rpc('get_multiple_basic_profile_info', { 
-          _user_ids: Array.from(scheduleUserIds) 
-        });
+        .from('profiles')
+        .select('user_id, first_name, last_name, initials, country_code')
+        .in('user_id', Array.from(scheduleUserIds));
       
       if (profilesData) {
         profilesData.forEach((profile: any) => {
@@ -382,6 +380,20 @@ function getCombinedAssignments(
   return combined;
 }
 
+// Helper function for formatting names with country codes in emails
+const formatNameForEmail = (profile: any): string => {
+  if (!profile) return 'TBD';
+  
+  const name = profile.initials || profile.first_name || 'Unknown';
+  const country = profile.country_code;
+  
+  if (country && country.trim() !== '') {
+    return `${name} (${country.toUpperCase()})`;
+  }
+  
+  return name;
+};
+
 // Build the HTML email content with multi-team support
 function buildDutyCoverageEmail(
   template: any,
@@ -440,13 +452,13 @@ function buildDutyCoverageEmail(
       // Create cells for each team
       const teamCells = teams.map(team => {
         const assignment = dateAssignments.find(a => a.team_id === team.id);
-        const primaryInitials = assignment?.user?.initials || '-';
-        const substituteInitials = assignment?.substitute?.initials || '-';
-        const sourceIndicator = assignment?.source === 'schedule' ? '📅' : '';
+        const primaryName = assignment?.user ? formatNameForEmail(assignment.user) : '-';
+        const substituteName = assignment?.substitute ? formatNameForEmail(assignment.substitute) : '-';
+        const sourceIndicator = assignment?.source === 'schedule' ? '📅 ' : '';
 
         return `
-          <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">${sourceIndicator}${primaryInitials}</td>
-          <td style="padding: 12px; border: 1px solid #e5e7eb;">${substituteInitials}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">${sourceIndicator}${primaryName}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${substituteName}</td>
         `;
       }).join('');
 

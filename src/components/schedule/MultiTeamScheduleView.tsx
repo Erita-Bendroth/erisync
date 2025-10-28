@@ -12,6 +12,7 @@ import { TeamFavoritesManager } from "./TeamFavoritesManager";
 import { CoverageOverview } from "./CoverageOverview";
 import { CoverageAlerts } from "./CoverageAlerts";
 import { CoverageHeatmap } from "./CoverageHeatmap";
+import { TeamCoverageGrid } from "./TeamCoverageGrid";
 import { useCoverageAnalysis } from "@/hooks/useCoverageAnalysis";
 import { useHolidayVisibility } from "@/hooks/useHolidayVisibility";
 import { HolidayBadge } from "./HolidayBadge";
@@ -25,6 +26,7 @@ interface TeamMember {
   first_name: string;
   last_name: string;
   initials: string;
+  country_code?: string;
 }
 
 interface ScheduleEntry {
@@ -52,7 +54,7 @@ export function MultiTeamScheduleView() {
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleEntry[]>>({});
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<"schedule" | "coverage">("schedule");
+  const [viewMode, setViewMode] = useState<"schedule" | "coverage" | "grid">("schedule");
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -320,9 +322,10 @@ export function MultiTeamScheduleView() {
           </div>
 
           {selectedTeams.length > 0 && (
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "schedule" | "coverage")}>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "schedule" | "coverage" | "grid")}>
               <TabsList>
                 <TabsTrigger value="schedule">Schedule View</TabsTrigger>
+                <TabsTrigger value="grid">Coverage Grid</TabsTrigger>
                 <TabsTrigger value="coverage">
                   <BarChart3 className="w-4 h-4 mr-2" />
                   Coverage Analysis
@@ -452,6 +455,14 @@ export function MultiTeamScheduleView() {
                     </div>
                   </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="grid" className="mt-4">
+                <TeamCoverageGrid
+                  teamIds={selectedTeams}
+                  currentDate={currentDate}
+                  showHolidays={showHolidays}
+                />
               </TabsContent>
 
               <TabsContent value="coverage" className="mt-4 space-y-4">
