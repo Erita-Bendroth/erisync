@@ -50,6 +50,7 @@ export function DutyAssignmentGrid({
   const [loading, setLoading] = useState(false);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const [scheduledUsers, setScheduledUsers] = useState<Record<string, ScheduledUser[]>>({});
+  const [availableShiftTypes, setAvailableShiftTypes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTeamMembers();
@@ -126,19 +127,28 @@ export function DutyAssignmentGrid({
       
       console.log('[DutyAssignmentGrid] Filtered work entries:', workEntries.length, 'of', data.length);
       
+      // Collect unique shift types from the schedule
+      const shiftTypes = new Set<string>();
       const map: Record<string, ScheduledUser[]> = {};
       workEntries.forEach((entry: any) => {
         const dateStr = entry.date;
+        const shiftType = entry.shift_type || 'normal';
+        
         if (!map[dateStr]) map[dateStr] = [];
         map[dateStr].push({
           date: dateStr,
           user_id: entry.user_id,
-          shift_type: entry.shift_type || 'normal'
+          shift_type: shiftType
         });
+        
+        // Track available shift types
+        shiftTypes.add(shiftType);
       });
       
       console.log('[DutyAssignmentGrid] Scheduled users map:', map);
+      console.log('[DutyAssignmentGrid] Available shift types:', Array.from(shiftTypes));
       setScheduledUsers(map);
+      setAvailableShiftTypes(shiftTypes);
     } else if (error) {
       console.error('[DutyAssignmentGrid] Error fetching scheduled users:', error);
     }
@@ -330,12 +340,47 @@ export function DutyAssignmentGrid({
   );
 
   const weekendDates = weekDates.filter(d => d.getDay() === 0 || d.getDay() === 6);
+  
+  // Determine which sections to show based on both template config and actual schedule data
+  const shouldShowWeekend = includeWeekend && (
+    availableShiftTypes.has('normal') || 
+    availableShiftTypes.has('weekend') ||
+    availableShiftTypes.size === 0 // Show if no data loaded yet
+  );
+
+  const shouldShowLateshift = includeLateshift && (
+    availableShiftTypes.has('late') ||
+    availableShiftTypes.size === 0
+  );
+
+  const shouldShowEarlyshift = includeEarlyshift && (
+    availableShiftTypes.has('early') ||
+    availableShiftTypes.size === 0
+  );
 
   return (
     <div className="space-y-4">
-      {includeWeekend && renderDutySection('Weekend/Holiday Duty', 'weekend', weekendDates)}
-      {includeLateshift && renderDutySection('Lateshift (14:00-20:00)', 'lateshift', weekDates)}
-      {includeEarlyshift && renderDutySection('Earlyshift (06:00-14:00)', 'earlyshift', weekDates)}
+      {shouldShowWeekend && renderDutySection('Weekend/Holiday Duty', 'weekend', weekendDates)}
+      {includeLateshift && !availableShiftTypes.has('late') && availableShiftTypes.size > 0 && (
+        <Card className="mb-4">
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground italic">
+              No late shift schedules found for this team this week.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {shouldShowLateshift && renderDutySection('Lateshift (14:00-20:00)', 'lateshift', weekDates)}
+      {includeEarlyshift && !availableShiftTypes.has('early') && availableShiftTypes.size > 0 && (
+        <Card className="mb-4">
+          <CardContent className="pt-6">
+            <div className="text-sm text-muted-foreground italic">
+              No early shift schedules found for this team this week.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {shouldShowEarlyshift && renderDutySection('Earlyshift (06:00-14:00)', 'earlyshift', weekDates)}
     </div>
   );
 }
