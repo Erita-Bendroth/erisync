@@ -395,14 +395,14 @@ export function DutyAssignmentGrid({
                         {currentAssignments.map((assignment) => (
                           <div key={assignment.id} className="flex items-center gap-2 p-2 border rounded-lg bg-card">
                             <Select
-                              value={assignment.userId || ''}
-                              onValueChange={(value) => updateAssignment(assignment.id!, 'userId', value || null)}
+                              value={assignment.userId || 'none'}
+                              onValueChange={(value) => updateAssignment(assignment.id!, 'userId', value === 'none' ? null : value)}
                             >
                               <SelectTrigger className="w-[140px] h-8 text-sm">
                                 <SelectValue placeholder="Select user" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="none">None</SelectItem>
                                 {teamMembers.map((member) => {
                                   const isScheduled = scheduled.some(s => s.user_id === member.user_id);
                                   return (
