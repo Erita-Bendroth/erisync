@@ -11,13 +11,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { formatUserName } from "@/lib/utils";
 import { TeamCapacityConfig } from '@/components/admin/TeamCapacityConfig';
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
+import { DelegateAccessModal } from "./DelegateAccessModal";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format as formatDate, startOfYear, endOfYear } from "date-fns";
 
 interface Team {
   id: string;
@@ -73,6 +77,12 @@ const EnhancedTeamManagement = () => {
     is_manager: false,
   });
   const [childTeamManagers, setChildTeamManagers] = useState<Map<string, Set<string>>>(new Map());
+  const [delegateAccessOpen, setDelegateAccessOpen] = useState(false);
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadTeamId, setDownloadTeamId] = useState<string>("");
+  const [downloadStartDate, setDownloadStartDate] = useState<Date>(startOfYear(new Date()));
+  const [downloadEndDate, setDownloadEndDate] = useState<Date>(endOfYear(new Date()));
+  const [downloadPreset, setDownloadPreset] = useState<"current-year" | "past-year" | "next-year" | "custom">("current-year");
 
   useEffect(() => {
     fetchUserRoles();
@@ -325,23 +335,78 @@ const EnhancedTeamManagement = () => {
     }
   };
 
-  const downloadTeamData = async (teamId: string, format: 'excel' | 'pdf') => {
+  const openDownloadDialog = (teamId: string) => {
+    setDownloadTeamId(teamId);
+    setDownloadDialogOpen(true);
+  };
+
+  const handlePresetChange = (preset: string) => {
+    setDownloadPreset(preset as any);
+    const now = new Date();
+    
+    switch(preset) {
+      case "current-year":
+        setDownloadStartDate(startOfYear(now));
+        setDownloadEndDate(endOfYear(now));
+        break;
+      case "past-year":
+        const lastYear = new Date(now.getFullYear() - 1, 0, 1);
+        setDownloadStartDate(startOfYear(lastYear));
+        setDownloadEndDate(endOfYear(lastYear));
+        break;
+      case "next-year":
+        const nextYear = new Date(now.getFullYear() + 1, 0, 1);
+        setDownloadStartDate(startOfYear(nextYear));
+        setDownloadEndDate(endOfYear(nextYear));
+        break;
+      case "custom":
+        // Keep current dates
+        break;
+    }
+  };
+
+  const downloadTeamData = async (teamId: string, startDate: Date, endDate: Date, exportFormat: 'excel' | 'pdf') => {
     try {
       const team = teams.find(t => t.id === teamId);
       const members = teamMembers[teamId] || [];
       
       if (!team) return;
 
-      // Create data for export
-      const exportData = members.map(member => ({
-        Name: formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials),
-        Email: member.profiles.email,
-        Role: member.user_roles.map(r => r.role).join(', '),
-        'Team Manager': member.is_manager ? 'Yes' : 'No',
-        Team: team.name
-      }));
+      // Fetch schedule data for the selected date range
+      const yearStart = formatDate(startDate, 'yyyy-MM-dd');
+      const yearEnd = formatDate(endDate, 'yyyy-MM-dd');
 
-      if (format === 'excel') {
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .eq('team_id', teamId)
+        .gte('date', yearStart)
+        .lte('date', yearEnd)
+        .order('date', { ascending: true });
+
+      if (scheduleError) throw scheduleError;
+
+      // Create data for export with schedule information
+      const exportData = members.map(member => {
+        const memberSchedules = scheduleData?.filter(s => s.user_id === member.user_id) || [];
+        const workDays = memberSchedules.filter(s => s.activity_type === 'work').length;
+        const vacationDays = memberSchedules.filter(s => s.activity_type === 'vacation').length;
+        const otherDays = memberSchedules.filter(s => s.activity_type !== 'work' && s.activity_type !== 'vacation').length;
+
+        return {
+          Name: formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials),
+          Email: member.profiles.email,
+          Role: member.user_roles.map(r => r.role).join(', '),
+          'Team Manager': member.is_manager ? 'Yes' : 'No',
+          Team: team.name,
+          'Work Days': workDays,
+          'Vacation Days': vacationDays,
+          'Other Days': otherDays,
+          'Total Scheduled': memberSchedules.length
+        };
+      });
+
+      if (exportFormat === 'excel') {
         // Create CSV content
         const headers = Object.keys(exportData[0] || {});
         const csvContent = [
@@ -357,7 +422,7 @@ const EnhancedTeamManagement = () => {
         a.download = `${team.name}_team_data.csv`;
         a.click();
         URL.revokeObjectURL(url);
-      } else if (format === 'pdf') {
+      } else if (exportFormat === 'pdf') {
         // For PDF, we'll use a simple HTML to PDF approach
         const htmlContent = `
           <html>
@@ -366,6 +431,7 @@ const EnhancedTeamManagement = () => {
               <style>
                 body { font-family: Arial, sans-serif; margin: 20px; }
                 h1 { color: #333; border-bottom: 2px solid #333; }
+                h2 { color: #666; margin-top: 10px; }
                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                 th { background-color: #f5f5f5; font-weight: bold; }
@@ -373,7 +439,8 @@ const EnhancedTeamManagement = () => {
               </style>
             </head>
             <body>
-              <h1>${team.name} Team Report</h1>
+              <h1>${team.name} Team Schedule Report</h1>
+              <h2>Period: ${formatDate(startDate, 'PP')} to ${formatDate(endDate, 'PP')}</h2>
               <p>Generated on: ${new Date().toLocaleDateString()}</p>
               <p>Total Members: ${members.length}</p>
               <table>
@@ -382,16 +449,20 @@ const EnhancedTeamManagement = () => {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
-                    <th>Team Manager</th>
+                    <th>Work Days</th>
+                    <th>Vacation Days</th>
+                    <th>Other Days</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${members.map(member => `
+                  ${exportData.map(row => `
                     <tr>
-                      <td>${member.profiles.first_name} ${member.profiles.last_name}</td>
-                      <td>${member.profiles.email}</td>
-                      <td>${member.user_roles.map(r => r.role).join(', ')}</td>
-                      <td>${member.is_manager ? 'Yes' : 'No'}</td>
+                      <td>${row.Name}</td>
+                      <td>${row.Email}</td>
+                      <td>${row.Role}</td>
+                      <td>${row['Work Days']}</td>
+                      <td>${row['Vacation Days']}</td>
+                      <td>${row['Other Days']}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -411,7 +482,7 @@ const EnhancedTeamManagement = () => {
 
       toast({
         title: "Export Complete",
-        description: `Team data exported as ${format.toUpperCase()}`,
+        description: `Team data exported as ${exportFormat.toUpperCase()}`,
       });
 
     } catch (error: any) {
@@ -588,14 +659,21 @@ const EnhancedTeamManagement = () => {
                 Manage teams and their members
               </CardDescription>
             </div>
-            {canEditTeams() && (
-              <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Member
-                  </Button>
-                </DialogTrigger>
+            <div className="flex gap-2">
+              {(isManager() || isAdmin()) && user && (
+                <Button size="sm" variant="outline" onClick={() => setDelegateAccessOpen(true)}>
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Delegate Access
+                </Button>
+              )}
+              {canEditTeams() && (
+                <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Member
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add Team Member</DialogTitle>
@@ -665,9 +743,10 @@ const EnhancedTeamManagement = () => {
                     </div>
                   </form>
                 </DialogContent>
-              </Dialog>
-            )}
-          </div>
+                </Dialog>
+              )}
+            </div>
+            </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {teams.length === 0 ? (
@@ -716,22 +795,17 @@ const EnhancedTeamManagement = () => {
                           <Badge variant="secondary">
                             {members.length} member{members.length !== 1 ? 's' : ''}
                           </Badge>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
-                                <Download className="w-4 h-4 mr-2" />
-                                Export
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => downloadTeamData(team.id, 'excel')}>
-                                Export as Excel
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => downloadTeamData(team.id, 'pdf')}>
-                                Export as PDF
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDownloadDialog(team.id);
+                            }}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Schedule
+                          </Button>
                         </div>
                       </div>
                     </CollapsibleTrigger>
@@ -884,6 +958,122 @@ const EnhancedTeamManagement = () => {
               <Button type="submit">Save Changes</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delegation Modal */}
+      {user && (
+        <DelegateAccessModal
+          open={delegateAccessOpen}
+          onOpenChange={setDelegateAccessOpen}
+          managerId={user.id}
+          onSuccess={() => {
+            toast({
+              title: "Success",
+              description: "Delegation created successfully",
+            });
+            fetchTeamsAndMembers();
+          }}
+        />
+      )}
+
+      {/* Download Schedule Dialog */}
+      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Download Team Schedule</DialogTitle>
+            <DialogDescription>
+              Select the date range for the schedule export
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Date Range Preset</Label>
+              <Select value={downloadPreset} onValueChange={handlePresetChange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="past-year">📅 Previous Year</SelectItem>
+                  <SelectItem value="current-year">📅 Current Year</SelectItem>
+                  <SelectItem value="next-year">📅 Next Year</SelectItem>
+                  <SelectItem value="custom">🎯 Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {downloadPreset === "custom" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formatDate(downloadStartDate, 'PPP')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={downloadStartDate}
+                        onSelect={(date) => date && setDownloadStartDate(date)}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formatDate(downloadEndDate, 'PPP')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={downloadEndDate}
+                        onSelect={(date) => date && setDownloadEndDate(date)}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </>
+            )}
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setDownloadDialogOpen(false)}>
+                Cancel
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    downloadTeamData(downloadTeamId, downloadStartDate, downloadEndDate, 'excel');
+                    setDownloadDialogOpen(false);
+                  }}>
+                    Download as Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    downloadTeamData(downloadTeamId, downloadStartDate, downloadEndDate, 'pdf');
+                    setDownloadDialogOpen(false);
+                  }}>
+                    Download as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
