@@ -284,12 +284,16 @@ function getCombinedAssignments(
   endDate: Date
 ): Assignment[] {
   const combined: Assignment[] = [];
-  const manualMap = new Map<string, any>();
+  const manualMap = new Map<string, any[]>();
 
   // Index manual assignments by key (date + team_id + duty_type)
+  // Store as arrays to handle multiple assignments for same date/team/duty
   manualAssignments.forEach(assignment => {
     const key = `${assignment.date}_${assignment.team_id}_${assignment.duty_type}`;
-    manualMap.set(key, assignment);
+    if (!manualMap.has(key)) {
+      manualMap.set(key, []);
+    }
+    manualMap.get(key)!.push(assignment);
   });
 
   // Process each day in the week for each team
@@ -305,10 +309,14 @@ function getCombinedAssignments(
       if (template.include_weekend_duty && isWeekend) {
         const key = `${dateStr}_${teamId}_weekend`;
         if (manualMap.has(key)) {
-          const manual = manualMap.get(key);
-          combined.push({
-            ...manual,
-            source: 'manual'
+          const manualAssignments = manualMap.get(key)!;
+          manualAssignments.forEach(manual => {
+            if (manual.user_id) { // Only include if user_id is not null
+              combined.push({
+                ...manual,
+                source: 'manual'
+              });
+            }
           });
         } else {
           // Auto-pull from schedule - get ALL matching users
@@ -332,10 +340,14 @@ function getCombinedAssignments(
       if (template.include_lateshift) {
         const key = `${dateStr}_${teamId}_lateshift`;
         if (manualMap.has(key)) {
-          const manual = manualMap.get(key);
-          combined.push({
-            ...manual,
-            source: 'manual'
+          const manualAssignments = manualMap.get(key)!;
+          manualAssignments.forEach(manual => {
+            if (manual.user_id) { // Only include if user_id is not null
+              combined.push({
+                ...manual,
+                source: 'manual'
+              });
+            }
           });
         } else {
           // Auto-pull from schedule - get ALL matching users
@@ -359,10 +371,14 @@ function getCombinedAssignments(
       if (template.include_earlyshift) {
         const key = `${dateStr}_${teamId}_earlyshift`;
         if (manualMap.has(key)) {
-          const manual = manualMap.get(key);
-          combined.push({
-            ...manual,
-            source: 'manual'
+          const manualAssignments = manualMap.get(key)!;
+          manualAssignments.forEach(manual => {
+            if (manual.user_id) { // Only include if user_id is not null
+              combined.push({
+                ...manual,
+                source: 'manual'
+              });
+            }
           });
         } else {
           // Auto-pull from schedule - get ALL matching users
