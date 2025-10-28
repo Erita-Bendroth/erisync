@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { escapeHtml } from "@/lib/validation";
 import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
+import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -36,6 +37,7 @@ const Schedule = () => {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [scheduleViewMode, setScheduleViewMode] = useState<"standard" | "multi-team">("standard");
+  const [managerCoverageWeek, setManagerCoverageWeek] = useState<Date>(new Date());
 
   // Two-week notification state
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -77,6 +79,7 @@ const Schedule = () => {
 
   const isPlanner = () => userRoles.includes('planner');
   const isManager = () => userRoles.includes('manager');
+  const isAdmin = () => userRoles.includes('admin');
 
   const handleSignOut = async () => {
     await signOut();
@@ -465,7 +468,15 @@ const Schedule = () => {
                 <ScheduleView key={scheduleRefreshKey} initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
               </>
             ) : (
-              <MultiTeamScheduleView />
+              // Show ManagerCoverageView for managers (not admin/planner), otherwise MultiTeamScheduleView
+              isManager() && !isAdmin() && !isPlanner() ? (
+                <ManagerCoverageView 
+                  selectedWeek={managerCoverageWeek}
+                  onWeekChange={setManagerCoverageWeek}
+                />
+              ) : (
+                <MultiTeamScheduleView />
+              )
             )}
           </TabsContent>
 
