@@ -203,6 +203,7 @@ export function MultiTeamScheduleView() {
       const dateStr = format(day, "yyyy-MM-dd");
       const dayName = format(day, "EEE");
       const row = [`${dayName} ${format(day, "dd.MM")}`];
+      const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
 
       selectedTeams.forEach((teamId) => {
         const members = teamMembers[teamId] || [];
@@ -210,8 +211,15 @@ export function MultiTeamScheduleView() {
           const key = `${dateStr}-${member.user_id}`;
           const entries = scheduleData[key] || [];
           const entry = entries[0];
+          
+          // Override shift_type for weekends if it's 'normal' and activity is 'work'
+          const effectiveShiftType = 
+            isWeekendDay && entry?.activity_type === 'work' && entry?.shift_type === 'normal'
+              ? 'weekend'
+              : entry?.shift_type;
+          
           const code = entry
-            ? getShiftTypeCode(entry.shift_type, entry.activity_type)
+            ? getShiftTypeCode(effectiveShiftType, entry.activity_type)
             : "";
           row.push(code);
         });
@@ -361,6 +369,20 @@ export function MultiTeamScheduleView() {
                     const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                     const holiday = showHolidays ? getHolidayForDate(day) : undefined;
 
+                    // Check if any visible user has a holiday/activity on this date
+                    const hasUserHoliday = selectedTeams.some(teamId => {
+                      const members = teamMembers[teamId] || [];
+                      return members.some(member => {
+                        const key = `${dateStr}-${member.user_id}`;
+                        const entries = scheduleData[key] || [];
+                        return entries.some(e => 
+                          e.activity_type === 'vacation' || 
+                          e.activity_type === 'sick' || 
+                          e.activity_type === 'off'
+                        );
+                      });
+                    });
+
                     return (
                       <tr
                         key={dateStr}
@@ -374,7 +396,7 @@ export function MultiTeamScheduleView() {
                               <div>{dayName}</div>
                               <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
                             </div>
-                            {holiday && showHolidays && <HolidayBadge holidayName={holiday.name} size="sm" />}
+                            {holiday && showHolidays && hasUserHoliday && <HolidayBadge holidayName={holiday.name} size="sm" />}
                           </div>
                         </td>
                         {selectedTeams.map((teamId) => {
@@ -384,14 +406,23 @@ export function MultiTeamScheduleView() {
                             const entries = scheduleData[key] || [];
                             const entry = entries[0];
 
+                            // Detect if the day is a weekend
+                            const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
+
+                            // Override shift_type for weekends if it's 'normal' and activity is 'work'
+                            const effectiveShiftType = 
+                              isWeekendDay && entry?.activity_type === 'work' && entry?.shift_type === 'normal'
+                                ? 'weekend'
+                                : entry?.shift_type;
+
                             const bgColor = entry
-                              ? getShiftTypeColor(entry.shift_type, entry.activity_type)
+                              ? getShiftTypeColor(effectiveShiftType, entry.activity_type)
                               : isWeekend
                               ? "hsl(var(--muted))"
                               : "transparent";
 
                             const code = entry
-                              ? getShiftTypeCode(entry.shift_type, entry.activity_type)
+                              ? getShiftTypeCode(effectiveShiftType, entry.activity_type)
                               : "";
 
                             return (
@@ -451,25 +482,6 @@ export function MultiTeamScheduleView() {
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("normal") }} />
                       <span>N - Normal Shift</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-4 text-xs">
-                    <div className="font-semibold">Activities:</div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "vacation") }} />
-                      <span>U - Vacation/Urlaub</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "sick") }} />
-                      <span>S - Sick/Sykdom</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "off") }} />
-                      <span>F - Off/Fridag</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "training") }} />
-                      <span>K - Training/Kurs</span>
                     </div>
                   </div>
                 </div>
