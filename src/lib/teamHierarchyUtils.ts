@@ -67,3 +67,14 @@ export function getChildTeamDisplayName(childName: string, parentName: string): 
     .replace(/[\s-]+$/, '')
     .trim();
 }
+
+/**
+ * Filters teams to only include Troubleshooting teams
+ * Excludes parent Operations and Support teams from display
+ */
+export function filterTroubleshootingTeams(teams: Team[]): Team[] {
+  return teams.filter(team => 
+    team.name.includes('Troubleshooting') ||
+    (!team.name.includes('Operations') && !team.name.includes('Support'))
+  );
+}

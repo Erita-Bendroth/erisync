@@ -19,6 +19,7 @@ import { HolidayBadge } from "./HolidayBadge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { filterTroubleshootingTeams } from "@/lib/teamHierarchyUtils";
 import * as XLSX from "xlsx";
 
 interface TeamMember {
@@ -47,7 +48,7 @@ interface Holiday {
 
 export function MultiTeamScheduleView() {
   const { user } = useAuth();
-  const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
+  const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
@@ -84,7 +85,7 @@ export function MultiTeamScheduleView() {
   }, [selectedTeams, currentDate]);
 
   const fetchTeams = async () => {
-    const { data } = await supabase.from("teams").select("id, name").order("name");
+    const { data } = await supabase.from("teams").select("id, name, parent_team_id").order("name");
     if (data) setTeams(data);
   };
 
@@ -340,7 +341,7 @@ export function MultiTeamScheduleView() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex flex-wrap gap-2">
               <span className="text-sm font-medium">Teams:</span>
-            {teams.map((team) => (
+            {filterTroubleshootingTeams(teams).map((team) => (
               <Badge
                 key={team.id}
                 variant={selectedTeams.includes(team.id) ? "default" : "outline"}

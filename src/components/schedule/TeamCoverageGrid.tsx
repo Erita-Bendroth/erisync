@@ -4,7 +4,7 @@ import { format, startOfWeek, addDays, endOfWeek, getWeek, getYear } from "date-
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { groupTeamsByHierarchy } from "@/lib/teamHierarchyUtils";
+import { groupTeamsByHierarchy, filterTroubleshootingTeams } from "@/lib/teamHierarchyUtils";
 
 interface TeamCoverageGridProps {
   teamIds: string[];
@@ -300,7 +300,9 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
   }
 
   console.log('Coverage Grid - Rendering with teams:', teams);
-  const hierarchicalTeams = groupTeamsByHierarchy(teams);
+  // Filter to only show Troubleshooting teams
+  const filteredTeams = filterTroubleshootingTeams(teams);
+  const hierarchicalTeams = groupTeamsByHierarchy(filteredTeams);
   console.log('Coverage Grid - Hierarchical teams:', hierarchicalTeams);
 
   return (
