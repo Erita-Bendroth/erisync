@@ -304,11 +304,11 @@ function getCombinedAssignments(
             source: 'manual'
           });
         } else {
-          // Auto-pull from schedule
-          const scheduleEntry = scheduleEntries.find(
+          // Auto-pull from schedule - get ALL matching users
+          const scheduleEntriesForDate = scheduleEntries.filter(
             e => e.date === dateStr && e.team_id === teamId
           );
-          if (scheduleEntry) {
+          scheduleEntriesForDate.forEach(scheduleEntry => {
             combined.push({
               user_id: scheduleEntry.user_id,
               user: scheduleEntry.user,
@@ -317,7 +317,7 @@ function getCombinedAssignments(
               duty_type: 'weekend',
               source: 'schedule'
             } as Assignment);
-          }
+          });
         }
       }
 
@@ -331,10 +331,11 @@ function getCombinedAssignments(
             source: 'manual'
           });
         } else {
-          const scheduleEntry = scheduleEntries.find(
+          // Auto-pull from schedule - get ALL matching users
+          const scheduleEntriesForDate = scheduleEntries.filter(
             e => e.date === dateStr && e.team_id === teamId && e.shift_type === 'late'
           );
-          if (scheduleEntry) {
+          scheduleEntriesForDate.forEach(scheduleEntry => {
             combined.push({
               user_id: scheduleEntry.user_id,
               user: scheduleEntry.user,
@@ -343,7 +344,7 @@ function getCombinedAssignments(
               duty_type: 'lateshift',
               source: 'schedule'
             } as Assignment);
-          }
+          });
         }
       }
 
@@ -357,10 +358,11 @@ function getCombinedAssignments(
             source: 'manual'
           });
         } else {
-          const scheduleEntry = scheduleEntries.find(
+          // Auto-pull from schedule - get ALL matching users
+          const scheduleEntriesForDate = scheduleEntries.filter(
             e => e.date === dateStr && e.team_id === teamId && e.shift_type === 'early'
           );
-          if (scheduleEntry) {
+          scheduleEntriesForDate.forEach(scheduleEntry => {
             combined.push({
               user_id: scheduleEntry.user_id,
               user: scheduleEntry.user,
@@ -369,7 +371,7 @@ function getCombinedAssignments(
               duty_type: 'earlyshift',
               source: 'schedule'
             } as Assignment);
-          }
+          });
         }
       }
     });
@@ -419,47 +421,47 @@ function buildDutyCoverageEmail(
   const lateshiftDuty = assignments.filter(a => a.duty_type === 'lateshift');
   const earlyshiftDuty = assignments.filter(a => a.duty_type === 'earlyshift');
 
-  // Helper to build duty section with multi-team columns
+    // Helper to build duty section with multi-team columns
   const buildDutySection = (title: string, dutyAssignments: Assignment[]) => {
     if (dutyAssignments.length === 0) return '';
 
-    // Group by date
-    const byDate: Record<string, Assignment[]> = {};
+    // Group by date, then team
+    const byDate: Record<string, Record<string, Assignment[]>> = {};
     dutyAssignments.forEach(assignment => {
       const date = assignment.date!;
-      if (!byDate[date]) byDate[date] = [];
-      byDate[date].push(assignment);
+      const teamId = assignment.team_id!;
+      if (!byDate[date]) byDate[date] = {};
+      if (!byDate[date][teamId]) byDate[date][teamId] = [];
+      byDate[date][teamId].push(assignment);
     });
 
     const days = Object.keys(byDate).sort();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    // Build header row with team columns
     const headerCells = teams.map(team => `
-      <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;" colspan="2">${team.name}</th>
-    `).join('');
-
-    const subHeaderCells = teams.map(() => `
-      <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: left; font-size: 12px;">Assignment</th>
-      <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: left; font-size: 12px;">Substitute</th>
+      <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;">${team.name}</th>
     `).join('');
 
     const rows = days.map(dateStr => {
       const date = new Date(dateStr + 'T00:00:00Z');
       const dayName = dayNames[date.getUTCDay()];
-      const dateAssignments = byDate[dateStr];
       
       // Create cells for each team
       const teamCells = teams.map(team => {
-        const assignment = dateAssignments.find(a => a.team_id === team.id);
-        const primaryName = assignment?.user ? formatNameForEmail(assignment.user) : '-';
-        const substituteName = assignment?.substitute ? formatNameForEmail(assignment.substitute) : '-';
-        const sourceIndicator = assignment?.source === 'schedule' ? '📅 ' : '';
+        const teamAssignments = byDate[dateStr][team.id] || [];
+        if (teamAssignments.length === 0) {
+          return '<td style="padding: 12px; border: 1px solid #e5e7eb; color: #9ca3af;">-</td>';
+        }
+        
+        // Format all assignments for this team/date - show name with region
+        const formattedAssignments = teamAssignments.map(assignment => {
+          const name = assignment.user ? formatNameForEmail(assignment.user) : 'TBD';
+          const region = assignment.responsibility_region ? ` (${assignment.responsibility_region})` : '';
+          const sourceIndicator = assignment.source === 'schedule' ? '📅 ' : '';
+          return `${sourceIndicator}${name}${region}`;
+        }).join(', ');
 
-        return `
-          <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: 600;">${sourceIndicator}${primaryName}</td>
-          <td style="padding: 12px; border: 1px solid #e5e7eb;">${substituteName}</td>
-        `;
+        return `<td style="padding: 12px; border: 1px solid #e5e7eb;">${formattedAssignments}</td>`;
       }).join('');
 
       return `
@@ -477,12 +479,9 @@ function buildDutyCoverageEmail(
         <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <thead>
             <tr style="background: #f9fafb;">
-              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;" rowspan="2">Date</th>
-              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;" rowspan="2">Weekday</th>
+              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;">Date</th>
+              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;">Weekday</th>
               ${headerCells}
-            </tr>
-            <tr style="background: #f9fafb;">
-              ${subHeaderCells}
             </tr>
           </thead>
           <tbody>
@@ -491,6 +490,8 @@ function buildDutyCoverageEmail(
         </table>
         <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">📅 = Auto-populated from schedule</p>
       </div>
+    `;
+  };
     `;
   };
 

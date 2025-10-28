@@ -168,9 +168,9 @@ export type Database = {
           date: string
           duty_type: Database["public"]["Enums"]["duty_type"]
           id: string
+          is_substitute: boolean | null
           notes: string | null
           responsibility_region: string | null
-          substitute_user_id: string | null
           team_id: string
           updated_at: string
           user_id: string | null
@@ -183,9 +183,9 @@ export type Database = {
           date: string
           duty_type: Database["public"]["Enums"]["duty_type"]
           id?: string
+          is_substitute?: boolean | null
           notes?: string | null
           responsibility_region?: string | null
-          substitute_user_id?: string | null
           team_id: string
           updated_at?: string
           user_id?: string | null
@@ -198,9 +198,9 @@ export type Database = {
           date?: string
           duty_type?: Database["public"]["Enums"]["duty_type"]
           id?: string
+          is_substitute?: boolean | null
           notes?: string | null
           responsibility_region?: string | null
-          substitute_user_id?: string | null
           team_id?: string
           updated_at?: string
           user_id?: string | null

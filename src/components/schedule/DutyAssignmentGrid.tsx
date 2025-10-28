@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
+import { X, Plus } from "lucide-react";
 
 interface DutyAssignmentGridProps {
   teamId: string;
@@ -23,11 +24,12 @@ interface TeamMember {
 }
 
 interface Assignment {
+  id?: string;
   date: string;
-  duty_type: 'weekend' | 'lateshift' | 'earlyshift';
-  user_id: string | null;
-  substitute_user_id: string | null;
-  responsibility_region: string | null;
+  dutyType: 'weekend' | 'lateshift' | 'earlyshift';
+  userId: string | null;
+  responsibilityRegion: string | null;
+  isSubstitute: boolean;
 }
 
 interface ScheduledUser {
@@ -46,7 +48,7 @@ export function DutyAssignmentGrid({
 }: DutyAssignmentGridProps) {
   const { toast } = useToast();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [assignments, setAssignments] = useState<Record<string, Assignment[]>>({});
   const [loading, setLoading] = useState(false);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const [scheduledUsers, setScheduledUsers] = useState<Record<string, ScheduledUser[]>>({});
@@ -67,14 +69,12 @@ export function DutyAssignmentGrid({
   }, [weekDates, teamId]);
 
   const calculateWeekDates = () => {
-    // Use ISO 8601 week date calculation (same as parent component)
-    // Find the Monday of the specified ISO week
     const jan4 = new Date(year, 0, 4);
-    const jan4Day = jan4.getDay() || 7; // Convert Sunday (0) to 7
-    jan4.setDate(jan4.getDate() + 4 - jan4Day); // Get to Thursday of week 1
+    const jan4Day = jan4.getDay() || 7;
+    jan4.setDate(jan4.getDate() + 4 - jan4Day);
     
     const weekStart = new Date(jan4);
-    weekStart.setDate(jan4.getDate() + (weekNumber - 1) * 7 - 3); // Go back to Monday
+    weekStart.setDate(jan4.getDate() + (weekNumber - 1) * 7 - 3);
 
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -104,8 +104,6 @@ export function DutyAssignmentGrid({
   };
 
   const fetchShiftTimeDefinitions = async () => {
-    console.log('[DutyAssignmentGrid] Fetching shift time definitions for team:', teamId);
-    
     const { data, error } = await supabase
       .from('shift_time_definitions')
       .select('*')
@@ -113,10 +111,7 @@ export function DutyAssignmentGrid({
       .order('shift_type');
       
     if (!error && data) {
-      console.log('[DutyAssignmentGrid] Loaded shift time definitions:', data);
       setShiftTimeDefinitions(data);
-    } else if (error) {
-      console.error('[DutyAssignmentGrid] Error fetching shift time definitions:', error);
     }
   };
 
@@ -126,8 +121,6 @@ export function DutyAssignmentGrid({
     const startDate = weekDates[0].toISOString().split('T')[0];
     const endDate = weekDates[6].toISOString().split('T')[0];
     
-    console.log('[DutyAssignmentGrid] Fetching scheduled users for team:', teamId, 'dates:', startDate, 'to', endDate);
-    
     const { data, error } = await supabase
       .from('schedule_entries')
       .select('date, user_id, shift_type, availability_status, activity_type')
@@ -135,18 +128,12 @@ export function DutyAssignmentGrid({
       .gte('date', startDate)
       .lte('date', endDate);
       
-    console.log('[DutyAssignmentGrid] Schedule entries query result:', { data, error, count: data?.length });
-      
     if (!error && data) {
-      // Filter for work entries only
       const workEntries = data.filter(entry => 
         entry.availability_status === 'available' && 
         entry.activity_type === 'work'
       );
       
-      console.log('[DutyAssignmentGrid] Filtered work entries:', workEntries.length, 'of', data.length);
-      
-      // Collect unique shift types from the schedule
       const shiftTypes = new Set<string>();
       const map: Record<string, ScheduledUser[]> = {};
       workEntries.forEach((entry: any) => {
@@ -160,57 +147,72 @@ export function DutyAssignmentGrid({
           shift_type: shiftType
         });
         
-        // Track available shift types
         shiftTypes.add(shiftType);
       });
       
-      console.log('[DutyAssignmentGrid] Scheduled users map:', map);
-      console.log('[DutyAssignmentGrid] Available shift types:', Array.from(shiftTypes));
       setScheduledUsers(map);
       setAvailableShiftTypes(shiftTypes);
-    } else if (error) {
-      console.error('[DutyAssignmentGrid] Error fetching scheduled users:', error);
     }
   };
 
   const fetchAssignments = async () => {
     const { data, error } = await supabase
       .from('duty_assignments')
-      .select('*')
+      .select(`
+        id,
+        date,
+        duty_type,
+        user_id,
+        responsibility_region,
+        is_substitute
+      `)
       .eq('team_id', teamId)
-      .eq('year', year)
-      .eq('week_number', weekNumber);
+      .eq('week_number', weekNumber)
+      .eq('year', year);
 
-    if (!error && data) {
-      setAssignments(data);
+    if (error) {
+      console.error('[DutyAssignmentGrid] Error fetching assignments:', error);
+      toast({ title: "Error", description: "Failed to load assignments", variant: "destructive" });
+      return;
+    }
+
+    if (data) {
+      const assignmentsMap: Record<string, Assignment[]> = {};
+      data.forEach((item: any) => {
+        const key = `${item.date}-${item.duty_type}`;
+        if (!assignmentsMap[key]) {
+          assignmentsMap[key] = [];
+        }
+        assignmentsMap[key].push({
+          id: item.id,
+          date: item.date,
+          dutyType: item.duty_type,
+          userId: item.user_id,
+          responsibilityRegion: item.responsibility_region,
+          isSubstitute: item.is_substitute || false,
+        });
+      });
+      setAssignments(assignmentsMap);
     }
   };
 
-  const getAssignment = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift') => {
+  const getAssignments = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift'): Assignment[] => {
     const dateStr = date.toISOString().split('T')[0];
-    return assignments.find(a => a.date === dateStr && a.duty_type === dutyType);
+    const key = `${dateStr}-${dutyType}`;
+    return assignments[key] || [];
   };
 
   const getScheduledUsersForDate = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift') => {
     const dateStr = date.toISOString().split('T')[0];
     const scheduled = scheduledUsers[dateStr] || [];
     
-    console.log(`[DutyAssignmentGrid] Getting scheduled for ${dateStr}, ${dutyType}:`, scheduled);
-    
     if (dutyType === 'lateshift') {
-      const filtered = scheduled.filter(s => s.shift_type === 'late');
-      console.log(`[DutyAssignmentGrid] Filtered late shift users:`, filtered);
-      return filtered;
+      return scheduled.filter(s => s.shift_type === 'late');
     } else if (dutyType === 'earlyshift') {
-      const filtered = scheduled.filter(s => s.shift_type === 'early');
-      console.log(`[DutyAssignmentGrid] Filtered early shift users:`, filtered);
-      return filtered;
+      return scheduled.filter(s => s.shift_type === 'early');
     }
     
-    // For weekend, include both 'normal' and 'weekend' shift types
-    const filtered = scheduled.filter(s => s.shift_type === 'normal' || s.shift_type === 'weekend');
-    console.log(`[DutyAssignmentGrid] Filtered weekend users:`, filtered);
-    return filtered;
+    return scheduled.filter(s => s.shift_type === 'normal' || s.shift_type === 'weekend');
   };
 
   const getShiftTimeRange = (shiftType: 'weekend' | 'lateshift' | 'earlyshift'): string => {
@@ -226,64 +228,129 @@ export function DutyAssignmentGrid({
     );
     
     if (matchingDefs.length > 0) {
-      // Use the most specific definition (team-specific over global)
       const specific = matchingDefs.find(d => d.team_id === teamId || d.team_ids?.includes(teamId));
       const def = specific || matchingDefs[0];
-      const startTime = def.start_time.substring(0, 5);
-      const endTime = def.end_time.substring(0, 5);
-      console.log(`[DutyAssignmentGrid] Time range for ${shiftType}:`, `${startTime}-${endTime}`, 'from def:', def);
-      return `${startTime}-${endTime}`;
+      return `${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)}`;
     }
     
-    // Fallback to generic times if no definition found
-    console.log(`[DutyAssignmentGrid] No definition found for ${shiftType}, using fallback`);
     if (shiftType === 'lateshift') return '14:00-20:00';
     if (shiftType === 'earlyshift') return '06:00-14:00';
-    return '07:00-13:00'; // weekend
+    return '07:00-13:00';
   };
 
-  const getDefaultUserId = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift'): string => {
-    const scheduled = getScheduledUsersForDate(date, dutyType);
-    return scheduled.length > 0 ? scheduled[0].user_id : "none";
+  const addAssignment = async (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift') => {
+    const dateStr = date.toISOString().split('T')[0];
+    
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
+        return;
+      }
+
+      const newAssignment: any = {
+        team_id: teamId,
+        date: dateStr,
+        duty_type: dutyType,
+        week_number: weekNumber,
+        year: year,
+        user_id: null,
+        responsibility_region: null,
+        is_substitute: false,
+        created_by: userData.user.id,
+      };
+
+      const { data, error } = await supabase
+        .from('duty_assignments')
+        .insert(newAssignment)
+        .select()
+        .single();
+
+      if (error) {
+        toast({ title: "Error", description: "Failed to add assignment", variant: "destructive" });
+        return;
+      }
+
+      const key = `${dateStr}-${dutyType}`;
+      setAssignments(prev => ({
+        ...prev,
+        [key]: [...(prev[key] || []), {
+          id: data.id,
+          date: dateStr,
+          dutyType,
+          userId: data.user_id,
+          responsibilityRegion: data.responsibility_region,
+          isSubstitute: data.is_substitute,
+        }]
+      }));
+
+      toast({ title: "Success", description: "Assignment added" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add assignment", variant: "destructive" });
+    }
   };
 
   const updateAssignment = async (
-    date: Date,
-    dutyType: 'weekend' | 'lateshift' | 'earlyshift',
-    userId: string | null,
-    isSubstitute: boolean = false,
-    region: string | null = null
+    assignmentId: string,
+    field: 'userId' | 'responsibilityRegion' | 'isSubstitute',
+    value: string | boolean | null
   ) => {
-    const dateStr = date.toISOString().split('T')[0];
-    const existing = getAssignment(date, dutyType);
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const updateData: any = {
+        [field === 'userId' ? 'user_id' : field === 'isSubstitute' ? 'is_substitute' : 'responsibility_region']: value,
+        updated_at: new Date().toISOString(),
+      };
 
-    const assignmentData = {
-      team_id: teamId,
-      user_id: isSubstitute ? (existing?.user_id || null) : userId,
-      substitute_user_id: isSubstitute ? userId : (existing?.substitute_user_id || null),
-      duty_type: dutyType,
-      week_number: weekNumber,
-      year: year,
-      date: dateStr,
-      created_by: user?.id,
-      responsibility_region: region !== undefined ? region : (existing?.responsibility_region || null),
-    };
-
-    let error;
-    if (existing) {
-      ({ error } = await supabase
+      const { error } = await supabase
         .from('duty_assignments')
-        .update(assignmentData)
-        .eq('id', (existing as any).id));
-    } else {
-      ({ error } = await supabase.from('duty_assignments').insert(assignmentData));
-    }
+        .update(updateData)
+        .eq('id', assignmentId);
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      fetchAssignments();
+      if (error) {
+        toast({ title: "Error", description: "Failed to update assignment", variant: "destructive" });
+        return;
+      }
+
+      setAssignments(prev => {
+        const updated = { ...prev };
+        for (const key in updated) {
+          updated[key] = updated[key].map(a => 
+            a.id === assignmentId 
+              ? { ...a, [field]: value } 
+              : a
+          );
+        }
+        return updated;
+      });
+
+      toast({ title: "Success", description: "Assignment updated" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update assignment", variant: "destructive" });
+    }
+  };
+
+  const removeAssignment = async (assignmentId: string, date: Date, dutyType: string) => {
+    try {
+      const { error } = await supabase
+        .from('duty_assignments')
+        .delete()
+        .eq('id', assignmentId);
+
+      if (error) {
+        toast({ title: "Error", description: "Failed to remove assignment", variant: "destructive" });
+        return;
+      }
+
+      const dateStr = date.toISOString().split('T')[0];
+      const key = `${dateStr}-${dutyType}`;
+      setAssignments(prev => ({
+        ...prev,
+        [key]: (prev[key] || []).filter(a => a.id !== assignmentId)
+      }));
+
+      toast({ title: "Success", description: "Assignment removed" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove assignment", variant: "destructive" });
     }
   };
 
@@ -299,92 +366,93 @@ export function DutyAssignmentGrid({
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b">
-                <th className="p-2 text-left">Date</th>
-                <th className="p-2 text-left">Day</th>
-                <th className="p-2 text-left">Scheduled</th>
-                <th className="p-2 text-left">Primary Assignment</th>
-                <th className="p-2 text-left">Region/Country</th>
-                <th className="p-2 text-left">Substitute</th>
+                <th className="p-2 text-left text-sm font-semibold">Date</th>
+                <th className="p-2 text-left text-sm font-semibold">Day</th>
+                <th className="p-2 text-left text-sm font-semibold">Scheduled</th>
+                <th className="p-2 text-left text-sm font-semibold" colSpan={3}>Assigned Personnel</th>
               </tr>
             </thead>
             <tbody>
               {dates.map(date => {
-                const assignment = getAssignment(date, dutyType);
                 const scheduled = getScheduledUsersForDate(date, dutyType);
                 const scheduledInitials = scheduled
                   .map(s => teamMembers.find(m => m.user_id === s.user_id)?.initials)
                   .filter(Boolean)
                   .join(', ');
-                const defaultValue = assignment?.user_id || getDefaultUserId(date, dutyType);
+                const currentAssignments = getAssignments(date, dutyType);
                 
                 return (
-                  <tr key={date.toISOString()} className="border-b">
-                    <td className="p-2">{date.toLocaleDateString('en-GB')}</td>
-                    <td className="p-2">{dayNames[date.getDay()]}</td>
-                    <td className="p-2">
-                      <div className="text-sm font-medium">
-                        {scheduledInitials || <span className="text-muted-foreground">No one scheduled</span>}
+                  <tr key={date.toISOString()} className="border-b hover:bg-muted/50">
+                    <td className="p-2 text-sm">{date.toLocaleDateString('en-GB')}</td>
+                    <td className="p-2 text-sm">{dayNames[date.getDay()]}</td>
+                    <td className="p-2 text-sm">
+                      <div className="font-medium text-primary">
+                        {scheduledInitials || <span className="text-muted-foreground">-</span>}
                       </div>
                     </td>
-                    <td className="p-2">
-                      <Select
-                        value={defaultValue}
-                        onValueChange={(value) =>
-                          updateAssignment(date, dutyType, value === "none" ? null : value)
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Unassigned" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Unassigned</SelectItem>
-                          {teamMembers.map(member => {
-                            const isScheduled = scheduled.some(s => s.user_id === member.user_id);
-                            return (
-                              <SelectItem 
-                                key={member.user_id} 
-                                value={member.user_id}
-                                className={isScheduled ? "font-semibold bg-primary/5" : ""}
-                              >
-                                {member.initials || `${member.first_name} ${member.last_name}`}
-                                {isScheduled && " ✓"}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="text"
-                        placeholder="e.g., South, AT, North West"
-                        value={assignment?.responsibility_region || ""}
-                        onChange={(e) => {
-                          const value = e.target.value.trim() || null;
-                          updateAssignment(date, dutyType, assignment?.user_id || null, false, value);
-                        }}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Select
-                        value={assignment?.substitute_user_id || "none"}
-                        onValueChange={(value) =>
-                          updateAssignment(date, dutyType, value === "none" ? null : value, true)
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {teamMembers.map(member => (
-                            <SelectItem key={member.user_id} value={member.user_id}>
-                              {member.initials || `${member.first_name} ${member.last_name}`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <td className="p-2" colSpan={3}>
+                      <div className="space-y-2">
+                        {currentAssignments.map((assignment) => (
+                          <div key={assignment.id} className="flex items-center gap-2 p-2 border rounded-lg bg-card">
+                            <Select
+                              value={assignment.userId || ''}
+                              onValueChange={(value) => updateAssignment(assignment.id!, 'userId', value || null)}
+                            >
+                              <SelectTrigger className="w-[140px] h-8 text-sm">
+                                <SelectValue placeholder="Select user" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">None</SelectItem>
+                                {teamMembers.map((member) => {
+                                  const isScheduled = scheduled.some(s => s.user_id === member.user_id);
+                                  return (
+                                    <SelectItem key={member.user_id} value={member.user_id}>
+                                      {member.initials || `${member.first_name} ${member.last_name}`}
+                                      {isScheduled && " ✓"}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="text"
+                              placeholder="Region (e.g., South, AT)"
+                              value={assignment.responsibilityRegion || ''}
+                              onChange={(e) => updateAssignment(assignment.id!, 'responsibilityRegion', e.target.value || null)}
+                              className="flex-1 h-8 text-sm"
+                            />
+                            <Select
+                              value={assignment.isSubstitute ? 'substitute' : 'primary'}
+                              onValueChange={(value) => updateAssignment(assignment.id!, 'isSubstitute', value === 'substitute')}
+                            >
+                              <SelectTrigger className="w-[100px] h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="primary">Primary</SelectItem>
+                                <SelectItem value="substitute">Backup</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeAssignment(assignment.id!, date, dutyType)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addAssignment(date, dutyType)}
+                          className="w-full h-8 text-sm"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Assignment
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -398,11 +466,10 @@ export function DutyAssignmentGrid({
 
   const weekendDates = weekDates.filter(d => d.getDay() === 0 || d.getDay() === 6);
   
-  // Determine which sections to show based on both template config and actual schedule data
   const shouldShowWeekend = includeWeekend && (
     availableShiftTypes.has('normal') || 
     availableShiftTypes.has('weekend') ||
-    availableShiftTypes.size === 0 // Show if no data loaded yet
+    availableShiftTypes.size === 0
   );
 
   const shouldShowLateshift = includeLateshift && (
