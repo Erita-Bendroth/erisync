@@ -381,12 +381,25 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
           {/* Weekend/Public Holiday Duty */}
           {renderCoverageTable(`Weekend/Public Holiday Duty (${shiftTimings.weekend})`, weekendDuty, "📅")}
 
-          {/* Late Shift */}
+          {/* Late Shift - Monday to Thursday */}
           {renderCoverageTable(
-            shiftTimings.lateWeekday === shiftTimings.lateFriday 
-              ? `Late Shift (${shiftTimings.lateWeekday})` 
-              : `Late Shift (Mon-Thu: ${shiftTimings.lateWeekday}, Fri: ${shiftTimings.lateFriday})`,
-            lateShifts, 
+            `Late Shift Mon-Thu (${shiftTimings.lateWeekday})`,
+            lateShifts.filter(shift => {
+              const date = new Date(shift.date);
+              const dayOfWeek = date.getDay();
+              return dayOfWeek >= 1 && dayOfWeek <= 4; // Monday = 1, Thursday = 4
+            }), 
+            "🌙"
+          )}
+
+          {/* Late Shift - Friday */}
+          {renderCoverageTable(
+            `Late Shift Friday (${shiftTimings.lateFriday})`,
+            lateShifts.filter(shift => {
+              const date = new Date(shift.date);
+              const dayOfWeek = date.getDay();
+              return dayOfWeek === 5; // Friday = 5
+            }), 
             "🌙"
           )}
 
