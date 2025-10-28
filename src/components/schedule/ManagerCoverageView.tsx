@@ -68,27 +68,30 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
       // Fetch schedule entries for the week
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('schedule_entries')
-        .select(`
-          date,
-          user_id,
-          team_id,
-          shift_type,
-          activity_type,
-          profiles!schedule_entries_user_id_fkey (
-            first_name,
-            last_name,
-            initials
-          ),
-          teams!schedule_entries_team_id_fkey (
-            name
-          )
-        `)
+        .select('date, user_id, team_id, shift_type, activity_type')
         .in('team_id', teamIds)
         .gte('date', startDate)
         .lte('date', endDate)
         .eq('activity_type', 'work');
 
       if (scheduleError) throw scheduleError;
+
+      // Get unique user IDs and fetch profile data
+      const userIds = [...new Set(scheduleData?.map(e => e.user_id) || [])];
+      
+      const { data: profilesData } = await supabase
+        .rpc('get_multiple_basic_profile_info', {
+          _user_ids: userIds
+        });
+
+      // Create lookup maps
+      const profileMap = new Map(
+        profilesData?.map(p => [p.user_id, p]) || []
+      );
+      
+      const teamMap = new Map(
+        teams.map(t => [t.id, t.name])
+      );
 
       // Process and categorize the data
       const weekend: DutyAssignment[] = [];
@@ -98,15 +101,16 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
       scheduleData?.forEach((entry: any) => {
         const date = new Date(entry.date);
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        const profile = profileMap.get(entry.user_id);
 
         const assignment: DutyAssignment = {
           date: entry.date,
           user_id: entry.user_id,
-          first_name: entry.profiles?.first_name || 'Unknown',
-          last_name: entry.profiles?.last_name || '',
-          initials: entry.profiles?.initials || null,
+          first_name: profile?.first_name || 'Unknown',
+          last_name: profile?.last_name || '',
+          initials: profile?.initials || null,
           team_id: entry.team_id,
-          team_name: entry.teams?.name || 'Unknown Team',
+          team_name: teamMap.get(entry.team_id) || 'Unknown Team',
           shift_type: entry.shift_type,
           activity_type: entry.activity_type,
         };
