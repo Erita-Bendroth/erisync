@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, startOfWeek, addDays, getISOWeek, getYear } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { filterTroubleshootingTeams } from "@/lib/teamHierarchyUtils";
 
 interface ManagerCoverageViewProps {
   selectedWeek: Date;
@@ -35,6 +36,15 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
   const [lateShifts, setLateShifts] = useState<DutyAssignment[]>([]);
   const [earlyShifts, setEarlyShifts] = useState<DutyAssignment[]>([]);
   const [accessibleTeams, setAccessibleTeams] = useState<any[]>([]);
+  const [shiftTimings, setShiftTimings] = useState<{
+    early: string;
+    late: string;
+    weekend: string;
+  }>({
+    early: '06:00-14:00',
+    late: '14:00-20:00',
+    weekend: '06:00-17:00'
+  });
 
   useEffect(() => {
     fetchCoverageData();
@@ -72,7 +82,31 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
         return;
       }
 
-      setAccessibleTeams(teams);
+      // Filter to only show Troubleshooting teams
+      const filteredTeams = filterTroubleshootingTeams(teams);
+      setAccessibleTeams(filteredTeams);
+
+      // Fetch shift time definitions for these teams
+      if (filteredTeams.length > 0) {
+        const { data: shiftDefs } = await supabase
+          .from('shift_time_definitions')
+          .select('shift_type, start_time, end_time, team_id')
+          .or(`team_id.in.(${filteredTeams.map(t => t.id).join(',')}),team_id.is.null`)
+          .order('team_id', { ascending: false }); // Prioritize team-specific over null
+
+        if (shiftDefs) {
+          // Get the first (most specific) definition for each shift type
+          const earlyDef = shiftDefs.find(sd => sd.shift_type === 'early');
+          const lateDef = shiftDefs.find(sd => sd.shift_type === 'late');
+          const weekendDef = shiftDefs.find(sd => sd.shift_type === 'weekend');
+
+          setShiftTimings({
+            early: earlyDef ? `${earlyDef.start_time.substring(0,5)}-${earlyDef.end_time.substring(0,5)}` : '06:00-14:00',
+            late: lateDef ? `${lateDef.start_time.substring(0,5)}-${lateDef.end_time.substring(0,5)}` : '14:00-20:00',
+            weekend: weekendDef ? `${weekendDef.start_time.substring(0,5)}-${weekendDef.end_time.substring(0,5)}` : '06:00-17:00'
+          });
+        }
+      }
 
       // Calculate week range
       const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 1 });
@@ -308,13 +342,13 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
       ) : (
         <div className="space-y-6">
           {/* Weekend/Public Holiday Duty */}
-          {renderCoverageTable("Weekend/Public Holiday Duty", weekendDuty, "📅")}
+          {renderCoverageTable(`Weekend/Public Holiday Duty (${shiftTimings.weekend})`, weekendDuty, "📅")}
 
           {/* Late Shift */}
-          {renderCoverageTable("Late Shift (14:00-20:00)", lateShifts, "🌙")}
+          {renderCoverageTable(`Late Shift (${shiftTimings.late})`, lateShifts, "🌙")}
 
           {/* Early Shift */}
-          {renderCoverageTable("Early Shift (06:00-14:00)", earlyShifts, "🌅")}
+          {renderCoverageTable(`Early Shift (${shiftTimings.early})`, earlyShifts, "🌅")}
         </div>
       )}
     </div>
