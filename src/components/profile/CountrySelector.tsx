@@ -117,6 +117,47 @@ const CountrySelector = () => {
     }
   };
 
+  const importHolidaysForYears = async (countryCode: string, regionCode: string | null) => {
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear, currentYear + 1];
+    
+    toast({
+      title: "Importing holidays...",
+      description: `Importing holidays for ${years.join(', ')}`,
+    });
+
+    const importPromises = years.map(year => 
+      supabase.functions.invoke('import-holidays', {
+        body: {
+          country_code: countryCode,
+          year: year,
+          user_id: user?.id,
+          region_code: countryCode === 'DE' ? regionCode : null
+        }
+      })
+    );
+    
+    const results = await Promise.allSettled(importPromises);
+    
+    const successCount = results.filter(r => r.status === 'fulfilled').length;
+    const failedCount = results.filter(r => r.status === 'rejected').length;
+    
+    if (successCount > 0) {
+      toast({
+        title: "Holidays imported",
+        description: `Successfully imported holidays for ${successCount} year(s)`,
+      });
+    }
+    
+    if (failedCount > 0) {
+      toast({
+        title: "Partial import",
+        description: `${failedCount} year(s) could not be imported. You can manually import them later.`,
+        variant: "destructive",
+      });
+    }
+  };
+
   const updateCountry = async () => {
     if (!user) return;
 
@@ -147,6 +188,14 @@ const CountrySelector = () => {
           ? "Country and region preferences updated successfully" 
           : "Country preference updated successfully",
       });
+
+      // Automatically import holidays for current and next year
+      try {
+        await importHolidaysForYears(currentCountry, currentCountry === 'DE' ? currentRegion : null);
+      } catch (importError) {
+        console.error('Error importing holidays:', importError);
+        // Don't block the user flow - they can manually import later
+      }
     } catch (error: any) {
       console.error('Error updating country:', error);
       toast({
