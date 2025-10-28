@@ -158,6 +158,14 @@ export function MultiTeamScheduleView() {
       }))
     });
     
+    // Ensure all selected teams are in the map, even if empty
+    selectedTeams.forEach(teamId => {
+      if (!membersMap[teamId]) {
+        membersMap[teamId] = [];
+        console.log('Added empty team to membersMap:', teamId, teams.find(t => t.id === teamId)?.name);
+      }
+    });
+    
     setTeamMembers(membersMap);
 
     // Fetch schedule entries

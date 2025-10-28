@@ -414,61 +414,63 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
                       );
 
                       return (
-                        <TooltipProvider key={team.id}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <td className={`p-2 min-h-[80px] border-l ${colorClass}`}>
-                                {cell.isGap && (
-                                  <div className="text-red-600 dark:text-red-400 font-bold text-xs mb-1">
-                                    ⚠️ {cell.actual}/{cell.required}
-                                  </div>
-                                )}
-                                <div className="flex flex-col gap-0.5">
-                                  {cell.members.map(member => (
-                                    <div key={member.userId} className="text-xs font-medium">
-                                      {formatMemberDisplay(
-                                        member.fullName.split(' ')[0],
-                                        member.fullName.split(' ')[1] || null,
-                                        member.initials,
-                                        member.countryCode
-                                      )}
+                        <td key={team.id} className={`p-2 min-h-[80px] border-l ${colorClass}`}>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-help">
+                                  {cell.isGap && (
+                                    <div className="text-red-600 dark:text-red-400 font-bold text-xs mb-1">
+                                      ⚠️ {cell.actual}/{cell.required}
                                     </div>
-                                  ))}
-                                  {cell.members.length === 0 && (
-                                    <div className="text-muted-foreground text-xs">No coverage</div>
+                                  )}
+                                  <div className="flex flex-col gap-0.5">
+                                    {cell.members.map(member => (
+                                      <div key={member.userId} className="text-xs font-medium">
+                                        {formatMemberDisplay(
+                                          member.fullName.split(' ')[0],
+                                          member.fullName.split(' ')[1] || null,
+                                          member.initials,
+                                          member.countryCode
+                                        )}
+                                      </div>
+                                    ))}
+                                    {cell.members.length === 0 && (
+                                      <div className="text-muted-foreground text-xs">No coverage</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-xs">
+                                <div className="space-y-1">
+                                  <div className="font-bold">{format(day, 'EEEE, MMM d')}</div>
+                                  <div className="text-sm">{cell.teamName}</div>
+                                  {cell.isHoliday && (
+                                    <div className="text-purple-600 dark:text-purple-400 text-xs">
+                                      🎉 {cell.holidayName}
+                                    </div>
+                                  )}
+                                  <div className="border-t pt-1 mt-1">
+                                    {cell.members.map(member => (
+                                      <div key={member.userId} className="text-xs">
+                                        <span className="font-medium">{member.fullName}</span>
+                                        {member.countryCode && (
+                                          <span className="text-muted-foreground"> ({member.countryCode})</span>
+                                        )}
+                                        <span className="text-muted-foreground"> • {member.shiftTime}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {cell.isGap && (
+                                    <div className="text-red-600 dark:text-red-400 text-xs mt-1">
+                                      ⚠️ Gap: {cell.required - cell.actual} more needed
+                                    </div>
                                   )}
                                 </div>
-                              </td>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs">
-                              <div className="space-y-1">
-                                <div className="font-bold">{format(day, 'EEEE, MMM d')}</div>
-                                <div className="text-sm">{cell.teamName}</div>
-                                {cell.isHoliday && (
-                                  <div className="text-purple-600 dark:text-purple-400 text-xs">
-                                    🎉 {cell.holidayName}
-                                  </div>
-                                )}
-                                <div className="border-t pt-1 mt-1">
-                                  {cell.members.map(member => (
-                                    <div key={member.userId} className="text-xs">
-                                      <span className="font-medium">{member.fullName}</span>
-                                      {member.countryCode && (
-                                        <span className="text-muted-foreground"> ({member.countryCode})</span>
-                                      )}
-                                      <span className="text-muted-foreground"> • {member.shiftTime}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                {cell.isGap && (
-                                  <div className="text-red-600 dark:text-red-400 text-xs mt-1">
-                                    ⚠️ Gap: {cell.required - cell.actual} more needed
-                                  </div>
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </td>
                       );
                     });
                   })}
