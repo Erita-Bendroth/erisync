@@ -150,18 +150,29 @@ export function getShiftTypeColor(
   shiftType: string,
   activityType?: string
 ): string {
-  if (activityType === "vacation") return "hsl(var(--chart-5))"; // Purple
-  if (activityType === "sick") return "hsl(var(--muted))"; // Gray
+  // Activity types override shift types for color
+  if (activityType === "vacation") {
+    return "hsl(280, 70%, 50%)"; // Purple for vacation
+  }
+  if (activityType === "sick" || activityType === "off") {
+    return "hsl(220, 13%, 46%)"; // Gray for sick/off days
+  }
+  if (activityType === "training") {
+    return "hsl(220, 13%, 46%)"; // Gray for training
+  }
 
+  // Shift type colors - Norwegian conventions
   switch (shiftType) {
     case "early":
-      return "hsl(var(--destructive))"; // Red
+      return "hsl(142, 76%, 36%)"; // Green for early shifts (weekdays)
     case "late":
-      return "hsl(var(--chart-1))"; // Blue
+      return "hsl(25, 95%, 53%)"; // Orange for late shifts (weekdays)
     case "weekend":
-      return "hsl(var(--chart-3))"; // Orange/Brown
+      return "hsl(173, 58%, 39%)"; // Teal for weekend/holiday duty
+    case "normal":
+      return "hsl(142, 76%, 36%)"; // Green for normal shifts
     default:
-      return "hsl(var(--chart-2))"; // Green/Default
+      return "hsl(220, 13%, 46%)"; // Default gray
   }
 }
 
@@ -169,17 +180,23 @@ export function getShiftTypeCode(
   shiftType: string,
   activityType?: string
 ): string {
-  if (activityType === "vacation") return "U";
-  if (activityType === "sick") return "K";
+  // Activity types take precedence
+  if (activityType === "vacation") return "U"; // Urlaub/Vacation
+  if (activityType === "sick") return "S"; // Sykdom/Sick
+  if (activityType === "training") return "K"; // Kurs/Training
+  if (activityType === "off") return "F"; // Fridag/Off
 
+  // Shift types
   switch (shiftType) {
     case "early":
-      return "F";
+      return "E"; // Early shift
     case "late":
-      return "S";
+      return "L"; // Late shift
     case "weekend":
-      return "W";
+      return "W"; // Weekend duty
+    case "normal":
+      return "N"; // Normal shift
     default:
-      return "N";
+      return "-";
   }
 }

@@ -438,22 +438,38 @@ export function MultiTeamScheduleView() {
                     <div className="font-semibold">Shifts:</div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("early") }} />
-                      <span>F - Early Shift</span>
+                      <span>E - Early Shift (Weekdays)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("late") }} />
-                      <span>S - Late Shift</span>
+                      <span>L - Late Shift (Weekdays)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("weekend") }} />
-                      <span>W - Weekend Duty</span>
+                      <span>W - Weekend/Holiday Duty</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("normal") }} />
+                      <span>N - Normal Shift</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-4 text-xs">
                     <div className="font-semibold">Activities:</div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "vacation") }} />
-                      <span>U - Vacation</span>
+                      <span>U - Vacation/Urlaub</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "sick") }} />
+                      <span>S - Sick/Sykdom</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "off") }} />
+                      <span>F - Off/Fridag</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6" style={{ backgroundColor: getShiftTypeColor("", "training") }} />
+                      <span>K - Training/Kurs</span>
                     </div>
                   </div>
                 </div>
