@@ -404,18 +404,10 @@ const EnhancedTeamManagement = () => {
       const yearStart = formatDate(startDate, 'yyyy-MM-dd');
       const yearEnd = formatDate(endDate, 'yyyy-MM-dd');
 
-      // Fetch detailed schedule entries with user profiles
+      // Step 1: Fetch schedule entries
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('schedule_entries')
-        .select(`
-          *,
-          profiles:user_id (
-            first_name,
-            last_name,
-            initials,
-            email
-          )
-        `)
+        .select('*')
         .eq('team_id', teamId)
         .gte('date', yearStart)
         .lte('date', yearEnd)
@@ -423,14 +415,38 @@ const EnhancedTeamManagement = () => {
         .order('user_id', { ascending: true });
 
       if (scheduleError) throw scheduleError;
+      
+      if (!scheduleData || scheduleData.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No schedule entries found for the selected date range",
+          variant: "default",
+        });
+        return;
+      }
 
-      // Create detailed export data with actual schedule information
-      const exportData = (scheduleData || []).map(entry => {
-        const profile = entry.profiles as any;
+      // Step 2: Get unique user IDs and fetch profiles
+      const userIds = [...new Set(scheduleData.map(e => e.user_id))];
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, initials, email')
+        .in('user_id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Step 3: Create profile lookup map
+      const profilesMap = new Map(
+        (profilesData || []).map(p => [p.user_id, p])
+      );
+
+      // Step 4: Create detailed export data with merged profiles
+      const exportData = scheduleData.map(entry => {
+        const profile = profilesMap.get(entry.user_id);
         const userName = formatUserName(
           profile?.first_name || '', 
           profile?.last_name || '', 
-          profile?.initials
+          profile?.initials || 'Unknown'
         );
 
         // Parse time blocks from notes or use default shift times
