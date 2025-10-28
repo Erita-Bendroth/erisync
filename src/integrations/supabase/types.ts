@@ -173,7 +173,7 @@ export type Database = {
           substitute_user_id: string | null
           team_id: string
           updated_at: string
-          user_id: string
+          user_id: string | null
           week_number: number
           year: number
         }
@@ -188,7 +188,7 @@ export type Database = {
           substitute_user_id?: string | null
           team_id: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           week_number: number
           year: number
         }
@@ -203,7 +203,7 @@ export type Database = {
           substitute_user_id?: string | null
           team_id?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           week_number?: number
           year?: number
         }
