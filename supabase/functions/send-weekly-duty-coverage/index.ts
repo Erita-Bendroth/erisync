@@ -528,16 +528,20 @@ function buildDutyCoverageEmail(
           `;
         }
         
-        // Display each person on a separate line with their region
-        const assignmentRows = teamAssignments.map(assignment => {
+        // Separate names and regions into individual columns
+        const nameRows = teamAssignments.map(assignment => {
           const name = assignment.user ? formatNameForEmail(assignment.user) : 'TBD';
           const sourceIndicator = assignment.source === 'schedule' ? '📅 ' : '';
-          const region = assignment.responsibility_region || '-';
-          return `${sourceIndicator}${name} / ${region}`;
+          return `${sourceIndicator}${name}`;
+        }).join('<br/>');
+
+        const regionRows = teamAssignments.map(assignment => {
+          return assignment.responsibility_region || '-';
         }).join('<br/>');
 
         return `
-          <td colspan="2" style="padding: 12px; border: 1px solid #e5e7eb;">${assignmentRows}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${nameRows}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${regionRows}</td>
         `;
       }).join('');
 

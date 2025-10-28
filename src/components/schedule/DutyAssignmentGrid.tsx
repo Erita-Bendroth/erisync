@@ -69,17 +69,17 @@ export function DutyAssignmentGrid({
   }, [weekDates, teamId]);
 
   const calculateWeekDates = () => {
-    const jan4 = new Date(year, 0, 4);
-    const jan4Day = jan4.getDay() || 7;
-    jan4.setDate(jan4.getDate() + 4 - jan4Day);
-    
+    // Use ISO week calculation (same as edge function)
+    const jan4 = new Date(Date.UTC(year, 0, 4)); // January 4th is always in week 1
+    const jan4Day = jan4.getUTCDay() || 7; // Sunday is 7, not 0
     const weekStart = new Date(jan4);
-    weekStart.setDate(jan4.getDate() + (weekNumber - 1) * 7 - 3);
+    weekStart.setUTCDate(jan4.getUTCDate() - (jan4Day - 1)); // Go back to Monday of week 1
+    weekStart.setUTCDate(weekStart.getUTCDate() + (weekNumber - 1) * 7); // Add weeks
 
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
+      date.setUTCDate(weekStart.getUTCDate() + i);
       dates.push(date);
     }
     setWeekDates(dates);
