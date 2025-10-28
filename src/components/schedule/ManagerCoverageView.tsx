@@ -38,11 +38,13 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
   const [accessibleTeams, setAccessibleTeams] = useState<any[]>([]);
   const [shiftTimings, setShiftTimings] = useState<{
     early: string;
-    late: string;
+    lateWeekday: string;
+    lateFriday: string;
     weekend: string;
   }>({
     early: '06:00-14:00',
-    late: '14:00-20:00',
+    lateWeekday: '14:00-20:00',
+    lateFriday: '14:00-20:00',
     weekend: '06:00-17:00'
   });
 
@@ -90,19 +92,54 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
       if (filteredTeams.length > 0) {
         const { data: shiftDefs } = await supabase
           .from('shift_time_definitions')
-          .select('shift_type, start_time, end_time, team_id')
-          .or(`team_id.in.(${filteredTeams.map(t => t.id).join(',')}),team_id.is.null`)
-          .order('team_id', { ascending: false }); // Prioritize team-specific over null
+          .select('shift_type, start_time, end_time, team_ids, day_of_week')
+          .is('team_id', null);
 
         if (shiftDefs) {
-          // Get the first (most specific) definition for each shift type
-          const earlyDef = shiftDefs.find(sd => sd.shift_type === 'early');
-          const lateDef = shiftDefs.find(sd => sd.shift_type === 'late');
-          const weekendDef = shiftDefs.find(sd => sd.shift_type === 'weekend');
-
+          const filteredTeamIds = filteredTeams.map(t => t.id);
+          
+          // Helper: Check if definition applies to our teams
+          const isApplicable = (def: any) => {
+            if (!def.team_ids || def.team_ids.length === 0) return true;
+            return def.team_ids.some((tid: string) => filteredTeamIds.includes(tid));
+          };
+          
+          const applicableDefs = shiftDefs.filter(isApplicable);
+          
+          // Get early shift (prioritize team-specific)
+          const earlyDef = applicableDefs.find(sd => 
+            sd.shift_type === 'early' && sd.team_ids && sd.team_ids.length > 0
+          ) || applicableDefs.find(sd => sd.shift_type === 'early');
+          
+          // Get late shifts - separate for weekday and Friday
+          const lateWeekdayDef = applicableDefs.find(sd => 
+            sd.shift_type === 'late' && 
+            sd.day_of_week && 
+            sd.day_of_week.includes(0) // Mon-Thu definitions include day 0 (Monday)
+          );
+          
+          const lateFridayDef = applicableDefs.find(sd => 
+            sd.shift_type === 'late' && 
+            sd.day_of_week && 
+            sd.day_of_week.includes(4) // Friday is day 4
+          );
+          
+          // Fallback to generic late shift if no day-specific found
+          const genericLateDef = applicableDefs.find(sd => 
+            sd.shift_type === 'late' && (!sd.day_of_week || sd.day_of_week.length === 0)
+          );
+          
+          // Get weekend shift (prioritize team-specific)
+          const weekendDef = applicableDefs.find(sd => 
+            sd.shift_type === 'weekend' && sd.team_ids && sd.team_ids.length > 0
+          ) || applicableDefs.find(sd => sd.shift_type === 'weekend');
+          
           setShiftTimings({
             early: earlyDef ? `${earlyDef.start_time.substring(0,5)}-${earlyDef.end_time.substring(0,5)}` : '06:00-14:00',
-            late: lateDef ? `${lateDef.start_time.substring(0,5)}-${lateDef.end_time.substring(0,5)}` : '14:00-20:00',
+            lateWeekday: lateWeekdayDef ? `${lateWeekdayDef.start_time.substring(0,5)}-${lateWeekdayDef.end_time.substring(0,5)}` : 
+                         (genericLateDef ? `${genericLateDef.start_time.substring(0,5)}-${genericLateDef.end_time.substring(0,5)}` : '14:00-20:00'),
+            lateFriday: lateFridayDef ? `${lateFridayDef.start_time.substring(0,5)}-${lateFridayDef.end_time.substring(0,5)}` : 
+                        (genericLateDef ? `${genericLateDef.start_time.substring(0,5)}-${genericLateDef.end_time.substring(0,5)}` : '14:00-20:00'),
             weekend: weekendDef ? `${weekendDef.start_time.substring(0,5)}-${weekendDef.end_time.substring(0,5)}` : '06:00-17:00'
           });
         }
@@ -345,7 +382,13 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
           {renderCoverageTable(`Weekend/Public Holiday Duty (${shiftTimings.weekend})`, weekendDuty, "📅")}
 
           {/* Late Shift */}
-          {renderCoverageTable(`Late Shift (${shiftTimings.late})`, lateShifts, "🌙")}
+          {renderCoverageTable(
+            shiftTimings.lateWeekday === shiftTimings.lateFriday 
+              ? `Late Shift (${shiftTimings.lateWeekday})` 
+              : `Late Shift (Mon-Thu: ${shiftTimings.lateWeekday}, Fri: ${shiftTimings.lateFriday})`,
+            lateShifts, 
+            "🌙"
+          )}
 
           {/* Early Shift */}
           {renderCoverageTable(`Early Shift (${shiftTimings.early})`, earlyShifts, "🌅")}
