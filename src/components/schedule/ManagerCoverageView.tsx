@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -27,6 +28,7 @@ interface DutyAssignment {
 
 export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCoverageViewProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weekendDuty, setWeekendDuty] = useState<DutyAssignment[]>([]);
@@ -43,10 +45,24 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
     setError(null);
 
     try {
-      // Get accessible teams
+      // Get manager's accessible team IDs
+      const { data: teamIds, error: teamIdsError } = await supabase
+        .rpc('get_manager_accessible_teams', {
+          _manager_id: user?.id
+        });
+
+      if (teamIdsError) throw teamIdsError;
+      if (!teamIds || teamIds.length === 0) {
+        setError("No accessible teams found");
+        setLoading(false);
+        return;
+      }
+
+      // Fetch team details for these IDs
       const { data: teams, error: teamsError } = await supabase
         .from('teams')
         .select('*')
+        .in('id', teamIds)
         .order('name');
 
       if (teamsError) throw teamsError;
@@ -57,7 +73,6 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
       }
 
       setAccessibleTeams(teams);
-      const teamIds = teams.map(t => t.id);
 
       // Calculate week range
       const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 1 });
