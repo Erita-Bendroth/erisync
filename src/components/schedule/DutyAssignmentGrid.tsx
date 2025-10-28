@@ -51,9 +51,11 @@ export function DutyAssignmentGrid({
   const [weekDates, setWeekDates] = useState<Date[]>([]);
   const [scheduledUsers, setScheduledUsers] = useState<Record<string, ScheduledUser[]>>({});
   const [availableShiftTypes, setAvailableShiftTypes] = useState<Set<string>>(new Set());
+  const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTeamMembers();
+    fetchShiftTimeDefinitions();
     calculateWeekDates();
   }, [teamId, weekNumber, year]);
 
@@ -98,6 +100,23 @@ export function DutyAssignmentGrid({
           initials: tm.profiles.initials,
         }))
       );
+    }
+  };
+
+  const fetchShiftTimeDefinitions = async () => {
+    console.log('[DutyAssignmentGrid] Fetching shift time definitions for team:', teamId);
+    
+    const { data, error } = await supabase
+      .from('shift_time_definitions')
+      .select('*')
+      .or(`team_id.eq.${teamId},team_ids.cs.{${teamId}},team_id.is.null`)
+      .order('shift_type');
+      
+    if (!error && data) {
+      console.log('[DutyAssignmentGrid] Loaded shift time definitions:', data);
+      setShiftTimeDefinitions(data);
+    } else if (error) {
+      console.error('[DutyAssignmentGrid] Error fetching shift time definitions:', error);
     }
   };
 
@@ -176,13 +195,51 @@ export function DutyAssignmentGrid({
     const dateStr = date.toISOString().split('T')[0];
     const scheduled = scheduledUsers[dateStr] || [];
     
+    console.log(`[DutyAssignmentGrid] Getting scheduled for ${dateStr}, ${dutyType}:`, scheduled);
+    
     if (dutyType === 'lateshift') {
-      return scheduled.filter(s => s.shift_type === 'late');
+      const filtered = scheduled.filter(s => s.shift_type === 'late');
+      console.log(`[DutyAssignmentGrid] Filtered late shift users:`, filtered);
+      return filtered;
     } else if (dutyType === 'earlyshift') {
-      return scheduled.filter(s => s.shift_type === 'early');
+      const filtered = scheduled.filter(s => s.shift_type === 'early');
+      console.log(`[DutyAssignmentGrid] Filtered early shift users:`, filtered);
+      return filtered;
     }
     
-    return scheduled;
+    // For weekend, include both 'normal' and 'weekend' shift types
+    const filtered = scheduled.filter(s => s.shift_type === 'normal' || s.shift_type === 'weekend');
+    console.log(`[DutyAssignmentGrid] Filtered weekend users:`, filtered);
+    return filtered;
+  };
+
+  const getShiftTimeRange = (shiftType: 'weekend' | 'lateshift' | 'earlyshift'): string => {
+    const typeMap = {
+      'weekend': 'weekend',
+      'lateshift': 'late',
+      'earlyshift': 'early'
+    };
+    
+    const matchingDefs = shiftTimeDefinitions.filter(def => 
+      def.shift_type === typeMap[shiftType] &&
+      (def.team_id === teamId || def.team_ids?.includes(teamId) || !def.team_id)
+    );
+    
+    if (matchingDefs.length > 0) {
+      // Use the most specific definition (team-specific over global)
+      const specific = matchingDefs.find(d => d.team_id === teamId || d.team_ids?.includes(teamId));
+      const def = specific || matchingDefs[0];
+      const startTime = def.start_time.substring(0, 5);
+      const endTime = def.end_time.substring(0, 5);
+      console.log(`[DutyAssignmentGrid] Time range for ${shiftType}:`, `${startTime}-${endTime}`, 'from def:', def);
+      return `${startTime}-${endTime}`;
+    }
+    
+    // Fallback to generic times if no definition found
+    console.log(`[DutyAssignmentGrid] No definition found for ${shiftType}, using fallback`);
+    if (shiftType === 'lateshift') return '14:00-20:00';
+    if (shiftType === 'earlyshift') return '06:00-14:00';
+    return '07:00-13:00'; // weekend
   };
 
   const getDefaultUserId = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift'): string => {
@@ -360,7 +417,7 @@ export function DutyAssignmentGrid({
 
   return (
     <div className="space-y-4">
-      {shouldShowWeekend && renderDutySection('Weekend/Holiday Duty', 'weekend', weekendDates)}
+      {shouldShowWeekend && renderDutySection(`Weekend/Holiday Duty (${getShiftTimeRange('weekend')})`, 'weekend', weekendDates)}
       {includeLateshift && !availableShiftTypes.has('late') && availableShiftTypes.size > 0 && (
         <Card className="mb-4">
           <CardContent className="pt-6">
@@ -370,7 +427,7 @@ export function DutyAssignmentGrid({
           </CardContent>
         </Card>
       )}
-      {shouldShowLateshift && renderDutySection('Lateshift (14:00-20:00)', 'lateshift', weekDates)}
+      {shouldShowLateshift && renderDutySection(`Lateshift (${getShiftTimeRange('lateshift')})`, 'lateshift', weekDates)}
       {includeEarlyshift && !availableShiftTypes.has('early') && availableShiftTypes.size > 0 && (
         <Card className="mb-4">
           <CardContent className="pt-6">
@@ -380,7 +437,7 @@ export function DutyAssignmentGrid({
           </CardContent>
         </Card>
       )}
-      {shouldShowEarlyshift && renderDutySection('Earlyshift (06:00-14:00)', 'earlyshift', weekDates)}
+      {shouldShowEarlyshift && renderDutySection(`Earlyshift (${getShiftTimeRange('earlyshift')})`, 'earlyshift', weekDates)}
     </div>
   );
 }
