@@ -492,8 +492,6 @@ function buildDutyCoverageEmail(
       </div>
     `;
   };
-    `;
-  };
 
   const weekendSection = template.include_weekend_duty ? buildDutySection(`Weekend/Public holiday duty${getShiftTimes('weekend')}`, weekendDuty) : '';
   const lateshiftSection = template.include_lateshift ? buildDutySection(`Late Shift Central${getShiftTimes('late')}`, lateshiftDuty) : '';
