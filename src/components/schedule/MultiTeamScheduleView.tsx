@@ -54,6 +54,7 @@ export function MultiTeamScheduleView() {
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleEntry[]>>({});
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"schedule" | "coverage" | "grid">("schedule");
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
 
@@ -113,81 +114,88 @@ export function MultiTeamScheduleView() {
 
   const fetchTeamData = async () => {
     setLoading(true);
+    setError(null);
 
-    // Fetch team members
-    const membersPromises = selectedTeams.map(async (teamId) => {
-      const { data } = await supabase
-        .from("team_members")
-        .select(`
-          user_id,
-          profiles:user_id (
-            first_name,
-            last_name,
-            initials,
-            country_code
-          )
-        `)
-        .eq("team_id", teamId);
+    try {
+      // Fetch team members
+      const membersPromises = selectedTeams.map(async (teamId) => {
+        const { data } = await supabase
+          .from("team_members")
+          .select(`
+            user_id,
+            profiles:user_id (
+              first_name,
+              last_name,
+              initials,
+              country_code
+            )
+          `)
+          .eq("team_id", teamId);
 
-      return {
-        teamId,
-        members: data?.filter((m: any) => m.profiles).map((m: any) => ({
-          user_id: m.user_id,
-          first_name: m.profiles.first_name,
-          last_name: m.profiles.last_name,
-          initials: m.profiles.initials || `${m.profiles.first_name[0]}${m.profiles.last_name[0]}`,
-          country_code: m.profiles.country_code,
-        })) || [],
-      };
-    });
+        return {
+          teamId,
+          members: data?.filter((m: any) => m.profiles).map((m: any) => ({
+            user_id: m.user_id,
+            first_name: m.profiles.first_name,
+            last_name: m.profiles.last_name,
+            initials: m.profiles.initials || `${m.profiles.first_name[0]}${m.profiles.last_name[0]}`,
+            country_code: m.profiles.country_code,
+          })) || [],
+        };
+      });
 
-    const membersResults = await Promise.all(membersPromises);
-    const membersMap: Record<string, TeamMember[]> = {};
-    membersResults.forEach(({ teamId, members }) => {
-      membersMap[teamId] = members;
-    });
-    
-    console.log('Multi-Team Schedule - Fetched team members:', {
-      selectedTeams,
-      membersMap,
-      totalUsers: Object.values(membersMap).flat().length,
-      teamCounts: Object.entries(membersMap).map(([teamId, members]) => ({
-        teamId,
-        teamName: teams.find(t => t.id === teamId)?.name,
-        count: members.length
-      }))
-    });
-    
-    // Ensure all selected teams are in the map, even if empty
-    selectedTeams.forEach(teamId => {
-      if (!membersMap[teamId]) {
-        membersMap[teamId] = [];
-        console.log('Added empty team to membersMap:', teamId, teams.find(t => t.id === teamId)?.name);
-      }
-    });
-    
-    setTeamMembers(membersMap);
+      const membersResults = await Promise.all(membersPromises);
+      const membersMap: Record<string, TeamMember[]> = {};
+      membersResults.forEach(({ teamId, members }) => {
+        membersMap[teamId] = members;
+      });
+      
+      console.log('Multi-Team Schedule - Fetched team members:', {
+        selectedTeams,
+        membersMap,
+        totalUsers: Object.values(membersMap).flat().length,
+        teamCounts: Object.entries(membersMap).map(([teamId, members]) => ({
+          teamId,
+          teamName: teams.find(t => t.id === teamId)?.name,
+          count: members.length
+        }))
+      });
+      
+      // Ensure all selected teams are in the map, even if empty
+      selectedTeams.forEach(teamId => {
+        if (!membersMap[teamId]) {
+          membersMap[teamId] = [];
+          console.log('Added empty team to membersMap:', teamId, teams.find(t => t.id === teamId)?.name);
+        }
+      });
+      
+      setTeamMembers(membersMap);
 
-    // Fetch schedule entries
-    const userIds = Object.values(membersMap)
-      .flat()
-      .map((m) => m.user_id);
+      // Fetch schedule entries
+      const userIds = Object.values(membersMap)
+        .flat()
+        .map((m) => m.user_id);
 
-    const { data: schedules } = await supabase
-      .from("schedule_entries")
-      .select("date, user_id, shift_type, activity_type")
-      .in("user_id", userIds)
-      .gte("date", format(weekDays[0], "yyyy-MM-dd"))
-      .lte("date", format(weekDays[6], "yyyy-MM-dd"));
+      const { data: schedules } = await supabase
+        .from("schedule_entries")
+        .select("date, user_id, shift_type, activity_type")
+        .in("user_id", userIds)
+        .gte("date", format(weekDays[0], "yyyy-MM-dd"))
+        .lte("date", format(weekDays[6], "yyyy-MM-dd"));
 
-    const scheduleMap: Record<string, ScheduleEntry[]> = {};
-    schedules?.forEach((entry) => {
-      const key = `${entry.date}-${entry.user_id}`;
-      scheduleMap[key] = scheduleMap[key] || [];
-      scheduleMap[key].push(entry);
-    });
-    setScheduleData(scheduleMap);
-    setLoading(false);
+      const scheduleMap: Record<string, ScheduleEntry[]> = {};
+      schedules?.forEach((entry) => {
+        const key = `${entry.date}-${entry.user_id}`;
+        scheduleMap[key] = scheduleMap[key] || [];
+        scheduleMap[key].push(entry);
+      });
+      setScheduleData(scheduleMap);
+    } catch (err) {
+      console.error('Error fetching team data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load schedule data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const changeWeek = (delta: number) => {
@@ -351,6 +359,12 @@ export function MultiTeamScheduleView() {
             </div>
           </div>
 
+          {error && (
+            <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
+              Error loading schedule: {error}
+            </div>
+          )}
+
           {selectedTeams.length > 0 && (
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "schedule" | "coverage" | "grid")}>
               <TabsList>
@@ -363,7 +377,8 @@ export function MultiTeamScheduleView() {
               </TabsList>
 
               <TabsContent value="schedule" className="mt-4 space-y-4">
-                <div className="overflow-x-auto border rounded-lg">
+                <TooltipProvider>
+                  <div className="overflow-x-auto border rounded-lg">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
@@ -394,115 +409,130 @@ export function MultiTeamScheduleView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {weekDays.map((day) => {
-                    const dateStr = format(day, "yyyy-MM-dd");
-                    const dayName = format(day, "EEE");
-                    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                    const holiday = showHolidays ? getHolidayForDate(day) : undefined;
-
-                    // Check if any visible user has a holiday/activity on this date
-                    const hasUserHoliday = selectedTeams.some(teamId => {
-                      const members = teamMembers[teamId] || [];
-                      return members.some(member => {
-                        const key = `${dateStr}-${member.user_id}`;
-                        const entries = scheduleData[key] || [];
-                        return entries.some(e => 
-                          e.activity_type === 'vacation' || 
-                          e.activity_type === 'sick' || 
-                          e.activity_type === 'off'
-                        );
+                  {(() => {
+                    // Pre-calculate weekend days for performance
+                    const weekendDays = new Set(
+                      weekDays.filter(day => day.getDay() === 0 || day.getDay() === 6).map(day => format(day, 'yyyy-MM-dd'))
+                    );
+                    
+                    // Pre-calculate days with user holidays for performance
+                    const datesWithUserHolidays = new Set<string>();
+                    weekDays.forEach(day => {
+                      const dateStr = format(day, 'yyyy-MM-dd');
+                      const hasActivity = selectedTeams.some(teamId => {
+                        const members = teamMembers[teamId] || [];
+                        return members.some(member => {
+                          const key = `${dateStr}-${member.user_id}`;
+                          const entries = scheduleData[key] || [];
+                          return entries.some(e => 
+                            e.activity_type === 'vacation' || 
+                            e.activity_type === 'sick' || 
+                            e.activity_type === 'off'
+                          );
+                        });
                       });
+                      if (hasActivity) datesWithUserHolidays.add(dateStr);
                     });
 
-                    return (
-                      <tr
-                        key={dateStr}
-                        className={`border-b ${isWeekend && showHolidays ? "bg-muted/30" : ""} ${
-                          holiday && showHolidays ? "bg-purple-50 dark:bg-purple-950/20" : ""
-                        }`}
-                      >
-                        <td className="p-2 sticky left-0 bg-background z-10 font-medium">
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <div>{dayName}</div>
-                              <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
+                    return weekDays.map((day) => {
+                      const dateStr = format(day, "yyyy-MM-dd");
+                      const dayName = format(day, "EEE");
+                      const isWeekend = weekendDays.has(dateStr);
+                      const holiday = showHolidays ? getHolidayForDate(day) : undefined;
+                      const hasUserHoliday = datesWithUserHolidays.has(dateStr);
+
+                      return (
+                        <tr
+                          key={dateStr}
+                          className={`border-b ${isWeekend && showHolidays ? "bg-muted/30" : ""} ${
+                            holiday && showHolidays ? "bg-purple-50 dark:bg-purple-950/20" : ""
+                          }`}
+                        >
+                          <td className="p-2 sticky left-0 bg-background z-10 font-medium">
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div>{dayName}</div>
+                                <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
+                              </div>
+                              {holiday && showHolidays && hasUserHoliday && <HolidayBadge holidayName={holiday.name} size="sm" />}
                             </div>
-                            {holiday && showHolidays && hasUserHoliday && <HolidayBadge holidayName={holiday.name} size="sm" />}
-                          </div>
-                        </td>
-                        {selectedTeams.map((teamId) => {
-                          const members = teamMembers[teamId] || [];
-                          
-                          // Show empty cell for teams with no members
-                          if (members.length === 0) {
-                            return (
-                              <td key={`${teamId}-empty`} className="p-2 text-center text-muted-foreground">
-                                -
-                              </td>
-                            );
-                          }
-                          
-                          return members.map((member) => {
-                            const key = `${dateStr}-${member.user_id}`;
-                            const entries = scheduleData[key] || [];
-                            const entry = entries[0];
+                          </td>
+                          {selectedTeams.map((teamId) => {
+                            const members = teamMembers[teamId] || [];
+                            
+                            // Show empty cell for teams with no members
+                            if (members.length === 0) {
+                              return (
+                                <td key={`${teamId}-empty`} className="p-2 text-center text-muted-foreground">
+                                  -
+                                </td>
+                              );
+                            }
+                            
+                            return members.map((member) => {
+                              const key = `${dateStr}-${member.user_id}`;
+                              const entries = scheduleData[key] || [];
+                              const entry = entries[0];
 
-                            // Detect if the day is a weekend
-                            const isWeekendDay = day.getDay() === 0 || day.getDay() === 6;
+                              // Use pre-calculated weekend check
+                              const isWeekendDay = weekendDays.has(dateStr);
 
-                            // Override shift_type for weekends if it's 'normal' and activity is 'work'
-                            const effectiveShiftType = 
-                              isWeekendDay && entry?.activity_type === 'work' && entry?.shift_type === 'normal'
-                                ? 'weekend'
-                                : entry?.shift_type;
+                              // Override shift_type for weekends if it's 'normal' and activity is 'work'
+                              const effectiveShiftType = 
+                                isWeekendDay && entry?.activity_type === 'work' && entry?.shift_type === 'normal'
+                                  ? 'weekend'
+                                  : entry?.shift_type;
 
-                            const bgColor = entry
-                              ? getShiftTypeColor(effectiveShiftType, entry.activity_type)
-                              : isWeekend
-                              ? "hsl(var(--muted))"
-                              : "transparent";
+                              const bgColor = entry
+                                ? getShiftTypeColor(effectiveShiftType, entry.activity_type)
+                                : isWeekend
+                                ? "hsl(var(--muted))"
+                                : "transparent";
 
-                            const code = entry
-                              ? getShiftTypeCode(effectiveShiftType, entry.activity_type)
-                              : "";
+                              const code = entry
+                                ? getShiftTypeCode(effectiveShiftType, entry.activity_type)
+                                : "";
 
-                            return (
-                              <TooltipProvider key={`${teamId}-${member.user_id}`}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <td
-                                      className="p-2 text-center font-bold cursor-pointer hover:opacity-80 transition-opacity"
-                                      style={{
-                                        backgroundColor: bgColor,
-                                        color: entry ? "white" : "inherit",
-                                      }}
-                                    >
-                                      {code}
-                                    </td>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <div className="text-sm">
-                                      <div className="font-bold">
-                                        {member.first_name} {member.last_name}
+                              return (
+                                <td
+                                  key={`${teamId}-${member.user_id}`}
+                                  className="p-2 text-center font-bold"
+                                  style={{
+                                    backgroundColor: bgColor,
+                                    color: entry ? "white" : "inherit",
+                                  }}
+                                >
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="cursor-pointer hover:opacity-80 transition-opacity">
+                                        {code}
                                       </div>
-                                      {entry && (
-                                        <div>
-                                          {entry.shift_type} - {entry.activity_type}
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-sm">
+                                        <div className="font-bold">
+                                          {member.first_name} {member.last_name}
                                         </div>
-                                      )}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            );
-                          });
-                        })}
-                      </tr>
-                    );
-                  })}
+                                        {entry && (
+                                          <div>
+                                            {entry.shift_type} - {entry.activity_type}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </td>
+                              );
+                            });
+                          })}
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
-                </div>
+                  </div>
+                </TooltipProvider>
 
                 {/* Legend */}
                 <div className="space-y-2">
