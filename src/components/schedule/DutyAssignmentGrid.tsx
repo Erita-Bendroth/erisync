@@ -64,15 +64,19 @@ export function DutyAssignmentGrid({
   }, [weekDates, teamId]);
 
   const calculateWeekDates = () => {
-    const firstDayOfYear = new Date(year, 0, 1);
-    const daysToFirstMonday = (8 - firstDayOfYear.getDay()) % 7;
-    const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
-    const weekStart = new Date(firstMonday.getTime() + (weekNumber - 1) * 7 * 24 * 60 * 60 * 1000);
+    // Use ISO 8601 week date calculation (same as parent component)
+    // Find the Monday of the specified ISO week
+    const jan4 = new Date(year, 0, 4);
+    const jan4Day = jan4.getDay() || 7; // Convert Sunday (0) to 7
+    jan4.setDate(jan4.getDate() + 4 - jan4Day); // Get to Thursday of week 1
+    
+    const weekStart = new Date(jan4);
+    weekStart.setDate(jan4.getDate() + (weekNumber - 1) * 7 - 3); // Go back to Monday
 
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
-      date.setDate(date.getDate() + i);
+      date.setDate(weekStart.getDate() + i);
       dates.push(date);
     }
     setWeekDates(dates);
