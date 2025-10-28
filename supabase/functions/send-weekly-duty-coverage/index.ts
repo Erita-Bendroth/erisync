@@ -19,17 +19,24 @@ interface DutyCoverageRequest {
 interface Assignment {
   user_id: string;
   substitute_user_id?: string;
-  user?: { first_name: string; last_name: string; initials: string };
-  substitute?: { first_name: string; last_name: string; initials: string };
+  user?: { first_name: string; last_name: string; initials: string; country_code?: string };
+  substitute?: { first_name: string; last_name: string; initials: string; country_code?: string };
   team_id: string;
   date?: string;
   duty_type?: string;
   source: 'manual' | 'schedule';
+  responsibility_region?: string;
 }
 
 interface TeamData {
   id: string;
   name: string;
+}
+
+interface ConsolidatedTeam {
+  displayName: string;
+  teamIds: string[];
+  category: string;
 }
 
 serve(async (req) => {
@@ -382,19 +389,32 @@ function getCombinedAssignments(
   return combined;
 }
 
-// Helper function for formatting names with country codes in emails
+// Helper function for formatting names without country codes
 const formatNameForEmail = (profile: any): string => {
   if (!profile) return 'TBD';
+  return profile.initials || profile.first_name || 'Unknown';
+};
+
+// Consolidate teams by category (e.g., all "Central" teams into one)
+function consolidateTeams(teams: TeamData[]): ConsolidatedTeam[] {
+  const consolidated: ConsolidatedTeam[] = [];
   
-  const name = profile.initials || profile.first_name || 'Unknown';
-  const country = profile.country_code;
+  // Find all teams with "Central" in their name
+  const centralTeams = teams.filter(t => t.name.toLowerCase().includes('central'));
   
-  if (country && country.trim() !== '') {
-    return `${name} (${country.toUpperCase()})`;
+  if (centralTeams.length > 0) {
+    consolidated.push({
+      displayName: 'Central',
+      teamIds: centralTeams.map(t => t.id),
+      category: 'central'
+    });
   }
   
-  return name;
-};
+  // Add other categories here if needed in the future
+  // For now, we only consolidate Central teams
+  
+  return consolidated;
+}
 
 // Build the HTML email content with multi-team support
 function buildDutyCoverageEmail(
@@ -421,47 +441,71 @@ function buildDutyCoverageEmail(
   const lateshiftDuty = assignments.filter(a => a.duty_type === 'lateshift');
   const earlyshiftDuty = assignments.filter(a => a.duty_type === 'earlyshift');
 
-    // Helper to build duty section with multi-team columns
+  // Consolidate teams by category
+  const consolidatedTeams = consolidateTeams(teams);
+
+  // Helper to build duty section with consolidated teams (Name + Region columns)
   const buildDutySection = (title: string, dutyAssignments: Assignment[]) => {
     if (dutyAssignments.length === 0) return '';
 
-    // Group by date, then team
+    // Group by date, then by consolidated team category
     const byDate: Record<string, Record<string, Assignment[]>> = {};
     dutyAssignments.forEach(assignment => {
       const date = assignment.date!;
-      const teamId = assignment.team_id!;
       if (!byDate[date]) byDate[date] = {};
-      if (!byDate[date][teamId]) byDate[date][teamId] = [];
-      byDate[date][teamId].push(assignment);
+      
+      // Find which consolidated team this assignment belongs to
+      const consolidated = consolidatedTeams.find(ct => ct.teamIds.includes(assignment.team_id));
+      const category = consolidated?.category || assignment.team_id;
+      
+      if (!byDate[date][category]) byDate[date][category] = [];
+      byDate[date][category].push(assignment);
     });
 
     const days = Object.keys(byDate).sort();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    const headerCells = teams.map(team => `
-      <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;">${team.name}</th>
+    // Create header with Name and Region columns for each consolidated team
+    const headerCells = consolidatedTeams.map(consolidated => `
+      <th colspan="2" style="padding: 12px; border: 1px solid #e5e7eb; text-align: center; font-weight: 600; background: #f3f4f6;">${consolidated.displayName}</th>
+    `).join('');
+
+    const subHeaderCells = consolidatedTeams.map(() => `
+      <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600; font-size: 12px;">Name</th>
+      <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600; font-size: 12px;">Responsible Region</th>
     `).join('');
 
     const rows = days.map(dateStr => {
       const date = new Date(dateStr + 'T00:00:00Z');
       const dayName = dayNames[date.getUTCDay()];
       
-      // Create cells for each team
-      const teamCells = teams.map(team => {
-        const teamAssignments = byDate[dateStr][team.id] || [];
+      // Create name and region cells for each consolidated team
+      const teamCells = consolidatedTeams.map(consolidated => {
+        const teamAssignments = byDate[dateStr][consolidated.category] || [];
+        
         if (teamAssignments.length === 0) {
-          return '<td style="padding: 12px; border: 1px solid #e5e7eb; color: #9ca3af;">-</td>';
+          return `
+            <td style="padding: 12px; border: 1px solid #e5e7eb; color: #9ca3af;">-</td>
+            <td style="padding: 12px; border: 1px solid #e5e7eb; color: #9ca3af;">-</td>
+          `;
         }
         
-        // Format all assignments for this team/date - show name with region
-        const formattedAssignments = teamAssignments.map(assignment => {
+        // Collect all names
+        const names = teamAssignments.map(assignment => {
           const name = assignment.user ? formatNameForEmail(assignment.user) : 'TBD';
-          const region = assignment.responsibility_region ? ` (${assignment.responsibility_region})` : '';
           const sourceIndicator = assignment.source === 'schedule' ? '📅 ' : '';
-          return `${sourceIndicator}${name}${region}`;
+          return `${sourceIndicator}${name}`;
+        }).join(', ');
+        
+        // Collect all regions
+        const regions = teamAssignments.map(assignment => {
+          return assignment.responsibility_region || '-';
         }).join(', ');
 
-        return `<td style="padding: 12px; border: 1px solid #e5e7eb;">${formattedAssignments}</td>`;
+        return `
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${names}</td>
+          <td style="padding: 12px; border: 1px solid #e5e7eb;">${regions}</td>
+        `;
       }).join('');
 
       return `
@@ -479,9 +523,12 @@ function buildDutyCoverageEmail(
         <table style="width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <thead>
             <tr style="background: #f9fafb;">
-              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;">Date</th>
-              <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600;">Weekday</th>
+              <th rowspan="2" style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600; vertical-align: middle;">Date</th>
+              <th rowspan="2" style="padding: 12px; border: 1px solid #e5e7eb; text-align: left; font-weight: 600; vertical-align: middle;">Weekday</th>
               ${headerCells}
+            </tr>
+            <tr style="background: #f9fafb;">
+              ${subHeaderCells}
             </tr>
           </thead>
           <tbody>
