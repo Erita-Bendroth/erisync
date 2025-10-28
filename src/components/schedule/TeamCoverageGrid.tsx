@@ -82,6 +82,7 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
   const [coverage, setCoverage] = useState<Record<string, Record<string, DayCoverageCell>>>({});
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -95,6 +96,8 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
 
   const fetchCoverageData = async () => {
     setLoading(true);
+    setError(null);
+    console.log('Coverage Grid - Fetching data for teams:', teamIds);
     try {
       // Fetch teams
       const { data: teamsData } = await supabase
@@ -103,7 +106,10 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
         .in('id', teamIds);
 
       if (teamsData) {
+        console.log('Coverage Grid - Teams fetched:', teamsData);
         setTeams(teamsData);
+      } else {
+        console.warn('Coverage Grid - No teams data returned');
       }
 
       // Fetch team members with country codes
@@ -230,9 +236,14 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
         });
       });
 
+      console.log('Coverage Grid - Coverage data built:', {
+        dates: Object.keys(coverageData),
+        teams: Object.keys(coverageData[Object.keys(coverageData)[0]] || {})
+      });
       setCoverage(coverageData);
     } catch (error) {
-      console.error('Error fetching coverage data:', error);
+      console.error('Coverage Grid - Error fetching coverage data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load coverage data');
     } finally {
       setLoading(false);
     }
@@ -257,6 +268,17 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
     );
   }
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <div className="text-destructive mb-2">Error loading coverage grid</div>
+          <div className="text-sm text-muted-foreground">{error}</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (teamIds.length === 0) {
     return (
       <Card>
@@ -267,7 +289,19 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
     );
   }
 
+  if (teams.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground">
+          No team data available
+        </CardContent>
+      </Card>
+    );
+  }
+
+  console.log('Coverage Grid - Rendering with teams:', teams);
   const hierarchicalTeams = groupTeamsByHierarchy(teams);
+  console.log('Coverage Grid - Hierarchical teams:', hierarchicalTeams);
 
   return (
     <div className="space-y-4">

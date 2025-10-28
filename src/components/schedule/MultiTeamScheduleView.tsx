@@ -146,6 +146,18 @@ export function MultiTeamScheduleView() {
     membersResults.forEach(({ teamId, members }) => {
       membersMap[teamId] = members;
     });
+    
+    console.log('Multi-Team Schedule - Fetched team members:', {
+      selectedTeams,
+      membersMap,
+      totalUsers: Object.values(membersMap).flat().length,
+      teamCounts: Object.entries(membersMap).map(([teamId, members]) => ({
+        teamId,
+        teamName: teams.find(t => t.id === teamId)?.name,
+        count: members.length
+      }))
+    });
+    
     setTeamMembers(membersMap);
 
     // Fetch schedule entries
@@ -353,6 +365,17 @@ export function MultiTeamScheduleView() {
                     {selectedTeams.map((teamId) => {
                       const team = teams.find((t) => t.id === teamId);
                       const members = teamMembers[teamId] || [];
+                      
+                      // Show column even if no members
+                      if (members.length === 0) {
+                        return (
+                          <th key={`${teamId}-empty`} className="p-2 text-center font-medium min-w-[60px]">
+                            <div className="text-xs">{team?.name}</div>
+                            <div className="text-xs text-muted-foreground">No members</div>
+                          </th>
+                        );
+                      }
+                      
                       return members.map((member) => (
                         <th key={`${teamId}-${member.user_id}`} className="p-2 text-center font-medium min-w-[60px]">
                           <div className="text-xs">{team?.name}</div>
@@ -401,6 +424,16 @@ export function MultiTeamScheduleView() {
                         </td>
                         {selectedTeams.map((teamId) => {
                           const members = teamMembers[teamId] || [];
+                          
+                          // Show empty cell for teams with no members
+                          if (members.length === 0) {
+                            return (
+                              <td key={`${teamId}-empty`} className="p-2 text-center text-muted-foreground">
+                                -
+                              </td>
+                            );
+                          }
+                          
                           return members.map((member) => {
                             const key = `${dateStr}-${member.user_id}`;
                             const entries = scheduleData[key] || [];
