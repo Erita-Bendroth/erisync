@@ -30,6 +30,12 @@ interface Assignment {
   responsibility_region: string | null;
 }
 
+interface ScheduledUser {
+  date: string;
+  user_id: string;
+  shift_type: string;
+}
+
 export function DutyAssignmentGrid({
   teamId,
   weekNumber,
@@ -43,12 +49,19 @@ export function DutyAssignmentGrid({
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
+  const [scheduledUsers, setScheduledUsers] = useState<Record<string, ScheduledUser[]>>({});
 
   useEffect(() => {
     fetchTeamMembers();
     calculateWeekDates();
-    fetchAssignments();
   }, [teamId, weekNumber, year]);
+
+  useEffect(() => {
+    if (weekDates.length > 0) {
+      fetchScheduledUsers();
+      fetchAssignments();
+    }
+  }, [weekDates, teamId]);
 
   const calculateWeekDates = () => {
     const firstDayOfYear = new Date(year, 0, 1);
@@ -83,6 +96,36 @@ export function DutyAssignmentGrid({
     }
   };
 
+  const fetchScheduledUsers = async () => {
+    if (weekDates.length === 0) return;
+    
+    const startDate = weekDates[0].toISOString().split('T')[0];
+    const endDate = weekDates[6].toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+      .from('schedule_entries')
+      .select('date, user_id, shift_type')
+      .eq('team_id', teamId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .eq('availability_status', 'available')
+      .eq('activity_type', 'work');
+      
+    if (!error && data) {
+      const map: Record<string, ScheduledUser[]> = {};
+      data.forEach((entry: any) => {
+        const dateStr = entry.date;
+        if (!map[dateStr]) map[dateStr] = [];
+        map[dateStr].push({
+          date: dateStr,
+          user_id: entry.user_id,
+          shift_type: entry.shift_type || 'normal'
+        });
+      });
+      setScheduledUsers(map);
+    }
+  };
+
   const fetchAssignments = async () => {
     const { data, error } = await supabase
       .from('duty_assignments')
@@ -99,6 +142,24 @@ export function DutyAssignmentGrid({
   const getAssignment = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift') => {
     const dateStr = date.toISOString().split('T')[0];
     return assignments.find(a => a.date === dateStr && a.duty_type === dutyType);
+  };
+
+  const getScheduledUsersForDate = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift') => {
+    const dateStr = date.toISOString().split('T')[0];
+    const scheduled = scheduledUsers[dateStr] || [];
+    
+    if (dutyType === 'lateshift') {
+      return scheduled.filter(s => s.shift_type === 'late');
+    } else if (dutyType === 'earlyshift') {
+      return scheduled.filter(s => s.shift_type === 'early');
+    }
+    
+    return scheduled;
+  };
+
+  const getDefaultUserId = (date: Date, dutyType: 'weekend' | 'lateshift' | 'earlyshift'): string => {
+    const scheduled = getScheduledUsersForDate(date, dutyType);
+    return scheduled.length > 0 ? scheduled[0].user_id : "none";
   };
 
   const updateAssignment = async (
@@ -155,6 +216,7 @@ export function DutyAssignmentGrid({
               <tr className="border-b">
                 <th className="p-2 text-left">Date</th>
                 <th className="p-2 text-left">Day</th>
+                <th className="p-2 text-left">Scheduled</th>
                 <th className="p-2 text-left">Primary Assignment</th>
                 <th className="p-2 text-left">Region/Country</th>
                 <th className="p-2 text-left">Substitute</th>
@@ -163,13 +225,25 @@ export function DutyAssignmentGrid({
             <tbody>
               {dates.map(date => {
                 const assignment = getAssignment(date, dutyType);
+                const scheduled = getScheduledUsersForDate(date, dutyType);
+                const scheduledInitials = scheduled
+                  .map(s => teamMembers.find(m => m.user_id === s.user_id)?.initials)
+                  .filter(Boolean)
+                  .join(', ');
+                const defaultValue = assignment?.user_id || getDefaultUserId(date, dutyType);
+                
                 return (
                   <tr key={date.toISOString()} className="border-b">
                     <td className="p-2">{date.toLocaleDateString('en-GB')}</td>
                     <td className="p-2">{dayNames[date.getDay()]}</td>
                     <td className="p-2">
+                      <div className="text-sm font-medium">
+                        {scheduledInitials || <span className="text-muted-foreground">No one scheduled</span>}
+                      </div>
+                    </td>
+                    <td className="p-2">
                       <Select
-                        value={assignment?.user_id || "none"}
+                        value={defaultValue}
                         onValueChange={(value) =>
                           updateAssignment(date, dutyType, value === "none" ? null : value)
                         }
@@ -179,11 +253,19 @@ export function DutyAssignmentGrid({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Unassigned</SelectItem>
-                          {teamMembers.map(member => (
-                            <SelectItem key={member.user_id} value={member.user_id}>
-                              {member.initials || `${member.first_name} ${member.last_name}`}
-                            </SelectItem>
-                          ))}
+                          {teamMembers.map(member => {
+                            const isScheduled = scheduled.some(s => s.user_id === member.user_id);
+                            return (
+                              <SelectItem 
+                                key={member.user_id} 
+                                value={member.user_id}
+                                className={isScheduled ? "font-semibold bg-primary/5" : ""}
+                              >
+                                {member.initials || `${member.first_name} ${member.last_name}`}
+                                {isScheduled && " ✓"}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </td>
