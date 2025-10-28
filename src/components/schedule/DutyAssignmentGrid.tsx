@@ -102,18 +102,28 @@ export function DutyAssignmentGrid({
     const startDate = weekDates[0].toISOString().split('T')[0];
     const endDate = weekDates[6].toISOString().split('T')[0];
     
+    console.log('[DutyAssignmentGrid] Fetching scheduled users for team:', teamId, 'dates:', startDate, 'to', endDate);
+    
     const { data, error } = await supabase
       .from('schedule_entries')
-      .select('date, user_id, shift_type')
+      .select('date, user_id, shift_type, availability_status, activity_type')
       .eq('team_id', teamId)
       .gte('date', startDate)
-      .lte('date', endDate)
-      .eq('availability_status', 'available')
-      .eq('activity_type', 'work');
+      .lte('date', endDate);
+      
+    console.log('[DutyAssignmentGrid] Schedule entries query result:', { data, error, count: data?.length });
       
     if (!error && data) {
+      // Filter for work entries only
+      const workEntries = data.filter(entry => 
+        entry.availability_status === 'available' && 
+        entry.activity_type === 'work'
+      );
+      
+      console.log('[DutyAssignmentGrid] Filtered work entries:', workEntries.length, 'of', data.length);
+      
       const map: Record<string, ScheduledUser[]> = {};
-      data.forEach((entry: any) => {
+      workEntries.forEach((entry: any) => {
         const dateStr = entry.date;
         if (!map[dateStr]) map[dateStr] = [];
         map[dateStr].push({
@@ -122,7 +132,11 @@ export function DutyAssignmentGrid({
           shift_type: entry.shift_type || 'normal'
         });
       });
+      
+      console.log('[DutyAssignmentGrid] Scheduled users map:', map);
       setScheduledUsers(map);
+    } else if (error) {
+      console.error('[DutyAssignmentGrid] Error fetching scheduled users:', error);
     }
   };
 
