@@ -184,6 +184,13 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
               
               if (member?.profiles) {
                 const profile = member.profiles as any;
+                
+                // Ensure profile has required fields
+                if (!profile.first_name) {
+                  console.warn('Profile missing first_name for user:', entry.user_id);
+                  return;
+                }
+                
                 const shiftDef = shiftDefs?.find(
                   sd => sd.shift_type === entry.shift_type && 
                   (sd.team_id === teamId || sd.team_id === null)

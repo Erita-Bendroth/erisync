@@ -123,18 +123,20 @@ export function MultiTeamScheduleView() {
           profiles:user_id (
             first_name,
             last_name,
-            initials
+            initials,
+            country_code
           )
         `)
         .eq("team_id", teamId);
 
       return {
         teamId,
-        members: data?.map((m: any) => ({
+        members: data?.filter((m: any) => m.profiles).map((m: any) => ({
           user_id: m.user_id,
           first_name: m.profiles.first_name,
           last_name: m.profiles.last_name,
           initials: m.profiles.initials || `${m.profiles.first_name[0]}${m.profiles.last_name[0]}`,
+          country_code: m.profiles.country_code,
         })) || [],
       };
     });
