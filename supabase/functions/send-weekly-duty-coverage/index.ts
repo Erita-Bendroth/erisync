@@ -7,6 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Get the start date (Monday) of the specified ISO week
+function getISOWeekStartDate(year: number, week: number): Date {
+  const jan4 = new Date(Date.UTC(year, 0, 4)); // January 4th is always in week 1
+  const jan4Day = jan4.getUTCDay() || 7; // Sunday is 7, not 0
+  const weekStart = new Date(jan4);
+  weekStart.setUTCDate(jan4.getUTCDate() - (jan4Day - 1)); // Go back to Monday of week 1
+  weekStart.setUTCDate(weekStart.getUTCDate() + (week - 1) * 7); // Add weeks
+  return weekStart;
+}
+
 const resend = new Resend(Deno.env.get('RESEND_API_KEY') || '');
 
 interface DutyCoverageRequest {
@@ -116,14 +126,10 @@ serve(async (req) => {
 
     const teams: TeamData[] = teamsData || [];
 
-    // Calculate week date range
-    const startDate = new Date(year, 0, 1 + (week_number - 1) * 7);
-    const dayOfWeek = startDate.getDay();
-    const diff = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
-    startDate.setDate(startDate.getDate() + diff);
-    
+    // Calculate week date range using ISO week calculation
+    const startDate = getISOWeekStartDate(year, week_number);
     const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 6);
+    endDate.setUTCDate(endDate.getUTCDate() + 6);
 
     console.log('Week range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
 
@@ -522,21 +528,16 @@ function buildDutyCoverageEmail(
           `;
         }
         
-        // Collect all names
-        const names = teamAssignments.map(assignment => {
+        // Display each person on a separate line with their region
+        const assignmentRows = teamAssignments.map(assignment => {
           const name = assignment.user ? formatNameForEmail(assignment.user) : 'TBD';
           const sourceIndicator = assignment.source === 'schedule' ? '📅 ' : '';
-          return `${sourceIndicator}${name}`;
-        }).join(', ');
-        
-        // Collect all regions
-        const regions = teamAssignments.map(assignment => {
-          return assignment.responsibility_region || '-';
-        }).join(', ');
+          const region = assignment.responsibility_region || '-';
+          return `${sourceIndicator}${name} / ${region}`;
+        }).join('<br/>');
 
         return `
-          <td style="padding: 12px; border: 1px solid #e5e7eb;">${names}</td>
-          <td style="padding: 12px; border: 1px solid #e5e7eb;">${regions}</td>
+          <td colspan="2" style="padding: 12px; border: 1px solid #e5e7eb;">${assignmentRows}</td>
         `;
       }).join('');
 
