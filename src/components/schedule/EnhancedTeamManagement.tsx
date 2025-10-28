@@ -72,6 +72,7 @@ const EnhancedTeamManagement = () => {
     team_id: "",
     is_manager: false,
   });
+  const [childTeamManagers, setChildTeamManagers] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
     fetchUserRoles();
@@ -130,34 +131,93 @@ const EnhancedTeamManagement = () => {
       
       // Fetch teams based on user role
       let teamsQuery = supabase.from('teams').select('*').order('name');
+      let teamsData: Team[] = [];
       
       if (isManager() && !isPlanner() && !isAdmin()) {
-        // Managers only see their assigned teams
+        // Managers only see their DIRECTLY managed teams (not parent teams)
         const { data: managerTeams } = await supabase
           .from('team_members')
-          .select('team_id')
+          .select('team_id, teams!inner(id, parent_team_id)')
           .eq('user_id', user?.id)
           .eq('is_manager', true);
         
         if (managerTeams && managerTeams.length > 0) {
-          const teamIds = managerTeams.map(t => t.team_id);
-          teamsQuery = teamsQuery.in('id', teamIds);
-        } else {
-          setTeams([]);
-          setLoading(false);
-          return;
+          const allManagerTeamIds = managerTeams.map((t: any) => t.team_id);
+          const directTeamIds: string[] = [];
+          
+          // Filter to only directly managed teams
+          for (const tm of managerTeams as any[]) {
+            const teamId = tm.team_id;
+            
+            // Check if this team has child teams
+            const { data: childTeams } = await supabase
+              .from('teams')
+              .select('id')
+              .eq('parent_team_id', teamId);
+            
+            if (childTeams && childTeams.length > 0) {
+              // This team has children - check if user manages any child
+              const childTeamIds = childTeams.map(c => c.id);
+              const managesChildTeam = allManagerTeamIds.some(id => 
+                childTeamIds.includes(id)
+              );
+              
+              // Only include parent team if user doesn't manage any child teams
+              if (!managesChildTeam) {
+                directTeamIds.push(teamId);
+              }
+            } else {
+              // No children, so this is a directly managed team
+              directTeamIds.push(teamId);
+            }
+          }
+          
+          if (directTeamIds.length > 0) {
+            const { data, error } = await supabase
+              .from('teams')
+              .select('*')
+              .in('id', directTeamIds)
+              .order('name');
+            
+            if (error) throw error;
+            teamsData = data || [];
+          }
         }
+      } else {
+        const { data, error: teamsError } = await teamsQuery;
+        if (teamsError) throw teamsError;
+        teamsData = data || [];
       }
 
-      const { data: teamsData, error: teamsError } = await teamsQuery;
-      if (teamsError) throw teamsError;
+      setTeams(teamsData);
 
-      setTeams(teamsData || []);
+      // Fetch child team managers for badge filtering
+      const childManagersMap = new Map<string, Set<string>>();
+      for (const team of teamsData) {
+        const { data: childTeams } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('parent_team_id', team.id);
+        
+        if (childTeams && childTeams.length > 0) {
+          const childTeamIds = childTeams.map(c => c.id);
+          const { data: childManagers } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .in('team_id', childTeamIds)
+            .eq('is_manager', true);
+          
+          if (childManagers) {
+            childManagersMap.set(team.id, new Set(childManagers.map(m => m.user_id)));
+          }
+        }
+      }
+      setChildTeamManagers(childManagersMap);
 
       // Fetch members for each team
       const membersMap: { [key: string]: TeamMember[] } = {};
       
-      for (const team of teamsData || []) {
+      for (const team of teamsData) {
         const { data: members, error: membersError } = await supabase
           .from('team_members')
           .select('id, user_id, team_id, is_manager')
@@ -226,6 +286,18 @@ const EnhancedTeamManagement = () => {
       newExpanded.add(teamId);
     }
     setExpandedTeams(newExpanded);
+  };
+
+  // Check if user should show manager badge in this team
+  const shouldShowManagerBadge = (userId: string, teamId: string, isManager: boolean): boolean => {
+    if (!isManager) return false;
+    
+    // Get child team managers for this team
+    const childManagers = childTeamManagers.get(teamId);
+    if (!childManagers) return true;
+    
+    // Hide badge if user is a child team manager (they only manage child teams, not this parent team)
+    return !childManagers.has(userId);
   };
 
   const removeTeamMember = async (memberId: string, teamId: string) => {
@@ -692,7 +764,7 @@ const EnhancedTeamManagement = () => {
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2">
                                     {formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials)}
-                                    {member.is_manager && (
+                                    {shouldShowManagerBadge(member.user_id, team.id, member.is_manager) && (
                                       <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
                                         Manager
                                       </Badge>

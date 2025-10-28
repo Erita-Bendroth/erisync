@@ -11,11 +11,16 @@ interface UseScheduleAccessControlProps {
  * 
  * Standard view: Managers only see full details for directly managed team members
  * Multi-team view: Managers see full details for all accessible teams (including parent team access)
+ * 
+ * This hook distinguishes between:
+ * 1. Direct management: User is manager of a specific team (not through parent team)
+ * 2. RLS access: User has access through parent team hierarchy for viewing sibling teams
  */
 export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlProps) {
   const { user } = useAuth();
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [directlyManagedUsers, setDirectlyManagedUsers] = useState<Set<string>>(new Set());
+  const [directlyManagedTeams, setDirectlyManagedTeams] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -31,31 +36,64 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
         setUserRoles(roles.map(r => r.role));
       }
 
-      // Fetch directly managed team members (not through parent teams)
-      const { data: teamMembers } = await supabase
+      // Fetch all teams where user is marked as manager
+      const { data: managerTeams } = await supabase
         .from('team_members')
         .select(`
           team_id,
           teams!inner (
             id,
+            name,
             parent_team_id
           )
         `)
         .eq('user_id', user.id)
         .eq('is_manager', true);
 
-      if (teamMembers) {
-        // Get IDs of teams user directly manages (not parent teams)
-        const directTeamIds = teamMembers
-          .filter((tm: any) => tm.teams && !tm.teams.parent_team_id)
-          .map((tm: any) => tm.team_id);
-
-        // Fetch all users in these directly managed teams
-        if (directTeamIds.length > 0) {
+      if (managerTeams) {
+        const allManagerTeamIds = managerTeams.map((tm: any) => tm.team_id);
+        const directTeamIds = new Set<string>();
+        
+        // Filter to get only DIRECTLY managed teams:
+        // - Teams with no parent (top-level teams they truly manage)
+        // - Child teams they manage
+        // - Exclude parent teams where they're only marked manager for RLS purposes
+        
+        for (const tm of managerTeams as any[]) {
+          const teamId = tm.team_id;
+          const hasParent = tm.teams.parent_team_id !== null;
+          
+          // If team has children, check if user also manages any child team
+          const { data: childTeams } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('parent_team_id', teamId);
+          
+          if (childTeams && childTeams.length > 0) {
+            // This team has children - check if user manages any child
+            const childTeamIds = childTeams.map(c => c.id);
+            const managesChildTeam = allManagerTeamIds.some(id => 
+              childTeamIds.includes(id)
+            );
+            
+            // Only include parent team if user doesn't manage any child teams
+            if (!managesChildTeam) {
+              directTeamIds.add(teamId);
+            }
+          } else {
+            // No children, so this is a directly managed team
+            directTeamIds.add(teamId);
+          }
+        }
+        
+        setDirectlyManagedTeams(directTeamIds);
+        
+        // Fetch users from directly managed teams only
+        if (directTeamIds.size > 0) {
           const { data: members } = await supabase
             .from('team_members')
             .select('user_id')
-            .in('team_id', directTeamIds);
+            .in('team_id', Array.from(directTeamIds));
 
           if (members) {
             setDirectlyManagedUsers(new Set(members.map(m => m.user_id)));
@@ -100,5 +138,7 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
     isAdmin,
     isPlanner,
     isManager,
+    directlyManagedTeams,
+    directlyManagedUsers,
   };
 }
