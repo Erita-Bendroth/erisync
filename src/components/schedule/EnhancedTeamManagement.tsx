@@ -365,6 +365,35 @@ const EnhancedTeamManagement = () => {
     }
   };
 
+  // Helper function to parse time blocks from notes or shift definitions
+  const parseTimeBlocks = (notes: string | null, shiftType: string | null): { startTime: string; endTime: string } => {
+    if (notes) {
+      // Try to parse time blocks like "08:00-16:00" from notes
+      const timePattern = /(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/;
+      const match = notes.match(timePattern);
+      
+      if (match) {
+        return {
+          startTime: match[1],
+          endTime: match[2],
+        };
+      }
+    }
+    
+    // Fall back to default shift times
+    return getDefaultShiftTimes(shiftType || 'normal');
+  };
+
+  const getDefaultShiftTimes = (shiftType: string): { startTime: string; endTime: string } => {
+    const defaults: Record<string, { startTime: string; endTime: string }> = {
+      'normal': { startTime: '08:00', endTime: '16:00' },
+      'early': { startTime: '06:00', endTime: '14:00' },
+      'late': { startTime: '14:00', endTime: '22:00' },
+      'weekend': { startTime: '08:00', endTime: '16:00' },
+    };
+    return defaults[shiftType] || defaults['normal'];
+  };
+
   const downloadTeamData = async (teamId: string, startDate: Date, endDate: Date, exportFormat: 'excel' | 'pdf') => {
     try {
       const team = teams.find(t => t.id === teamId);
@@ -372,124 +401,140 @@ const EnhancedTeamManagement = () => {
       
       if (!team) return;
 
-      // Fetch schedule data for the selected date range
       const yearStart = formatDate(startDate, 'yyyy-MM-dd');
       const yearEnd = formatDate(endDate, 'yyyy-MM-dd');
 
+      // Fetch detailed schedule entries with user profiles
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('schedule_entries')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            first_name,
+            last_name,
+            initials,
+            email
+          )
+        `)
         .eq('team_id', teamId)
         .gte('date', yearStart)
         .lte('date', yearEnd)
-        .order('date', { ascending: true });
+        .order('date', { ascending: true })
+        .order('user_id', { ascending: true });
 
       if (scheduleError) throw scheduleError;
 
-      // Create data for export with schedule information
-      const exportData = members.map(member => {
-        const memberSchedules = scheduleData?.filter(s => s.user_id === member.user_id) || [];
-        const workDays = memberSchedules.filter(s => s.activity_type === 'work').length;
-        const vacationDays = memberSchedules.filter(s => s.activity_type === 'vacation').length;
-        const otherDays = memberSchedules.filter(s => s.activity_type !== 'work' && s.activity_type !== 'vacation').length;
+      // Create detailed export data with actual schedule information
+      const exportData = (scheduleData || []).map(entry => {
+        const profile = entry.profiles as any;
+        const userName = formatUserName(
+          profile?.first_name || '', 
+          profile?.last_name || '', 
+          profile?.initials
+        );
 
+        // Parse time blocks from notes or use default shift times
+        const timeBlocks = parseTimeBlocks(entry.notes, entry.shift_type);
+        
         return {
-          Name: formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials),
-          Email: member.profiles.email,
-          Role: member.user_roles.map(r => r.role).join(', '),
-          'Team Manager': member.is_manager ? 'Yes' : 'No',
-          Team: team.name,
-          'Work Days': workDays,
-          'Vacation Days': vacationDays,
-          'Other Days': otherDays,
-          'Total Scheduled': memberSchedules.length
+          'Date': entry.date,
+          'Day of Week': formatDate(new Date(entry.date + 'T00:00:00'), 'EEEE'),
+          'Team Member': userName,
+          'Email': profile?.email || '',
+          'Shift Type': entry.shift_type || 'normal',
+          'Start Time': timeBlocks.startTime,
+          'End Time': timeBlocks.endTime,
+          'Activity Type': entry.activity_type || 'work',
+          'Availability': entry.availability_status || 'available',
+          'Notes': entry.notes || '',
         };
       });
 
       if (exportFormat === 'excel') {
-        // Create CSV content
-        const headers = Object.keys(exportData[0] || {});
-        const csvContent = [
-          headers.join(','),
-          ...exportData.map(row => headers.map(header => `"${row[header as keyof typeof row] || ''}"`).join(','))
-        ].join('\n');
+        const XLSX = await import('xlsx');
+        const ws = XLSX.utils.json_to_sheet(exportData);
         
-        // Download CSV
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${team.name}_team_data.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+        // Set column widths for better readability
+        ws['!cols'] = [
+          { width: 12 }, // Date
+          { width: 14 }, // Day
+          { width: 20 }, // Name
+          { width: 28 }, // Email
+          { width: 12 }, // Shift
+          { width: 11 }, // Start
+          { width: 11 }, // End
+          { width: 14 }, // Activity
+          { width: 14 }, // Availability
+          { width: 40 }, // Notes
+        ];
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Team Schedule');
+        
+        const fileName = `${team.name}_detailed_schedule_${yearStart}_to_${yearEnd}.xlsx`;
+        XLSX.writeFile(wb, fileName);
       } else if (exportFormat === 'pdf') {
-        // For PDF, we'll use a simple HTML to PDF approach
-        const htmlContent = `
-          <html>
-            <head>
-              <title>${team.name} Team Report</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #333; border-bottom: 2px solid #333; }
-                h2 { color: #666; margin-top: 10px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f5f5f5; font-weight: bold; }
-                tr:nth-child(even) { background-color: #f9f9f9; }
-              </style>
-            </head>
-            <body>
-              <h1>${team.name} Team Schedule Report</h1>
-              <h2>Period: ${formatDate(startDate, 'PP')} to ${formatDate(endDate, 'PP')}</h2>
-              <p>Generated on: ${new Date().toLocaleDateString()}</p>
-              <p>Total Members: ${members.length}</p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Work Days</th>
-                    <th>Vacation Days</th>
-                    <th>Other Days</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${exportData.map(row => `
-                    <tr>
-                      <td>${row.Name}</td>
-                      <td>${row.Email}</td>
-                      <td>${row.Role}</td>
-                      <td>${row['Work Days']}</td>
-                      <td>${row['Vacation Days']}</td>
-                      <td>${row['Other Days']}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </body>
-          </html>
-        `;
+        const { jsPDF } = await import('jspdf');
+        const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for table
         
-        // Create a new window for printing
-        const printWindow = window.open('', '', 'width=800,height=600');
-        if (printWindow) {
-          printWindow.document.write(htmlContent);
-          printWindow.document.close();
-          printWindow.print();
+        doc.setFontSize(16);
+        doc.text(`Team Schedule: ${team.name}`, 14, 15);
+        
+        doc.setFontSize(10);
+        doc.text(`Period: ${yearStart} to ${yearEnd}`, 14, 22);
+        doc.text(`Total Entries: ${exportData.length}`, 14, 28);
+        
+        // Add table with schedule details
+        let yPos = 35;
+        doc.setFontSize(8);
+        
+        // Table headers
+        doc.text('Date', 14, yPos);
+        doc.text('Day', 35, yPos);
+        doc.text('Name', 55, yPos);
+        doc.text('Shift', 90, yPos);
+        doc.text('Start', 110, yPos);
+        doc.text('End', 130, yPos);
+        doc.text('Activity', 150, yPos);
+        doc.text('Availability', 175, yPos);
+        
+        yPos += 6;
+        
+        // Table rows (first 50 entries to fit on page)
+        exportData.slice(0, 50).forEach((row) => {
+          doc.text(row.Date, 14, yPos);
+          doc.text(row['Day of Week'].substring(0, 3), 35, yPos);
+          doc.text(row['Team Member'].substring(0, 15), 55, yPos);
+          doc.text(row['Shift Type'], 90, yPos);
+          doc.text(row['Start Time'], 110, yPos);
+          doc.text(row['End Time'], 130, yPos);
+          doc.text(row['Activity Type'], 150, yPos);
+          doc.text(row['Availability'], 175, yPos);
+          yPos += 5;
+          
+          if (yPos > 190) {
+            doc.addPage();
+            yPos = 15;
+          }
+        });
+        
+        if (exportData.length > 50) {
+          doc.text(`Note: Showing first 50 of ${exportData.length} entries. Use Excel export for complete data.`, 14, yPos + 10);
         }
+        
+        doc.save(`${team.name}_detailed_schedule_${yearStart}_to_${yearEnd}.pdf`);
       }
 
       toast({
         title: "Export Complete",
-        description: `Team data exported as ${exportFormat.toUpperCase()}`,
+        description: `Detailed schedule exported with ${exportData.length} entries`,
       });
 
     } catch (error: any) {
-      console.error('Error exporting team data:', error);
+      console.error('Error exporting team schedule:', error);
       toast({
         title: "Export Failed",
-        description: error.message || "Failed to export team data",
+        description: error.message || "Failed to export schedule",
         variant: "destructive",
       });
     }

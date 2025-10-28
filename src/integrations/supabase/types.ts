@@ -1122,6 +1122,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_expired_delegations: { Args: never; Returns: undefined }
       create_default_schedule_with_holidays: {
         Args: {
           _country_code?: string
