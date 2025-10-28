@@ -392,15 +392,20 @@ function getCombinedAssignments(
 // Helper function for formatting names without country codes
 const formatNameForEmail = (profile: any): string => {
   if (!profile) return 'TBD';
-  return profile.initials || profile.first_name || 'Unknown';
+  const name = profile.initials || profile.first_name || 'Unknown';
+  // Strip any country codes in format (XX) from the name
+  return name.replace(/\s*\([A-Z]{2}\)\s*/g, '').trim();
 };
 
 // Consolidate teams by category (e.g., all "Central" teams into one)
 function consolidateTeams(teams: TeamData[]): ConsolidatedTeam[] {
   const consolidated: ConsolidatedTeam[] = [];
   
-  // Find all teams with "Central" in their name
-  const centralTeams = teams.filter(t => t.name.toLowerCase().includes('central'));
+  // Find all teams with "Central" or "Turbine Troubleshooting Central" in their name
+  const centralTeams = teams.filter(t => {
+    const lowerName = t.name.toLowerCase();
+    return lowerName.includes('central') || lowerName.includes('turbine troubleshooting central');
+  });
   
   if (centralTeams.length > 0) {
     consolidated.push({
@@ -410,8 +415,19 @@ function consolidateTeams(teams: TeamData[]): ConsolidatedTeam[] {
     });
   }
   
-  // Add other categories here if needed in the future
-  // For now, we only consolidate Central teams
+  // Add non-Central teams individually if needed
+  const otherTeams = teams.filter(t => {
+    const lowerName = t.name.toLowerCase();
+    return !lowerName.includes('central') && !lowerName.includes('turbine troubleshooting central');
+  });
+  
+  otherTeams.forEach(team => {
+    consolidated.push({
+      displayName: team.name,
+      teamIds: [team.id],
+      category: team.id
+    });
+  });
   
   return consolidated;
 }
