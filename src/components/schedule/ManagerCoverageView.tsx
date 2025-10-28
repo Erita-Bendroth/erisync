@@ -25,6 +25,7 @@ interface DutyAssignment {
   team_name: string;
   shift_type: string;
   activity_type: string;
+  responsibility_region?: string | null;
 }
 
 export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCoverageViewProps) {
@@ -162,6 +163,21 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
 
       if (scheduleError) throw scheduleError;
 
+      // Fetch duty assignments to get responsibility regions
+      const { data: dutyData } = await supabase
+        .from('duty_assignments')
+        .select('user_id, team_id, date, duty_type, responsibility_region')
+        .in('team_id', teamIds)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      // Create a map of duty assignments for quick lookup
+      const dutyMap = new Map<string, string | null>();
+      dutyData?.forEach((duty: any) => {
+        const key = `${duty.user_id}-${duty.date}-${duty.team_id}`;
+        dutyMap.set(key, duty.responsibility_region);
+      });
+
       // Get unique user IDs and fetch profile data
       const userIds = [...new Set(scheduleData?.map(e => e.user_id) || [])];
       
@@ -189,6 +205,10 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
         const profile = profileMap.get(entry.user_id);
 
+        // Look up responsibility region from duty assignments
+        const dutyKey = `${entry.user_id}-${entry.date}-${entry.team_id}`;
+        const responsibilityRegion = dutyMap.get(dutyKey);
+
         const assignment: DutyAssignment = {
           date: entry.date,
           user_id: entry.user_id,
@@ -199,6 +219,7 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
           team_name: teamMap.get(entry.team_id) || 'Unknown Team',
           shift_type: entry.shift_type,
           activity_type: entry.activity_type,
+          responsibility_region: responsibilityRegion,
         };
 
         // Categorize by shift type and weekend
@@ -306,8 +327,18 @@ export function ManagerCoverageView({ selectedWeek, onWeekChange }: ManagerCover
                             {teamAssignments.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {teamAssignments.map((assignment, idx) => (
-                                  <Badge key={idx} variant="secondary" className="text-xs">
+                                  <Badge 
+                                    key={idx} 
+                                    variant="secondary" 
+                                    className="text-xs"
+                                    title={`${assignment.first_name} ${assignment.last_name} - ${assignment.team_name}${assignment.responsibility_region ? ' - ' + assignment.responsibility_region : ''}`}
+                                  >
                                     {formatUserName(assignment)}
+                                    {assignment.responsibility_region && (
+                                      <span className="ml-1 text-muted-foreground">
+                                        ({assignment.responsibility_region})
+                                      </span>
+                                    )}
                                   </Badge>
                                 ))}
                               </div>

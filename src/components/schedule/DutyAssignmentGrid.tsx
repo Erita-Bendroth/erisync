@@ -27,6 +27,7 @@ interface Assignment {
   duty_type: 'weekend' | 'lateshift' | 'earlyshift';
   user_id: string | null;
   substitute_user_id: string | null;
+  responsibility_region: string | null;
 }
 
 export function DutyAssignmentGrid({
@@ -104,7 +105,8 @@ export function DutyAssignmentGrid({
     date: Date,
     dutyType: 'weekend' | 'lateshift' | 'earlyshift',
     userId: string | null,
-    isSubstitute: boolean = false
+    isSubstitute: boolean = false,
+    region: string | null = null
   ) => {
     const dateStr = date.toISOString().split('T')[0];
     const existing = getAssignment(date, dutyType);
@@ -119,6 +121,7 @@ export function DutyAssignmentGrid({
       year: year,
       date: dateStr,
       created_by: user?.id,
+      responsibility_region: region !== undefined ? region : (existing?.responsibility_region || null),
     };
 
     let error;
@@ -153,6 +156,7 @@ export function DutyAssignmentGrid({
                 <th className="p-2 text-left">Date</th>
                 <th className="p-2 text-left">Day</th>
                 <th className="p-2 text-left">Primary Assignment</th>
+                <th className="p-2 text-left">Region/Country</th>
                 <th className="p-2 text-left">Substitute</th>
               </tr>
             </thead>
@@ -182,6 +186,18 @@ export function DutyAssignmentGrid({
                           ))}
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        placeholder="e.g., South, AT, North West"
+                        value={assignment?.responsibility_region || ""}
+                        onChange={(e) => {
+                          const value = e.target.value.trim() || null;
+                          updateAssignment(date, dutyType, assignment?.user_id || null, false, value);
+                        }}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
                     </td>
                     <td className="p-2">
                       <Select

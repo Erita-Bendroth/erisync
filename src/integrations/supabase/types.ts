@@ -169,6 +169,7 @@ export type Database = {
           duty_type: Database["public"]["Enums"]["duty_type"]
           id: string
           notes: string | null
+          responsibility_region: string | null
           substitute_user_id: string | null
           team_id: string
           updated_at: string
@@ -183,6 +184,7 @@ export type Database = {
           duty_type: Database["public"]["Enums"]["duty_type"]
           id?: string
           notes?: string | null
+          responsibility_region?: string | null
           substitute_user_id?: string | null
           team_id: string
           updated_at?: string
@@ -197,6 +199,7 @@ export type Database = {
           duty_type?: Database["public"]["Enums"]["duty_type"]
           id?: string
           notes?: string | null
+          responsibility_region?: string | null
           substitute_user_id?: string | null
           team_id?: string
           updated_at?: string
