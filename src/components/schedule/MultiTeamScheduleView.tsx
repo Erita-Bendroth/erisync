@@ -214,7 +214,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const endDate = format(weekDays[6], "yyyy-MM-dd");
 
       // Fetch ALL data in parallel: schedules, profiles, holidays, and capacity config
-      const [schedulesResult, profilesResult, holidaysResult, capacityResult] = await Promise.all([
+      const [schedulesResult, holidaysResult, capacityResult] = await Promise.all([
         supabase
           .from("schedule_entries")
           .select("date, user_id, team_id, shift_type, activity_type, created_by, notes")
@@ -222,9 +222,6 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
           .gte("date", startDate)
           .lte("date", endDate)
           .limit(1000),
-        supabase
-          .from("profiles")
-          .select("user_id, first_name, last_name, initials, email, country_code"),
         supabase
           .from('holidays')
           .select('*')
@@ -238,16 +235,33 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       ]);
 
       if (schedulesResult.error) throw schedulesResult.error;
-      if (profilesResult.error) console.warn('Error fetching profiles:', profilesResult.error);
       if (holidaysResult.error) console.warn('Error fetching holidays:', holidaysResult.error);
       if (capacityResult.error) console.warn('Error fetching capacity:', capacityResult.error);
 
       const schedules = schedulesResult.data;
-      const profilesData = profilesResult.data || [];
       const holidaysData = holidaysResult.data || [];
       const capacityData = capacityResult.data || [];
       
       setCapacityConfigs(capacityData);
+
+      // Collect ALL user IDs we need (both assignees and creators)
+      const allUserIds = new Set<string>();
+      schedules?.forEach((entry: any) => {
+        if (entry.user_id) allUserIds.add(entry.user_id);
+        if (entry.created_by) allUserIds.add(entry.created_by);
+      });
+
+      console.log(`📊 Fetching profiles for ${allUserIds.size} unique users (assignees + creators)`);
+
+      // Fetch only the profiles we need
+      const profilesResult = await supabase
+        .from("profiles")
+        .select("user_id, first_name, last_name, initials, email, country_code")
+        .in("user_id", Array.from(allUserIds));
+
+      if (profilesResult.error) console.warn('Error fetching profiles:', profilesResult.error);
+
+      const profilesData = profilesResult.data || [];
 
       // Create lookup maps
       const profileMap = new Map(
@@ -273,9 +287,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
           last_name: profile?.last_name || '',
           initials: profile?.initials || null,
           created_by: entry.created_by,
-          creator_name: creatorProfile 
-            ? `${creatorProfile.first_name} ${creatorProfile.last_name || ''}`.trim()
-            : 'System',
+          creator_name: creatorProfile?.first_name || entry.created_by || 'Unknown',
           notes: entry.notes,
         };
       }) || [];
@@ -591,12 +603,10 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                                     <div className="text-xs text-muted-foreground">
                                                       {entry.team_name}
                                                     </div>
-                                                    {entry.creator_name && (
-                                                      <div className="text-xs pt-1 mt-1 border-t border-border">
-                                                        <span className="text-muted-foreground">Scheduled by:</span>{' '}
-                                                        <span className="font-medium">{entry.creator_name}</span>
-                                                      </div>
-                                                    )}
+                                                    <div className="text-xs pt-1 mt-1 border-t border-border">
+                                                      <span className="text-muted-foreground">Scheduled by:</span>{' '}
+                                                      <span className="font-medium">{entry.creator_name}</span>
+                                                    </div>
                                                   </div>
                                                 </TooltipContent>
                                               </Tooltip>

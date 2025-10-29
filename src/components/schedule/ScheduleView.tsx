@@ -591,7 +591,7 @@ useEffect(() => {
             user_id: emp.user_id,
             first_name: emp.first_name ?? '',
             last_name: emp.last_name ?? '',
-            initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+            initials: emp.initials ?? (emp.last_name ? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}` : emp.first_name),
             displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim(),
             country_code: location?.country_code,
             region_code: location?.region_code
@@ -663,7 +663,7 @@ useEffect(() => {
             user_id: emp.user_id,
             first_name: emp.first_name ?? '',
             last_name: emp.last_name ?? '',
-            initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+            initials: emp.initials ?? (emp.last_name ? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}` : emp.first_name),
             displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim(),
             country_code: location?.country_code,
             region_code: location?.region_code
@@ -692,7 +692,7 @@ useEffect(() => {
           user_id: emp.user_id,
           first_name: emp.first_name ?? '',
           last_name: emp.last_name ?? '',
-          initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+          initials: emp.initials ?? (emp.last_name ? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}` : emp.first_name),
           displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
         }));
 
@@ -1025,7 +1025,7 @@ useEffect(() => {
             user_id: emp.user_id,
             first_name: emp.first_name ?? '',
             last_name: emp.last_name ?? '',
-            initials: emp.initials ?? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}`,
+            initials: emp.initials ?? (emp.last_name ? `${emp.first_name?.[0] ?? ''}${emp.last_name?.[0] ?? ''}` : emp.first_name),
             displayName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim()
           }));
 
