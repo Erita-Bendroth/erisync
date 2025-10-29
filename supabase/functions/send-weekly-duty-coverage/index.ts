@@ -365,7 +365,7 @@ serve(async (req) => {
 
     // Send email via Resend using your verified domain
     const emailResult = await resend.emails.send({
-      from: 'Weekly Duty Coverage <onboarding@resend.dev>',
+      from: 'Weekly Duty Coverage <duty@erisync.xyz>',
       to: template.distribution_list,
       subject: `Weekly Duty Coverage - Week ${week_number}, ${year}`,
       html: htmlContent,
