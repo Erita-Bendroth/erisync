@@ -318,57 +318,8 @@ serve(async (req) => {
       );
     }
 
-    // Process screenshots as inline attachments using public URLs
-    const attachments = [];
-    if (customTemplate?.template_data?.screenshots) {
-      for (const screenshot of customTemplate.template_data.screenshots) {
-        try {
-          // Extract the path from the full URL
-          const urlParts = screenshot.url.split('/email-screenshots/');
-          if (urlParts.length === 2) {
-            const filePath = urlParts[1];
-            
-            // Get public URL from Supabase Storage
-            const { data: publicUrlData } = supabaseServiceRole
-              .storage
-              .from('email-screenshots')
-              .getPublicUrl(filePath);
-            
-            if (publicUrlData?.publicUrl) {
-              // Determine file extension
-              const extension = screenshot.name.split('.').pop()?.toLowerCase() || 'png';
-              
-              // Use Resend's path property with public URL
-              attachments.push({
-                path: publicUrlData.publicUrl,
-                filename: `${screenshot.id}.${extension}`,
-                contentId: screenshot.id,
-              });
-              
-              console.log('Added screenshot attachment:', {
-                name: screenshot.name,
-                contentId: screenshot.id,
-                publicUrl: publicUrlData.publicUrl
-              });
-            } else {
-              console.error('Could not get public URL for screenshot:', screenshot.name);
-            }
-          }
-        } catch (err) {
-          console.error('Error processing screenshot:', screenshot.name, err);
-        }
-      }
-    }
-
-    // Log attachment details for debugging
-    console.log('Attachments count:', attachments.length);
-    if (attachments.length > 0) {
-      console.log('Attachment details:', attachments.map(att => ({
-        filename: att.filename,
-        contentId: att.contentId,
-        path: att.path
-      })));
-    }
+    // Screenshots are embedded directly in HTML using public URLs - no attachments needed
+    const attachments: any[] = [];
 
     // Send email via Resend using your verified domain
     const emailResult = await resend.emails.send({
@@ -376,7 +327,7 @@ serve(async (req) => {
       to: template.distribution_list,
       subject: `Weekly Duty Coverage - Week ${week_number}, ${year}`,
       html: htmlContent,
-      attachments: attachments.length > 0 ? attachments : undefined,
+      // No attachments - screenshots are embedded directly via public URLs
     });
 
     console.log('Email sent:', emailResult);
