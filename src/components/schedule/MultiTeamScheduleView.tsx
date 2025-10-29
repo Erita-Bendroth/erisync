@@ -100,7 +100,6 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   useEffect(() => {
     if (selectedTeams.length > 0 && !screenshotMode) {
       fetchTeamData();
-      fetchHolidays();
     } else if (selectedTeams.length === 0) {
       setLoading(false);
       setScheduleData([]);
@@ -118,7 +117,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     }
   };
 
-  const fetchHolidays = async () => {
+  const fetchHolidays = async (userCountries: string[]) => {
     try {
       const startDate = format(weekDays[0], "yyyy-MM-dd");
       const endDate = format(weekDays[6], "yyyy-MM-dd");
@@ -128,7 +127,8 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         .select("*")
         .gte("date", startDate)
         .lte("date", endDate)
-        .eq("is_public", true);
+        .eq("is_public", true)
+        .in("country_code", userCountries);
 
       if (error) throw error;
       setHolidays(data || []);
@@ -166,9 +166,9 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       let profilesData: any[] = [];
       if (userIds.length > 0) {
         const { data, error: profileError } = await supabase
-          .rpc('get_multiple_basic_profile_info', {
-            _user_ids: userIds
-          });
+          .from('profiles')
+          .select('user_id, first_name, last_name, initials, email, country_code')
+          .in('user_id', userIds);
         
         if (profileError) {
           console.warn('Error fetching profiles, continuing without:', profileError);
@@ -215,6 +215,17 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       });
 
       setScheduleData(enrichedSchedules);
+
+      // Extract unique country codes and fetch relevant holidays
+      const userCountries = [...new Set(
+        profilesData
+          .map(p => p.country_code)
+          .filter(c => c) // Remove nulls/undefined
+      )];
+      
+      if (userCountries.length > 0) {
+        await fetchHolidays(userCountries);
+      }
     } catch (err) {
       console.error('Error fetching team data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load schedule data');
