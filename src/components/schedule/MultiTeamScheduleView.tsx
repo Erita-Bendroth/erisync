@@ -98,6 +98,51 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     capacityData: capacityConfigs,
   });
 
+  // Helper function to count shift types for a given date across all selected teams
+  const getShiftTypeCounts = (dateStr: string, day: Date) => {
+    const counts = {
+      early: 0,
+      late: 0,
+      normal: 0,
+      weekend: 0,
+      total: 0
+    };
+    
+    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+    
+    selectedTeams.forEach(teamId => {
+      const daySchedules = scheduleByDateAndTeam.get(dateStr)?.get(teamId) || [];
+      daySchedules.forEach(entry => {
+        // Only count "work" activities
+        if (entry.activity_type === 'work') {
+          counts.total++;
+          
+          // Determine effective shift type (weekend overrides normal on Sat/Sun)
+          const effectiveShiftType = isWeekend && entry.shift_type === 'normal' 
+            ? 'weekend' 
+            : entry.shift_type;
+          
+          switch (effectiveShiftType) {
+            case 'early':
+              counts.early++;
+              break;
+            case 'late':
+              counts.late++;
+              break;
+            case 'weekend':
+              counts.weekend++;
+              break;
+            case 'normal':
+              counts.normal++;
+              break;
+          }
+        }
+      });
+    });
+    
+    return counts;
+  };
+
   // Sync teams from props
   useEffect(() => {
     if (teamsFromProps && teamsFromProps.length > 0) {
@@ -548,16 +593,46 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                 }`}
                               >
                                 <td className="p-3 sticky left-0 bg-background z-10 font-medium">
-                                  <div className="flex items-center gap-2">
-                                    <div>
-                                      <div>{dayName}</div>
-                                      <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <div>
+                                        <div>{dayName}</div>
+                                        <div className="text-xs text-muted-foreground">{format(day, "dd.MM")}</div>
+                                      </div>
+                                      {holiday && showHolidays && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          {holiday.name}
+                                        </Badge>
+                                      )}
                                     </div>
-                                    {holiday && showHolidays && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        {holiday.name}
-                                      </Badge>
-                                    )}
+                                    {/* Shift type counter */}
+                                    {selectedTeams.length > 0 && (() => {
+                                      const counts = getShiftTypeCounts(dateStr, day);
+                                      return counts.total > 0 ? (
+                                        <div className="flex gap-1.5 text-xs font-mono mt-1">
+                                          {counts.early > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded font-semibold" style={{ backgroundColor: getShiftTypeColor("early"), color: 'white' }}>
+                                              E:{counts.early}
+                                            </span>
+                                          )}
+                                          {counts.late > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded font-semibold" style={{ backgroundColor: getShiftTypeColor("late"), color: 'white' }}>
+                                              L:{counts.late}
+                                            </span>
+                                          )}
+                                          {counts.normal > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded font-semibold" style={{ backgroundColor: getShiftTypeColor("normal"), color: 'white' }}>
+                                              N:{counts.normal}
+                                            </span>
+                                          )}
+                                          {counts.weekend > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded font-semibold" style={{ backgroundColor: getShiftTypeColor("weekend"), color: 'white' }}>
+                                              W:{counts.weekend}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : null;
+                                    })()}
                                   </div>
                                 </td>
                                 {selectedTeams.map((teamId) => {
