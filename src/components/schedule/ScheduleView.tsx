@@ -954,13 +954,15 @@ useEffect(() => {
       const data = allData;
       const error = null;
 
-      // Fetch user profiles for the entries
+      // Fetch user profiles for the entries (assignees AND creators)
       const userIds = [...new Set(data?.map(entry => entry.user_id) || [])];
+      const creatorIds = [...new Set(data?.map(entry => entry.created_by).filter(Boolean) || [])];
+      const allUserIds = [...new Set([...userIds, ...creatorIds])];
       const teamIds = [...new Set(data?.map(entry => entry.team_id) || [])];
       
       console.log('🔍 Fetching profiles and teams for entries...');
       const [profilesResult, teamsResult] = await Promise.all([
-        supabase.rpc('get_multiple_basic_profile_info', { _user_ids: userIds }),
+        supabase.rpc('get_multiple_basic_profile_info', { _user_ids: allUserIds }),
         supabase.from('teams').select('id, name').in('id', teamIds)
       ]);
       
@@ -977,16 +979,19 @@ useEffect(() => {
       const profilesMap = new Map((profilesResult.data || []).map(p => [p.user_id, p]));
       const teamsMap = new Map((teamsResult.data || []).map(t => [t.id, t]));
       
-      const transformedData = data?.map(item => {
-        const profile = profilesMap.get(item.user_id) || { first_name: 'Unknown', last_name: 'User' };
-        const team = teamsMap.get(item.team_id) || { name: 'Unknown Team' };
-        
-        return {
-          ...item,
-          profiles: profile,
-          teams: team
-        };
-      }) || [];
+        const transformedData = data?.map(item => {
+          const profile = profilesMap.get(item.user_id) || { first_name: 'Unknown', last_name: 'User' };
+          const creatorProfile = profilesMap.get(item.created_by);
+          const team = teamsMap.get(item.team_id) || { name: 'Unknown Team' };
+          
+          return {
+            ...item,
+            profiles: profile,
+            teams: team,
+            created_by: item.created_by,
+            creator_name: creatorProfile?.first_name || item.created_by || 'Unknown'
+          };
+        }) || [];
       
       console.log('✅ Final merged dataset:', {
         totalEntries: transformedData.length,

@@ -23,6 +23,8 @@ interface ScheduleEntry {
   activity_type: string;
   availability_status: string;
   notes?: string;
+  created_by?: string;
+  creator_name?: string;
   profiles: {
     first_name: string;
     last_name: string;
@@ -336,6 +338,13 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             {format(new Date(entry.date), "EEEE, MMMM d, yyyy")}
           </DialogDescription>
         </DialogHeader>
+        
+        {entry.creator_name && (
+          <div className="mt-2 p-2 bg-muted rounded-md text-sm">
+            <span className="text-muted-foreground">Scheduled by:</span>{' '}
+            <span className="font-medium">{entry.creator_name}</span>
+          </div>
+        )}
         
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
