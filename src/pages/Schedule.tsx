@@ -316,7 +316,7 @@ const Schedule = () => {
                 </Select>
                 {scheduleViewMode === "standard" && (
                   <>
-                    <ScheduleEntryForm>
+                    <ScheduleEntryForm onSuccess={() => setScheduleRefreshKey(prev => prev + 1)}>
                       <Button>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Entry
@@ -465,7 +465,7 @@ const Schedule = () => {
             {scheduleViewMode === "standard" ? (
               <>
                 <BulkScheduleGenerator onScheduleGenerated={() => setScheduleRefreshKey(prev => prev + 1)} />
-                <ScheduleView key={scheduleRefreshKey} initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
+                <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
               </>
             ) : (
               // Show ManagerCoverageView for managers (not admin/planner), otherwise MultiTeamScheduleView
