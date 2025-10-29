@@ -64,6 +64,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const [currentDate, setCurrentDate] = useState(new Date());
   const [scheduleData, setScheduleData] = useState<ScheduleEntry[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [capacityConfigs, setCapacityConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"schedule" | "coverage" | "grid">("schedule");
@@ -90,6 +91,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     scheduleData: scheduleData,
     teamsData: teams.filter(t => selectedTeams.includes(t.id)),
     holidaysData: holidays,
+    capacityData: capacityConfigs,
   });
 
   // Sync teams from props
@@ -207,36 +209,41 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const startDate = format(weekDays[0], "yyyy-MM-dd");
       const endDate = format(weekDays[6], "yyyy-MM-dd");
 
-      // Fetch schedule entries and capacity config in PARALLEL
-      const [schedulesResult] = await Promise.all([
+      // Fetch ALL data in parallel: schedules, profiles, holidays, and capacity config
+      const [schedulesResult, profilesResult, holidaysResult, capacityResult] = await Promise.all([
         supabase
           .from("schedule_entries")
           .select("date, user_id, team_id, shift_type, activity_type")
           .in("team_id", selectedTeams)
           .gte("date", startDate)
           .lte("date", endDate)
-          .limit(1000)
+          .limit(1000),
+        supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name, initials, email, country_code"),
+        supabase
+          .from('holidays')
+          .select('*')
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .eq('is_public', true),
+        supabase
+          .from('team_capacity_config')
+          .select('*')
+          .in('team_id', selectedTeams)
       ]);
 
       if (schedulesResult.error) throw schedulesResult.error;
-      const schedules = schedulesResult.data;
+      if (profilesResult.error) console.warn('Error fetching profiles:', profilesResult.error);
+      if (holidaysResult.error) console.warn('Error fetching holidays:', holidaysResult.error);
+      if (capacityResult.error) console.warn('Error fetching capacity:', capacityResult.error);
 
-      // Get unique user IDs and fetch profile data
-      const userIds = [...new Set(schedules?.map(e => e.user_id) || [])];
+      const schedules = schedulesResult.data;
+      const profilesData = profilesResult.data || [];
+      const holidaysData = holidaysResult.data || [];
+      const capacityData = capacityResult.data || [];
       
-      let profilesData: any[] = [];
-      if (userIds.length > 0) {
-        const { data, error: profileError } = await supabase
-          .from('profiles')
-          .select('user_id, first_name, last_name, initials, email, country_code')
-          .in('user_id', userIds);
-        
-        if (profileError) {
-          console.warn('Error fetching profiles, continuing without:', profileError);
-        } else {
-          profilesData = data || [];
-        }
-      }
+      setCapacityConfigs(capacityData);
 
       // Create lookup maps
       const profileMap = new Map(
@@ -264,17 +271,19 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       }) || [];
 
       setScheduleData(enrichedSchedules);
-
-      // Extract unique country codes and fetch relevant holidays
-      const userCountries = [...new Set(
+      
+      // Filter holidays by user countries to avoid showing irrelevant holidays
+      const userCountries = new Set(
         profilesData
           .map(p => p.country_code)
-          .filter(c => c) // Remove nulls/undefined
-      )];
+          .filter(c => c)
+      );
       
-      if (userCountries.length > 0) {
-        await fetchHolidays(userCountries);
-      }
+      const relevantHolidays = userCountries.size > 0
+        ? holidaysData.filter(h => userCountries.has(h.country_code))
+        : [];
+      
+      setHolidays(relevantHolidays);
     } catch (err) {
       console.error('Error fetching team data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load schedule data');

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CoverageGap {
@@ -31,6 +31,7 @@ interface UseCoverageAnalysisProps {
   scheduleData?: any[];
   teamsData?: Array<{ id: string; name: string }>;
   holidaysData?: any[];
+  capacityData?: any[];
 }
 
 export function useCoverageAnalysis({
@@ -41,6 +42,7 @@ export function useCoverageAnalysis({
   scheduleData,
   teamsData,
   holidaysData,
+  capacityData,
 }: UseCoverageAnalysisProps): CoverageAnalysis {
   const [analysis, setAnalysis] = useState<CoverageAnalysis>({
     coveragePercentage: 100,
@@ -52,24 +54,8 @@ export function useCoverageAnalysis({
     isLoading: true,
   });
 
-  useEffect(() => {
-    if (teamIds.length === 0) {
-      setAnalysis({
-        coveragePercentage: 100,
-        gaps: [],
-        belowThreshold: false,
-        totalDays: 0,
-        coveredDays: 0,
-        threshold,
-        isLoading: false,
-      });
-      return;
-    }
+  const analyzeCoverage = useCallback(async () => {
 
-    analyzeCoverage();
-  }, [teamIds, startDate, endDate, threshold]);
-
-  const analyzeCoverage = async () => {
     try {
       setAnalysis((prev) => ({ ...prev, isLoading: true }));
 
@@ -108,13 +94,16 @@ export function useCoverageAnalysis({
         holidays = data || [];
       }
 
-      // Fetch capacity config (only query that remains)
-      const { data: capacityConfigs, error: capacityError } = await supabase
-        .from('team_capacity_config')
-        .select('*')
-        .in('team_id', teamIds);
-
-      if (capacityError) throw capacityError;
+      // Use provided capacity data or fetch it
+      let capacityConfigs = capacityData;
+      if (!capacityConfigs) {
+        const { data, error: capacityError } = await supabase
+          .from('team_capacity_config')
+          .select('*')
+          .in('team_id', teamIds);
+        if (capacityError) throw capacityError;
+        capacityConfigs = data || [];
+      }
 
       // Build coverage analysis
       const gaps: CoverageGap[] = [];
@@ -137,11 +126,15 @@ export function useCoverageAnalysis({
 
         for (const teamId of teamIds) {
           const capacity = capacityMap.get(teamId);
-          if (!capacity) continue;
+          
+          // Default to 1 required staff if no capacity config exists
+          if (!capacity) {
+            console.warn(`Team ${teamId} (${teamMap.get(teamId)}) has no capacity configuration. Using default of 1 required staff.`);
+          }
 
           // Determine required staff
-          let required = capacity.min_staff_required;
-          if (isWeekend && capacity.applies_to_weekends) {
+          let required = capacity?.min_staff_required || 1;
+          if (isWeekend && capacity?.applies_to_weekends) {
             required = capacity.min_staff_required;
           }
 
@@ -187,7 +180,24 @@ export function useCoverageAnalysis({
       console.error('Error analyzing coverage:', error);
       setAnalysis((prev) => ({ ...prev, isLoading: false }));
     }
-  };
+  }, [teamIds, startDate, endDate, threshold, scheduleData, teamsData, holidaysData, capacityData]);
+
+  useEffect(() => {
+    if (teamIds.length === 0) {
+      setAnalysis({
+        coveragePercentage: 100,
+        gaps: [],
+        belowThreshold: false,
+        totalDays: 0,
+        coveredDays: 0,
+        threshold,
+        isLoading: false,
+      });
+      return;
+    }
+
+    analyzeCoverage();
+  }, [teamIds, startDate, endDate, threshold, scheduleData, teamsData, holidaysData, capacityData, analyzeCoverage]);
 
   return analysis;
 }
