@@ -318,7 +318,7 @@ serve(async (req) => {
       );
     }
 
-    // Process screenshots as inline attachments
+    // Process screenshots as inline attachments using public URLs
     const attachments = [];
     if (customTemplate?.template_data?.screenshots) {
       for (const screenshot of customTemplate.template_data.screenshots) {
@@ -328,37 +328,30 @@ serve(async (req) => {
           if (urlParts.length === 2) {
             const filePath = urlParts[1];
             
-            // Download image from Supabase Storage
-            const { data: imageData, error: downloadError } = await supabaseServiceRole
+            // Get public URL from Supabase Storage
+            const { data: publicUrlData } = supabaseServiceRole
               .storage
               .from('email-screenshots')
-              .download(filePath);
+              .getPublicUrl(filePath);
             
-            if (!downloadError && imageData) {
-              // Convert to base64 using proper binary encoding
-              const arrayBuffer = await imageData.arrayBuffer();
-              const bytes = new Uint8Array(arrayBuffer);
-              let binary = '';
-              for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
-              }
-              const base64 = btoa(binary);
+            if (publicUrlData?.publicUrl) {
+              // Determine file extension
+              const extension = screenshot.name.split('.').pop()?.toLowerCase() || 'png';
               
-              // Determine content type from filename
-              const extension = screenshot.name.split('.').pop()?.toLowerCase();
-              const contentType = extension === 'png' ? 'image/png' : 
-                                  extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 
-                                  'image/png';
-              
+              // Use Resend's path property with public URL
               attachments.push({
+                path: publicUrlData.publicUrl,
                 filename: `${screenshot.id}.${extension}`,
-                content: base64,
                 contentId: screenshot.id,
               });
               
-              console.log('Processed screenshot:', screenshot.name, 'with CID:', screenshot.id);
+              console.log('Added screenshot attachment:', {
+                name: screenshot.name,
+                contentId: screenshot.id,
+                publicUrl: publicUrlData.publicUrl
+              });
             } else {
-              console.error('Error downloading screenshot:', downloadError);
+              console.error('Could not get public URL for screenshot:', screenshot.name);
             }
           }
         } catch (err) {
