@@ -27,6 +27,10 @@ interface UseCoverageAnalysisProps {
   startDate: Date;
   endDate: Date;
   threshold?: number;
+  // Optional pre-fetched data to avoid duplicate queries
+  scheduleData?: any[];
+  teamsData?: Array<{ id: string; name: string }>;
+  holidaysData?: any[];
 }
 
 export function useCoverageAnalysis({
@@ -34,6 +38,9 @@ export function useCoverageAnalysis({
   startDate,
   endDate,
   threshold = 90,
+  scheduleData,
+  teamsData,
+  holidaysData,
 }: UseCoverageAnalysisProps): CoverageAnalysis {
   const [analysis, setAnalysis] = useState<CoverageAnalysis>({
     coveragePercentage: 100,
@@ -66,41 +73,48 @@ export function useCoverageAnalysis({
     try {
       setAnalysis((prev) => ({ ...prev, isLoading: true }));
 
-      // Fetch teams data
-      const { data: teams, error: teamsError } = await supabase
-        .from('teams')
-        .select('id, name')
-        .in('id', teamIds);
+      // Use provided data if available, otherwise fetch
+      let teams = teamsData;
+      if (!teams) {
+        const { data, error: teamsError } = await supabase
+          .from('teams')
+          .select('id, name')
+          .in('id', teamIds);
+        if (teamsError) throw teamsError;
+        teams = data || [];
+      }
 
-      if (teamsError) throw teamsError;
+      let scheduleEntries = scheduleData;
+      if (!scheduleEntries) {
+        const { data, error: scheduleError } = await supabase
+          .from('schedule_entries')
+          .select('*')
+          .in('team_id', teamIds)
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0])
+          .in('activity_type', ['work']);
+        if (scheduleError) throw scheduleError;
+        scheduleEntries = data || [];
+      }
 
-      // Fetch capacity config for teams
+      let holidays = holidaysData;
+      if (!holidays) {
+        const { data, error: holidaysError } = await supabase
+          .from('holidays')
+          .select('*')
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0]);
+        if (holidaysError) throw holidaysError;
+        holidays = data || [];
+      }
+
+      // Fetch capacity config (only query that remains)
       const { data: capacityConfigs, error: capacityError } = await supabase
         .from('team_capacity_config')
         .select('*')
         .in('team_id', teamIds);
 
       if (capacityError) throw capacityError;
-
-      // Fetch schedule entries for date range
-      const { data: scheduleEntries, error: scheduleError } = await supabase
-        .from('schedule_entries')
-        .select('*')
-        .in('team_id', teamIds)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
-        .in('activity_type', ['work']);
-
-      if (scheduleError) throw scheduleError;
-
-      // Fetch holidays for date range
-      const { data: holidays, error: holidaysError } = await supabase
-        .from('holidays')
-        .select('*')
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
-
-      if (holidaysError) throw holidaysError;
 
       // Build coverage analysis
       const gaps: CoverageGap[] = [];

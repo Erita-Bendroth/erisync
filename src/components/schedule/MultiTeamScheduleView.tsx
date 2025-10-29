@@ -81,12 +81,15 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const year = getYear(currentDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Coverage analysis hook
+  // Coverage analysis hook - pass pre-fetched data to avoid duplicate queries
   const coverageAnalysis = useCoverageAnalysis({
     teamIds: selectedTeams,
     startDate: weekStart,
     endDate: weekEnd,
     threshold: 90,
+    scheduleData: scheduleData,
+    teamsData: teams.filter(t => selectedTeams.includes(t.id)),
+    holidaysData: holidays,
   });
 
   // Sync teams from props
@@ -204,16 +207,19 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const startDate = format(weekDays[0], "yyyy-MM-dd");
       const endDate = format(weekDays[6], "yyyy-MM-dd");
 
-      // Fetch schedule entries directly for selected teams
-      const { data: schedules, error: scheduleError } = await supabase
-        .from("schedule_entries")
-        .select("date, user_id, team_id, shift_type, activity_type")
-        .in("team_id", selectedTeams)
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .limit(1000);
+      // Fetch schedule entries and capacity config in PARALLEL
+      const [schedulesResult] = await Promise.all([
+        supabase
+          .from("schedule_entries")
+          .select("date, user_id, team_id, shift_type, activity_type")
+          .in("team_id", selectedTeams)
+          .gte("date", startDate)
+          .lte("date", endDate)
+          .limit(1000)
+      ]);
 
-      if (scheduleError) throw scheduleError;
+      if (schedulesResult.error) throw schedulesResult.error;
+      const schedules = schedulesResult.data;
 
       // Get unique user IDs and fetch profile data
       const userIds = [...new Set(schedules?.map(e => e.user_id) || [])];
