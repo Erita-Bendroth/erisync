@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save, RefreshCw, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save, RefreshCw, Info, ImageIcon } from "lucide-react";
 import { DutyAssignmentGrid } from "./DutyAssignmentGrid";
 import { DistributionListManager } from "./DistributionListManager";
 import { EmailTableBuilder } from "./EmailTableBuilder";
@@ -58,6 +58,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [customNotes, setCustomNotes] = useState<string[]>([]);
   const [useCustomLayout, setUseCustomLayout] = useState(false);
   const [customTemplateId, setCustomTemplateId] = useState<string | null>(null);
+  const [customScreenshots, setCustomScreenshots] = useState<Array<{
+    id: string;
+    name: string;
+    url: string;
+    caption: string;
+  }>>([]);
 
   useEffect(() => {
     if (open) {
@@ -398,19 +404,55 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     };
   };
 
+  const getWeekDates = (weekNumber: number, year: number): Date[] => {
+    const jan1 = new Date(year, 0, 1);
+    const jan1Day = jan1.getDay() || 7;
+    const firstMonday = new Date(year, 0, 1 + ((8 - jan1Day) % 7));
+    const daysOffset = (weekNumber - 1) * 7;
+    const weekStart = new Date(firstMonday.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+    
+    const dates: Date[] = [];
+    for (let i = 0; i < 5; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
   const addCustomRegion = () => {
+    const weekDates = getWeekDates(currentWeek, currentYear);
+    const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+    
+    const rows = weekDates.map((date, index) => {
+      const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+      
+      return {
+        id: crypto.randomUUID(),
+        cells: [
+          { 
+            id: crypto.randomUUID(), 
+            content: dateStr, 
+            backgroundColor: 'white' as const
+          },
+          { 
+            id: crypto.randomUUID(), 
+            content: weekdays[index], 
+            backgroundColor: 'white' as const
+          },
+          { 
+            id: crypto.randomUUID(), 
+            content: '', 
+            backgroundColor: 'white' as const
+          },
+        ]
+      };
+    });
+    
     const newRegion: EmailRegionTable = {
       id: crypto.randomUUID(),
-      title: 'New Region',
-      rows: [
-        {
-          id: crypto.randomUUID(),
-          cells: [
-            { id: crypto.randomUUID(), content: '', backgroundColor: 'white' },
-            { id: crypto.randomUUID(), content: '', backgroundColor: 'white' },
-          ]
-        }
-      ]
+      title: 'New Custom Table',
+      rows
     };
     setCustomRegions([...customRegions, newRegion]);
   };
@@ -439,6 +481,66 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     setCustomNotes(customNotes.filter((_, i) => i !== index));
   };
 
+  const handleScreenshotUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Error", description: "Please upload an image file", variant: "destructive" });
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Error", description: "Image must be smaller than 5MB", variant: "destructive" });
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user?.id}/${crypto.randomUUID()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('email-screenshots')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('email-screenshots')
+        .getPublicUrl(fileName);
+      
+      setCustomScreenshots([
+        ...customScreenshots,
+        {
+          id: crypto.randomUUID(),
+          name: file.name,
+          url: publicUrl,
+          caption: ''
+        }
+      ]);
+      
+      toast({ title: "Success", description: "Screenshot uploaded successfully" });
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({ title: "Error", description: error.message || "Failed to upload screenshot", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateScreenshotCaption = (id: string, caption: string) => {
+    setCustomScreenshots(
+      customScreenshots.map(s => s.id === id ? { ...s, caption } : s)
+    );
+  };
+
+  const deleteScreenshot = (id: string) => {
+    setCustomScreenshots(customScreenshots.filter(s => s.id !== id));
+  };
+
   const saveCustomLayout = async () => {
     if (!selectedTemplate) {
       toast({ title: "Error", description: "Please save the template first", variant: "destructive" });
@@ -456,6 +558,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       template_data: {
         regions: customRegions,
         notes: customNotes,
+        screenshots: customScreenshots,
       } as any,
       distribution_list: distributionList,
       mode: 'hybrid',
@@ -702,6 +805,20 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                 <Plus className="w-4 h-4 mr-2" />
                 Add Custom Table
               </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => document.getElementById('screenshot-upload')?.click()}
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Add Screenshot
+              </Button>
+              <input
+                id="screenshot-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleScreenshotUpload}
+                className="hidden"
+              />
             </div>
 
             {customRegions.length > 0 && (
@@ -716,6 +833,38 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                   </div>
                 ))}
               </div>
+            )}
+
+            {customScreenshots.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Screenshots</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {customScreenshots.map((screenshot) => (
+                    <div key={screenshot.id} className="border rounded-lg p-4 space-y-2">
+                      <img 
+                        src={screenshot.url} 
+                        alt={screenshot.name}
+                        className="max-w-full h-auto rounded"
+                      />
+                      <Input
+                        value={screenshot.caption}
+                        onChange={(e) => updateScreenshotCaption(screenshot.id, e.target.value)}
+                        placeholder="Add caption..."
+                      />
+                      <Button 
+                        onClick={() => deleteScreenshot(screenshot.id)} 
+                        variant="destructive" 
+                        size="sm"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
             )}
 
             {customRegions.length > 0 && (

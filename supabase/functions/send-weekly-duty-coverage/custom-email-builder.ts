@@ -15,9 +15,17 @@ interface EmailRegionTable {
   rows: EmailTableRow[];
 }
 
+interface Screenshot {
+  id: string;
+  name: string;
+  url: string;
+  caption: string;
+}
+
 interface TemplateData {
   regions: EmailRegionTable[];
   notes: string[];
+  screenshots?: Screenshot[];
 }
 
 export function buildCustomEmailHtml(
@@ -58,6 +66,18 @@ export function buildCustomEmailHtml(
     </table>
   `).join('');
 
+  const screenshotsHtml = templateData.screenshots && templateData.screenshots.length > 0 ? `
+    <div style="margin-top: 30px;">
+      <h3 style="color: #555; font-size: 16px; margin-bottom: 16px;">Screenshots</h3>
+      ${templateData.screenshots.map((screenshot) => `
+        <div style="margin-bottom: 24px;">
+          <img src="${screenshot.url}" alt="${escapeHtml(screenshot.name)}" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #e5e7eb;" />
+          ${screenshot.caption ? `<p style="margin-top: 8px; color: #6b7280; font-size: 14px;">${escapeHtml(screenshot.caption)}</p>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
   const notesHtml = templateData.notes && templateData.notes.length > 0 ? `
     <div class="notes" style="margin-top: 30px;">
       <h3 style="color: #555; font-size: 16px;">Notes</h3>
@@ -90,6 +110,7 @@ export function buildCustomEmailHtml(
   <div class="container">
     <h1>${escapeHtml(templateName)} - KW ${weekNumber}</h1>
     ${regionsHtml}
+    ${screenshotsHtml}
     ${notesHtml}
   </div>
 </body>
