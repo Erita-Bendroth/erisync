@@ -335,9 +335,14 @@ serve(async (req) => {
               .download(filePath);
             
             if (!downloadError && imageData) {
-              // Convert to base64
+              // Convert to base64 using proper binary encoding
               const arrayBuffer = await imageData.arrayBuffer();
-              const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+              const bytes = new Uint8Array(arrayBuffer);
+              let binary = '';
+              for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+              }
+              const base64 = btoa(binary);
               
               // Determine content type from filename
               const extension = screenshot.name.split('.').pop()?.toLowerCase();
@@ -361,6 +366,18 @@ serve(async (req) => {
           console.error('Error processing screenshot:', screenshot.name, err);
         }
       }
+    }
+
+    // Log attachment details for debugging
+    console.log('Attachments count:', attachments.length);
+    if (attachments.length > 0) {
+      console.log('Attachment details:', attachments.map(att => ({
+        filename: att.filename,
+        contentId: att.contentId,
+        contentType: att.content_type,
+        base64Length: att.content.length,
+        base64Preview: att.content.substring(0, 50) + '...'
+      })));
     }
 
     // Send email via Resend using your verified domain
