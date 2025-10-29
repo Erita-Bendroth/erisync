@@ -319,16 +319,27 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         throw error;
       }
 
-      // Filter based on selected team
+      // Get all descendant team IDs for the selected team (for hierarchy support)
+      let allTeamIds = selectedTeam ? [selectedTeam] : [];
+      if (selectedTeam) {
+        const { data: subteamData } = await supabase
+          .rpc('get_all_subteam_ids', { _team_id: selectedTeam });
+        
+        if (subteamData && subteamData.length > 0) {
+          allTeamIds = subteamData;
+        }
+      }
+
+      // Filter based on selected team and all its descendants
       let filtered = data || [];
       if (selectedTeam) {
         filtered = data?.filter(def => {
           // Global definitions (both fields null)
           const isGlobal = def.team_ids === null && def.team_id === null;
           
-          // Team-specific definitions
-          const matchesTeamIds = def.team_ids && def.team_ids.includes(selectedTeam);
-          const matchesTeamId = def.team_id === selectedTeam;
+          // Check if definition matches any team in the hierarchy
+          const matchesTeamIds = def.team_ids && def.team_ids.some(tid => allTeamIds.includes(tid));
+          const matchesTeamId = def.team_id && allTeamIds.includes(def.team_id);
           
           return isGlobal || matchesTeamIds || matchesTeamId;
         }) || [];
