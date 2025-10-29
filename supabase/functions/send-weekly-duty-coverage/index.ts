@@ -346,7 +346,7 @@ serve(async (req) => {
                                   'image/png';
               
               attachments.push({
-                filename: screenshot.name.split('/').pop() || screenshot.name,
+                filename: `${screenshot.id}.${extension}`,
                 content: base64,
                 content_type: contentType,
                 cid: screenshot.id, // Content-ID for inline reference
