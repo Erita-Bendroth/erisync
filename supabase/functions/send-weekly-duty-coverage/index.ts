@@ -366,9 +366,7 @@ serve(async (req) => {
       console.log('Attachment details:', attachments.map(att => ({
         filename: att.filename,
         contentId: att.contentId,
-        contentType: att.content_type,
-        base64Length: att.content.length,
-        base64Preview: att.content.substring(0, 50) + '...'
+        path: att.path
       })));
     }
 
