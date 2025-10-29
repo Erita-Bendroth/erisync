@@ -597,7 +597,19 @@ function buildDutyCoverageEmail(
       const teamCells = consolidatedTeams.map(consolidated => {
         const teamAssignments = byDate[dateStr][consolidated.category] || [];
         
-        if (teamAssignments.length === 0) {
+        // Deduplicate assignments by user_id - if same person appears in multiple sub-teams, show only once
+        const uniqueAssignments = teamAssignments.reduce((acc, assignment) => {
+          // Use user_id as key, or generate unique key for TBD entries
+          const key = assignment.user_id || `tbd_${assignment.team_id}`;
+          if (!acc.has(key)) {
+            acc.set(key, assignment);
+          }
+          return acc;
+        }, new Map<string, Assignment>());
+        
+        const dedupedAssignments = Array.from(uniqueAssignments.values());
+        
+        if (dedupedAssignments.length === 0) {
           return `
             <td style="padding: 12px; border: 1px solid #e5e7eb; color: #9ca3af;">-</td>
             <td style="padding: 12px; border: 1px solid #e5e7eb; color: #9ca3af;">-</td>
@@ -605,13 +617,13 @@ function buildDutyCoverageEmail(
         }
         
         // Separate names and regions into individual columns
-        const nameRows = teamAssignments.map(assignment => {
+        const nameRows = dedupedAssignments.map(assignment => {
           const name = assignment.user ? formatNameForEmail(assignment.user) : 'TBD';
           const sourceIndicator = assignment.source === 'schedule' ? '📅 ' : '';
           return `${sourceIndicator}${name}`;
         }).join('<br/>');
 
-        const regionRows = teamAssignments.map(assignment => {
+        const regionRows = dedupedAssignments.map(assignment => {
           return assignment.responsibility_region || '-';
         }).join('<br/>');
 
