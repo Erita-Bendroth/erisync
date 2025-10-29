@@ -233,8 +233,12 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       return;
     }
 
-    console.log('Sending email with template ID:', savedId);
-    console.log('Distribution list:', distributionList);
+    console.log('About to send with:', {
+      customTemplateId,
+      savedId,
+      hasValue: !!savedId,
+      distributionList: distributionList.length
+    });
 
     setLoading(true);
     const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
@@ -654,19 +658,42 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       : await supabase.from('custom_duty_email_templates').insert([templateData]).select().single();
 
     setLoading(false);
+
+    // Check if UPDATE returned no data (template doesn't exist anymore)
+    if (!error && !data && customTemplateId) {
+      console.warn('Template not found, creating new one instead');
+      const { data: newData, error: insertError } = await supabase
+        .from('custom_duty_email_templates')
+        .insert([templateData])
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        toast({ title: "Error", description: insertError.message, variant: "destructive" });
+        return null;
+      }
+      
+      if (newData) {
+        setCustomTemplateId(newData.id);
+        console.log('Created new template with ID:', newData.id);
+        toast({ title: "Success", description: "Custom layout saved successfully" });
+        return newData.id;
+      }
+    }
+
     if (error) {
       console.error('Save error:', error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return null;
-    } else {
-      if (data) {
-        setCustomTemplateId(data.id);
-        console.log('Saved template with ID:', data.id);
-        toast({ title: "Success", description: "Custom layout saved successfully" });
-        return data.id;
-      }
-      return null;
+    } else if (data) {
+      setCustomTemplateId(data.id);
+      console.log('Saved template with ID:', data.id);
+      toast({ title: "Success", description: "Custom layout saved successfully" });
+      return data.id;
     }
+
+    return null;
   };
 
   const previewCustomLayout = async () => {
@@ -690,7 +717,11 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       templateIdToUse = savedId;
     }
 
-    console.log('Previewing template ID:', templateIdToUse);
+    console.log('About to preview with:', {
+      customTemplateId,
+      templateIdToUse,
+      hasValue: !!templateIdToUse
+    });
 
     setLoading(true);
     const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
@@ -741,10 +772,16 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   useEffect(() => {
-    if (selectedTemplate && open) {
-      loadCustomLayoutForTemplate(selectedTemplate);
+    if (open) {
+      // Clear stale state when modal opens
+      setCustomTemplateId(undefined);
+      
+      // Then load if template is selected
+      if (selectedTemplate) {
+        loadCustomLayoutForTemplate(selectedTemplate);
+      }
     }
-  }, [selectedTemplate, currentWeek, currentYear, open]);
+  }, [open, selectedTemplate, currentWeek, currentYear]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

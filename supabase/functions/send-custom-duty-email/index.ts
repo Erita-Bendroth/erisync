@@ -56,6 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { template_id, preview } = await req.json() as CustomEmailRequest;
 
+    console.log('Received request:', { template_id, preview });
+
     if (!template_id) {
       throw new Error('Template ID is required');
     }
