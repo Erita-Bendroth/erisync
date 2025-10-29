@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,11 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const [viewMode, setViewMode] = useState<"schedule" | "coverage" | "grid">("schedule");
   const [screenshotMode, setScreenshotMode] = useState(false);
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
+  
+  // Fetch deduplication ref
+  const fetchInProgressRef = useRef(false);
+  const prevSelectedTeamsRef = useRef<string[]>([]);
+  const prevDateRef = useRef<Date>(currentDate);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -93,9 +98,43 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     }
   }, [teamsFromProps]);
 
+  // Memoize schedule data by date and team for fast lookups
+  const scheduleByDateAndTeam = useMemo(() => {
+    const map = new Map<string, Map<string, ScheduleEntry[]>>();
+    
+    scheduleData.forEach(entry => {
+      const dateStr = typeof entry.date === 'string' ? entry.date : format(parseISO(entry.date), "yyyy-MM-dd");
+      
+      if (!map.has(dateStr)) {
+        map.set(dateStr, new Map());
+      }
+      
+      const dateMap = map.get(dateStr)!;
+      if (!dateMap.has(entry.team_id)) {
+        dateMap.set(entry.team_id, []);
+      }
+      
+      if (entry.activity_type === 'work') {
+        dateMap.get(entry.team_id)!.push(entry);
+      }
+    });
+    
+    return map;
+  }, [scheduleData]);
+
   useEffect(() => {
-    if (selectedTeams.length > 0 && !screenshotMode) {
-      fetchTeamData();
+    // Only fetch if something actually changed
+    const teamsChanged = JSON.stringify([...prevSelectedTeamsRef.current].sort()) !== 
+                         JSON.stringify([...selectedTeams].sort());
+    const dateChanged = prevDateRef.current.getTime() !== currentDate.getTime();
+    
+    if (teamsChanged || dateChanged) {
+      prevSelectedTeamsRef.current = [...selectedTeams];
+      prevDateRef.current = currentDate;
+      
+      if (selectedTeams.length > 0 && !screenshotMode) {
+        fetchTeamData();
+      }
     } else if (selectedTeams.length === 0) {
       setLoading(false);
       setScheduleData([]);
@@ -136,14 +175,13 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   };
 
   const fetchTeamData = async () => {
-    console.log('🚀 fetchTeamData CALLED:', {
-      selectedTeams,
-      selectedTeamNames: selectedTeams.map(id => teams.find(t => t.id === id)?.name),
-      weekStart: format(weekDays[0], "yyyy-MM-dd"),
-      weekEnd: format(weekDays[6], "yyyy-MM-dd"),
-      screenshotMode
-    });
+    // Prevent concurrent fetches
+    if (fetchInProgressRef.current) {
+      console.log('⏭️ Fetch already in progress, skipping...');
+      return;
+    }
     
+    fetchInProgressRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -158,7 +196,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         .in("team_id", selectedTeams)
         .gte("date", startDate)
         .lte("date", endDate)
-        .limit(2000);
+        .limit(1000);
 
       if (scheduleError) throw scheduleError;
 
@@ -204,10 +242,6 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         };
       }) || [];
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📥 Fetched:', enrichedSchedules.length, 'entries for', selectedTeams.length, 'teams');
-      }
-
       setScheduleData(enrichedSchedules);
 
       // Extract unique country codes and fetch relevant holidays
@@ -229,6 +263,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         variant: "destructive"
       });
     } finally {
+      fetchInProgressRef.current = false;
       setLoading(false);
     }
   };
@@ -473,10 +508,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                   </div>
                                 </td>
                                 {selectedTeams.map((teamId) => {
-                                  const daySchedules = scheduleData.filter(e => {
-                                    const entryDate = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
-                                    return entryDate === dateStr && e.team_id === teamId && e.activity_type === 'work';
-                                  });
+                                  const daySchedules = scheduleByDateAndTeam.get(dateStr)?.get(teamId) || [];
                                   
                                   return (
                                     <td key={teamId} className="p-3">
