@@ -84,8 +84,15 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     threshold: 90,
   });
 
+  // Sync teams from props and auto-select on first load
   useEffect(() => {
-    if (!teamsFromProps) {
+    if (teamsFromProps && teamsFromProps.length > 0) {
+      setTeams(teamsFromProps);
+      // Auto-select all teams on first load
+      if (selectedTeams.length === 0) {
+        setSelectedTeams(teamsFromProps.map(t => t.id));
+      }
+    } else if (!teamsFromProps || (Array.isArray(teamsFromProps) && teamsFromProps.length === 0)) {
       fetchTeams();
     }
   }, [teamsFromProps]);
@@ -94,12 +101,21 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     if (selectedTeams.length > 0 && !screenshotMode) {
       fetchTeamData();
       fetchHolidays();
+    } else if (selectedTeams.length === 0) {
+      setLoading(false);
+      setScheduleData([]);
     }
   }, [selectedTeams, currentDate, screenshotMode]);
 
   const fetchTeams = async () => {
     const { data } = await supabase.from("teams").select("id, name, parent_team_id").order("name");
-    if (data) setTeams(data);
+    if (data) {
+      setTeams(data);
+      // Auto-select all teams on first load
+      if (selectedTeams.length === 0 && data.length > 0) {
+        setSelectedTeams(data.map(t => t.id));
+      }
+    }
   };
 
   const fetchHolidays = async () => {
@@ -395,7 +411,11 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
               </TabsList>
 
               <TabsContent value="schedule" className="mt-4 space-y-4">
-                {loading ? (
+                {selectedTeams.length === 0 && !loading ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p className="text-lg">Please select teams to view the schedule</p>
+                  </div>
+                ) : loading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                   </div>
