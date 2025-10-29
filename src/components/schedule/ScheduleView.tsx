@@ -1982,7 +1982,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
-                          {employee.initials}
+                          {formatUserName(employee.first_name, employee.last_name, employee.initials)}
                         </div>
                         <div className="flex-1">
                           {/* Show full name or initials based on management rights */}
