@@ -218,6 +218,9 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       return;
     }
 
+    console.log('Sending email with template ID:', customTemplateId);
+    console.log('Distribution list:', distributionList);
+
     setLoading(true);
     const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
       body: {
@@ -228,11 +231,13 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
     setLoading(false);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error('Send error:', error);
+      toast({ title: "Error", description: `${error.message} (Template ID: ${customTemplateId})`, variant: "destructive" });
     } else {
+      console.log('Send response:', data);
       toast({
         title: "Success",
-        description: data.message || `Email sent successfully`,
+        description: data?.message || `Email sent to ${distributionList.length} recipient(s)`,
       });
     }
   };
@@ -607,7 +612,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
   const saveCustomLayout = async () => {
     if (!selectedTemplate) {
-      toast({ title: "Error", description: "Please save the template first", variant: "destructive" });
+      toast({ title: "Error", description: "Please select a template first", variant: "destructive" });
       return;
     }
 
@@ -618,7 +623,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       source_template_id: selectedTemplate,
       week_number: currentWeek,
       year: currentYear,
-      template_name: `${templateName} - Custom Layout`,
+      template_name: templateName,
       template_data: {
         regions: customRegions,
         notes: customNotes,
@@ -635,30 +640,56 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
     setLoading(false);
     if (error) {
+      console.error('Save error:', error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      if (data) setCustomTemplateId(data.id);
+      if (data) {
+        setCustomTemplateId(data.id);
+        console.log('Saved template with ID:', data.id);
+      }
       toast({ title: "Success", description: "Custom layout saved successfully" });
     }
   };
 
   const previewCustomLayout = async () => {
+    // First, ensure we have a saved template
+    if (!customTemplateId) {
+      toast({ 
+        title: "Saving first...", 
+        description: "Saving layout before preview" 
+      });
+      await saveCustomLayout();
+      // Wait for state to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    if (!customTemplateId) {
+      toast({ 
+        title: "Error", 
+        description: "Please save the custom layout first", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    console.log('Previewing template ID:', customTemplateId);
+
     setLoading(true);
     const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
       body: {
-        template_name: templateName,
-        week_number: currentWeek,
-        template_data: {
-          regions: customRegions,
-          notes: customNotes,
-        },
+        template_id: customTemplateId,
         preview: true,
       },
     });
 
     setLoading(false);
     if (error || !data?.html) {
-      toast({ title: "Error", description: error?.message || "Failed to generate preview", variant: "destructive" });
+      console.error('Preview error:', error);
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to generate preview", 
+        variant: "destructive" 
+      });
     } else {
       setPreviewHtml(data.html);
       setShowPreview(true);

@@ -67,8 +67,19 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', template_id)
       .single();
 
-    if (fetchError) throw fetchError;
-    if (!template) throw new Error('Template not found');
+    if (fetchError) {
+      console.error('Template fetch error:', fetchError);
+      throw new Error(`Template not found: ${fetchError.message}`);
+    }
+    if (!template) {
+      throw new Error(`Template with ID ${template_id} does not exist`);
+    }
+
+    console.log('Found template:', {
+      id: template.id,
+      name: template.template_name,
+      recipients: template.distribution_list?.length || 0
+    });
 
     // Build HTML from template data
     const html = buildCustomEmailHtml(
