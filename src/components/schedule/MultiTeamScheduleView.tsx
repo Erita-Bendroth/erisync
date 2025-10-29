@@ -72,7 +72,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   
   // Fetch deduplication ref
   const fetchInProgressRef = useRef(false);
-  const prevSelectedTeamsRef = useRef<string[]>([]);
+  const prevSelectedTeamsRef = useRef<string[]>(selectedTeams);
   const prevDateRef = useRef<Date>(currentDate);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -123,21 +123,22 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   }, [scheduleData]);
 
   useEffect(() => {
+    // Don't fetch on initial render or if no teams selected
+    if (selectedTeams.length === 0) {
+      setLoading(false);
+      setScheduleData([]);
+      return;
+    }
+    
     // Only fetch if something actually changed
     const teamsChanged = JSON.stringify([...prevSelectedTeamsRef.current].sort()) !== 
                          JSON.stringify([...selectedTeams].sort());
-    const dateChanged = prevDateRef.current.getTime() !== currentDate.getTime();
+    const dateChanged = Math.abs(prevDateRef.current.getTime() - currentDate.getTime()) > 1000;
     
-    if (teamsChanged || dateChanged) {
+    if ((teamsChanged || dateChanged) && !screenshotMode) {
       prevSelectedTeamsRef.current = [...selectedTeams];
       prevDateRef.current = currentDate;
-      
-      if (selectedTeams.length > 0 && !screenshotMode) {
-        fetchTeamData();
-      }
-    } else if (selectedTeams.length === 0) {
-      setLoading(false);
-      setScheduleData([]);
+      fetchTeamData();
     }
   }, [selectedTeams, currentDate, screenshotMode]);
 
@@ -184,6 +185,20 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     fetchInProgressRef.current = true;
     setLoading(true);
     setError(null);
+    
+    // Add timeout protection (30 seconds)
+    const timeoutId = setTimeout(() => {
+      if (fetchInProgressRef.current) {
+        fetchInProgressRef.current = false;
+        setLoading(false);
+        setError('Request timed out. Please refresh and try again.');
+        toast({
+          title: "Timeout",
+          description: "The request took too long. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }, 30000);
 
     try {
       const startDate = format(weekDays[0], "yyyy-MM-dd");
@@ -263,6 +278,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         variant: "destructive"
       });
     } finally {
+      clearTimeout(timeoutId);
       fetchInProgressRef.current = false;
       setLoading(false);
     }
