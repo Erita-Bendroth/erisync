@@ -308,7 +308,7 @@ serve(async (req) => {
     
     // Append custom content if exists
     if (customTemplate?.template_data) {
-      const customHtml = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
+      const customHtml = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data, preview);
       const customBodyMatch = customHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
       const customContent = customBodyMatch ? customBodyMatch[1] : customHtml;
       
