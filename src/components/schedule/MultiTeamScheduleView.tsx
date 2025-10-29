@@ -102,18 +102,6 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     }
   }, [selectedTeams, currentDate, screenshotMode]);
 
-  // Monitor scheduleData state changes
-  useEffect(() => {
-    console.log('📊 scheduleData state updated:', {
-      totalEntries: scheduleData.length,
-      uniqueTeams: [...new Set(scheduleData.map(e => e.team_id))],
-      teamCounts: selectedTeams.map(tid => ({
-        teamId: tid,
-        name: teams.find(t => t.id === tid)?.name,
-        count: scheduleData.filter(e => e.team_id === tid).length
-      }))
-    });
-  }, [scheduleData]);
 
   const fetchTeams = async () => {
     const { data } = await supabase.from("teams").select("id, name, parent_team_id").order("name");
@@ -169,7 +157,8 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         .select("date, user_id, team_id, shift_type, activity_type")
         .in("team_id", selectedTeams)
         .gte("date", startDate)
-        .lte("date", endDate);
+        .lte("date", endDate)
+        .limit(2000);
 
       if (scheduleError) throw scheduleError;
 
@@ -215,18 +204,11 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         };
       }) || [];
 
-      console.log('📥 Raw fetch response:', {
-        selectedTeams,
-        totalFetched: enrichedSchedules.length,
-        teamBreakdown: selectedTeams.map(tid => ({
-          id: tid,
-          name: teams.find(t => t.id === tid)?.name,
-          count: enrichedSchedules.filter(e => e.team_id === tid).length,
-          dates: [...new Set(enrichedSchedules.filter(e => e.team_id === tid).map(e => e.date))]
-        }))
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📥 Fetched:', enrichedSchedules.length, 'entries for', selectedTeams.length, 'teams');
+      }
 
-      setScheduleData([...enrichedSchedules]); // Force new array reference
+      setScheduleData(enrichedSchedules);
 
       // Extract unique country codes and fetch relevant holidays
       const userCountries = [...new Set(
@@ -257,17 +239,9 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
 
   const toggleTeam = (teamId: string) => {
     setSelectedTeams((prev) => {
-      const newSelection = prev.includes(teamId)
+      return prev.includes(teamId)
         ? prev.filter((id) => id !== teamId)
         : [...prev, teamId];
-      
-      console.log('🔄 Team toggled:', {
-        teamId,
-        teamName: teams.find(t => t.id === teamId)?.name,
-        action: prev.includes(teamId) ? 'REMOVED' : 'ADDED',
-        newSelection: newSelection.map(id => teams.find(t => t.id === id)?.name)
-      });
-      return newSelection;
     });
   };
 

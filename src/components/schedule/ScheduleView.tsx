@@ -238,34 +238,21 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     }
   }, [user]);
 
+  // Consolidated useEffect with debouncing to prevent redundant fetches
   useEffect(() => {
-    if (user && userRoles.length > 0) {
+    if (!user || userRoles.length === 0) return;
+    
+    const timer = setTimeout(() => {
       fetchTeams();
       fetchEmployees();
       fetchScheduleEntries();
       fetchHolidays();
       fetchShiftTimeDefinitions();
-      // Fetch pending requests count for all authenticated users
       fetchPendingRequestsCount();
-    }
-  }, [user, currentWeek, userRoles]);
-
-  useEffect(() => {
-    // Refetch entries when team selection or view mode changes
-    if (user && userRoles.length > 0) {
-      fetchEmployees();
-      fetchScheduleEntries();
-      fetchHolidays();
-    }
-  }, [selectedTeams, viewMode]);
-
-  // Refresh data when external trigger changes (without resetting view state)
-  useEffect(() => {
-    if (refreshTrigger && refreshTrigger > 0 && user && userRoles.length > 0) {
-      console.log('🔄 External refresh triggered, preserving current view');
-      fetchScheduleEntries();
-    }
-  }, [refreshTrigger]);
+    }, 150); // Debounce 150ms
+    
+    return () => clearTimeout(timer);
+  }, [user, currentWeek, userRoles, selectedTeams, viewMode, refreshTrigger]);
 
 // Pre-populate managed users set for performance and deterministic rendering
 useEffect(() => {
@@ -847,8 +834,8 @@ useEffect(() => {
         
         console.log(`📅 Fetching schedules for date range: ${dateStart} to ${dateEnd}`);
 
-        // Batch fetch by team with smaller batch size to avoid hitting limits
-        const BATCH_SIZE = 10; // Reduced from 25 to ensure all dates get fetched
+        // Batch fetch by team with optimized batch size
+        const BATCH_SIZE = 50; // Optimized for performance
         let batchNumber = 0;
         
         for (let i = 0; i < teamIds.length; i += BATCH_SIZE) {
@@ -874,7 +861,7 @@ useEffect(() => {
             .lte("date", dateEnd)
             .in("team_id", batchTeamIds)
             .order("date")
-            .limit(10000);
+            .limit(5000);
           
           if (batchError) {
             console.error('Batch error:', batchError);
@@ -895,7 +882,8 @@ useEffect(() => {
             accumulatedTotal: allData.length + (batchData?.length || 0)
           });
           
-          allData = [...allData, ...(batchData || [])];
+          // Direct push for better performance
+          if (batchData) allData.push(...batchData);
         }
         
         // Log final accumulated data before transformation
