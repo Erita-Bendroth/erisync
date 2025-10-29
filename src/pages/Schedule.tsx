@@ -484,15 +484,7 @@ const Schedule = () => {
                 <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
               </>
             ) : (
-              // Show ManagerCoverageView for managers (not admin/planner), otherwise MultiTeamScheduleView
-              isManager() && !isAdmin() && !isPlanner() ? (
-                <ManagerCoverageView 
-                  selectedWeek={managerCoverageWeek}
-                  onWeekChange={setManagerCoverageWeek}
-                />
-              ) : (
-                <MultiTeamScheduleView teams={teams} />
-              )
+              <MultiTeamScheduleView teams={teams} />
             )}
           </TabsContent>
 
