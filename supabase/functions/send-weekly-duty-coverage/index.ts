@@ -250,6 +250,8 @@ serve(async (req) => {
 
     if (preview) {
       if (return_structured_data) {
+        console.log('Returning structured data with', combinedAssignments.length, 'assignments');
+        console.log('Sample assignment:', combinedAssignments[0]);
         return new Response(
           JSON.stringify({ assignments: combinedAssignments }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
