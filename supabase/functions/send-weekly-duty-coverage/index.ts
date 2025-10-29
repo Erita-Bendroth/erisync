@@ -65,6 +65,13 @@ serve(async (req) => {
       );
     }
 
+    // Create client with service role key to bypass RLS for database operations
+    const supabaseServiceRole = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Create anon client for auth check only
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -96,7 +103,7 @@ serve(async (req) => {
     const { template_id, week_number, year, preview, return_structured_data }: DutyCoverageRequest = await req.json();
 
     // Fetch duty template
-    const { data: template, error: templateError } = await supabase
+    const { data: template, error: templateError } = await supabaseServiceRole
       .from('weekly_duty_templates')
       .select('*')
       .eq('id', template_id)
@@ -113,7 +120,7 @@ serve(async (req) => {
     console.log('Template fetched:', template.template_name);
 
     // Fetch team names for all teams in the template
-    const { data: teamsData, error: teamsError } = await supabase
+    const { data: teamsData, error: teamsError } = await supabaseServiceRole
       .from('teams')
       .select('id, name')
       .in('id', template.team_ids);
@@ -136,7 +143,7 @@ serve(async (req) => {
     console.log('Week range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
 
     // Fetch manual duty assignments (overrides) for this template and week
-    const { data: manualAssignmentsRaw, error: assignmentsError } = await supabase
+    const { data: manualAssignmentsRaw, error: assignmentsError } = await supabaseServiceRole
       .from('duty_assignments')
       .select('*')
       .eq('week_number', week_number)
@@ -159,7 +166,7 @@ serve(async (req) => {
     // Fetch profiles for manual assignment users with country codes
     let manualProfiles: Record<string, any> = {};
     if (manualUserIds.size > 0) {
-      const { data: profilesData } = await supabase
+      const { data: profilesData } = await supabaseServiceRole
         .from('profiles')
         .select('user_id, first_name, last_name, initials, country_code')
         .in('user_id', Array.from(manualUserIds));
@@ -179,7 +186,7 @@ serve(async (req) => {
     })) || [];
 
     // Fetch schedule entries for auto-pull
-    const { data: scheduleEntriesRaw, error: scheduleError } = await supabase
+    const { data: scheduleEntriesRaw, error: scheduleError } = await supabaseServiceRole
       .from('schedule_entries')
       .select('*')
       .in('team_id', template.team_ids)
@@ -200,7 +207,7 @@ serve(async (req) => {
     // Fetch profiles for schedule assignment users with country codes
     let scheduleProfiles: Record<string, any> = {};
     if (scheduleUserIds.size > 0) {
-      const { data: profilesData } = await supabase
+      const { data: profilesData } = await supabaseServiceRole
         .from('profiles')
         .select('user_id, first_name, last_name, initials, country_code')
         .in('user_id', Array.from(scheduleUserIds));
@@ -232,14 +239,14 @@ serve(async (req) => {
     console.log('Combined assignments:', combinedAssignments.length);
 
     // Fetch shift time definitions for descriptions
-    const { data: shiftDefs } = await supabase
+    const { data: shiftDefs } = await supabaseServiceRole
       .from('shift_time_definitions')
       .select('*');
 
     console.log('Fetched shift time definitions:', shiftDefs?.length || 0);
 
     // Check for custom layout template
-    const { data: customTemplate } = await supabase
+    const { data: customTemplate } = await supabaseServiceRole
       .from('custom_duty_email_templates')
       .select('*')
       .eq('source_template_id', template_id)
@@ -247,6 +254,15 @@ serve(async (req) => {
       .eq('year', year)
       .eq('mode', 'hybrid')
       .single();
+
+    console.log('Custom template query result:', {
+      found: !!customTemplate,
+      template_id,
+      week_number,
+      year,
+      customTemplateId: customTemplate?.id,
+      hasTemplateData: !!customTemplate?.template_data
+    });
 
     if (preview) {
       if (return_structured_data) {
@@ -305,7 +321,7 @@ serve(async (req) => {
     console.log('Email sent:', emailResult);
 
     // Log email history
-    await supabase.from('weekly_email_history').insert({
+    await supabaseServiceRole.from('weekly_email_history').insert({
       template_id,
       week_number,
       year,
