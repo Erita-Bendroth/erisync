@@ -79,6 +79,42 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_duty_email_templates: {
+        Row: {
+          created_at: string
+          created_by: string
+          distribution_list: string[] | null
+          id: string
+          template_data: Json
+          template_name: string
+          updated_at: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          distribution_list?: string[] | null
+          id?: string
+          template_data: Json
+          template_name: string
+          updated_at?: string
+          week_number: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          distribution_list?: string[] | null
+          id?: string
+          template_data?: Json
+          template_name?: string
+          updated_at?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
       dashboard_preferences: {
         Row: {
           coverage_threshold: number | null
