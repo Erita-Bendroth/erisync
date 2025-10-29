@@ -135,6 +135,14 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   };
 
   const fetchTeamData = async () => {
+    console.log('🚀 fetchTeamData CALLED:', {
+      selectedTeams,
+      selectedTeamNames: selectedTeams.map(id => teams.find(t => t.id === id)?.name),
+      weekStart: format(weekDays[0], "yyyy-MM-dd"),
+      weekEnd: format(weekDays[6], "yyyy-MM-dd"),
+      screenshotMode
+    });
+    
     setLoading(true);
     setError(null);
 
@@ -210,7 +218,15 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         }))
       });
 
-      setScheduleData(enrichedSchedules);
+      setScheduleData([...enrichedSchedules]); // Force new array reference
+
+      console.log('✅ scheduleData SET:', {
+        totalEntries: enrichedSchedules.length,
+        southTeamId: 'a8c41fee-9caa-430b-9db7-a997b23401fe',
+        southTeamEntries: enrichedSchedules.filter(e => e.team_id === 'a8c41fee-9caa-430b-9db7-a997b23401fe').length,
+        southTeamDates: [...new Set(enrichedSchedules.filter(e => e.team_id === 'a8c41fee-9caa-430b-9db7-a997b23401fe').map(e => e.date))],
+        southTeamSample: enrichedSchedules.filter(e => e.team_id === 'a8c41fee-9caa-430b-9db7-a997b23401fe')[0]
+      });
 
       // Extract unique country codes and fetch relevant holidays
       const userCountries = [...new Set(
@@ -244,12 +260,15 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const newSelection = prev.includes(teamId)
         ? prev.filter((id) => id !== teamId)
         : [...prev, teamId];
-      console.log('Team selection changed:', {
+      
+      console.log('🔧 Team Toggle Debug:', {
         teamId,
         teamName: teams.find(t => t.id === teamId)?.name,
         action: prev.includes(teamId) ? 'removed' : 'added',
         newSelection,
-        newSelectionNames: newSelection.map(id => teams.find(t => t.id === id)?.name)
+        newSelectionNames: newSelection.map(id => teams.find(t => t.id === id)?.name),
+        screenshotMode,
+        currentDate: format(currentDate, 'yyyy-MM-dd')
       });
       return newSelection;
     });
@@ -487,6 +506,20 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                     const entryDate = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
                                     return entryDate === dateStr && e.team_id === teamId && e.activity_type === 'work';
                                   });
+
+                                  // Debug ONLY for South team and ONLY for first day
+                                  if (teamId === 'a8c41fee-9caa-430b-9db7-a997b23401fe' && dateStr === '2025-10-27') {
+                                    console.log('🔍 Filter Debug (South, Oct 27):', {
+                                      scheduleDataLength: scheduleData.length,
+                                      southEntriesInScheduleData: scheduleData.filter(e => e.team_id === teamId).length,
+                                      entriesForThisDate: scheduleData.filter(e => {
+                                        const ed = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
+                                        return ed === dateStr && e.team_id === teamId;
+                                      }).length,
+                                      daySchedulesFound: daySchedules.length,
+                                      sampleEntry: scheduleData.filter(e => e.team_id === teamId)[0]
+                                    });
+                                  }
                                   
                                   return (
                                     <td key={teamId} className="p-3">
@@ -504,16 +537,18 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                             return (
                                               <Tooltip key={idx}>
                                                 <TooltipTrigger asChild>
-                                                  <Badge 
-                                                    variant="secondary"
-                                                    className="cursor-pointer text-xs font-semibold"
-                                                    style={{
-                                                      backgroundColor: bgColor,
-                                                      color: 'white',
-                                                    }}
-                                                  >
-                                                    {userName} ({code})
-                                                  </Badge>
+                                                  <span className="inline-block">
+                                                    <Badge 
+                                                      variant="secondary"
+                                                      className="cursor-pointer text-xs font-semibold"
+                                                      style={{
+                                                        backgroundColor: bgColor,
+                                                        color: 'white',
+                                                      }}
+                                                    >
+                                                      {userName} ({code})
+                                                    </Badge>
+                                                  </span>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
                                                   <div className="text-sm">
