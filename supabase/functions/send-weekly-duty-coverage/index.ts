@@ -318,15 +318,62 @@ serve(async (req) => {
       );
     }
 
+    // Process screenshots as inline attachments
+    const attachments = [];
+    if (customTemplate?.template_data?.screenshots) {
+      for (const screenshot of customTemplate.template_data.screenshots) {
+        try {
+          // Extract the path from the full URL
+          const urlParts = screenshot.url.split('/email-screenshots/');
+          if (urlParts.length === 2) {
+            const filePath = urlParts[1];
+            
+            // Download image from Supabase Storage
+            const { data: imageData, error: downloadError } = await supabaseServiceRole
+              .storage
+              .from('email-screenshots')
+              .download(filePath);
+            
+            if (!downloadError && imageData) {
+              // Convert to base64
+              const arrayBuffer = await imageData.arrayBuffer();
+              const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+              
+              // Determine content type from filename
+              const extension = screenshot.name.split('.').pop()?.toLowerCase();
+              const contentType = extension === 'png' ? 'image/png' : 
+                                  extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 
+                                  'image/png';
+              
+              attachments.push({
+                filename: screenshot.name.split('/').pop() || screenshot.name,
+                content: base64,
+                content_type: contentType,
+                cid: screenshot.id, // Content-ID for inline reference
+              });
+              
+              console.log('Processed screenshot:', screenshot.name, 'with CID:', screenshot.id);
+            } else {
+              console.error('Error downloading screenshot:', downloadError);
+            }
+          }
+        } catch (err) {
+          console.error('Error processing screenshot:', screenshot.name, err);
+        }
+      }
+    }
+
     // Send email via Resend using your verified domain
     const emailResult = await resend.emails.send({
-      from: 'Weekly Duty Coverage <duty@erisync.xyz>',
+      from: 'Weekly Duty Coverage <onboarding@resend.dev>',
       to: template.distribution_list,
       subject: `Weekly Duty Coverage - Week ${week_number}, ${year}`,
       html: htmlContent,
+      attachments: attachments.length > 0 ? attachments : undefined,
     });
 
     console.log('Email sent:', emailResult);
+    console.log('Attachments count:', attachments.length);
 
     // Log email history
     await supabaseServiceRole.from('weekly_email_history').insert({
