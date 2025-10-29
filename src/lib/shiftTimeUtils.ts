@@ -170,7 +170,7 @@ export function getShiftTypeColor(
     case "weekend":
       return "hsl(173, 58%, 39%)"; // Teal for weekend/holiday duty
     case "normal":
-      return "hsl(142, 76%, 36%)"; // Green for normal shifts
+      return "hsl(48, 96%, 53%)"; // Light yellow for normal shifts
     default:
       return "hsl(220, 13%, 46%)"; // Default gray
   }
