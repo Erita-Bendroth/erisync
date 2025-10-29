@@ -349,7 +349,7 @@ serve(async (req) => {
                 filename: `${screenshot.id}.${extension}`,
                 content: base64,
                 content_type: contentType,
-                cid: screenshot.id, // Content-ID for inline reference
+                contentId: screenshot.id, // Resend uses "contentId" not "cid"
               });
               
               console.log('Processed screenshot:', screenshot.name, 'with CID:', screenshot.id);
