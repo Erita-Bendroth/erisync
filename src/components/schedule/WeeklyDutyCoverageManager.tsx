@@ -426,18 +426,14 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     
     const rows = weekDates.map((date, index) => {
       const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+      const combinedDateWeekday = `${dateStr} ${weekdays[index]}`;
       
       return {
         id: crypto.randomUUID(),
         cells: [
           { 
             id: crypto.randomUUID(), 
-            content: dateStr, 
-            backgroundColor: 'white' as const
-          },
-          { 
-            id: crypto.randomUUID(), 
-            content: weekdays[index], 
+            content: combinedDateWeekday, 
             backgroundColor: 'white' as const
           },
           { 
