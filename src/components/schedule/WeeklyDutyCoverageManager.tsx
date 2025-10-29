@@ -241,9 +241,11 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     });
 
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
+    const { data, error } = await supabase.functions.invoke('send-weekly-duty-coverage', {
       body: {
-        template_id: savedId,
+        template_id: selectedTemplate,
+        week_number: currentWeek,
+        year: currentYear,
         preview: false,
       },
     });
@@ -724,9 +726,11 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     });
 
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
+    const { data, error } = await supabase.functions.invoke('send-weekly-duty-coverage', {
       body: {
-        template_id: templateIdToUse,
+        template_id: selectedTemplate,
+        week_number: currentWeek,
+        year: currentYear,
         preview: true,
       },
     });
