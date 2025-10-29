@@ -3,13 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmailColorPicker, EmailCellColor } from "./EmailColorPicker";
-import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Plus, Trash2 } from "lucide-react";
 
 export interface EmailTableCell {
   id: string;
@@ -169,26 +163,28 @@ export function EmailTableBuilder({ table, onChange, onDelete }: EmailTableBuild
             {table.rows.map((row, rowIndex) => (
               <tr key={row.id}>
                 <td className="p-1 bg-muted/50 border-r">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                        <ChevronDown className="h-3 w-3" />
+                  <div className="flex flex-col gap-0.5">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-5 w-5 p-0 hover:bg-primary/10"
+                      onClick={() => addRow('below', rowIndex)}
+                      title="Add row below"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                    {table.rows.length > 1 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 w-5 p-0 hover:bg-destructive/10 text-destructive"
+                        onClick={() => deleteRow(rowIndex)}
+                        title="Delete row"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => addRow('above', rowIndex)}>
-                        <Plus className="h-4 w-4 mr-2" /> Add Row Above
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => addRow('below', rowIndex)}>
-                        <Plus className="h-4 w-4 mr-2" /> Add Row Below
-                      </DropdownMenuItem>
-                      {table.rows.length > 1 && (
-                        <DropdownMenuItem onClick={() => deleteRow(rowIndex)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete Row
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                  </div>
                 </td>
                 {row.cells.map((cell, cellIndex) => (
                   <td
@@ -214,26 +210,28 @@ export function EmailTableBuilder({ table, onChange, onDelete }: EmailTableBuild
               <td className="p-1 bg-muted/50"></td>
               {table.rows[0]?.cells.map((_, cellIndex) => (
                 <td key={cellIndex} className="p-1 bg-muted/50 border-t">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-6 w-full p-0">
-                        <ChevronRight className="h-3 w-3" />
+                  <div className="flex gap-1 justify-center">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-5 w-5 p-0 hover:bg-primary/10"
+                      onClick={() => addColumn('right', cellIndex)}
+                      title="Add column to the right"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                    {table.rows[0]?.cells.length > 1 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 w-5 p-0 hover:bg-destructive/10 text-destructive"
+                        onClick={() => deleteColumn(cellIndex)}
+                        title="Delete column"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => addColumn('left', cellIndex)}>
-                        <Plus className="h-4 w-4 mr-2" /> Add Column Left
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => addColumn('right', cellIndex)}>
-                        <Plus className="h-4 w-4 mr-2" /> Add Column Right
-                      </DropdownMenuItem>
-                      {table.rows[0]?.cells.length > 1 && (
-                        <DropdownMenuItem onClick={() => deleteColumn(cellIndex)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete Column
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                  </div>
                 </td>
               ))}
             </tr>
