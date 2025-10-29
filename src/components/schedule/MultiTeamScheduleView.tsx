@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Download, BarChart3, Camera, Loader2 } from "lucide-react";
 import { getShiftTypeColor, getShiftTypeCode } from "@/lib/shiftTimeUtils";
-import { format, startOfWeek, addDays, getWeek, getYear, endOfWeek } from "date-fns";
+import { format, startOfWeek, addDays, getWeek, getYear, endOfWeek, parseISO } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TeamFavoritesManager } from "./TeamFavoritesManager";
 import { CoverageOverview } from "./CoverageOverview";
@@ -182,7 +182,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const enrichedSchedules: ScheduleEntry[] = schedules?.map((entry: any) => {
         const profile = profileMap.get(entry.user_id);
         return {
-          date: entry.date,
+          date: format(parseISO(entry.date), "yyyy-MM-dd"), // Normalize date format
           user_id: entry.user_id,
           shift_type: entry.shift_type,
           activity_type: entry.activity_type,
@@ -194,15 +194,19 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         };
       }) || [];
 
-      console.log('Multi-Team Schedule - Fetched schedule data:', {
+      console.log('Multi-Team Schedule - DEBUG:', {
         selectedTeams,
+        selectedTeamNames: selectedTeams.map(id => teams.find(t => t.id === id)?.name),
         totalEntries: enrichedSchedules.length,
         uniqueUsers: userIds.length,
         profilesFetched: profilesData.length,
+        sampleEntry: enrichedSchedules[0],
         teamCounts: selectedTeams.map(teamId => ({
           teamId,
           teamName: teams.find(t => t.id === teamId)?.name,
-          entries: enrichedSchedules.filter(e => e.team_id === teamId).length
+          entries: enrichedSchedules.filter(e => e.team_id === teamId).length,
+          dates: [...new Set(enrichedSchedules.filter(e => e.team_id === teamId).map(e => e.date))],
+          sampleEntries: enrichedSchedules.filter(e => e.team_id === teamId).slice(0, 2)
         }))
       });
 
@@ -236,9 +240,19 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   };
 
   const toggleTeam = (teamId: string) => {
-    setSelectedTeams((prev) =>
-      prev.includes(teamId) ? prev.filter((id) => id !== teamId) : [...prev, teamId]
-    );
+    setSelectedTeams((prev) => {
+      const newSelection = prev.includes(teamId)
+        ? prev.filter((id) => id !== teamId)
+        : [...prev, teamId];
+      console.log('Team selection changed:', {
+        teamId,
+        teamName: teams.find(t => t.id === teamId)?.name,
+        action: prev.includes(teamId) ? 'removed' : 'added',
+        newSelection,
+        newSelectionNames: newSelection.map(id => teams.find(t => t.id === id)?.name)
+      });
+      return newSelection;
+    });
   };
 
   const handleApplyFavorite = (teamIds: string[], name: string) => {
@@ -469,9 +483,25 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                   </div>
                                 </td>
                                 {selectedTeams.map((teamId) => {
-                                  const daySchedules = scheduleData.filter(
-                                    e => e.date === dateStr && e.team_id === teamId && e.activity_type === 'work'
-                                  );
+                                  const daySchedules = scheduleData.filter(e => {
+                                    const entryDate = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
+                                    const match = entryDate === dateStr && e.team_id === teamId && e.activity_type === 'work';
+                                    
+                                    // Debug logging for Troubleshooting East team
+                                    if (teamId === 'f162d8bf-1cb0-48c9-aff0-d6b58a9351d2' && entryDate === dateStr) {
+                                      console.log('🔍 Troubleshooting East filter check:', {
+                                        dateStr,
+                                        entryDate,
+                                        teamId,
+                                        entryTeamId: e.team_id,
+                                        activityType: e.activity_type,
+                                        match,
+                                        entry: e
+                                      });
+                                    }
+                                    
+                                    return match;
+                                  });
                                   
                                   return (
                                     <td key={teamId} className="p-3">
