@@ -914,28 +914,26 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
 
           <TabsContent value="assignments">
             {selectedTeams.length > 0 && selectedTemplate ? (
-              <div className="space-y-6">
-                {selectedTeams.map((teamId) => {
-                  const team = teams.find((t) => t.id === teamId);
-                  return (
-                    <Card key={teamId}>
-                      <CardHeader>
-                        <CardTitle>{team?.name}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <DutyAssignmentGrid
-                          teamId={teamId}
-                          weekNumber={currentWeek}
-                          year={currentYear}
-                          includeWeekend={includeWeekend}
-                          includeLateshift={includeLateshift}
-                          includeEarlyshift={includeEarlyshift}
-                        />
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    Combined Duty Assignments
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      ({selectedTeams.length} team{selectedTeams.length > 1 ? 's' : ''})
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <DutyAssignmentGrid
+                    teamIds={selectedTeams}
+                    weekNumber={currentWeek}
+                    year={currentYear}
+                    includeWeekend={includeWeekend}
+                    includeLateshift={includeLateshift}
+                    includeEarlyshift={includeEarlyshift}
+                  />
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">

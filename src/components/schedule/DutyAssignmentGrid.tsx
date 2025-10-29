@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { X, Plus } from "lucide-react";
 
 interface DutyAssignmentGridProps {
-  teamId: string;
+  teamIds: string[];
   weekNumber: number;
   year: number;
   includeWeekend: boolean;
@@ -39,7 +39,7 @@ interface ScheduledUser {
 }
 
 export function DutyAssignmentGrid({
-  teamId,
+  teamIds,
   weekNumber,
   year,
   includeWeekend,
@@ -59,14 +59,14 @@ export function DutyAssignmentGrid({
     fetchTeamMembers();
     fetchShiftTimeDefinitions();
     calculateWeekDates();
-  }, [teamId, weekNumber, year]);
+  }, [teamIds, weekNumber, year]);
 
   useEffect(() => {
     if (weekDates.length > 0) {
       fetchScheduledUsers();
       fetchAssignments();
     }
-  }, [weekDates, teamId]);
+  }, [weekDates, teamIds]);
 
   const calculateWeekDates = () => {
     // Use ISO week calculation (same as edge function)
@@ -89,25 +89,33 @@ export function DutyAssignmentGrid({
     const { data, error } = await supabase
       .from('team_members')
       .select('user_id, profiles!inner(first_name, last_name, initials)')
-      .eq('team_id', teamId);
+      .in('team_id', teamIds);
 
     if (!error && data) {
-      setTeamMembers(
-        data.map((tm: any) => ({
-          user_id: tm.user_id,
-          first_name: tm.profiles.first_name,
-          last_name: tm.profiles.last_name,
-          initials: tm.profiles.initials,
-        }))
+      // Deduplicate users who might be in multiple teams
+      const uniqueMembers = Array.from(
+        new Map(
+          data.map((tm: any) => [
+            tm.user_id,
+            {
+              user_id: tm.user_id,
+              first_name: tm.profiles.first_name,
+              last_name: tm.profiles.last_name,
+              initials: tm.profiles.initials,
+            }
+          ])
+        ).values()
       );
+      setTeamMembers(uniqueMembers);
     }
   };
 
   const fetchShiftTimeDefinitions = async () => {
+    const orConditions = teamIds.map(id => `team_id.eq.${id},team_ids.cs.{${id}}`).join(',');
     const { data, error } = await supabase
       .from('shift_time_definitions')
       .select('*')
-      .or(`team_id.eq.${teamId},team_ids.cs.{${teamId}},team_id.is.null`)
+      .or(`${orConditions},team_id.is.null`)
       .order('shift_type');
       
     if (!error && data) {
@@ -124,7 +132,7 @@ export function DutyAssignmentGrid({
     const { data, error } = await supabase
       .from('schedule_entries')
       .select('date, user_id, shift_type, availability_status, activity_type')
-      .eq('team_id', teamId)
+      .in('team_id', teamIds)
       .gte('date', startDate)
       .lte('date', endDate);
       
@@ -163,10 +171,11 @@ export function DutyAssignmentGrid({
         date,
         duty_type,
         user_id,
+        team_id,
         responsibility_region,
         is_substitute
       `)
-      .eq('team_id', teamId)
+      .in('team_id', teamIds)
       .eq('week_number', weekNumber)
       .eq('year', year);
 
@@ -224,11 +233,11 @@ export function DutyAssignmentGrid({
     
     const matchingDefs = shiftTimeDefinitions.filter(def => 
       def.shift_type === typeMap[shiftType] &&
-      (def.team_id === teamId || def.team_ids?.includes(teamId) || !def.team_id)
+      (teamIds.includes(def.team_id) || def.team_ids?.some((id: string) => teamIds.includes(id)) || !def.team_id)
     );
     
     if (matchingDefs.length > 0) {
-      const specific = matchingDefs.find(d => d.team_id === teamId || d.team_ids?.includes(teamId));
+      const specific = matchingDefs.find(d => teamIds.includes(d.team_id) || d.team_ids?.some((id: string) => teamIds.includes(id)));
       const def = specific || matchingDefs[0];
       return `${def.start_time.substring(0, 5)}-${def.end_time.substring(0, 5)}`;
     }
@@ -249,7 +258,7 @@ export function DutyAssignmentGrid({
       }
 
       const newAssignment: any = {
-        team_id: teamId,
+        team_id: teamIds[0],
         date: dateStr,
         duty_type: dutyType,
         week_number: weekNumber,
