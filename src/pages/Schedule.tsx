@@ -38,6 +38,7 @@ const Schedule = () => {
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [scheduleViewMode, setScheduleViewMode] = useState<"standard" | "multi-team">("standard");
   const [managerCoverageWeek, setManagerCoverageWeek] = useState<Date>(new Date());
+  const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
 
   // Two-week notification state
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -61,6 +62,7 @@ const Schedule = () => {
   useEffect(() => {
     if (user) {
       fetchUserRoles();
+      fetchTeams();
     }
   }, [user]);
 
@@ -74,6 +76,20 @@ const Schedule = () => {
       setUserRoles(data?.map(r => r.role) || []);
     } catch (error) {
       console.error("Error fetching user roles:", error);
+    }
+  };
+
+  const fetchTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, parent_team_id")
+        .order("name");
+
+      if (error) throw error;
+      setTeams(data || []);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
     }
   };
 
@@ -475,7 +491,7 @@ const Schedule = () => {
                   onWeekChange={setManagerCoverageWeek}
                 />
               ) : (
-                <MultiTeamScheduleView />
+                <MultiTeamScheduleView teams={teams} />
               )
             )}
           </TabsContent>
