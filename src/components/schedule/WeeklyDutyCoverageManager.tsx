@@ -756,7 +756,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       .eq('source_template_id', templateId)
       .eq('week_number', currentWeek)
       .eq('year', currentYear)
-      .order('created_at', { ascending: false })
+      .eq('mode', 'hybrid')
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 

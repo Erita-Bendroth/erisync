@@ -245,15 +245,22 @@ serve(async (req) => {
 
     console.log('Fetched shift time definitions:', shiftDefs?.length || 0);
 
-    // Check for custom layout template
-    const { data: customTemplate } = await supabaseServiceRole
+    // Check for custom layout template - use order + limit instead of single to handle duplicates
+    const { data: customTemplateArray, error: customError } = await supabaseServiceRole
       .from('custom_duty_email_templates')
       .select('*')
       .eq('source_template_id', template_id)
       .eq('week_number', week_number)
       .eq('year', year)
       .eq('mode', 'hybrid')
-      .single();
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    const customTemplate = customTemplateArray?.[0] || null;
+
+    if (customError) {
+      console.error('Error fetching custom template:', customError);
+    }
 
     console.log('Custom template query result:', {
       found: !!customTemplate,
@@ -261,7 +268,8 @@ serve(async (req) => {
       week_number,
       year,
       customTemplateId: customTemplate?.id,
-      hasTemplateData: !!customTemplate?.template_data
+      hasTemplateData: !!customTemplate?.template_data,
+      arrayLength: customTemplateArray?.length || 0
     });
 
     if (preview) {
