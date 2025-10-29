@@ -102,6 +102,19 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     }
   }, [selectedTeams, currentDate, screenshotMode]);
 
+  // Monitor scheduleData state changes
+  useEffect(() => {
+    console.log('📊 scheduleData state updated:', {
+      totalEntries: scheduleData.length,
+      uniqueTeams: [...new Set(scheduleData.map(e => e.team_id))],
+      teamCounts: selectedTeams.map(tid => ({
+        teamId: tid,
+        name: teams.find(t => t.id === tid)?.name,
+        count: scheduleData.filter(e => e.team_id === tid).length
+      }))
+    });
+  }, [scheduleData]);
+
   const fetchTeams = async () => {
     const { data } = await supabase.from("teams").select("id, name, parent_team_id").order("name");
     if (data) {
@@ -202,31 +215,18 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         };
       }) || [];
 
-      console.log('Multi-Team Schedule - DEBUG:', {
+      console.log('📥 Raw fetch response:', {
         selectedTeams,
-        selectedTeamNames: selectedTeams.map(id => teams.find(t => t.id === id)?.name),
-        totalEntries: enrichedSchedules.length,
-        uniqueUsers: userIds.length,
-        profilesFetched: profilesData.length,
-        sampleEntry: enrichedSchedules[0],
-        teamCounts: selectedTeams.map(teamId => ({
-          teamId,
-          teamName: teams.find(t => t.id === teamId)?.name,
-          entries: enrichedSchedules.filter(e => e.team_id === teamId).length,
-          dates: [...new Set(enrichedSchedules.filter(e => e.team_id === teamId).map(e => e.date))],
-          sampleEntries: enrichedSchedules.filter(e => e.team_id === teamId).slice(0, 2)
+        totalFetched: enrichedSchedules.length,
+        teamBreakdown: selectedTeams.map(tid => ({
+          id: tid,
+          name: teams.find(t => t.id === tid)?.name,
+          count: enrichedSchedules.filter(e => e.team_id === tid).length,
+          dates: [...new Set(enrichedSchedules.filter(e => e.team_id === tid).map(e => e.date))]
         }))
       });
 
       setScheduleData([...enrichedSchedules]); // Force new array reference
-
-      console.log('✅ scheduleData SET:', {
-        totalEntries: enrichedSchedules.length,
-        southTeamId: 'a8c41fee-9caa-430b-9db7-a997b23401fe',
-        southTeamEntries: enrichedSchedules.filter(e => e.team_id === 'a8c41fee-9caa-430b-9db7-a997b23401fe').length,
-        southTeamDates: [...new Set(enrichedSchedules.filter(e => e.team_id === 'a8c41fee-9caa-430b-9db7-a997b23401fe').map(e => e.date))],
-        southTeamSample: enrichedSchedules.filter(e => e.team_id === 'a8c41fee-9caa-430b-9db7-a997b23401fe')[0]
-      });
 
       // Extract unique country codes and fetch relevant holidays
       const userCountries = [...new Set(
@@ -261,14 +261,11 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         ? prev.filter((id) => id !== teamId)
         : [...prev, teamId];
       
-      console.log('🔧 Team Toggle Debug:', {
+      console.log('🔄 Team toggled:', {
         teamId,
         teamName: teams.find(t => t.id === teamId)?.name,
-        action: prev.includes(teamId) ? 'removed' : 'added',
-        newSelection,
-        newSelectionNames: newSelection.map(id => teams.find(t => t.id === id)?.name),
-        screenshotMode,
-        currentDate: format(currentDate, 'yyyy-MM-dd')
+        action: prev.includes(teamId) ? 'REMOVED' : 'ADDED',
+        newSelection: newSelection.map(id => teams.find(t => t.id === id)?.name)
       });
       return newSelection;
     });
@@ -506,20 +503,6 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                     const entryDate = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
                                     return entryDate === dateStr && e.team_id === teamId && e.activity_type === 'work';
                                   });
-
-                                  // Debug ONLY for South team and ONLY for first day
-                                  if (teamId === 'a8c41fee-9caa-430b-9db7-a997b23401fe' && dateStr === '2025-10-27') {
-                                    console.log('🔍 Filter Debug (South, Oct 27):', {
-                                      scheduleDataLength: scheduleData.length,
-                                      southEntriesInScheduleData: scheduleData.filter(e => e.team_id === teamId).length,
-                                      entriesForThisDate: scheduleData.filter(e => {
-                                        const ed = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
-                                        return ed === dateStr && e.team_id === teamId;
-                                      }).length,
-                                      daySchedulesFound: daySchedules.length,
-                                      sampleEntry: scheduleData.filter(e => e.team_id === teamId)[0]
-                                    });
-                                  }
                                   
                                   return (
                                     <td key={teamId} className="p-3">
