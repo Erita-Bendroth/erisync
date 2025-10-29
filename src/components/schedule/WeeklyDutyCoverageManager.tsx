@@ -608,8 +608,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           <TabsList>
             <TabsTrigger value="template">Template Setup</TabsTrigger>
             <TabsTrigger value="assignments">Duty Assignments</TabsTrigger>
-            <TabsTrigger value="send">Preview & Send</TabsTrigger>
-            <TabsTrigger value="customize">Customize Layout</TabsTrigger>
+            <TabsTrigger value="customize">Customize & Send</TabsTrigger>
           </TabsList>
 
           <TabsContent value="template" className="space-y-4">
@@ -755,7 +754,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
             )}
           </TabsContent>
 
-          <TabsContent value="send" className="space-y-4">
+          <TabsContent value="customize" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Week Selection</CardTitle>
@@ -772,26 +771,16 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
+                <p className="text-sm text-muted-foreground text-center mt-2">
+                  Custom tables will use dates from this week (Monday-Friday)
+                </p>
               </CardContent>
             </Card>
 
-            <div className="flex gap-2 justify-center">
-              <Button onClick={handlePreview} disabled={loading || !selectedTemplate}>
-                <Eye className="w-4 h-4 mr-2" />
-                Preview Email
-              </Button>
-              <Button onClick={handleSend} disabled={loading || !selectedTemplate}>
-                <Mail className="w-4 h-4 mr-2" />
-                Send to Distribution List
-              </Button>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="customize" className="space-y-4">
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                The standard duty assignments (Weekend, Late Shift, Early Shift) will automatically appear at the top of the email.
+                Standard duty assignments (Weekend, Late Shift, Early Shift) for Week {currentWeek}, {currentYear} will automatically appear at the top of the email.
                 Use this tab to add additional custom content that will appear BELOW those tables.
               </AlertDescription>
             </Alert>
@@ -864,43 +853,45 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
             )}
 
             {customRegions.length > 0 && (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {customNotes.map((note, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Input
-                          value={note}
-                          onChange={(e) => updateNote(index, e.target.value)}
-                          placeholder="Add a note..."
-                        />
-                        <Button onClick={() => deleteNote(index)} variant="ghost" size="icon">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button onClick={addNote} variant="outline" size="sm">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Note
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <div className="flex gap-2 justify-center">
-                  <Button onClick={saveCustomLayout} disabled={loading}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Custom Layout
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {customNotes.map((note, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={note}
+                        onChange={(e) => updateNote(index, e.target.value)}
+                        placeholder="Add a note..."
+                      />
+                      <Button onClick={() => deleteNote(index)} variant="ghost" size="icon">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button onClick={addNote} variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Note
                   </Button>
-                  <Button onClick={previewCustomLayout} disabled={loading}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Preview Custom Email
-                  </Button>
-                </div>
-              </>
+                </CardContent>
+              </Card>
             )}
+
+            <div className="flex gap-2 justify-center">
+              <Button onClick={saveCustomLayout} disabled={loading || customRegions.length === 0}>
+                <Save className="w-4 h-4 mr-2" />
+                Save Custom Layout
+              </Button>
+              <Button onClick={previewCustomLayout} disabled={loading || !selectedTemplate}>
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Complete Email
+              </Button>
+              <Button onClick={handleSend} disabled={loading || !selectedTemplate}>
+                <Mail className="w-4 h-4 mr-2" />
+                Send to Distribution List
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
 
