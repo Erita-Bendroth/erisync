@@ -31,9 +31,17 @@ interface EmailRegionTable {
   rows: EmailTableRow[];
 }
 
+interface Screenshot {
+  id: string;
+  url: string;
+  name: string;
+  caption: string;
+}
+
 interface TemplateData {
   regions: EmailRegionTable[];
   notes: string[];
+  screenshots: Screenshot[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -165,6 +173,22 @@ function buildCustomEmailHtml(
     </table>
   `).join('');
 
+  const screenshotsHtml = templateData.screenshots && templateData.screenshots.length > 0 ? `
+    <div class="screenshots" style="margin-top: 30px;">
+      ${templateData.screenshots.map(screenshot => `
+        <div style="margin-bottom: 20px;">
+          <img src="${screenshot.url}" alt="${escapeHtml(screenshot.name)}" 
+               style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;">
+          ${screenshot.caption ? `
+            <p style="margin-top: 8px; color: #666; font-size: 14px; font-style: italic;">
+              ${escapeHtml(screenshot.caption)}
+            </p>
+          ` : ''}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
   const notesHtml = templateData.notes && templateData.notes.length > 0 ? `
     <div class="notes" style="margin-top: 30px;">
       <h3 style="color: #555; font-size: 16px;">Notes</h3>
@@ -197,6 +221,7 @@ function buildCustomEmailHtml(
   <div class="container">
     <h1>${escapeHtml(templateName)} - KW ${weekNumber}</h1>
     ${regionsHtml}
+    ${screenshotsHtml}
     ${notesHtml}
   </div>
 </body>

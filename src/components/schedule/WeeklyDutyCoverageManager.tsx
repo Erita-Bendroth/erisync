@@ -94,6 +94,15 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     if (!error && data) setTeams(data);
   };
 
+  // Attach paste event listener for screenshot pasting
+  useEffect(() => {
+    if (open) {
+      const pasteHandler = (e: ClipboardEvent) => handlePaste(e);
+      window.addEventListener('paste', pasteHandler);
+      return () => window.removeEventListener('paste', pasteHandler);
+    }
+  }, [open, customScreenshots]);
+
   const fetchTemplates = async () => {
     const { data, error } = await supabase.from('weekly_duty_templates').select('*').order('template_name');
     if (!error && data) setTemplates(data);
@@ -199,8 +208,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const handleSend = async () => {
-    if (!selectedTemplate) {
-      toast({ title: "Error", description: "Please save the template first", variant: "destructive" });
+    if (!customTemplateId) {
+      toast({ title: "Error", description: "Please save the custom layout first", variant: "destructive" });
       return;
     }
 
@@ -210,11 +219,9 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     }
 
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('send-weekly-duty-coverage', {
+    const { data, error } = await supabase.functions.invoke('send-custom-duty-email', {
       body: {
-        template_id: selectedTemplate,
-        week_number: currentWeek,
-        year: currentYear,
+        template_id: customTemplateId,
         preview: false,
       },
     });
@@ -225,7 +232,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     } else {
       toast({
         title: "Success",
-        description: `Sent to ${data.sent || 0} recipients${data.failed ? ` (${data.failed} failed)` : ''}`,
+        description: data.message || `Email sent successfully`,
       });
     }
   };
@@ -461,33 +468,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     setCustomRegions([...customRegions, newRegion]);
   };
 
-  // Sync all custom tables to current week when week changes
-  useEffect(() => {
-    if (customRegions.length === 0) return;
-    
-    const weekDates = getWeekDates(currentWeek, currentYear);
-    const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-    
-    const updatedRegions = customRegions.map(region => ({
-      ...region,
-      rows: region.rows.map((row, index) => {
-        if (index >= 5) return row; // Safety check
-        const date = weekDates[index];
-        const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
-        
-        return {
-          ...row,
-          cells: row.cells.map((cell, cellIndex) => 
-            cellIndex === 0 
-              ? { ...cell, content: `${dateStr} ${weekdays[index]}` }
-              : cell
-          )
-        };
-      })
-    }));
-    
-    setCustomRegions(updatedRegions);
-  }, [currentWeek, currentYear]);
 
   const updateCustomRegion = (index: number, updated: EmailRegionTable) => {
     const newRegions = [...customRegions];
@@ -560,6 +540,58 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       toast({ title: "Error", description: error.message || "Failed to upload screenshot", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePaste = async (e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (!blob) continue;
+
+        setLoading(true);
+        
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const fileName = `${user?.id}/screenshot-${Date.now()}.png`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('email-screenshots')
+            .upload(fileName, blob);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('email-screenshots')
+            .getPublicUrl(fileName);
+
+          setCustomScreenshots([
+            ...customScreenshots,
+            {
+              id: crypto.randomUUID(),
+              url: publicUrl,
+              name: fileName,
+              caption: '',
+            }
+          ]);
+
+          toast({ title: "Success", description: "Screenshot added from clipboard!" });
+        } catch (error: any) {
+          console.error('Paste upload error:', error);
+          toast({ 
+            title: "Error", 
+            description: error.message || "Failed to upload screenshot", 
+            variant: "destructive" 
+          });
+        } finally {
+          setLoading(false);
+        }
+        break;
+      }
     }
   };
 
@@ -821,25 +853,30 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
               </AlertDescription>
             </Alert>
 
-            <div className="flex gap-2">
-              <Button onClick={addCustomRegion} variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Custom Table
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => document.getElementById('screenshot-upload')?.click()}
-              >
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Add Screenshot
-              </Button>
-              <input
-                id="screenshot-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleScreenshotUpload}
-                className="hidden"
-              />
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Button onClick={addCustomRegion} variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Custom Table
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => document.getElementById('screenshot-upload')?.click()}
+                >
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  Add Screenshot
+                </Button>
+                <input
+                  id="screenshot-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleScreenshotUpload}
+                  className="hidden"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                💡 Tip: Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border">Ctrl+V</kbd> to paste screenshots directly from clipboard
+              </p>
             </div>
 
             {customRegions.length > 0 && (

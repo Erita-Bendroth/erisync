@@ -36,7 +36,52 @@ interface EmailTableBuilderProps {
 }
 
 export function EmailTableBuilder({ table, onChange, onDelete }: EmailTableBuilderProps) {
-  const [selectedCell, setSelectedCell] = useState<{ rowIndex: number; cellIndex: number } | null>(null);
+  const [selectedCells, setSelectedCells] = useState<Array<{ rowIndex: number; cellIndex: number }>>([]);
+
+  const handleCellClick = (rowIndex: number, cellIndex: number, event: React.MouseEvent) => {
+    if (event.shiftKey && selectedCells.length > 0) {
+      // Shift+Click: Select range
+      const lastSelected = selectedCells[selectedCells.length - 1];
+      const newSelections: Array<{ rowIndex: number; cellIndex: number }> = [];
+      
+      const minRow = Math.min(lastSelected.rowIndex, rowIndex);
+      const maxRow = Math.max(lastSelected.rowIndex, rowIndex);
+      const minCol = Math.min(lastSelected.cellIndex, cellIndex);
+      const maxCol = Math.max(lastSelected.cellIndex, cellIndex);
+      
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          newSelections.push({ rowIndex: r, cellIndex: c });
+        }
+      }
+      setSelectedCells(newSelections);
+    } else if (event.ctrlKey || event.metaKey) {
+      // Ctrl+Click: Add to selection
+      const exists = selectedCells.some(
+        cell => cell.rowIndex === rowIndex && cell.cellIndex === cellIndex
+      );
+      if (exists) {
+        setSelectedCells(selectedCells.filter(
+          cell => !(cell.rowIndex === rowIndex && cell.cellIndex === cellIndex)
+        ));
+      } else {
+        setSelectedCells([...selectedCells, { rowIndex, cellIndex }]);
+      }
+    } else {
+      // Normal click: Single selection
+      setSelectedCells([{ rowIndex, cellIndex }]);
+    }
+  };
+
+  const bulkUpdateColor = (color: EmailCellColor) => {
+    const newRows = [...table.rows];
+    selectedCells.forEach(({ rowIndex, cellIndex }) => {
+      if (newRows[rowIndex]?.cells[cellIndex]) {
+        newRows[rowIndex].cells[cellIndex].backgroundColor = color;
+      }
+    });
+    onChange({ ...table, rows: newRows });
+  };
 
   const updateCell = (rowIndex: number, cellIndex: number, updates: Partial<EmailTableCell>) => {
     const newRows = [...table.rows];
@@ -149,11 +194,11 @@ export function EmailTableBuilder({ table, onChange, onDelete }: EmailTableBuild
                   <td
                     key={cell.id}
                     className={`border p-0 ${getColorClass(cell.backgroundColor)} ${
-                      selectedCell?.rowIndex === rowIndex && selectedCell?.cellIndex === cellIndex
+                      selectedCells.some(s => s.rowIndex === rowIndex && s.cellIndex === cellIndex)
                         ? 'ring-2 ring-primary'
                         : ''
                     }`}
-                    onClick={() => setSelectedCell({ rowIndex, cellIndex })}
+                    onClick={(e) => handleCellClick(rowIndex, cellIndex, e)}
                   >
                     <Textarea
                       value={cell.content}
@@ -196,13 +241,24 @@ export function EmailTableBuilder({ table, onChange, onDelete }: EmailTableBuild
         </table>
       </div>
 
-      {selectedCell && (
+      {selectedCells.length > 0 && (
         <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
-          <span className="text-sm font-medium">Cell Color:</span>
+          <span className="text-sm font-medium">
+            {selectedCells.length > 1 
+              ? `${selectedCells.length} cells selected` 
+              : 'Cell Color:'}
+          </span>
           <EmailColorPicker
-            value={table.rows[selectedCell.rowIndex]?.cells[selectedCell.cellIndex]?.backgroundColor || 'white'}
-            onChange={(color) => updateCell(selectedCell.rowIndex, selectedCell.cellIndex, { backgroundColor: color })}
+            value={selectedCells.length === 1 
+              ? table.rows[selectedCells[0].rowIndex]?.cells[selectedCells[0].cellIndex]?.backgroundColor || 'white'
+              : 'white'}
+            onChange={bulkUpdateColor}
           />
+          {selectedCells.length > 1 && (
+            <span className="text-xs text-muted-foreground ml-2">
+              💡 Shift+Click to select range, Ctrl+Click to multi-select
+            </span>
+          )}
         </div>
       )}
     </div>
