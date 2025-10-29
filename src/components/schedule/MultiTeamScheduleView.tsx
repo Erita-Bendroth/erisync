@@ -483,25 +483,47 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                   </div>
                                 </td>
                                 {selectedTeams.map((teamId) => {
+                                  // Debug date comparison for South team
+                                  if (teamId === 'a8c41fee-9caa-430b-9db7-a997b23401fe') {
+                                    console.log('📅 SOUTH team date check before filter:', {
+                                      dayOfWeek: format(day, 'EEE'),
+                                      day: day,
+                                      dayType: typeof day,
+                                      dateStr: dateStr,
+                                      scheduleDataCount: scheduleData.filter(e => e.team_id === teamId).length
+                                    });
+                                  }
+
                                   const daySchedules = scheduleData.filter(e => {
                                     const entryDate = typeof e.date === 'string' ? e.date : format(parseISO(e.date), "yyyy-MM-dd");
                                     const match = entryDate === dateStr && e.team_id === teamId && e.activity_type === 'work';
                                     
-                                    // Debug logging for Troubleshooting East team
-                                    if (teamId === 'f162d8bf-1cb0-48c9-aff0-d6b58a9351d2' && entryDate === dateStr) {
-                                      console.log('🔍 Troubleshooting East filter check:', {
+                                    // Debug logging for Troubleshooting SOUTH team
+                                    if (teamId === 'a8c41fee-9caa-430b-9db7-a997b23401fe') {
+                                      console.log('🔍 Troubleshooting SOUTH filter check:', {
+                                        dayOfWeek: format(day, 'EEE'),
                                         dateStr,
                                         entryDate,
+                                        entryDateType: typeof e.date,
+                                        rawEntryDate: e.date,
+                                        dateMatch: entryDate === dateStr,
                                         teamId,
                                         entryTeamId: e.team_id,
+                                        teamMatch: e.team_id === teamId,
                                         activityType: e.activity_type,
-                                        match,
+                                        activityMatch: e.activity_type === 'work',
+                                        finalMatch: match,
                                         entry: e
                                       });
                                     }
                                     
                                     return match;
                                   });
+                                  
+                                  // Log results for South team
+                                  if (teamId === 'a8c41fee-9caa-430b-9db7-a997b23401fe') {
+                                    console.log(`📊 SOUTH team - ${format(day, 'EEE MMM dd')}: Found ${daySchedules.length} schedules`, daySchedules);
+                                  }
                                   
                                   return (
                                     <td key={teamId} className="p-3">
