@@ -258,11 +258,19 @@ serve(async (req) => {
         );
       }
       
-      let htmlContent;
-      if (customTemplate) {
-        htmlContent = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
-      } else {
-        htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+      // Always generate auto tables first
+      let htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+      
+      // Append custom content if exists
+      if (customTemplate?.template_data) {
+        const customHtml = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
+        const customBodyMatch = customHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        const customContent = customBodyMatch ? customBodyMatch[1] : customHtml;
+        
+        htmlContent = htmlContent.replace(
+          '</div>\n  </div>\n</body>',
+          `</div>\n      <hr style="border: 0; border-top: 2px solid #e5e7eb; margin: 32px 0;" />\n      <div style="margin-top: 32px;">\n        <h2 style="color: #111827; margin-bottom: 16px; font-size: 24px; font-weight: 600;">Additional Information</h2>\n        ${customContent}\n      </div>\n    </div>\n  </div>\n</body>`
+        );
       }
       
       return new Response(
@@ -271,12 +279,19 @@ serve(async (req) => {
       );
     }
 
-    // Generate email HTML (use custom layout if available)
-    let htmlContent;
-    if (customTemplate) {
-      htmlContent = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
-    } else {
-      htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+    // Generate email HTML - always start with auto-generated tables
+    let htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+    
+    // Append custom content if exists
+    if (customTemplate?.template_data) {
+      const customHtml = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
+      const customBodyMatch = customHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      const customContent = customBodyMatch ? customBodyMatch[1] : customHtml;
+      
+      htmlContent = htmlContent.replace(
+        '</div>\n  </div>\n</body>',
+        `</div>\n      <hr style="border: 0; border-top: 2px solid #e5e7eb; margin: 32px 0;" />\n      <div style="margin-top: 32px;">\n        <h2 style="color: #111827; margin-bottom: 16px; font-size: 24px; font-weight: 600;">Additional Information</h2>\n        ${customContent}\n      </div>\n    </div>\n  </div>\n</body>`
+      );
     }
 
     // Send email via Resend using your verified domain
