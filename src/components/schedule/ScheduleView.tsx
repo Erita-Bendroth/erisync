@@ -43,6 +43,7 @@ interface ScheduleEntry {
   profiles: {
     first_name: string;
     last_name: string;
+    initials?: string;
   };
   teams: {
     name: string;
