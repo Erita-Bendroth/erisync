@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
+import { buildCustomEmailHtml } from './custom-email-builder.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +25,7 @@ interface DutyCoverageRequest {
   week_number: number;
   year: number;
   preview?: boolean;
+  return_structured_data?: boolean;
 }
 
 interface Assignment {
@@ -91,7 +93,7 @@ serve(async (req) => {
       );
     }
 
-    const { template_id, week_number, year, preview }: DutyCoverageRequest = await req.json();
+    const { template_id, week_number, year, preview, return_structured_data }: DutyCoverageRequest = await req.json();
 
     // Fetch duty template
     const { data: template, error: templateError } = await supabase
@@ -236,16 +238,44 @@ serve(async (req) => {
 
     console.log('Fetched shift time definitions:', shiftDefs?.length || 0);
 
+    // Check for custom layout template
+    const { data: customTemplate } = await supabase
+      .from('custom_duty_email_templates')
+      .select('*')
+      .eq('source_template_id', template_id)
+      .eq('week_number', week_number)
+      .eq('year', year)
+      .eq('mode', 'hybrid')
+      .single();
+
     if (preview) {
-      const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+      if (return_structured_data) {
+        return new Response(
+          JSON.stringify({ assignments: combinedAssignments }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      let htmlContent;
+      if (customTemplate) {
+        htmlContent = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
+      } else {
+        htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+      }
+      
       return new Response(
         JSON.stringify({ html: htmlContent }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate email HTML
-    const htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+    // Generate email HTML (use custom layout if available)
+    let htmlContent;
+    if (customTemplate) {
+      htmlContent = buildCustomEmailHtml(customTemplate.template_name, week_number, customTemplate.template_data);
+    } else {
+      htmlContent = buildDutyCoverageEmail(template, combinedAssignments, teams, shiftDefs || []);
+    }
 
     // Send email via Resend using your verified domain
     const emailResult = await resend.emails.send({

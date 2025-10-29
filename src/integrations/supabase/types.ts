@@ -85,6 +85,8 @@ export type Database = {
           created_by: string
           distribution_list: string[] | null
           id: string
+          mode: string | null
+          source_template_id: string | null
           template_data: Json
           template_name: string
           updated_at: string
@@ -96,6 +98,8 @@ export type Database = {
           created_by: string
           distribution_list?: string[] | null
           id?: string
+          mode?: string | null
+          source_template_id?: string | null
           template_data: Json
           template_name: string
           updated_at?: string
@@ -107,13 +111,23 @@ export type Database = {
           created_by?: string
           distribution_list?: string[] | null
           id?: string
+          mode?: string | null
+          source_template_id?: string | null
           template_data?: Json
           template_name?: string
           updated_at?: string
           week_number?: number
           year?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "custom_duty_email_templates_source_template_id_fkey"
+            columns: ["source_template_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_duty_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dashboard_preferences: {
         Row: {
