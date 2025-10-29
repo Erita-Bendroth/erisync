@@ -208,7 +208,7 @@ export function WeeklyDutyCoverageBuilder({ open, onOpenChange }: WeeklyDutyCove
         template_data: {
           regions: template.regions,
           notes: template.notes,
-        },
+        } as any,
         distribution_list: emails,
         created_by: user.id,
       };

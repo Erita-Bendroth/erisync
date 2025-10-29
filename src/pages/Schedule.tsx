@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { escapeHtml } from "@/lib/validation";
 import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
+import { WeeklyDutyCoverageBuilder } from "@/components/schedule/WeeklyDutyCoverageBuilder";
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
 
@@ -50,6 +51,7 @@ const Schedule = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDutyCoverageModal, setShowDutyCoverageModal] = useState(false);
+  const [showCustomEmailBuilder, setShowCustomEmailBuilder] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -455,6 +457,10 @@ const Schedule = () => {
                           <Mail className="w-4 h-4 mr-2" />
                           Weekly Duty Coverage
                         </Button>
+                        <Button variant="outline" onClick={() => setShowCustomEmailBuilder(true)}>
+                          <Mail className="w-4 h-4 mr-2" />
+                          Create Custom Email
+                        </Button>
                       </>
                     )}
                   </>
@@ -499,6 +505,11 @@ const Schedule = () => {
       <WeeklyDutyCoverageManager
         open={showDutyCoverageModal}
         onOpenChange={setShowDutyCoverageModal}
+      />
+      
+      <WeeklyDutyCoverageBuilder
+        open={showCustomEmailBuilder}
+        onOpenChange={setShowCustomEmailBuilder}
       />
     </div>
   );
