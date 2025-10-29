@@ -353,7 +353,7 @@ serve(async (req) => {
               attachments.push({
                 filename: `${screenshot.id}.${extension}`,
                 content: base64,
-                content_type: contentType,
+                type: contentType,
                 contentId: screenshot.id, // Resend uses "contentId" not "cid"
               });
               
