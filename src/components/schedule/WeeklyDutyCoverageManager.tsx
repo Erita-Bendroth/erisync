@@ -405,18 +405,26 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   };
 
   const getWeekDates = (weekNumber: number, year: number): Date[] => {
-    const jan1 = new Date(year, 0, 1);
-    const jan1Day = jan1.getDay() || 7;
-    const firstMonday = new Date(year, 0, 1 + ((8 - jan1Day) % 7));
-    const daysOffset = (weekNumber - 1) * 7;
-    const weekStart = new Date(firstMonday.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+    // ISO 8601: Week 1 is the week with the year's first Thursday
+    const jan4 = new Date(year, 0, 4); // Jan 4 is always in week 1
+    const jan4Day = jan4.getDay() || 7; // 1=Mon, 7=Sun
     
+    // Find Monday of week 1
+    const week1Monday = new Date(jan4);
+    week1Monday.setDate(jan4.getDate() - (jan4Day - 1));
+    
+    // Calculate Monday of target week
+    const targetMonday = new Date(week1Monday);
+    targetMonday.setDate(week1Monday.getDate() + (weekNumber - 1) * 7);
+    
+    // Generate Mon-Fri
     const dates: Date[] = [];
     for (let i = 0; i < 5; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
+      const date = new Date(targetMonday);
+      date.setDate(targetMonday.getDate() + i);
       dates.push(date);
     }
+    
     return dates;
   };
 
@@ -452,6 +460,34 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     };
     setCustomRegions([...customRegions, newRegion]);
   };
+
+  // Sync all custom tables to current week when week changes
+  useEffect(() => {
+    if (customRegions.length === 0) return;
+    
+    const weekDates = getWeekDates(currentWeek, currentYear);
+    const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+    
+    const updatedRegions = customRegions.map(region => ({
+      ...region,
+      rows: region.rows.map((row, index) => {
+        if (index >= 5) return row; // Safety check
+        const date = weekDates[index];
+        const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+        
+        return {
+          ...row,
+          cells: row.cells.map((cell, cellIndex) => 
+            cellIndex === 0 
+              ? { ...cell, content: `${dateStr} ${weekdays[index]}` }
+              : cell
+          )
+        };
+      })
+    }));
+    
+    setCustomRegions(updatedRegions);
+  }, [currentWeek, currentYear]);
 
   const updateCustomRegion = (index: number, updated: EmailRegionTable) => {
     const newRegions = [...customRegions];
