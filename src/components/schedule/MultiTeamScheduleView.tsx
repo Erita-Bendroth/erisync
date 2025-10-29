@@ -84,14 +84,10 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     threshold: 90,
   });
 
-  // Sync teams from props and auto-select on first load
+  // Sync teams from props
   useEffect(() => {
     if (teamsFromProps && teamsFromProps.length > 0) {
       setTeams(teamsFromProps);
-      // Auto-select all teams on first load
-      if (selectedTeams.length === 0) {
-        setSelectedTeams(teamsFromProps.map(t => t.id));
-      }
     } else if (!teamsFromProps || (Array.isArray(teamsFromProps) && teamsFromProps.length === 0)) {
       fetchTeams();
     }
@@ -110,10 +106,6 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     const { data } = await supabase.from("teams").select("id, name, parent_team_id").order("name");
     if (data) {
       setTeams(data);
-      // Auto-select all teams on first load
-      if (selectedTeams.length === 0 && data.length > 0) {
-        setSelectedTeams(data.map(t => t.id));
-      }
     }
   };
 
