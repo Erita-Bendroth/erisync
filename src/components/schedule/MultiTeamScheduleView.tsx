@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Download, BarChart3, Camera, Loader2 } from "lucide-react";
 import { getShiftTypeColor, getShiftTypeCode } from "@/lib/shiftTimeUtils";
+import { formatUserName } from "@/lib/utils";
 import { format, startOfWeek, addDays, getWeek, getYear, endOfWeek, parseISO } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TeamFavoritesManager } from "./TeamFavoritesManager";
@@ -41,6 +42,9 @@ interface ScheduleEntry {
   first_name: string;
   last_name: string;
   initials: string | null;
+  created_by?: string;
+  creator_name?: string;
+  notes?: string;
 }
 
 interface Holiday {
@@ -213,7 +217,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const [schedulesResult, profilesResult, holidaysResult, capacityResult] = await Promise.all([
         supabase
           .from("schedule_entries")
-          .select("date, user_id, team_id, shift_type, activity_type")
+          .select("date, user_id, team_id, shift_type, activity_type, created_by, notes")
           .in("team_id", selectedTeams)
           .gte("date", startDate)
           .lte("date", endDate)
@@ -257,6 +261,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       // Process schedule data with profile info
       const enrichedSchedules: ScheduleEntry[] = schedules?.map((entry: any) => {
         const profile = profileMap.get(entry.user_id);
+        const creatorProfile = profileMap.get(entry.created_by);
         return {
           date: format(parseISO(entry.date), "yyyy-MM-dd"), // Normalize date format
           user_id: entry.user_id,
@@ -267,6 +272,11 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
           first_name: profile?.first_name || 'Unknown',
           last_name: profile?.last_name || '',
           initials: profile?.initials || null,
+          created_by: entry.created_by,
+          creator_name: creatorProfile 
+            ? `${creatorProfile.first_name} ${creatorProfile.last_name || ''}`.trim()
+            : 'System',
+          notes: entry.notes,
         };
       }) || [];
 
@@ -552,7 +562,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                                 : entry.shift_type;
                                             const bgColor = getShiftTypeColor(effectiveShiftType, entry.activity_type);
                                             const code = getShiftTypeCode(effectiveShiftType, entry.activity_type);
-                                            const userName = entry.initials || `${entry.first_name} ${entry.last_name}`;
+                                            const userName = formatUserName(entry.first_name, entry.last_name, entry.initials);
                                             
                                             return (
                                               <Tooltip key={idx}>
@@ -571,7 +581,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                                   </span>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                  <div className="text-sm">
+                                                  <div className="text-sm space-y-1">
                                                     <div className="font-bold">
                                                       {entry.first_name} {entry.last_name}
                                                     </div>
@@ -581,6 +591,12 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                                     <div className="text-xs text-muted-foreground">
                                                       {entry.team_name}
                                                     </div>
+                                                    {entry.creator_name && (
+                                                      <div className="text-xs pt-1 mt-1 border-t border-border">
+                                                        <span className="text-muted-foreground">Scheduled by:</span>{' '}
+                                                        <span className="font-medium">{entry.creator_name}</span>
+                                                      </div>
+                                                    )}
                                                   </div>
                                                 </TooltipContent>
                                               </Tooltip>
