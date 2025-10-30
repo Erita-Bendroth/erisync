@@ -1808,6 +1808,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                     description: `Viewing teams from "${name}"`,
                   });
                 }}
+                viewContext="schedule"
               />
             </div>
           )}
