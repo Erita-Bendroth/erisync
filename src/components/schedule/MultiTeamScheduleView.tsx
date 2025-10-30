@@ -3,11 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, Download, BarChart3, Camera, Loader2 } from "lucide-react";
 import { getShiftTypeColor, getShiftTypeCode } from "@/lib/shiftTimeUtils";
 import { formatUserName } from "@/lib/utils";
-import { format, startOfWeek, addDays, getWeek, getYear, endOfWeek, parseISO } from "date-fns";
+import { format, startOfWeek, addDays, getWeek, getYear, endOfWeek, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TeamFavoritesManager } from "./TeamFavoritesManager";
 import { CoverageOverview } from "./CoverageOverview";
@@ -74,6 +75,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"schedule" | "coverage" | "grid">("schedule");
   const [screenshotMode, setScreenshotMode] = useState(false);
+  const [dateRangeType, setDateRangeType] = useState<'1week' | '2weeks' | '1month' | '3months' | '6months'>('1week');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
   
   // Access control hook for multi-team view mode
@@ -88,11 +90,46 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const prevSelectedTeamsRef = useRef<string[]>(selectedTeams);
   const prevDateRef = useRef<Date>(currentDate);
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  // Calculate date range based on selected range type
+  const getDateRange = (baseDate: Date, rangeType: typeof dateRangeType) => {
+    switch (rangeType) {
+      case '1week':
+        return {
+          start: startOfWeek(baseDate, { weekStartsOn: 1 }),
+          end: endOfWeek(baseDate, { weekStartsOn: 1 }),
+        };
+      case '2weeks':
+        const week1Start = startOfWeek(baseDate, { weekStartsOn: 1 });
+        return {
+          start: week1Start,
+          end: addDays(week1Start, 13),
+        };
+      case '1month':
+        return {
+          start: startOfMonth(baseDate),
+          end: endOfMonth(baseDate),
+        };
+      case '3months':
+        const month3Start = startOfMonth(baseDate);
+        return {
+          start: month3Start,
+          end: endOfMonth(addMonths(month3Start, 2)),
+        };
+      case '6months':
+        const month6Start = startOfMonth(baseDate);
+        return {
+          start: month6Start,
+          end: endOfMonth(addMonths(month6Start, 5)),
+        };
+    }
+  };
+
+  const dateRange = getDateRange(currentDate, dateRangeType);
+  const weekStart = dateRange.start;
+  const weekEnd = dateRange.end;
   const weekNumber = getWeek(currentDate, { weekStartsOn: 1 });
   const year = getYear(currentDate);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   // Coverage analysis hook - pass pre-fetched data to avoid duplicate queries
   const coverageAnalysis = useCoverageAnalysis({
@@ -376,7 +413,25 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   };
 
   const changeWeek = (delta: number) => {
-    setCurrentDate(addDays(currentDate, delta * 7));
+    let newDate: Date;
+    
+    switch (dateRangeType) {
+      case '1week':
+      case '2weeks':
+        newDate = addDays(currentDate, delta * 7);
+        break;
+      case '1month':
+        newDate = delta > 0 ? addMonths(currentDate, 1) : subMonths(currentDate, 1);
+        break;
+      case '3months':
+        newDate = delta > 0 ? addMonths(currentDate, 3) : subMonths(currentDate, 3);
+        break;
+      case '6months':
+        newDate = delta > 0 ? addMonths(currentDate, 6) : subMonths(currentDate, 6);
+        break;
+    }
+    
+    setCurrentDate(newDate);
   };
 
   const toggleTeam = (teamId: string) => {
@@ -427,8 +482,11 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
 
     const ws = XLSX.utils.aoa_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Week ${weekNumber}`);
-    XLSX.writeFile(wb, `schedule-week-${weekNumber}-${year}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, dateRangeType === '1week' ? `Week ${weekNumber}` : `Schedule`);
+    const filename = dateRangeType === '1week' 
+      ? `schedule-week-${weekNumber}-${year}.xlsx`
+      : `schedule-${format(weekStart, 'yyyy-MM-dd')}_to_${format(weekEnd, 'yyyy-MM-dd')}.xlsx`;
+    XLSX.writeFile(wb, filename);
   };
 
   const exportGapsToCsv = () => {
@@ -470,7 +528,9 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                 <div>
                   <CardTitle>Multi-Team Schedule Overview</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Week {weekNumber} • {format(weekStart, "dd.MM.yyyy")} - {format(weekDays[6], "dd.MM.yyyy")}
+                    {dateRangeType === '1week' && `Week ${weekNumber} • `}
+                    {format(weekStart, "dd.MM.yyyy")} - {format(weekEnd, "dd.MM.yyyy")}
+                    {dateRangeType !== '1week' && ` (${weekDays.length} days)`}
                   </p>
                 </div>
                 {selectedTeams.length > 0 && !coverageAnalysis.isLoading && (
@@ -484,6 +544,21 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Select 
+                value={dateRangeType} 
+                onValueChange={(value) => setDateRangeType(value as typeof dateRangeType)}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1week">1 Week</SelectItem>
+                  <SelectItem value="2weeks">2 Weeks</SelectItem>
+                  <SelectItem value="1month">1 Month</SelectItem>
+                  <SelectItem value="3months">3 Months</SelectItem>
+                  <SelectItem value="6months">6 Months</SelectItem>
+                </SelectContent>
+              </Select>
               <Button 
                 variant={screenshotMode ? "default" : "outline"} 
                 size="sm" 
