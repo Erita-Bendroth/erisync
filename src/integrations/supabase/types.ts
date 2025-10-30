@@ -864,6 +864,7 @@ export type Database = {
           team_ids: string[]
           updated_at: string
           user_id: string
+          view_context: string
         }
         Insert: {
           created_at?: string
@@ -872,6 +873,7 @@ export type Database = {
           team_ids: string[]
           updated_at?: string
           user_id: string
+          view_context?: string
         }
         Update: {
           created_at?: string
@@ -880,6 +882,7 @@ export type Database = {
           team_ids?: string[]
           updated_at?: string
           user_id?: string
+          view_context?: string
         }
         Relationships: []
       }

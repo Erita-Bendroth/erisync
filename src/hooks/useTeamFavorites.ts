@@ -6,7 +6,9 @@ export interface TeamFavorite {
   name: string;
   team_ids: string[];
   created_at: string;
-  view_context?: 'schedule' | 'multi-team';
+  user_id: string;
+  updated_at: string;
+  view_context: 'schedule' | 'multi-team';
 }
 
 export const useTeamFavorites = (viewContext?: 'schedule' | 'multi-team') => {
@@ -32,7 +34,7 @@ export const useTeamFavorites = (viewContext?: 'schedule' | 'multi-team') => {
       const { data, error } = await finalQuery.order('created_at', { ascending: false });
 
       if (error) throw error;
-      setFavorites(data || []);
+      setFavorites((data as TeamFavorite[]) || []);
     } catch (error) {
       console.error('Error fetching favorites:', error);
     } finally {
