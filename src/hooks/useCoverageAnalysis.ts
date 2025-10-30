@@ -12,9 +12,20 @@ export interface CoverageGap {
   isHoliday: boolean;
 }
 
+export interface CoverageDayDetail {
+  date: string;
+  teamId: string;
+  required: number;
+  actual: number;
+  percentage: number;
+  isWeekend: boolean;
+  isHoliday: boolean;
+}
+
 export interface CoverageAnalysis {
   coveragePercentage: number;
   gaps: CoverageGap[];
+  coverageDetails: CoverageDayDetail[];
   belowThreshold: boolean;
   totalDays: number;
   coveredDays: number;
@@ -47,6 +58,7 @@ export function useCoverageAnalysis({
   const [analysis, setAnalysis] = useState<CoverageAnalysis>({
     coveragePercentage: 100,
     gaps: [],
+    coverageDetails: [],
     belowThreshold: false,
     totalDays: 0,
     coveredDays: 0,
@@ -107,6 +119,7 @@ export function useCoverageAnalysis({
 
       // Build coverage analysis
       const gaps: CoverageGap[] = [];
+      const coverageDetails: CoverageDayDetail[] = [];
       let totalDays = 0;
       let coveredDays = 0;
 
@@ -145,6 +158,20 @@ export function useCoverageAnalysis({
 
           totalDays++;
 
+          // Calculate percentage
+          const percentage = required > 0 ? Math.round((actual / required) * 100) : 100;
+
+          // Store complete coverage detail
+          coverageDetails.push({
+            date: dateStr,
+            teamId,
+            required,
+            actual,
+            percentage,
+            isWeekend,
+            isHoliday,
+          });
+
           if (actual >= required) {
             coveredDays++;
           } else {
@@ -170,6 +197,7 @@ export function useCoverageAnalysis({
       setAnalysis({
         coveragePercentage,
         gaps: gaps.sort((a, b) => b.deficit - a.deficit),
+        coverageDetails,
         belowThreshold: coveragePercentage < threshold,
         totalDays,
         coveredDays,
@@ -187,6 +215,7 @@ export function useCoverageAnalysis({
       setAnalysis({
         coveragePercentage: 100,
         gaps: [],
+        coverageDetails: [],
         belowThreshold: false,
         totalDays: 0,
         coveredDays: 0,

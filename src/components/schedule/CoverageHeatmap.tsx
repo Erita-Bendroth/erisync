@@ -18,17 +18,25 @@ export function CoverageHeatmap({ teamIds, startDate, endDate, teams }: Coverage
 
   const getCoverageForTeamAndDate = (teamId: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const gap = analysis.gaps.find((g) => g.teamId === teamId && g.date === dateStr);
+    
+    // Use coverageDetails instead of gaps for complete data
+    const detail = analysis.coverageDetails?.find(
+      (d) => d.teamId === teamId && d.date === dateStr
+    );
 
-    if (!gap) {
-      return { percentage: 100, actual: 0, required: 0 };
+    if (!detail) {
+      return { percentage: 0, actual: 0, required: 0 };
     }
 
-    const percentage = gap.required > 0 ? Math.round((gap.actual / gap.required) * 100) : 0;
-    return { percentage, actual: gap.actual, required: gap.required };
+    return {
+      percentage: detail.percentage,
+      actual: detail.actual,
+      required: detail.required,
+    };
   };
 
-  const getCoverageColor = (percentage: number) => {
+  const getCoverageColor = (percentage: number, required: number) => {
+    if (required === 0) return 'bg-gray-300 dark:bg-gray-700'; // No requirement
     if (percentage >= 100) return 'bg-green-600 dark:bg-green-500';
     if (percentage >= 80) return 'bg-green-400 dark:bg-green-600';
     if (percentage >= 60) return 'bg-yellow-400 dark:bg-yellow-600';
@@ -45,6 +53,38 @@ export function CoverageHeatmap({ teamIds, startDate, endDate, teams }: Coverage
         </CardHeader>
         <CardContent>
           <div className="h-64 bg-muted animate-pulse rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (teams.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Coverage Heatmap</CardTitle>
+          <CardDescription>Select teams to view coverage heatmap</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center text-muted-foreground">
+            No teams selected
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!analysis.coverageDetails || analysis.coverageDetails.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Coverage Heatmap</CardTitle>
+          <CardDescription>No coverage data available</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center text-muted-foreground">
+            No schedule data found for the selected date range
+          </div>
         </CardContent>
       </Card>
     );
@@ -89,7 +129,7 @@ export function CoverageHeatmap({ teamIds, startDate, endDate, teams }: Coverage
                           <div
                             className={cn(
                               'w-8 h-8 rounded cursor-pointer transition-transform hover:scale-110',
-                              getCoverageColor(coverage.percentage)
+                              getCoverageColor(coverage.percentage, coverage.required)
                             )}
                           />
                         </TooltipTrigger>
