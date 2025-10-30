@@ -499,30 +499,79 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     XLSX.writeFile(wb, filename);
   };
 
-  const exportGapsToCsv = () => {
-    if (coverageAnalysis.gaps.length === 0) return;
+  const exportGapsToExcel = () => {
+    if (coverageAnalysis.gaps.length === 0) {
+      toast({
+        title: 'No Gaps to Export',
+        description: 'There are no coverage gaps in the selected date range.',
+        variant: 'default'
+      });
+      return;
+    }
 
-    const csvData = [
-      ["Date", "Team", "Required", "Actual", "Deficit", "Weekend", "Holiday"],
-      ...coverageAnalysis.gaps.map((gap) => [
-        format(new Date(gap.date), "yyyy-MM-dd"),
-        gap.teamName,
-        gap.required.toString(),
-        gap.actual.toString(),
-        gap.deficit.toString(),
-        gap.isWeekend ? "Yes" : "No",
-        gap.isHoliday ? "Yes" : "No",
-      ]),
+    // Prepare data with calculated columns
+    const excelData = coverageAnalysis.gaps.map((gap) => ({
+      'Date': format(new Date(gap.date), 'yyyy-MM-dd (EEE)'), // Add day of week
+      'Team': gap.teamName,
+      'Required Staff': gap.required,
+      'Actual Staff': gap.actual,
+      'Deficit': gap.deficit,
+      'Coverage %': gap.required > 0 ? Math.round((gap.actual / gap.required) * 100) : 0,
+      'Severity': gap.deficit >= 3 ? 'CRITICAL' : gap.deficit >= 2 ? 'High' : 'Medium',
+      'Weekend': gap.isWeekend ? 'Yes' : 'No',
+      'Holiday': gap.isHoliday ? 'Yes' : 'No',
+    }));
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths for readability
+    ws['!cols'] = [
+      { wch: 18 }, // Date
+      { wch: 35 }, // Team (long names)
+      { wch: 14 }, // Required Staff
+      { wch: 12 }, // Actual Staff
+      { wch: 10 }, // Deficit
+      { wch: 12 }, // Coverage %
+      { wch: 12 }, // Severity
+      { wch: 10 }, // Weekend
+      { wch: 10 }, // Holiday
     ];
 
-    const csv = csvData.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `coverage-gaps-week-${weekNumber}-${year}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // Add autofilter to all columns
+    ws['!autofilter'] = { ref: ws['!ref'] || 'A1' };
+
+    // Create workbook and add summary sheet
+    const wb = XLSX.utils.book_new();
+    
+    // Add summary statistics sheet
+    const summaryData = [
+      ['Coverage Gap Summary'],
+      [''],
+      ['Date Range:', `${format(weekStart, 'yyyy-MM-dd')} to ${format(weekEnd, 'yyyy-MM-dd')}`],
+      ['Total Gaps:', coverageAnalysis.gaps.length],
+      ['Total Staff Deficit:', coverageAnalysis.gaps.reduce((sum, g) => sum + g.deficit, 0)],
+      ['Critical Gaps (3+ staff short):', coverageAnalysis.gaps.filter(g => g.deficit >= 3).length],
+      ['High Priority (2 staff short):', coverageAnalysis.gaps.filter(g => g.deficit === 2).length],
+      [''],
+      ['Teams Affected:'],
+      ...Array.from(new Set(coverageAnalysis.gaps.map(g => g.teamName))).map(team => [team])
+    ];
+    
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    wsSummary['!cols'] = [{ wch: 30 }, { wch: 40 }];
+    
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+    XLSX.utils.book_append_sheet(wb, ws, 'Coverage Gaps');
+
+    // Download file
+    const filename = `coverage-gaps-week-${weekNumber}-${year}.xlsx`;
+    XLSX.writeFile(wb, filename);
+
+    toast({
+      title: 'Export Complete',
+      description: `Coverage gaps exported to ${filename}`,
+    });
   };
 
   return (
@@ -846,7 +895,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
 
               <TabsContent value="coverage" className="mt-4 space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <CoverageOverview analysis={coverageAnalysis} onExportGaps={exportGapsToCsv} />
+                  <CoverageOverview analysis={coverageAnalysis} onExportGaps={exportGapsToExcel} />
                   <CoverageHeatmap
                     teamIds={selectedTeams}
                     startDate={weekStart}

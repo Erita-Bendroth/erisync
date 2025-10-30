@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CoverageGap {
@@ -66,7 +66,26 @@ export function useCoverageAnalysis({
     isLoading: true,
   });
 
+  // Create stable reference to check if we actually need to re-analyze
+  const dataSignature = useMemo(
+    () => JSON.stringify({ 
+      teamIds: [...teamIds].sort(), 
+      start: startDate.toISOString(), 
+      end: endDate.toISOString(),
+      threshold 
+    }),
+    [teamIds, startDate, endDate, threshold]
+  );
+
+  const prevSignature = useRef<string>('');
+
   const analyzeCoverage = useCallback(async () => {
+    // Prevent unnecessary re-analysis if data hasn't changed
+    if (prevSignature.current === dataSignature && analysis.coverageDetails.length > 0) {
+      return;
+    }
+    
+    prevSignature.current = dataSignature;
 
     try {
       setAnalysis((prev) => ({ ...prev, isLoading: true }));
@@ -208,7 +227,7 @@ export function useCoverageAnalysis({
       console.error('Error analyzing coverage:', error);
       setAnalysis((prev) => ({ ...prev, isLoading: false }));
     }
-  }, [teamIds, startDate, endDate, threshold, scheduleData, teamsData, holidaysData, capacityData]);
+  }, [dataSignature, scheduleData, teamsData, holidaysData, capacityData, analysis.coverageDetails.length]);
 
   useEffect(() => {
     if (teamIds.length === 0) {
@@ -225,7 +244,12 @@ export function useCoverageAnalysis({
       return;
     }
 
-    analyzeCoverage();
+    // Debounce to prevent rapid re-renders
+    const timer = setTimeout(() => {
+      analyzeCoverage();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [teamIds, startDate, endDate, threshold, scheduleData, teamsData, holidaysData, capacityData, analyzeCoverage]);
 
   return analysis;
