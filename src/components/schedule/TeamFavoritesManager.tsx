@@ -29,15 +29,17 @@ interface TeamFavoritesManagerProps {
   currentSelectedTeamIds: string[];
   teams: Array<{ id: string; name: string }>;
   onApplyFavorite: (teamIds: string[], name: string) => void;
+  viewContext: 'schedule' | 'multi-team';
 }
 
 export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
   currentSelectedTeamIds,
   teams,
   onApplyFavorite,
+  viewContext,
 }) => {
   const { toast } = useToast();
-  const { favorites, refetchFavorites } = useTeamFavorites();
+  const { favorites, refetchFavorites } = useTeamFavorites(viewContext);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -70,13 +72,14 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('team_view_favorites')
-        .insert({
-          user_id: user.id,
-          name: favoriteName.trim(),
-          team_ids: currentSelectedTeamIds,
-        });
+    const { error } = await supabase
+      .from('team_view_favorites')
+      .insert({
+        user_id: user.id,
+        name: favoriteName.trim(),
+        team_ids: currentSelectedTeamIds,
+        view_context: viewContext,
+      });
 
       if (error) {
         if (error.code === '23505') { // Unique constraint violation
@@ -219,7 +222,9 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-80">
-            <DropdownMenuLabel>Saved Team Views</DropdownMenuLabel>
+          <DropdownMenuLabel>
+            {viewContext === 'multi-team' ? 'Saved Multi-Team Views' : 'Saved Team Views'}
+          </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {favorites.length === 0 ? (
               <div className="px-2 py-6 text-center text-sm text-muted-foreground">

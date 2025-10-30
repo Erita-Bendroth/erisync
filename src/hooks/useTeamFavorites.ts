@@ -6,9 +6,10 @@ export interface TeamFavorite {
   name: string;
   team_ids: string[];
   created_at: string;
+  view_context?: 'schedule' | 'multi-team';
 }
 
-export const useTeamFavorites = () => {
+export const useTeamFavorites = (viewContext?: 'schedule' | 'multi-team') => {
   const [favorites, setFavorites] = useState<TeamFavorite[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -18,11 +19,17 @@ export const useTeamFavorites = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('team_view_favorites')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
+      
+      // Filter by context if provided
+      if (viewContext) {
+        query = query.eq('view_context', viewContext);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setFavorites(data || []);
@@ -31,7 +38,7 @@ export const useTeamFavorites = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewContext]);
 
   useEffect(() => {
     fetchFavorites();

@@ -586,6 +586,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                 currentSelectedTeamIds={selectedTeams}
                 teams={teams}
                 onApplyFavorite={handleApplyFavorite}
+                viewContext="multi-team"
               />
               <Button variant="outline" size="sm" onClick={exportToExcel} disabled={selectedTeams.length === 0}>
                 <Download className="w-4 h-4 mr-2" />
