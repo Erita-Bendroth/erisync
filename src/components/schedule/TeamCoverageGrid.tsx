@@ -4,7 +4,7 @@ import { format, startOfWeek, addDays, endOfWeek, getWeek, getYear } from "date-
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { groupTeamsByHierarchy, filterTroubleshootingTeams } from "@/lib/teamHierarchyUtils";
+import { groupTeamsByHierarchy } from "@/lib/teamHierarchyUtils";
 
 interface TeamCoverageGridProps {
   teamIds: string[];
@@ -292,18 +292,24 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
   if (teams.length === 0) {
     return (
       <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          No team data available
+        <CardContent className="py-12 text-center">
+          <div className="text-muted-foreground mb-2">No team data available</div>
+          <div className="text-sm text-muted-foreground">
+            The selected teams could not be loaded. Please try refreshing the page.
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   console.log('Coverage Grid - Rendering with teams:', teams);
-  // Filter to only show Troubleshooting teams
-  const filteredTeams = filterTroubleshootingTeams(teams);
-  const hierarchicalTeams = groupTeamsByHierarchy(filteredTeams);
+  // Display all selected teams (user has explicitly chosen which teams to view)
+  const hierarchicalTeams = groupTeamsByHierarchy(teams);
   console.log('Coverage Grid - Hierarchical teams:', hierarchicalTeams);
+  
+  if (hierarchicalTeams.topLevel.length === 0 && teams.length > 0) {
+    console.log('Coverage Grid - All teams are child teams, will display under parents');
+  }
 
   return (
     <div className="space-y-4">
