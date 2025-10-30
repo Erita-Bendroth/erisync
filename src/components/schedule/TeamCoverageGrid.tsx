@@ -303,13 +303,19 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
   }
 
   console.log('Coverage Grid - Rendering with teams:', teams);
-  // Display all selected teams (user has explicitly chosen which teams to view)
-  const hierarchicalTeams = groupTeamsByHierarchy(teams);
-  console.log('Coverage Grid - Hierarchical teams:', hierarchicalTeams);
   
-  if (hierarchicalTeams.topLevel.length === 0 && teams.length > 0) {
-    console.log('Coverage Grid - All teams are child teams, will display under parents');
-  }
+  // Group teams by hierarchy
+  const hierarchicalTeams = groupTeamsByHierarchy(teams);
+  
+  // If all selected teams are children (no parents selected), display them as top-level
+  const displayTeams = hierarchicalTeams.topLevel.length > 0
+    ? hierarchicalTeams
+    : {
+        topLevel: teams, // Treat all selected child teams as top-level
+        childrenMap: new Map() // No children since we're displaying them as top-level
+      };
+  
+  console.log('Coverage Grid - Display structure:', displayTeams);
 
   return (
     <div className="space-y-4">
@@ -346,8 +352,8 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
               <th className="p-3 text-left font-semibold sticky left-0 bg-muted/50 z-10 min-w-[120px]">
                 Date / Day
               </th>
-              {hierarchicalTeams.topLevel.map(team => {
-                const children = hierarchicalTeams.childrenMap.get(team.id) || [];
+              {displayTeams.topLevel.map(team => {
+                const children = displayTeams.childrenMap.get(team.id) || [];
                 const colSpan = children.length || 1;
                 
                 return (
@@ -366,8 +372,8 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
               <th className="p-2 text-xs text-left sticky left-0 bg-muted/30 z-10">
                 
               </th>
-              {hierarchicalTeams.topLevel.map(parentTeam => {
-                const children = hierarchicalTeams.childrenMap.get(parentTeam.id) || [];
+              {displayTeams.topLevel.map(parentTeam => {
+                const children = displayTeams.childrenMap.get(parentTeam.id) || [];
                 
                 if (children.length > 0) {
                   return children.map(child => (
@@ -399,8 +405,8 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
                       <span className="text-xs text-muted-foreground">{dayName}</span>
                     </div>
                   </td>
-                  {hierarchicalTeams.topLevel.map(parentTeam => {
-                    const children = hierarchicalTeams.childrenMap.get(parentTeam.id) || [];
+                  {displayTeams.topLevel.map(parentTeam => {
+                    const children = displayTeams.childrenMap.get(parentTeam.id) || [];
                     const teamsToShow = children.length > 0 ? children : [parentTeam];
 
                     return teamsToShow.map(team => {

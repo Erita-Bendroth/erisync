@@ -21,7 +21,8 @@ import { HolidayBadge } from "./HolidayBadge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { filterTroubleshootingTeams } from "@/lib/teamHierarchyUtils";
+import { TeamFavoritesQuickAccess } from "./TeamFavoritesQuickAccess";
+import { useTeamFavorites } from "@/hooks/useTeamFavorites";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 import { useScheduleAccessControl } from "@/hooks/useScheduleAccessControl";
@@ -77,6 +78,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const [screenshotMode, setScreenshotMode] = useState(false);
   const [dateRangeType, setDateRangeType] = useState<'1week' | '2weeks' | '1month' | '3months' | '6months'>('1week');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
+  const { favorites } = useTeamFavorites('multi-team');
   
   // Access control hook for multi-team view mode
   const {
@@ -247,6 +249,14 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
     if (data) {
       setTeams(data);
     }
+  };
+
+  const applyFavorite = (teamIds: string[], name: string) => {
+    setSelectedTeams(teamIds);
+    toast({
+      title: 'Favorite Applied',
+      description: `Now viewing: ${name}`,
+    });
   };
 
   const fetchHolidays = async (userCountries: string[]) => {
@@ -596,10 +606,21 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Quick access to saved favorites */}
+          {favorites.length > 0 && (
+            <div className="pb-2">
+              <TeamFavoritesQuickAccess
+                favorites={favorites}
+                currentSelectedTeamIds={selectedTeams}
+                onApplyFavorite={applyFavorite}
+              />
+            </div>
+          )}
+          
           <div className="flex items-center justify-between mb-4">
             <div className="flex flex-wrap gap-2">
               <span className="text-sm font-medium">Teams:</span>
-            {filterTroubleshootingTeams(teams).map((team) => (
+            {teams.map((team) => (
               <Badge
                 key={team.id}
                 variant={selectedTeams.includes(team.id) ? "default" : "outline"}
