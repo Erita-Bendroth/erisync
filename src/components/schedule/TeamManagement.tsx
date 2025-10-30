@@ -134,25 +134,10 @@ const TeamManagement = () => {
           return;
         }
       } else if (roleToUse === 'manager') {
-        console.log("Fetching teams for manager...");
-        const { data: managedTeams, error: managerError } = await supabase
-          .from("team_members")
-          .select("team_id")
-          .eq("user_id", user!.id)
-          .eq("is_manager", true);
-        
-        console.log("Manager team memberships:", managedTeams, "Error:", managerError);
-        
-        if (managedTeams && managedTeams.length > 0) {
-          const teamIds = managedTeams.map(tm => tm.team_id);
-          console.log("Filtering teams to only show managed team IDs:", teamIds);
-          query = query.in("id", teamIds);
-        } else {
-          // Manager doesn't manage any teams, return empty array
-          console.log("Manager doesn't manage any teams, showing empty list");
-          setTeams([]);
-          return;
-        }
+        console.log("Fetching teams for manager - RLS will handle hierarchy access");
+        // Managers see all teams they have access to via RLS (including hierarchy)
+        // The RLS policies use get_manager_accessible_teams() which includes sub-teams
+        // No need to manually filter here
       } else {
         console.log("User has admin/planner role, showing all teams");
       }

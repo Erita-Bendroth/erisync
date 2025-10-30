@@ -51,52 +51,27 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
         .eq('is_manager', true);
 
       if (managerTeams) {
-        const allManagerTeamIds = managerTeams.map((tm: any) => tm.team_id);
-        const directTeamIds = new Set<string>();
-        
-        // Filter to get only DIRECTLY managed teams:
-        // - Teams with no parent (top-level teams they truly manage)
-        // - Child teams they manage
-        // - Exclude parent teams where they're only marked manager for RLS purposes
-        
-        for (const tm of managerTeams as any[]) {
-          const teamId = tm.team_id;
-          const hasParent = tm.teams.parent_team_id !== null;
-          
-          // If team has children, check if user also manages any child team
-          const { data: childTeams } = await supabase
-            .from('teams')
-            .select('id')
-            .eq('parent_team_id', teamId);
-          
-          if (childTeams && childTeams.length > 0) {
-            // This team has children - check if user manages any child
-            const childTeamIds = childTeams.map(c => c.id);
-            const managesChildTeam = allManagerTeamIds.some(id => 
-              childTeamIds.includes(id)
-            );
-            
-            // Only include parent team if user doesn't manage any child teams
-            if (!managesChildTeam) {
-              directTeamIds.add(teamId);
-            }
-          } else {
-            // No children, so this is a directly managed team
-            directTeamIds.add(teamId);
-          }
-        }
-        
+        // ALL teams where user is marked as manager are directly managed
+        // The RLS policies handle the hierarchy correctly via get_manager_accessible_teams()
+        const directTeamIds = new Set(managerTeams.map((tm: any) => tm.team_id));
         setDirectlyManagedTeams(directTeamIds);
         
-        // Fetch users from directly managed teams only
+        // Fetch ALL users from all accessible teams in the hierarchy
         if (directTeamIds.size > 0) {
-          const { data: members } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .in('team_id', Array.from(directTeamIds));
+          // Use the database function to get all teams in the hierarchy
+          const { data: allAccessibleTeams } = await supabase
+            .rpc('get_manager_accessible_teams', { _manager_id: user.id });
+          
+          if (allAccessibleTeams && allAccessibleTeams.length > 0) {
+            // Fetch members from ALL accessible teams (including sub-teams)
+            const { data: members } = await supabase
+              .from('team_members')
+              .select('user_id')
+              .in('team_id', allAccessibleTeams);
 
-          if (members) {
-            setDirectlyManagedUsers(new Set(members.map(m => m.user_id)));
+            if (members) {
+              setDirectlyManagedUsers(new Set(members.map(m => m.user_id)));
+            }
           }
         }
       }
