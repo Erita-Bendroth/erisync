@@ -30,6 +30,7 @@ import { cn, formatUserName, doesShiftCrossMidnight } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useShiftCounts } from '@/hooks/useShiftCounts';
 import { ShiftCountsDisplay } from './ShiftCountsDisplay';
+import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 
 interface ScheduleEntry {
   id: string;
@@ -123,6 +124,15 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   const [editingVacationRequest, setEditingVacationRequest] = useState<any>(null);
   const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
 
+  // Access control hook for standard view mode
+  const {
+    canViewActivityDetails,
+    isAdmin: isAdminRole,
+    isPlanner: isPlannerRole,
+    isManager: isManagerRole,
+    directlyManagedUsers,
+  } = useScheduleAccessControl({ viewMode: 'standard' });
+
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 // Show Monday through Sunday (full week)
 const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
@@ -130,9 +140,9 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (!isManager() && !isPlanner()) return;
     
-    // Managers can only edit entries for users in their managed teams
-    if (isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id)) {
-      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you manage", variant: "destructive" });
+    // Managers can only edit entries for users they directly manage
+    if (isManager() && !isPlanner() && !canViewActivityDetails(entry.user_id)) {
+      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you directly manage", variant: "destructive" });
       return;
     }
     
@@ -153,9 +163,9 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   const handleDateClick = async (userId: string, date: Date) => {
     if (!isManager() && !isPlanner()) return;
     
-    // Managers can only edit entries for users in their managed teams
-    if (isManager() && !isPlanner() && !canViewFullDetailsSync(userId)) {
-      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you manage", variant: "destructive" });
+    // Managers can only edit entries for users they directly manage
+    if (isManager() && !isPlanner() && !canViewActivityDetails(userId)) {
+      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you directly manage", variant: "destructive" });
       return;
     }
     
@@ -1264,12 +1274,16 @@ useEffect(() => {
     enabled: (isManager() || isPlanner()) && employees.length > 0 && timeView === "weekly",
   });
 
-// Helper: can manager view full details for a user synchronously
-const canViewFullDetailsSync = (userId: string) => {
-  if (!isManager() || isPlanner()) return true;
-  const hasAccess = managedUsersSet.has(userId);
-  console.log('[ScheduleView] Access check for user:', userId, 'hasAccess:', hasAccess, 'managedUsersSet size:', managedUsersSet.size);
-  return hasAccess;
+// Helper: simplified display for non-managed users (only show Available/Unavailable)
+const getSimplifiedDisplay = (userId: string, day: Date) => {
+  const dayStr = format(day, 'yyyy-MM-dd');
+  const hasAnyEntry = scheduleEntries.some(
+    entry => entry.user_id === userId && entry.date === dayStr
+  );
+  
+  return hasAnyEntry
+    ? { status: 'Available', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' }
+    : { status: 'Unavailable', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300' };
 };
 
   // Render employee name - show full name if available, otherwise nothing (initials are in the avatar)
@@ -1291,14 +1305,14 @@ const getActivityDisplay = (entry: ScheduleEntry) => {
     return getAvailabilityStatus(entry.activity_type);
   }
   
-  // For managers, check if user is in a managed team
+  // For managers in standard view, check if they directly manage this user
   if (isManager() && !isPlanner()) {
-    const canViewFull = canViewFullDetailsSync(entry.user_id);
-    if (canViewFull === false) {
-      // Manager doesn't manage this user's team - show availability only
+    const canView = canViewActivityDetails(entry.user_id);
+    if (!canView) {
+      // Manager doesn't directly manage this user - show availability only
       return getAvailabilityStatus(entry.activity_type);
     } else {
-      // Manager manages this user's team - show full details
+      // Manager directly manages this user - show full details
       return getActivityDisplayName(entry.activity_type);
     }
   }
@@ -1371,9 +1385,9 @@ const getActivityColor = (entry: ScheduleEntry) => {
       : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
   }
 
-  // For managers, check if they can view full details
+  // For managers in standard view, check if they can view full details
   if (isManager() && !isPlanner()) {
-    const canViewFull = canViewFullDetailsSync(entry.user_id);
+    const canViewFull = canViewActivityDetails(entry.user_id);
     if (!canViewFull) {
       // Show availability colors only (work and hotline_support = available)
       const availableTypes = ['work', 'hotline_support'];
@@ -2021,9 +2035,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             {/* Show continuation from previous day first */}
                             {continuationEntries.map((entry) => {
                               const times = getShiftTimesFromEntry(entry);
+                              const canView = canViewActivityDetails(entry.user_id);
+                              
                               return (
                                 <div key={`continuation-${entry.id}`} className="space-y-1">
-                                   {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
+                                   {canView ? (
                                     <TimeBlockDisplay
                                       entry={entry}
                                       userRole={userRoles.length > 0 ? userRoles[0].role : ""}
@@ -2033,10 +2049,8 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       shiftDescription={getShiftDescription(entry, employee)}
                                       onClick={(e) => {
                                         e?.stopPropagation();
-                                        if (!multiSelectMode && (isManager() || isPlanner())) {
-                                          if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
-                                            handleEditShift(entry);
-                                          }
+                                        if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
+                                          handleEditShift(entry);
                                         }
                                       }}
                                     />
@@ -2074,59 +2088,51 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                   {(isManager() || isPlanner()) && !multiSelectMode ? "+" : "-"}
                                 </span>
                               ) : (
-                              dayEntries.map((entry) => (
-                                <div key={entry.id} className="space-y-1">
-                                  {multiSelectMode && (
-                                    <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
-                                      <Checkbox
-                                        checked={selectedShiftIds.includes(entry.id)}
-                                        onCheckedChange={() => toggleShiftSelection(entry.id)}
-                                      />
-                                    </div>
-                                  )}
-                                  {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) ? (
-                                    <TimeBlockDisplay
-                                      entry={entry}
-                                      userRole={userRoles.length > 0 ? userRoles[0].role : ""}
-                                      showNotes={isTeamMember() && !isManager() && !isPlanner()}
-                                      shiftDescription={getShiftDescription(entry, employee)}
-                                      onClick={(e) => {
-                                        e?.stopPropagation();
-                                        if (!multiSelectMode && (isManager() || isPlanner())) {
-                                          // Additional check for managers - they can only edit users in their managed teams
-                                          if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
-                                            handleEditShift(entry);
-                                          }
-                                        }
-                                      }}
-                                    />
-                                  ) : (
-                                    <Badge
-                                      variant="secondary"
-                                      className={`${getActivityColor(entry)} block cursor-pointer hover:opacity-80 transition-opacity text-xs`}
-                                      onClick={(e) => {
-                                        e?.stopPropagation();
-                                        if (!multiSelectMode && (isManager() || isPlanner())) {
-                                          // Additional check for managers - they can only edit users in their managed teams
-                                          if (!(isManager() && !isPlanner() && !canViewFullDetailsSync(entry.user_id))) {
-                                            handleEditShift(entry);
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      <div className="flex flex-col items-center py-1">
-                                        <span className="font-medium">{getActivityDisplay(entry)}</span>
+                              dayEntries.map((entry) => {
+                                const canView = canViewActivityDetails(entry.user_id);
+                                
+                                return (
+                                  <div key={entry.id} className="space-y-1">
+                                    {multiSelectMode && canView && (
+                                      <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
+                                        <Checkbox
+                                          checked={selectedShiftIds.includes(entry.id)}
+                                          onCheckedChange={() => toggleShiftSelection(entry.id)}
+                                        />
                                       </div>
-                                    </Badge>
-                                  )}
+                                    )}
+                                    {canView ? (
+                                      <TimeBlockDisplay
+                                        entry={entry}
+                                        userRole={userRoles.length > 0 ? userRoles[0].role : ""}
+                                        showNotes={isTeamMember() && !isManager() && !isPlanner()}
+                                        shiftDescription={getShiftDescription(entry, employee)}
+                                        onClick={(e) => {
+                                          e?.stopPropagation();
+                                          if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
+                                            handleEditShift(entry);
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <Badge
+                                        variant="secondary"
+                                        className={`${getActivityColor(entry)} block text-xs pointer-events-none`}
+                                      >
+                                        <div className="flex flex-col items-center py-1">
+                                          <span className="font-medium">{getActivityDisplay(entry)}</span>
+                                        </div>
+                                      </Badge>
+                                    )}
 
-                                  {(!(isManager() && !isPlanner()) || canViewFullDetailsSync(entry.user_id) === true) && entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
-                                    <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
-                                      {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
-                                    </p>
-                                  )}
-                                </div>
-                              ))
+                                    {canView && entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
+                                      <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
+                                        {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })
                             )}
                           </div>
                         </TableCell>

@@ -23,6 +23,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { filterTroubleshootingTeams } from "@/lib/teamHierarchyUtils";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
+import { useScheduleAccessControl } from "@/hooks/useScheduleAccessControl";
 
 interface TeamMember {
   user_id: string;
@@ -74,6 +75,13 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const [viewMode, setViewMode] = useState<"schedule" | "coverage" | "grid">("schedule");
   const [screenshotMode, setScreenshotMode] = useState(false);
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
+  
+  // Access control hook for multi-team view mode
+  const {
+    canViewActivityDetails,
+    isAdmin: isAdminRole,
+    isPlanner: isPlannerRole,
+  } = useScheduleAccessControl({ viewMode: 'multi-team' });
   
   // Fetch deduplication ref
   const fetchInProgressRef = useRef(false);
@@ -258,12 +266,13 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       const startDate = format(weekDays[0], "yyyy-MM-dd");
       const endDate = format(weekDays[6], "yyyy-MM-dd");
 
-      // Fetch ALL data in parallel: schedules, profiles, holidays, and capacity config
+      // Fetch ALL data in parallel: schedules (work activities only), holidays, and capacity config
       const [schedulesResult, holidaysResult, capacityResult] = await Promise.all([
         supabase
           .from("schedule_entries")
           .select("date, user_id, team_id, shift_type, activity_type, created_by, notes")
           .in("team_id", selectedTeams)
+          .eq("activity_type", "work")
           .gte("date", startDate)
           .lte("date", endDate)
           .limit(1000),
@@ -561,7 +570,10 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                   </div>
                 ) : (
                   <TooltipProvider>
-                    <div className="overflow-x-auto border rounded-lg">
+                <div className="overflow-x-auto border rounded-lg">
+                      <div className="px-3 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
+                        <strong>Note:</strong> Multi-team overview shows work schedules only. Other activities (vacation, training, etc.) are not displayed here.
+                      </div>
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b bg-muted/50">
