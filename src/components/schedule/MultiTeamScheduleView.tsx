@@ -83,6 +83,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   // Access control hook for multi-team view mode
   const {
     canViewActivityDetails,
+    canEditTeam,
     isAdmin: isAdminRole,
     isPlanner: isPlannerRole,
   } = useScheduleAccessControl({ viewMode: 'multi-team' });

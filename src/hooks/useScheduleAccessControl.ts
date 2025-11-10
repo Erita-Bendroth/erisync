@@ -21,6 +21,7 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [directlyManagedUsers, setDirectlyManagedUsers] = useState<Set<string>>(new Set());
   const [directlyManagedTeams, setDirectlyManagedTeams] = useState<Set<string>>(new Set());
+  const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -56,18 +57,21 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
         const directTeamIds = new Set(managerTeams.map((tm: any) => tm.team_id));
         setDirectlyManagedTeams(directTeamIds);
         
-        // Fetch ALL users from all accessible teams in the hierarchy
+        // Fetch EDITABLE teams (directly managed + descendants, NO siblings)
         if (directTeamIds.size > 0) {
-          // Use the database function to get all teams in the hierarchy
-          const { data: allAccessibleTeams } = await supabase
-            .rpc('get_manager_accessible_teams', { _manager_id: user.id });
+          // Use the database function to get all editable teams in the hierarchy
+          const { data: editableTeamsList } = await supabase
+            .rpc('get_manager_editable_teams', { _manager_id: user.id });
           
-          if (allAccessibleTeams && allAccessibleTeams.length > 0) {
-            // Fetch members from ALL accessible teams (including sub-teams)
+          if (editableTeamsList && editableTeamsList.length > 0) {
+            // Store editable team IDs for canEditTeam check
+            setEditableTeams(new Set(editableTeamsList));
+            
+            // Fetch members from only EDITABLE teams (directly managed + descendants, NO siblings)
             const { data: members } = await supabase
               .from('team_members')
               .select('user_id')
-              .in('team_id', allAccessibleTeams);
+              .in('team_id', editableTeamsList);
 
             if (members) {
               setDirectlyManagedUsers(new Set(members.map(m => m.user_id)));
@@ -108,12 +112,28 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
     }
   };
 
+  /**
+   * Determines if the current user can edit a specific team's schedule entries
+   */
+  const canEditTeam = (teamId: string): boolean => {
+    // Admins and planners always have edit access
+    if (isAdmin || isPlanner) return true;
+
+    // Non-managers cannot edit
+    if (!isManager) return false;
+
+    // Managers can only edit teams in their editable teams set
+    return editableTeams.has(teamId);
+  };
+
   return {
     canViewActivityDetails,
+    canEditTeam,
     isAdmin,
     isPlanner,
     isManager,
     directlyManagedTeams,
     directlyManagedUsers,
+    editableTeams,
   };
 }

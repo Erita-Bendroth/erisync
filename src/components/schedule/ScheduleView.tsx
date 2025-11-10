@@ -127,6 +127,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   // Access control hook for standard view mode
   const {
     canViewActivityDetails,
+    canEditTeam,
     isAdmin: isAdminRole,
     isPlanner: isPlannerRole,
     isManager: isManagerRole,
@@ -140,9 +141,13 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (!isManager() && !isPlanner()) return;
     
-    // Managers can only edit entries for users they directly manage
-    if (isManager() && !isPlanner() && !canViewActivityDetails(entry.user_id)) {
-      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you directly manage", variant: "destructive" });
+    // Check if manager can edit this team
+    if (!canEditTeam(entry.team_id)) {
+      toast({ 
+        title: "Edit Not Allowed", 
+        description: "You can only edit schedules for teams you directly manage", 
+        variant: "destructive" 
+      });
       return;
     }
     
@@ -163,12 +168,6 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   const handleDateClick = async (userId: string, date: Date) => {
     if (!isManager() && !isPlanner()) return;
     
-    // Managers can only edit entries for users they directly manage
-    if (isManager() && !isPlanner() && !canViewActivityDetails(userId)) {
-      toast({ title: "Access Denied", description: "You can only edit schedules for users in teams you directly manage", variant: "destructive" });
-      return;
-    }
-    
     try {
       const existingEntry = scheduleEntries.find(entry => 
         entry.user_id === userId && isSameDay(new Date(entry.date), date)
@@ -188,6 +187,16 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
 
       if (teamError || !userTeamData?.team_id) {
         toast({ title: "Error", description: "User is not assigned to any team", variant: "destructive" });
+        return;
+      }
+      
+      // Check if manager can edit this team
+      if (!canEditTeam(userTeamData.team_id)) {
+        toast({ 
+          title: "Edit Not Allowed", 
+          description: "You can only edit schedules for teams you directly manage", 
+          variant: "destructive" 
+        });
         return;
       }
 
@@ -2111,7 +2120,16 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                         onClick={(e) => {
                                           e?.stopPropagation();
                                           if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
-                                            handleEditShift(entry);
+                                            // Check if manager can edit this team before opening edit modal
+                                            if (canEditTeam(entry.team_id)) {
+                                              handleEditShift(entry);
+                                            } else {
+                                              toast({ 
+                                                title: "View Only", 
+                                                description: "You can view this schedule but cannot edit it", 
+                                                variant: "default" 
+                                              });
+                                            }
                                           }
                                         }}
                                       />
