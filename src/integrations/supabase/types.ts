@@ -1257,6 +1257,10 @@ export type Database = {
         Args: { _delegate_id: string }
         Returns: string[]
       }
+      get_directly_managed_teams: {
+        Args: { _manager_id: string }
+        Returns: string[]
+      }
       get_eligible_delegation_users: {
         Args: { _requesting_user_id: string }
         Returns: {
@@ -1269,6 +1273,10 @@ export type Database = {
       }
       get_managed_team_ids: { Args: { _uid: string }; Returns: string[] }
       get_manager_accessible_teams: {
+        Args: { _manager_id: string }
+        Returns: string[]
+      }
+      get_manager_editable_teams: {
         Args: { _manager_id: string }
         Returns: string[]
       }
@@ -1364,6 +1372,10 @@ export type Database = {
         Returns: Json
       }
       has_manager_access: {
+        Args: { _team_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_manager_edit_access: {
         Args: { _team_id: string; _user_id: string }
         Returns: boolean
       }
