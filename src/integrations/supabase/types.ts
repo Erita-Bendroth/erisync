@@ -1079,6 +1079,7 @@ export type Database = {
           include_earlyshift: boolean
           include_lateshift: boolean
           include_weekend_duty: boolean
+          table_layout: Json | null
           team_ids: string[]
           template_name: string
           updated_at: string
@@ -1091,6 +1092,7 @@ export type Database = {
           include_earlyshift?: boolean
           include_lateshift?: boolean
           include_weekend_duty?: boolean
+          table_layout?: Json | null
           team_ids: string[]
           template_name: string
           updated_at?: string
@@ -1103,6 +1105,7 @@ export type Database = {
           include_earlyshift?: boolean
           include_lateshift?: boolean
           include_weekend_duty?: boolean
+          table_layout?: Json | null
           team_ids?: string[]
           template_name?: string
           updated_at?: string
