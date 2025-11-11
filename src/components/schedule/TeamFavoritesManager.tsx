@@ -23,6 +23,7 @@ import { Settings, Trash2, Edit2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 
 interface TeamFavoritesManagerProps {
@@ -45,6 +46,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [favoriteName, setFavoriteName] = useState('');
   const [editingFavorite, setEditingFavorite] = useState<any>(null);
+  const [editingFavoriteTeamIds, setEditingFavoriteTeamIds] = useState<string[]>([]);
   const [deletingFavorite, setDeletingFavorite] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -122,7 +124,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
         .from('team_view_favorites')
         .update({
           name: favoriteName.trim(),
-          team_ids: currentSelectedTeamIds,
+          team_ids: editingFavoriteTeamIds,
         })
         .eq('id', editingFavorite.id);
 
@@ -249,6 +251,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
                     onClick={() => {
                       setEditingFavorite(favorite);
                       setFavoriteName(favorite.name);
+                      setEditingFavoriteTeamIds(favorite.team_ids);
                       setShowEditDialog(true);
                     }}
                   >
@@ -316,7 +319,7 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
 
       {/* Edit Favorite Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Favorite</DialogTitle>
             <DialogDescription>
@@ -331,15 +334,44 @@ export const TeamFavoritesManager: React.FC<TeamFavoritesManagerProps> = ({
                 placeholder="e.g., Plant Teams, North Region"
                 value={favoriteName}
                 onChange={(e) => setFavoriteName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUpdateFavorite()}
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Selected Teams ({editingFavoriteTeamIds.length})</Label>
+              <div className="border rounded-md p-3 max-h-60 overflow-y-auto bg-background">
+                {teams.map((team) => (
+                  <div key={team.id} className="flex items-center gap-2 py-1.5">
+                    <Checkbox
+                      id={`edit-team-${team.id}`}
+                      checked={editingFavoriteTeamIds.includes(team.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setEditingFavoriteTeamIds([...editingFavoriteTeamIds, team.id]);
+                        } else {
+                          setEditingFavoriteTeamIds(editingFavoriteTeamIds.filter(id => id !== team.id));
+                        }
+                      }}
+                    />
+                    <Label 
+                      htmlFor={`edit-team-${team.id}`}
+                      className="flex-1 cursor-pointer text-sm font-normal"
+                    >
+                      {team.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateFavorite} disabled={loading}>
+            <Button 
+              onClick={handleUpdateFavorite} 
+              disabled={loading || editingFavoriteTeamIds.length === 0}
+            >
               {loading ? 'Updating...' : 'Update Favorite'}
             </Button>
           </DialogFooter>
