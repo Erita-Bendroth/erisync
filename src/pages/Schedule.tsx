@@ -26,6 +26,7 @@ import { escapeHtml } from "@/lib/validation";
 import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
+import { VacationPlanningDashboard } from "@/components/schedule/vacation-planning/VacationPlanningDashboard";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -289,7 +290,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -297,6 +298,10 @@ const Schedule = () => {
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
+            </TabsTrigger>
+            <TabsTrigger value="vacation-planning" className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              Vacation Planning
             </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
@@ -486,6 +491,13 @@ const Schedule = () => {
             ) : (
               <MultiTeamScheduleView teams={teams} />
             )}
+          </TabsContent>
+
+          <TabsContent value="vacation-planning" className="space-y-6">
+            <VacationPlanningDashboard 
+              teamIds={teams.map(t => t.id)}
+              teams={teams}
+            />
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
