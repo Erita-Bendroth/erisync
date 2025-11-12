@@ -88,7 +88,7 @@ interface ScheduleViewProps {
 const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { favorites } = useTeamFavorites();
+  const { favorites } = useTeamFavorites('schedule');
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
