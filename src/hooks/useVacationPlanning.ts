@@ -74,6 +74,7 @@ export const useVacationPlanning = ({
           teams!vacation_requests_team_id_fkey(name)
         `)
         .in('team_id', teamIds)
+        .in('status', ['pending', 'approved'])
         .gte('requested_date', format(dateRange.start, 'yyyy-MM-dd'))
         .lte('requested_date', format(dateRange.end, 'yyyy-MM-dd'))
         .order('requested_date', { ascending: true });

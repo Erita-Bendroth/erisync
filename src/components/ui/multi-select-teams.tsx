@@ -45,10 +45,19 @@ export function MultiSelectTeams({
     onValueChange(newSelection);
   };
 
-  const selectedTeamNames = teams
-    .filter((team) => selectedTeamIds.includes(team.id))
-    .map((team) => team.name)
-    .join(", ");
+  const getDisplayText = () => {
+    if (selectedTeamIds.length === 0) {
+      return placeholder;
+    }
+    if (selectedTeamIds.length === teams.length) {
+      return `All teams (${teams.length})`;
+    }
+    if (selectedTeamIds.length === 1) {
+      const team = teams.find((t) => t.id === selectedTeamIds[0]);
+      return team?.name || placeholder;
+    }
+    return `${selectedTeamIds.length} teams selected`;
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -57,11 +66,11 @@ export function MultiSelectTeams({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between text-left"
           disabled={disabled}
         >
           <span className="truncate">
-            {selectedTeamIds.length > 0 ? selectedTeamNames : placeholder}
+            {getDisplayText()}
           </span>
         </Button>
       </PopoverTrigger>
