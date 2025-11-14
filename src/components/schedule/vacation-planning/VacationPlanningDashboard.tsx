@@ -18,6 +18,7 @@ import { useVacationPlanning } from '@/hooks/useVacationPlanning';
 import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { addMonths, subMonths } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MultiSelectTeams } from '@/components/ui/multi-select-teams';
 
 interface VacationPlanningDashboardProps {
   teamIds: string[];
@@ -29,6 +30,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
   const [monthsToShow, setMonthsToShow] = useState(3);
   const [view, setView] = useState<'calendar' | 'pipeline'>('calendar');
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(teamIds);
 
   // Add access control for multi-team hierarchy
   const {
@@ -47,7 +49,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
     rejectRequest,
     refresh
   } = useVacationPlanning({
-    teamIds,
+    teamIds: selectedTeamIds.length > 0 ? selectedTeamIds : teamIds,
     monthsToShow,
     startDate
   });
@@ -114,18 +116,47 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4">
+            {/* Team Selection Filter */}
             <div className="flex items-center gap-2">
-              <Button
-                variant="default"
-                onClick={() => setShowManualEntry(true)}
+              <label className="text-sm font-medium min-w-[60px]">Teams:</label>
+              <div className="flex-1">
+                <MultiSelectTeams
+                  teams={teams}
+                  selectedTeamIds={selectedTeamIds}
+                  onValueChange={setSelectedTeamIds}
+                  placeholder="Select teams to view"
+                />
+              </div>
+              <Button 
+                variant="outline" 
                 size="sm"
+                onClick={() => setSelectedTeamIds(teamIds)}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Entry
+                Select All
               </Button>
-              <Button onClick={handlePreviousMonth} variant="outline" size="sm">
-                <ChevronLeft className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setSelectedTeamIds([])}
+              >
+                Clear
+              </Button>
+            </div>
+            
+            {/* Navigation and Actions */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  onClick={() => setShowManualEntry(true)}
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Entry
+                </Button>
+                <Button onClick={handlePreviousMonth} variant="outline" size="sm">
+                  <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button onClick={handleToday} variant="outline" size="sm">
                 Today
