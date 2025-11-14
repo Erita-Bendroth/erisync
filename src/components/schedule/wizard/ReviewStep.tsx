@@ -222,13 +222,25 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           };
           
           for (const userId of usersToSchedule) {
+            // Format time information as JSON in notes
+            const timeInfo = JSON.stringify([{
+              activity_type: "work",
+              start_time: finalShiftInfo.startTime,
+              end_time: finalShiftInfo.endTime
+            }]);
+            
+            const description = wizardData.mode === "rotation" 
+              ? `Auto-generated ${shiftInfo?.shiftName || finalShiftInfo.shiftType} (Rotation)`
+              : `Auto-generated ${shiftInfo?.shiftName || finalShiftInfo.shiftType}`;
+            
             entries.push({
               user_id: userId,
               team_id: wizardData.selectedTeam,
               date: dateStr,
               shift_type: finalShiftInfo.shiftType,
-              start_time: finalShiftInfo.startTime,
-              end_time: finalShiftInfo.endTime,
+              activity_type: "work",
+              availability_status: "available",
+              notes: `Times: ${timeInfo}\n${description}`,
               created_by: user.id,
             });
           }
