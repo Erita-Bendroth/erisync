@@ -444,7 +444,7 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
             </Button>
 
             <Button 
-              onClick={exportAsJSON} 
+              onClick={exportToCalendar} 
               disabled={exporting || loadingData}
               variant="outline"
               className="flex items-center gap-2"
@@ -452,9 +452,9 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
               {exporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <FileText className="w-4 h-4" />
+                <Calendar className="w-4 h-4" />
               )}
-              JSON
+              ICS Calendar
             </Button>
           </div>
           
