@@ -62,28 +62,46 @@ export const TeamPeopleStep = ({ wizardData, updateWizardData }: TeamPeopleStepP
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Step 1: Get team members
+      const { data: membersData, error: membersError } = await supabase
         .from("team_members")
-        .select(`
-          user:profiles!inner(user_id, first_name, last_name, email, initials)
-        `)
+        .select("user_id")
         .eq("team_id", wizardData.selectedTeam);
 
-      if (error) {
-        console.error("Error fetching users:", error);
-        throw error;
+      if (membersError) {
+        console.error("Error fetching team members:", membersError);
+        throw membersError;
       }
 
-      const userList = data?.map((item: any) => ({
-        id: item.user.user_id,
-        first_name: item.user.first_name,
-        last_name: item.user.last_name,
-        email: item.user.email,
-        initials: item.user.initials
-      })).filter(Boolean) || [];
+      if (!membersData || membersData.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Step 2: Get profiles for those users using RPC function
+      const userIds = membersData.map(member => member.user_id);
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
+
+      // Transform the data to match the expected User interface
+      const userList = profilesData?.map((profile: any) => ({
+        id: profile.user_id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        initials: profile.initials
+      })) || [];
+
       setUsers(userList);
     } catch (error) {
       console.error("Error fetching users:", error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
