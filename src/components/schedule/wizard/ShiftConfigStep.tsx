@@ -2,8 +2,11 @@ import React, { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TimeSelect } from "@/components/ui/time-select";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WizardData } from "./BulkScheduleWizard";
-import { Moon, Sun, Calendar, Clock } from "lucide-react";
+import { Moon, Sun, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { cn, doesShiftCrossMidnight } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -123,6 +126,43 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
         <p className="text-muted-foreground">Choose a preset or set custom times</p>
       </div>
 
+      {wizardData.mode === "rotation" && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CalendarIcon className="h-5 w-5 text-primary" />
+                <div>
+                  <Label htmlFor="use-pattern" className="text-base font-medium">
+                    Use Weekly Shift Pattern
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Assign different shifts to different days of the week
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="use-pattern"
+                checked={wizardData.useShiftPattern}
+                onCheckedChange={(checked) => {
+                  updateWizardData({ useShiftPattern: checked });
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {wizardData.useShiftPattern && wizardData.mode === "rotation" ? (
+        <Alert>
+          <CalendarIcon className="h-4 w-4" />
+          <AlertDescription>
+            You'll configure day-specific shifts in the next step. Click Continue to proceed.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <>
+
       {/* Preset Shifts */}
       <div className="space-y-4">
         <Label className="text-base font-medium">Quick Presets</Label>
@@ -229,7 +269,7 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
       )}
 
       {/* Summary */}
-      {selectedPreset !== "custom" && wizardData.startTime && wizardData.endTime && (
+      {!wizardData.useShiftPattern && selectedPreset !== "custom" && wizardData.startTime && wizardData.endTime && (
         <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
           <div className="text-center space-y-1">
             <p className="font-medium">
@@ -241,6 +281,8 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
             </p>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

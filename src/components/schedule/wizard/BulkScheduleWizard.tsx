@@ -9,6 +9,7 @@ import { ModeSelectionStep } from "./ModeSelectionStep";
 import { TeamPeopleStep } from "./TeamPeopleStep";
 import { DateRangeStep } from "./DateRangeStep";
 import { ShiftConfigStep } from "./ShiftConfigStep";
+import { ShiftPatternStep } from "./ShiftPatternStep";
 import { AdvancedOptionsStep } from "./AdvancedOptionsStep";
 import { ReviewStep } from "./ReviewStep";
 import { WizardProgress } from "./WizardProgress";
@@ -34,6 +35,15 @@ export interface WizardData {
   rotationIntervalWeeks: number;
   rotationCycles: number;
   perDateTimes?: { [dateStr: string]: { startTime: string; endTime: string } };
+  useShiftPattern: boolean;
+  shiftPattern?: {
+    [dayOfWeek: string]: {
+      shiftType: string;
+      shiftName: string;
+      startTime: string;
+      endTime: string;
+    }
+  };
 }
 
 interface BulkScheduleWizardProps {
@@ -66,6 +76,8 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     enableRecurring: false,
     rotationIntervalWeeks: 4,
     rotationCycles: 1,
+    useShiftPattern: false,
+    shiftPattern: {},
   });
 
   useEffect(() => {
@@ -108,24 +120,44 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     { id: 1, label: "Team & People", component: TeamPeopleStep },
     { id: 2, label: "Dates", component: DateRangeStep },
     { id: 3, label: "Shifts", component: ShiftConfigStep },
-    { id: 4, label: "Options", component: AdvancedOptionsStep },
-    { id: 5, label: "Review", component: ReviewStep },
+    ...(wizardData.useShiftPattern && wizardData.mode === "rotation" 
+      ? [{ id: 4, label: "Pattern", component: ShiftPatternStep }] 
+      : []
+    ),
+    { id: wizardData.useShiftPattern && wizardData.mode === "rotation" ? 5 : 4, label: "Options", component: AdvancedOptionsStep },
+    { id: wizardData.useShiftPattern && wizardData.mode === "rotation" ? 6 : 5, label: "Review", component: ReviewStep },
   ];
 
   const canProceed = () => {
-    switch (currentStep) {
-      case 0: // Mode selection
+    const currentStepInfo = steps[currentStep];
+    if (!currentStepInfo) return false;
+    
+    // Check based on step label instead of index
+    switch (currentStepInfo.label) {
+      case "Mode":
         return wizardData.mode !== null;
-      case 1: // Team & People
+      case "Team & People":
         if (wizardData.mode === "team") {
           return wizardData.selectedTeam !== "";
         }
         return wizardData.selectedTeam !== "" && wizardData.selectedUsers.length > 0;
-      case 2: // Dates
+      case "Dates":
         return wizardData.startDate && wizardData.endDate;
-      case 3: // Shifts
+      case "Shifts":
+        // If using pattern mode, can proceed to configure pattern
+        if (wizardData.useShiftPattern && wizardData.mode === "rotation") {
+          return true;
+        }
+        // Otherwise need shift times configured
         return wizardData.startTime && wizardData.endTime;
-      case 4: // Options (always valid, optional settings)
+      case "Pattern":
+        // Check if all days in pattern are configured
+        if (!wizardData.shiftPattern) return false;
+        const requiredDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+        return requiredDays.every(day => wizardData.shiftPattern?.[day]);
+      case "Options":
+        return true; // Always valid, optional settings
+      case "Review":
         return true;
       default:
         return true;
