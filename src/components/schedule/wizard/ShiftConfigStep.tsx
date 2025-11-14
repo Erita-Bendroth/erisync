@@ -176,10 +176,12 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
                 )}
                 onClick={() => handleShiftDefinitionSelect(def)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">{def.shift_type}</div>
+                <div className="space-y-1">
+                  <div className="font-medium text-base">
+                    {def.description || def.shift_type}
+                  </div>
                   <div className="text-sm text-muted-foreground">
-                    {def.start_time} - {def.end_time}
+                    {def.start_time.substring(0, 5)} - {def.end_time.substring(0, 5)}
                   </div>
                 </div>
               </div>
