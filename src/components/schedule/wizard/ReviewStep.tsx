@@ -110,6 +110,22 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
     }
   };
 
+  // Map UI shift types to valid database enum values
+  const mapShiftTypeToEnum = (shiftType: string | undefined): "early" | "late" | "normal" | "weekend" => {
+    if (!shiftType) return "normal";
+    
+    const mapping: Record<string, "early" | "late" | "normal" | "weekend"> = {
+      "day": "normal",
+      "night": "late",
+      "custom": "normal",
+      "early": "early",
+      "late": "late",
+      "normal": "normal",
+      "weekend": "weekend",
+    };
+    return mapping[shiftType] || "normal";
+  };
+
   const getTotalShifts = () => {
     if (!wizardData.startDate || !wizardData.endDate) return 0;
     
@@ -137,8 +153,17 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
     setLoading(true);
     
     try {
-      if (!wizardData.startDate || !wizardData.endDate || !user) {
-        throw new Error("Missing required data");
+      // Validate required data
+      if (!wizardData.startDate || !wizardData.endDate) {
+        throw new Error("Start date and end date are required");
+      }
+      
+      if (!wizardData.selectedTeam) {
+        throw new Error("Please select a team before generating schedule");
+      }
+      
+      if (!user?.id) {
+        throw new Error("User authentication required");
       }
 
       // Get pattern days (the base rotation pattern)
@@ -212,16 +237,24 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           
           // Use shift pattern info if available, otherwise fallback to wizard data
           const finalShiftInfo = shiftInfo ? {
-            shiftType: shiftInfo.shiftType,
+            shiftType: mapShiftTypeToEnum(shiftInfo.shiftType),
+            shiftName: shiftInfo.shiftName,
             startTime: shiftInfo.startTime,
             endTime: shiftInfo.endTime,
           } : {
-            shiftType: wizardData.shiftType,
-            startTime: wizardData.startTime,
-            endTime: wizardData.endTime,
+            shiftType: mapShiftTypeToEnum(wizardData.shiftType),
+            shiftName: wizardData.shiftName || "Day Shift",
+            startTime: wizardData.startTime || "08:00",
+            endTime: wizardData.endTime || "16:30",
           };
           
           for (const userId of usersToSchedule) {
+            // Validate user ID
+            if (!userId) {
+              console.warn("Skipping entry: user_id is undefined");
+              continue;
+            }
+
             // Format time information as JSON in notes
             const timeInfo = JSON.stringify([{
               activity_type: "work",
@@ -230,16 +263,16 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             }]);
             
             const description = wizardData.mode === "rotation" 
-              ? `Auto-generated ${shiftInfo?.shiftName || finalShiftInfo.shiftType} (Rotation)`
-              : `Auto-generated ${shiftInfo?.shiftName || finalShiftInfo.shiftType}`;
+              ? `Auto-generated ${finalShiftInfo.shiftName} (Rotation)`
+              : `Auto-generated ${finalShiftInfo.shiftName}`;
             
             entries.push({
               user_id: userId,
               team_id: wizardData.selectedTeam,
               date: dateStr,
-              shift_type: finalShiftInfo.shiftType,
-              activity_type: "work",
-              availability_status: "available",
+              shift_type: finalShiftInfo.shiftType as "early" | "late" | "normal" | "weekend",
+              activity_type: "work" as const,
+              availability_status: "available" as const,
               notes: `Times: ${timeInfo}\n${description}`,
               created_by: user.id,
             });
@@ -270,9 +303,15 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
       onScheduleGenerated?.();
     } catch (error) {
       console.error("Error generating schedule:", error);
+      
+      // Show more specific error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to generate schedule. Please check your configuration and try again.";
+      
       toast({
         title: "Error",
-        description: "Failed to generate schedule. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

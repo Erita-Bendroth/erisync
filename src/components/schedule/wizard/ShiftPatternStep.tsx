@@ -24,10 +24,10 @@ interface ShiftDefinition {
 }
 
 const QUICK_PRESETS = [
-  { value: "skip", label: "🚫 Skip / Day Off", start: "", end: "" },
-  { value: "day", label: "Day Shift", start: "08:00", end: "16:30" },
-  { value: "night", label: "Night Shift", start: "22:00", end: "06:00" },
-  { value: "custom", label: "Custom Times", start: "08:00", end: "16:30" },
+  { value: "skip", label: "🚫 Skip / Day Off", start: "", end: "", dbType: null },
+  { value: "day", label: "Day Shift", start: "08:00", end: "16:30", dbType: "normal" },
+  { value: "night", label: "Night Shift", start: "22:00", end: "06:00", dbType: "late" },
+  { value: "custom", label: "Custom Times", start: "08:00", end: "16:30", dbType: "normal" },
 ];
 
 export const ShiftPatternStep = ({ wizardData, updateWizardData }: ShiftPatternStepProps) => {
@@ -102,7 +102,7 @@ export const ShiftPatternStep = ({ wizardData, updateWizardData }: ShiftPatternS
       };
     } else if (preset) {
       shiftInfo = {
-        shiftType: preset.value,
+        shiftType: preset.dbType || preset.value,
         shiftName: preset.label,
         startTime: preset.start,
         endTime: preset.end,
