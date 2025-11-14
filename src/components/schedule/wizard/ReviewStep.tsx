@@ -197,13 +197,25 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           const scheduledDate = addDays(day, offsetDays);
           const dateStr = format(scheduledDate, "yyyy-MM-dd");
           
+          // Get shift info for this specific date
+          const shiftInfo = wizardData.shiftPattern?.[dateStr];
+          
+          // Skip if marked as day off
+          if (shiftInfo?.isDayOff) {
+            continue;
+          }
+          
           // Skip if it's a holiday
           if (wizardData.skipHolidays && holidays.includes(dateStr)) {
             continue;
           }
           
-          // Use single shift for all days (for non-rotation modes)
-          const shiftInfo = {
+          // Use shift pattern info if available, otherwise fallback to wizard data
+          const finalShiftInfo = shiftInfo ? {
+            shiftType: shiftInfo.shiftType,
+            startTime: shiftInfo.startTime,
+            endTime: shiftInfo.endTime,
+          } : {
             shiftType: wizardData.shiftType,
             startTime: wizardData.startTime,
             endTime: wizardData.endTime,
@@ -214,9 +226,9 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
               user_id: userId,
               team_id: wizardData.selectedTeam,
               date: dateStr,
-              shift_type: shiftInfo.shiftType,
-              start_time: shiftInfo.startTime,
-              end_time: shiftInfo.endTime,
+              shift_type: finalShiftInfo.shiftType,
+              start_time: finalShiftInfo.startTime,
+              end_time: finalShiftInfo.endTime,
               created_by: user.id,
             });
           }

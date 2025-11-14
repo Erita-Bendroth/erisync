@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Calendar, Clock, Copy } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format, eachDayOfInterval } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface ShiftPatternStepProps {
   wizardData: WizardData;
@@ -23,6 +24,7 @@ interface ShiftDefinition {
 }
 
 const QUICK_PRESETS = [
+  { value: "skip", label: "🚫 Skip / Day Off", start: "", end: "" },
   { value: "day", label: "Day Shift", start: "08:00", end: "16:30" },
   { value: "night", label: "Night Shift", start: "22:00", end: "06:00" },
   { value: "custom", label: "Custom Times", start: "08:00", end: "16:30" },
@@ -70,6 +72,23 @@ export const ShiftPatternStep = ({ wizardData, updateWizardData }: ShiftPatternS
   };
 
   const handleDateShiftChange = (dateStr: string, shiftId: string) => {
+    // Handle "skip" option
+    if (shiftId === "skip") {
+      updateWizardData({
+        shiftPattern: {
+          ...wizardData.shiftPattern,
+          [dateStr]: {
+            shiftType: "skip",
+            shiftName: "Day Off",
+            startTime: "",
+            endTime: "",
+            isDayOff: true,
+          },
+        },
+      });
+      return;
+    }
+
     const selectedShift = shiftDefinitions.find(s => s.id === shiftId);
     const preset = QUICK_PRESETS.find(p => p.value === shiftId);
 
@@ -201,10 +220,22 @@ export const ShiftPatternStep = ({ wizardData, updateWizardData }: ShiftPatternS
     updateWizardData({ shiftPattern: updatedPattern });
   };
 
-  const configuredCount = dates.filter(date => {
+  const configuredDates = dates.filter(date => {
     const dateStr = format(date, "yyyy-MM-dd");
     return wizardData.shiftPattern?.[dateStr];
+  });
+
+  const workDays = configuredDates.filter(date => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return !wizardData.shiftPattern?.[dateStr]?.isDayOff;
   }).length;
+
+  const skipDays = configuredDates.filter(date => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return wizardData.shiftPattern?.[dateStr]?.isDayOff;
+  }).length;
+
+  const configuredCount = configuredDates.length;
 
   return (
     <div className="space-y-6">
@@ -220,6 +251,7 @@ export const ShiftPatternStep = ({ wizardData, updateWizardData }: ShiftPatternS
         <AlertDescription>
           Configuring {dates.length} dates from {wizardData.startDate && format(wizardData.startDate, "MMM d")} to {wizardData.endDate && format(wizardData.endDate, "MMM d, yyyy")}. 
           Progress: {configuredCount}/{dates.length} dates configured
+          {skipDays > 0 && <span className="ml-2 text-muted-foreground">({workDays} work days, {skipDays} days off)</span>}
         </AlertDescription>
       </Alert>
 
@@ -267,11 +299,21 @@ export const ShiftPatternStep = ({ wizardData, updateWizardData }: ShiftPatternS
             const dayName = format(date, "EEEE");
             const fullDate = format(date, "MMMM d, yyyy");
             const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            const isSkipped = wizardData.shiftPattern?.[dateStr]?.isDayOff;
 
             return (
-              <div key={dateStr} className="flex items-center gap-4 p-3 rounded-lg border">
+              <div 
+                key={dateStr} 
+                className={cn(
+                  "flex items-center gap-4 p-3 rounded-lg border",
+                  isSkipped && "bg-muted/50 border-muted opacity-60"
+                )}
+              >
                 <div className="min-w-[200px]">
-                  <div className="font-medium">{dayName}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {dayName}
+                    {isSkipped && <span className="text-xs text-destructive">(Skipped)</span>}
+                  </div>
                   <div className={`text-sm ${isWeekend ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'}`}>
                     {fullDate}
                   </div>

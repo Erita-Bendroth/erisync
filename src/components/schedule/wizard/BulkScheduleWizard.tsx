@@ -42,6 +42,7 @@ export interface WizardData {
       shiftName: string;
       startTime: string;
       endTime: string;
+      isDayOff?: boolean;
     }
   };
 }
