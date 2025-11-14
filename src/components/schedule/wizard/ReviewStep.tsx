@@ -202,14 +202,44 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             continue;
           }
           
+          // Determine shift for this day
+          let shiftInfo;
+          if (wizardData.useShiftPattern && wizardData.shiftPattern) {
+            // Get day of week (lowercase: monday, tuesday, etc.)
+            const dayOfWeek = format(scheduledDate, 'EEEE').toLowerCase();
+            const patternShift = wizardData.shiftPattern[dayOfWeek];
+            
+            if (patternShift) {
+              shiftInfo = {
+                shiftType: patternShift.shiftType,
+                startTime: patternShift.startTime,
+                endTime: patternShift.endTime,
+              };
+            } else {
+              // Fallback to default if day not configured
+              shiftInfo = {
+                shiftType: wizardData.shiftType,
+                startTime: wizardData.startTime,
+                endTime: wizardData.endTime,
+              };
+            }
+          } else {
+            // Use single shift for all days
+            shiftInfo = {
+              shiftType: wizardData.shiftType,
+              startTime: wizardData.startTime,
+              endTime: wizardData.endTime,
+            };
+          }
+          
           for (const userId of usersToSchedule) {
             entries.push({
               user_id: userId,
               team_id: wizardData.selectedTeam,
               date: dateStr,
-              shift_type: wizardData.shiftType,
-              start_time: wizardData.startTime,
-              end_time: wizardData.endTime,
+              shift_type: shiftInfo.shiftType,
+              start_time: shiftInfo.startTime,
+              end_time: shiftInfo.endTime,
               created_by: user.id,
             });
           }
