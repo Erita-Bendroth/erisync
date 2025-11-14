@@ -125,7 +125,12 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
       return true;
     });
 
-    return workingDays.length * userCount;
+    const baseDays = workingDays.length;
+    const multiplier = wizardData.enableRecurring && wizardData.mode === "rotation" 
+      ? wizardData.rotationCycles 
+      : 1;
+
+    return baseDays * userCount * multiplier;
   };
 
   const handleGenerate = async () => {
@@ -136,38 +141,34 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         throw new Error("Missing required data");
       }
 
-      const allDays = eachDayOfInterval({
+      // Get pattern days (the base rotation pattern)
+      const patternDays = eachDayOfInterval({
         start: wizardData.startDate,
         end: wizardData.endDate,
-      });
-
-      const workingDays = allDays.filter(day => {
+      }).filter(day => {
         if (wizardData.skipWeekends && isWeekendDate(day)) {
           return false;
         }
         return true;
       });
 
-      // Fetch holidays if needed
+      // Fetch holidays if needed (for the entire potential date range)
       let holidays: string[] = [];
       if (wizardData.skipHolidays && wizardData.selectedTeam) {
+        const isRecurring = wizardData.enableRecurring && wizardData.mode === "rotation";
+        const endDateForHolidays = isRecurring 
+          ? addDays(wizardData.startDate, wizardData.rotationCycles * wizardData.rotationIntervalWeeks * 7)
+          : wizardData.endDate;
+
         const { data } = await supabase
           .from("holidays")
           .select("date")
           .gte("date", format(wizardData.startDate, "yyyy-MM-dd"))
-          .lte("date", format(wizardData.endDate, "yyyy-MM-dd"))
+          .lte("date", format(endDateForHolidays, "yyyy-MM-dd"))
           .eq("is_public", true);
         
         holidays = data?.map(h => h.date) || [];
       }
-
-      const finalDays = workingDays.filter(day => {
-        if (wizardData.skipHolidays) {
-          const dateStr = format(day, "yyyy-MM-dd");
-          return !holidays.includes(dateStr);
-        }
-        return true;
-      });
 
       // Get users to schedule
       let usersToSchedule: string[] = [];
@@ -184,17 +185,34 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
 
       // Create schedule entries
       const entries = [];
-      for (const day of finalDays) {
-        for (const userId of usersToSchedule) {
-          entries.push({
-            user_id: userId,
-            team_id: wizardData.selectedTeam,
-            date: format(day, "yyyy-MM-dd"),
-            shift_type: wizardData.shiftType,
-            start_time: wizardData.startTime,
-            end_time: wizardData.endTime,
-            created_by: user.id,
-          });
+      
+      // Check if this is a recurring rotation
+      const isRecurring = wizardData.enableRecurring && wizardData.mode === "rotation";
+      const cycles = isRecurring ? wizardData.rotationCycles : 1;
+      
+      for (let cycle = 0; cycle < cycles; cycle++) {
+        const offsetDays = cycle * wizardData.rotationIntervalWeeks * 7;
+        
+        for (const day of patternDays) {
+          const scheduledDate = addDays(day, offsetDays);
+          const dateStr = format(scheduledDate, "yyyy-MM-dd");
+          
+          // Skip if it's a holiday
+          if (wizardData.skipHolidays && holidays.includes(dateStr)) {
+            continue;
+          }
+          
+          for (const userId of usersToSchedule) {
+            entries.push({
+              user_id: userId,
+              team_id: wizardData.selectedTeam,
+              date: dateStr,
+              shift_type: wizardData.shiftType,
+              start_time: wizardData.startTime,
+              end_time: wizardData.endTime,
+              created_by: user.id,
+            });
+          }
         }
       }
 
@@ -209,9 +227,13 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         if (error) throw error;
       }
 
+      const description = isRecurring
+        ? `Created ${entries.length} schedule entries across ${cycles} rotation cycles`
+        : `Created ${entries.length} schedule entries`;
+
       toast({
         title: "Success!",
-        description: `Created ${entries.length} schedule entries`,
+        description,
       });
 
       onScheduleGenerated?.();
@@ -308,6 +330,25 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
               <span className="text-muted-foreground">Fairness Mode:</span>
               <Badge variant="secondary">Enabled</Badge>
             </div>
+          )}
+          {wizardData.enableRecurring && wizardData.mode === "rotation" && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Rotation Interval:</span>
+                <span className="font-medium">Every {wizardData.rotationIntervalWeeks} week(s)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Number of Cycles:</span>
+                <span className="font-medium">{wizardData.rotationCycles} cycles</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Duration:</span>
+                <span className="font-medium">
+                  ~{wizardData.rotationCycles * wizardData.rotationIntervalWeeks} weeks
+                  {" "}({Math.round(wizardData.rotationCycles * wizardData.rotationIntervalWeeks / 4.33)} months)
+                </span>
+              </div>
+            </>
           )}
         </div>
       </div>

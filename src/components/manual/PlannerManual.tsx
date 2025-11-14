@@ -222,7 +222,14 @@ export const PlannerManual = () => {
           <h4 className="font-semibold mb-2">Step 5: Advanced Options (Optional)</h4>
           <ul className="list-disc list-inside space-y-1 text-sm ml-2">
             <li><strong>Fairness Distribution:</strong> Balance shifts fairly across team members</li>
-            <li><strong>Rotation Patterns:</strong> Set up recurring rotation schedules</li>
+            <li><strong>Recurring Rotation Patterns (Rotation Mode Only):</strong></li>
+            <ul className="list-disc list-inside ml-6 space-y-1">
+              <li>Enable recurring rotation to repeat your schedule pattern</li>
+              <li><strong>Rotation Interval:</strong> Choose how often to repeat (1-12 weeks)</li>
+              <li><strong>Number of Cycles:</strong> Set how many times to repeat (1-26 cycles)</li>
+              <li>Example: Schedule 1 week, repeat every 4 weeks for 13 cycles = 1 year of coverage</li>
+              <li>System automatically calculates total duration in weeks and months</li>
+            </ul>
             <li><strong>Priority Weights:</strong> Adjust importance of night/weekend/holiday shifts</li>
           </ul>
         </div>
@@ -231,7 +238,13 @@ export const PlannerManual = () => {
           <h4 className="font-semibold mb-2">Step 6: Review & Generate</h4>
           <ul className="list-disc list-inside space-y-1 text-sm ml-2">
             <li>Review all selections in comprehensive summary</li>
-            <li>See total shift count before generation</li>
+            <li>See total shift count before generation (accounts for rotation cycles)</li>
+            <li>For recurring rotations, view additional info:</li>
+            <ul className="list-disc list-inside ml-6 space-y-1">
+              <li>Rotation interval and number of cycles</li>
+              <li>Total duration across all cycles</li>
+              <li>Automatic calculation of shifts × cycles</li>
+            </ul>
             <li>Preview calendar showing first 14 days with:</li>
             <ul className="list-disc list-inside ml-6 space-y-1">
               <li>User initials/team indicators on each day</li>
@@ -239,7 +252,7 @@ export const PlannerManual = () => {
               <li>Hover tooltips with full schedule details</li>
               <li>Visual distinction between weekdays and weekends</li>
             </ul>
-            <li>Click <strong>"Generate Schedule"</strong> to create all entries</li>
+            <li>Click <strong>"Generate Schedule"</strong> to create all entries across all cycles</li>
           </ul>
         </div>
 
