@@ -36,7 +36,7 @@ export const RecommendationEngine = ({ teams, dateRange }: RecommendationEngineP
         .from('team_members')
         .select(`
           user_id,
-          profiles!user_id(first_name, last_name)
+          profiles!team_members_user_id_fkey(first_name, last_name)
         `)
         .eq('team_id', teamId);
 
