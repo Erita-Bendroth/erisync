@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save, RefreshCw, Info, ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, Eye, Plus, Trash2, Save, RefreshCw, Info, ImageIcon, CheckCircle2, X } from "lucide-react";
 import { DutyAssignmentGrid } from "./DutyAssignmentGrid";
 import { DistributionListManager } from "./DistributionListManager";
 import { EmailTableBuilder } from "./EmailTableBuilder";
@@ -66,6 +66,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     url: string;
     caption: string;
   }>>([]);
+  const [customLayoutName, setCustomLayoutName] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -184,6 +185,10 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
         setCustomRegions([]);
         setUseCustomLayout(false);
       }
+      
+      // Clear custom layout selection when switching templates
+      setCustomLayoutName("");
+      setSelectedCustomLayout("");
       
       toast({ title: "Success", description: "Template loaded" });
     }
@@ -713,7 +718,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       source_template_id: selectedTemplate,
       week_number: currentWeek,
       year: currentYear,
-      template_name: templateName,
+      template_name: customLayoutName || `Week ${currentWeek} Layout`,
       template_data: {
         regions: customRegions,
         notes: customNotes,
@@ -782,7 +787,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       source_template_id: selectedTemplate,
       week_number: currentWeek,
       year: currentYear,
-      template_name: templateName,
+      template_name: customLayoutName || `Week ${currentWeek} Layout`,
       template_data: {
         regions: customRegions,
         notes: customNotes,
@@ -928,16 +933,17 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
         })
       }));
       
-      setCustomRegions(regionsWithUpdatedDates);
-      setCustomNotes(templateData?.notes || []);
-      setCustomScreenshots(templateData?.screenshots || []);
-      setDistributionList(data.distribution_list || []);
-      setUseCustomLayout(true);
-      
-      toast({ 
-        title: "Loaded", 
-        description: `Custom layout from Week ${data.week_number}, ${data.year} loaded (dates updated to Week ${currentWeek}, ${currentYear})` 
-      });
+    setCustomRegions(regionsWithUpdatedDates);
+    setCustomNotes(templateData?.notes || []);
+    setCustomScreenshots(templateData?.screenshots || []);
+    setDistributionList(data.distribution_list || []);
+    setUseCustomLayout(true);
+    setCustomLayoutName(data.template_name || `Week ${data.week_number} Layout`);
+    
+    toast({ 
+      title: "Loaded", 
+      description: `Custom layout from Week ${data.week_number}, ${data.year} loaded (dates updated to Week ${currentWeek}, ${currentYear})` 
+    });
     } else {
       toast({
         title: "Error",
@@ -1247,7 +1253,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                       <SelectContent>
                         {availableCustomLayouts.map((layout) => (
                           <SelectItem key={layout.id} value={layout.id}>
-                            Week {layout.week_number}, {layout.year} 
+                            {layout.template_name} - Week {layout.week_number}, {layout.year}
                             {layout.week_number === currentWeek && layout.year === currentYear && " (Current)"}
                           </SelectItem>
                         ))}
@@ -1256,6 +1262,27 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                     <p className="text-xs text-muted-foreground">
                       💡 Load any saved custom layout and it will adapt dates to the current week
                     </p>
+                    {selectedCustomLayout && customRegions.length > 0 && (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Custom layout active ({customRegions.length} table{customRegions.length > 1 ? 's' : ''})</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            const confirmed = window.confirm('Delete this custom layout? This cannot be undone.');
+                            if (confirmed) {
+                              await deleteCustomLayout(selectedCustomLayout);
+                            }
+                          }}
+                          className="h-auto p-1 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1271,6 +1298,18 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
             </Alert>
 
             <div className="flex flex-col gap-2">
+              <div className="space-y-2 mb-4">
+                <Label>Custom Layout Name</Label>
+                <Input
+                  value={customLayoutName}
+                  onChange={(e) => setCustomLayoutName(e.target.value)}
+                  placeholder={`e.g., "Reg. East Coverage KW ${currentWeek}" or "Special Holiday Plan"`}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Give this custom layout a descriptive name so you can identify it later
+                </p>
+              </div>
+
               <div className="flex gap-2 flex-wrap items-center">
                 <Button onClick={addCustomRegion} variant="outline">
                   <Plus className="w-4 h-4 mr-2" />
@@ -1284,6 +1323,23 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                   Add Screenshot
                 </Button>
               <div className="ml-auto flex gap-2">
+                <Button
+                  onClick={() => {
+                    setCustomRegions([]);
+                    setCustomNotes([]);
+                    setCustomScreenshots([]);
+                    setCustomLayoutName("");
+                    setSelectedCustomLayout("");
+                    setCustomTemplateId(null);
+                    setUseCustomLayout(false);
+                    toast({ title: "Cleared", description: "Custom content cleared" });
+                  }}
+                  variant="outline"
+                  disabled={customRegions.length === 0 && customNotes.length === 0 && customScreenshots.length === 0}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Custom Content
+                </Button>
                 <Button
                   onClick={() => saveTemplate(true)}
                   variant="default"
