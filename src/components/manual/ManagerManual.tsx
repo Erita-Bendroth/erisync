@@ -61,24 +61,57 @@ export const ManagerManual = () => {
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Click on a date in the calendar or use <strong>"Add Schedule Entry"</strong></li>
           <li>Select the team member</li>
-          <li>Choose date and time block:
-            <ul className="list-disc list-inside ml-6 mt-2">
-              
-              
-              
-            </ul>
-          </li>
-          <li>Select shift type: Working, Vacation, Sick, Training, or Other</li>
+          <li>Choose date and shift type (Working, Vacation, Sick, Training, Other)</li>
+          <li>Select shift time: Day (8:00-16:30), Early (6:00-14:00), Late (14:00-22:00), Night (22:00-06:00), or custom</li>
           <li>Add optional notes</li>
           <li>Click <strong>"Create Schedule Entry"</strong></li>
         </ol>
 
-        <div className="my-4">
-          <img 
-            src="/images/manual/manager-schedule-entry.png" 
-            alt="Schedule interface showing Add Entry form with team member selection, date picker, time blocks, and shift type dropdown"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+        <h3 className="text-xl font-semibold mb-3">Bulk Schedule Generator (Wizard)</h3>
+        <p className="mb-4">
+          The Bulk Schedule Generator uses a guided, step-by-step wizard to help you create schedules efficiently across multiple days and team members.
+        </p>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 1: Mode Selection</h4>
+          <p className="text-sm mb-2">Choose how you want to create schedules:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li><strong>Assign to Multiple Users:</strong> Schedule same shifts for selected people across date range</li>
+            <li><strong>Assign to Entire Team:</strong> Schedule whole team for specific dates</li>
+            <li><strong>Rotation Schedule:</strong> Create repeating rotation patterns (Advanced)</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 2: Select Team & People</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Choose the team from dropdown (required)</li>
+            <li>Select specific people using checkboxes (for Users mode)</li>
+            <li>Use <strong>"Select All"</strong> / <strong>"Deselect All"</strong> for quick selection</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 3: Date Range</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Select start and end dates using visual calendar</li>
+            <li>Quick select buttons: "This Week", "Next 2 Weeks", "This Month"</li>
+            <li>Toggle options: Skip Weekends, Skip Public Holidays</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 4: Shift Configuration</h4>
+          <p className="text-sm mb-2">Choose from preset shift times or create custom times</p>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 5: Review & Generate</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Review all selections</li>
+            <li>Preview calendar showing first 14 days with user initials and shift info</li>
+            <li>Click <strong>"Generate Schedule"</strong></li>
+          </ul>
         </div>
 
         <h3 className="text-xl font-semibold mb-3">Editing Schedule Entries</h3>
@@ -88,6 +121,15 @@ export const ManagerManual = () => {
           <li>Click <strong>"Update"</strong></li>
           <li>Consider notifying the affected team member of changes</li>
         </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Team Favorites</h3>
+        <p className="mb-2">Quick access to frequently used team combinations:</p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Select multiple teams you work with regularly</li>
+          <li>Click the star icon to save as favorite</li>
+          <li>Access favorites from the dropdown for instant team selection</li>
+        </ol>
+      </section>
 
         <h3 className="text-xl font-semibold mb-3">Understanding Shift Types</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
@@ -388,5 +430,6 @@ export const ManagerManual = () => {
           </AlertDescription>
         </Alert>
       </section>
-    </div>;
+    </div>
+  );
 };

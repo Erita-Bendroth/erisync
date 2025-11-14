@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ReviewStepProps {
   wizardData: WizardData;
@@ -21,10 +22,12 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
   const [teamName, setTeamName] = useState("");
   const [userCount, setUserCount] = useState(0);
   const [previewDays, setPreviewDays] = useState<Date[]>([]);
+  const [previewUsers, setPreviewUsers] = useState<Array<{ initials: string; name: string }>>([]);
 
   useEffect(() => {
     fetchTeamName();
     calculatePreview();
+    fetchPreviewUsers();
   }, [wizardData]);
 
   const fetchTeamName = async () => {
@@ -72,6 +75,39 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
       .eq("team_id", wizardData.selectedTeam);
     
     setUserCount(count || 0);
+  };
+
+  const fetchPreviewUsers = async () => {
+    if (wizardData.mode === "users" && wizardData.selectedUsers.length > 0) {
+      const { data } = await supabase
+        .rpc('get_multiple_basic_profile_info', { _user_ids: wizardData.selectedUsers });
+      
+      if (data) {
+        setPreviewUsers(data.map((u: any) => ({
+          initials: u.initials || `${u.first_name[0]}${u.last_name[0]}`,
+          name: `${u.first_name} ${u.last_name}`
+        })));
+      }
+    } else if (wizardData.mode === "team" && wizardData.selectedTeam) {
+      const { data: membersData } = await supabase
+        .from("team_members")
+        .select("user_id")
+        .eq("team_id", wizardData.selectedTeam)
+        .limit(5);
+
+      if (membersData && membersData.length > 0) {
+        const userIds = membersData.map(m => m.user_id);
+        const { data } = await supabase
+          .rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
+        
+        if (data) {
+          setPreviewUsers(data.map((u: any) => ({
+            initials: u.initials || `${u.first_name[0]}${u.last_name[0]}`,
+            name: `${u.first_name} ${u.last_name}`
+          })));
+        }
+      }
+    }
   };
 
   const getTotalShifts = () => {
@@ -279,31 +315,107 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
       {/* Preview Calendar */}
       {previewDays.length > 0 && (
         <div className="border rounded-lg p-6">
-          <h3 className="font-medium text-lg mb-4">Preview (First {previewDays.length} Days)</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium text-lg">Preview (First {previewDays.length} Days)</h3>
+            <div className="flex gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-primary/20 border border-primary/40"></div>
+                <span className="text-muted-foreground">Weekday</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded bg-muted/50 border border-border"></div>
+                <span className="text-muted-foreground">Weekend</span>
+              </div>
+            </div>
+          </div>
           
           <div className="grid grid-cols-7 gap-2">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-muted-foreground">
+              <div key={day} className="text-center text-xs font-medium text-muted-foreground pb-1">
                 {day}
               </div>
             ))}
             
-            {previewDays.map((day, index) => {
-              const dayOfWeek = getDay(day);
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-              
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "text-center p-2 rounded text-sm",
-                    isWeekend ? "bg-muted/50" : "bg-primary/10"
-                  )}
-                >
-                  {format(day, "d")}
-                </div>
-              );
-            })}
+            <TooltipProvider>
+              {previewDays.map((day, index) => {
+                const dayOfWeek = getDay(day);
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const shiftLabel = wizardData.shiftType === "normal" ? "Day" : 
+                                  wizardData.shiftType === "early" ? "Early" :
+                                  wizardData.shiftType === "late" ? "Late" : 
+                                  wizardData.shiftType === "night" ? "Night" : "Custom";
+                
+                return (
+                  <Tooltip key={index}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={cn(
+                          "relative rounded border p-2 min-h-[60px] cursor-pointer transition-colors hover:border-primary/60",
+                          isWeekend ? "bg-muted/50 border-border" : "bg-primary/10 border-primary/30"
+                        )}
+                      >
+                        <div className="text-xs font-medium mb-1">{format(day, "d")}</div>
+                        
+                        {wizardData.mode === "users" && previewUsers.length > 0 && (
+                          <div className="space-y-0.5">
+                            {previewUsers.slice(0, 2).map((user, idx) => (
+                              <div key={idx} className="text-[10px] bg-primary/20 rounded px-1 truncate">
+                                {user.initials}
+                              </div>
+                            ))}
+                            {previewUsers.length > 2 && (
+                              <div className="text-[10px] text-muted-foreground">
+                                +{previewUsers.length - 2}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {wizardData.mode === "team" && (
+                          <div className="space-y-0.5">
+                            <Badge variant="secondary" className="text-[9px] h-4 px-1">
+                              {shiftLabel}
+                            </Badge>
+                            <div className="text-[10px] text-muted-foreground">
+                              {userCount} members
+                            </div>
+                          </div>
+                        )}
+                        
+                        {wizardData.mode === "rotation" && (
+                          <div className="text-[10px] text-center">
+                            <Badge variant="outline" className="text-[9px] h-4 px-1">
+                              Rotation
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <div className="space-y-1">
+                        <div className="font-medium">{format(day, "MMMM d, yyyy")}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {shiftLabel} Shift: {wizardData.startTime || "08:00"} - {wizardData.endTime || "16:30"}
+                        </div>
+                        {wizardData.mode === "users" && previewUsers.length > 0 && (
+                          <div className="text-xs pt-1 border-t">
+                            <div className="font-medium">People scheduled:</div>
+                            {previewUsers.map((user, idx) => (
+                              <div key={idx}>• {user.name}</div>
+                            ))}
+                          </div>
+                        )}
+                        {wizardData.mode === "team" && (
+                          <div className="text-xs pt-1 border-t">
+                            Team: {teamName} ({userCount} members)
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TooltipProvider>
           </div>
         </div>
       )}

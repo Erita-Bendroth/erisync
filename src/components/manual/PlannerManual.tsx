@@ -166,17 +166,90 @@ export const PlannerManual = () => {
           <li>Click <strong>"Create Schedule Entry"</strong></li>
         </ol>
 
-        <h3 className="text-xl font-semibold mb-3">Bulk Schedule Generator</h3>
-        <p className="mb-2">Create recurring schedule patterns automatically:</p>
-        <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Click <strong>"Bulk Schedule Generator"</strong></li>
-          <li>Select start and end dates</li>
-          <li>Choose users to include</li>
-          <li>Select shift pattern (e.g., rotating shifts, fixed schedules)</li>
-          <li>Set time blocks and shift types</li>
-          <li>Preview the generated schedule</li>
-          <li>Click <strong>"Generate Schedule"</strong></li>
-        </ol>
+        <h3 className="text-xl font-semibold mb-3">Bulk Schedule Generator (Wizard)</h3>
+        <p className="mb-4">
+          The Bulk Schedule Generator uses a guided, step-by-step wizard to help you create schedules efficiently across multiple days and team members.
+        </p>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 1: Mode Selection</h4>
+          <p className="text-sm mb-2">Choose how you want to create schedules:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li><strong>Assign to Multiple Users:</strong> Schedule same shifts for selected people across date range</li>
+            <li><strong>Assign to Entire Team:</strong> Schedule whole team for specific dates</li>
+            <li><strong>Rotation Schedule:</strong> Create repeating rotation patterns (Advanced)</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 2: Select Team & People</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Choose the team from dropdown (required)</li>
+            <li>Select specific people using checkboxes (for Users mode)</li>
+            <li>Use <strong>"Select All"</strong> / <strong>"Deselect All"</strong> for quick selection</li>
+            <li>Search functionality to find specific team members</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 3: Date Range</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Select start and end dates using visual calendar</li>
+            <li>Quick select buttons: "This Week", "Next 2 Weeks", "This Month"</li>
+            <li>Toggle options:</li>
+            <ul className="list-disc list-inside ml-6 space-y-1">
+              <li>☑ Skip Weekends (exclude Saturday & Sunday)</li>
+              <li>☑ Skip Public Holidays (auto-detected based on country/region)</li>
+            </ul>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 4: Shift Configuration</h4>
+          <p className="text-sm mb-2">Choose from preset shift times or create custom:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li><strong>Standard Day:</strong> 8:00-16:30</li>
+            <li><strong>Early Shift:</strong> 6:00-14:00</li>
+            <li><strong>Late Shift:</strong> 14:00-22:00</li>
+            <li><strong>Night Shift:</strong> 22:00-06:00</li>
+            <li><strong>Weekend Duty:</strong> Configurable weekend coverage</li>
+            <li><strong>Custom Times:</strong> Set your own start/end times</li>
+          </ul>
+          <p className="text-sm mt-2 text-muted-foreground">View duration and midnight crossing warnings automatically.</p>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 5: Advanced Options (Optional)</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li><strong>Fairness Distribution:</strong> Balance shifts fairly across team members</li>
+            <li><strong>Rotation Patterns:</strong> Set up recurring rotation schedules</li>
+            <li><strong>Priority Weights:</strong> Adjust importance of night/weekend/holiday shifts</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Step 6: Review & Generate</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Review all selections in comprehensive summary</li>
+            <li>See total shift count before generation</li>
+            <li>Preview calendar showing first 14 days with:</li>
+            <ul className="list-disc list-inside ml-6 space-y-1">
+              <li>User initials/team indicators on each day</li>
+              <li>Shift type badges (Day, Night, Early, Late)</li>
+              <li>Hover tooltips with full schedule details</li>
+              <li>Visual distinction between weekdays and weekends</li>
+            </ul>
+            <li>Click <strong>"Generate Schedule"</strong> to create all entries</li>
+          </ul>
+        </div>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Navigation Tips</AlertTitle>
+          <AlertDescription>
+            The wizard shows your progress at the top with completed steps marked. Use "Back" to change previous selections or "Cancel" to exit without saving.
+          </AlertDescription>
+        </Alert>
 
         <h3 className="text-xl font-semibold mb-3">Editing Schedules</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
@@ -409,7 +482,7 @@ export const PlannerManual = () => {
       <Separator />
 
       <section id="security">
-        <h2 className="text-2xl font-bold mb-4">12. Security & Best Practices</h2>
+        <h2 className="text-2xl font-bold mb-4">16. Security & Best Practices</h2>
         
         <h3 className="text-xl font-semibold mb-3">Password Policies</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
