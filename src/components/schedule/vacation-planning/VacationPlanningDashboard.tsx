@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Calendar, BarChart3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, BarChart3, Plus } from 'lucide-react';
 import { MultiMonthVacationCalendar } from './MultiMonthVacationCalendar';
 import { VacationPipeline } from './VacationPipeline';
 import { CapacityOverview } from './CapacityOverview';
@@ -13,6 +13,7 @@ import { CoverageHeatmap } from './CoverageHeatmap';
 import { RecommendationEngine } from './RecommendationEngine';
 import { ExportTools } from './ExportTools';
 import { VacationAnalytics } from './VacationAnalytics';
+import { ManualVacationEntry } from './ManualVacationEntry';
 import { useVacationPlanning } from '@/hooks/useVacationPlanning';
 import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { addMonths, subMonths } from 'date-fns';
@@ -27,6 +28,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
   const [startDate, setStartDate] = useState(new Date());
   const [monthsToShow, setMonthsToShow] = useState(3);
   const [view, setView] = useState<'calendar' | 'pipeline'>('calendar');
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   // Add access control for multi-team hierarchy
   const {
@@ -114,6 +116,14 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                onClick={() => setShowManualEntry(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Entry
+              </Button>
               <Button onClick={handlePreviousMonth} variant="outline" size="sm">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -257,6 +267,17 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
           />
         </TabsContent>
       </Tabs>
+
+      {/* Manual Vacation Entry Modal */}
+      <ManualVacationEntry
+        open={showManualEntry}
+        onOpenChange={setShowManualEntry}
+        teams={teams}
+        onSuccess={refresh}
+        canEditTeam={canEditTeam}
+        isAdmin={isAdmin}
+        isPlanner={isPlanner}
+      />
     </div>
   );
 };

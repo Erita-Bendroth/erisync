@@ -5,6 +5,7 @@ import { Download, FileSpreadsheet, FileText, Calendar } from 'lucide-react';
 import { VacationRequest, DayCapacity } from '@/hooks/useVacationPlanning';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 
@@ -167,50 +168,108 @@ export const ExportTools = ({ vacationRequests, capacityData, teams, dateRange }
     }
   };
 
-  const exportToCalendar = () => {
+  const exportToCalendar = async () => {
+    setExporting(true);
     try {
-      // Generate iCalendar format
-      let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Vacation Planning//EN\n';
+      // Fetch schedule entries with proper joins
+      const { data: scheduleEntries, error } = await supabase
+        .from('schedule_entries')
+        .select(`
+          id,
+          date,
+          shift_type,
+          activity_type,
+          availability_status,
+          notes,
+          user_id,
+          team_id
+        `)
+        .in('team_id', teams.map(t => t.id))
+        .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
+        .lte('date', format(dateRange.end, 'yyyy-MM-dd'))
+        .order('date');
 
-      vacationRequests
-        .filter(vr => vr.status === 'approved')
-        .forEach(req => {
-          const dtstart = format(parseISO(req.requested_date), "yyyyMMdd");
-          const summary = `${req.profiles?.first_name} ${req.profiles?.last_name} - Vacation`;
-          const description = `Team: ${req.teams?.name}${req.notes ? `\\nNotes: ${req.notes}` : ''}`;
+      if (error) throw error;
 
-          icsContent += 'BEGIN:VEVENT\n';
-          icsContent += `DTSTART:${dtstart}\n`;
-          icsContent += `DTEND:${dtstart}\n`;
-          icsContent += `SUMMARY:${summary}\n`;
-          icsContent += `DESCRIPTION:${description}\n`;
-          icsContent += 'END:VEVENT\n';
+      if (!scheduleEntries || scheduleEntries.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No schedule entries to export",
+          variant: "destructive"
         });
+        setExporting(false);
+        return;
+      }
+
+      // Fetch user names for entries
+      const userIds = [...new Set(scheduleEntries.map(e => e.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', userIds);
+
+      // Fetch team names
+      const teamIds = [...new Set(scheduleEntries.map(e => e.team_id))];
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('id, name')
+        .in('id', teamIds);
+
+      // Create lookup maps
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      const teamMap = new Map(teamData?.map(t => [t.id, t.name]) || []);
+
+      let icsContent = 'BEGIN:VCALENDAR\n';
+      icsContent += 'VERSION:2.0\n';
+      icsContent += 'PRODID:-//Schedule Export//EN\n';
+      icsContent += 'CALSCALE:GREGORIAN\n';
+
+      scheduleEntries.forEach(entry => {
+        const date = parseISO(entry.date);
+        const dateStr = format(date, 'yyyyMMdd');
+        const profile = profileMap.get(entry.user_id);
+        const userName = profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown';
+        const teamName = teamMap.get(entry.team_id) || 'Unknown Team';
+        const shiftType = entry.shift_type || 'normal';
+        const activityType = entry.activity_type || 'work';
+
+        icsContent += 'BEGIN:VEVENT\n';
+        icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
+        icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
+        icsContent += `SUMMARY:${userName} - ${shiftType} - ${activityType}\n`;
+        icsContent += `DESCRIPTION:Team: ${teamName}\\nShift: ${shiftType}\\nActivity: ${activityType}\\nAvailability: ${entry.availability_status}`;
+        if (entry.notes) {
+          icsContent += `\\nNotes: ${entry.notes.replace(/\n/g, '\\n')}`;
+        }
+        icsContent += '\n';
+        icsContent += `UID:${entry.id}@schedule-export\n`;
+        icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss'Z'")}\n`;
+        icsContent += 'END:VEVENT\n';
+      });
 
       icsContent += 'END:VCALENDAR';
 
-      // Create download
       const blob = new Blob([icsContent], { type: 'text/calendar' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `vacation-schedule-${format(new Date(), 'yyyy-MM-dd')}.ics`;
-      document.body.appendChild(link);
+      link.download = `schedule-export-${format(dateRange.start, 'yyyy-MM-dd')}.ics`;
       link.click();
-      document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
       toast({
         title: "Export Successful",
-        description: "Calendar file generated"
+        description: `Exported ${scheduleEntries.length} schedule entries to calendar`
       });
     } catch (error) {
-      console.error('Error exporting calendar:', error);
+      console.error('Error exporting to calendar:', error);
       toast({
         title: "Export Failed",
-        description: "Failed to export calendar",
+        description: "Failed to export to calendar",
         variant: "destructive"
       });
+    } finally {
+      setExporting(false);
     }
   };
 
