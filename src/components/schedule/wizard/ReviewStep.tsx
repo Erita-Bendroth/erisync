@@ -202,35 +202,12 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             continue;
           }
           
-          // Determine shift for this day
-          let shiftInfo;
-          if (wizardData.useShiftPattern && wizardData.shiftPattern) {
-            // Get day of week (lowercase: monday, tuesday, etc.)
-            const dayOfWeek = format(scheduledDate, 'EEEE').toLowerCase();
-            const patternShift = wizardData.shiftPattern[dayOfWeek];
-            
-            if (patternShift) {
-              shiftInfo = {
-                shiftType: patternShift.shiftType,
-                startTime: patternShift.startTime,
-                endTime: patternShift.endTime,
-              };
-            } else {
-              // Fallback to default if day not configured
-              shiftInfo = {
-                shiftType: wizardData.shiftType,
-                startTime: wizardData.startTime,
-                endTime: wizardData.endTime,
-              };
-            }
-          } else {
-            // Use single shift for all days
-            shiftInfo = {
-              shiftType: wizardData.shiftType,
-              startTime: wizardData.startTime,
-              endTime: wizardData.endTime,
-            };
-          }
+          // Use single shift for all days (for non-rotation modes)
+          const shiftInfo = {
+            shiftType: wizardData.shiftType,
+            startTime: wizardData.startTime,
+            endTime: wizardData.endTime,
+          };
           
           for (const userId of usersToSchedule) {
             entries.push({
