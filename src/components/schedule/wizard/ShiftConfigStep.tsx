@@ -35,8 +35,8 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
       const { data, error } = await supabase
         .from("shift_time_definitions")
         .select("*")
-        .eq("team_id", wizardData.selectedTeam)
-        .order("name");
+        .or(`team_id.eq.${wizardData.selectedTeam},team_ids.cs.{${wizardData.selectedTeam}},team_id.is.null`)
+        .order("shift_type");
 
       if (error) throw error;
       setShiftDefinitions(data || []);
@@ -49,7 +49,7 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
     {
       id: "day",
       label: "Standard Day",
-      description: "8:00 AM - 4:30 PM",
+      description: "08:00 - 16:30",
       icon: Sun,
       startTime: "08:00",
       endTime: "16:30",
@@ -57,7 +57,7 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
     {
       id: "night",
       label: "Night Shift",
-      description: "10:00 PM - 6:00 AM",
+      description: "22:00 - 06:00",
       icon: Moon,
       startTime: "22:00",
       endTime: "06:00",
