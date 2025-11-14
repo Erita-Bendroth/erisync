@@ -184,6 +184,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
                 Pipeline
               </Button>
             </div>
+            </div>
           </div>
         </CardContent>
       </Card>
