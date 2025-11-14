@@ -1,8 +1,10 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
+
 export const ManagerManual = () => {
-  return <div className="space-y-8">
+  return (
+    <div className="space-y-8">
       <section id="getting-started">
         <h2 className="text-2xl font-bold mb-4">1. Getting Started</h2>
         <p className="text-muted-foreground mb-4">
@@ -129,7 +131,6 @@ export const ManagerManual = () => {
           <li>Click the star icon to save as favorite</li>
           <li>Access favorites from the dropdown for instant team selection</li>
         </ol>
-      </section>
 
         <h3 className="text-xl font-semibold mb-3">Understanding Shift Types</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
