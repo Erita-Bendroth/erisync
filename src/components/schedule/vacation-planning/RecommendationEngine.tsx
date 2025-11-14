@@ -77,22 +77,26 @@ export const RecommendationEngine = ({ teams, dateRange }: RecommendationEngineP
 
     setLoading(true);
     try {
-      // Verify we have an active session before calling the function
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get fresh session and explicitly pass the token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (!session) {
+      if (sessionError || !session) {
+        console.error('Session error:', sessionError);
         toast({
           title: "Authentication Required",
-          description: "Please log in to use this feature",
+          description: "Please log in to use this feature. Try refreshing the page.",
           variant: "destructive"
         });
         setLoading(false);
         return;
       }
       
-      console.log('Calling vacation-recommendations with session:', !!session);
+      console.log('Calling vacation-recommendations with fresh session');
       
       const { data, error } = await supabase.functions.invoke('vacation-recommendations', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: {
           teamIds: [selectedTeam],
           userId: selectedUserId,
