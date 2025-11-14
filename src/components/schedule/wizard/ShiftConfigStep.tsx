@@ -35,7 +35,7 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
       const { data, error } = await supabase
         .from("shift_time_definitions")
         .select("*")
-        .or(`team_id.eq.${wizardData.selectedTeam},team_ids.cs.{${wizardData.selectedTeam}},team_id.is.null`)
+        .or(`team_id.eq.${wizardData.selectedTeam},team_ids.cs.{${wizardData.selectedTeam}},and(team_id.is.null,team_ids.is.null)`)
         .order("shift_type");
 
       if (error) throw error;
