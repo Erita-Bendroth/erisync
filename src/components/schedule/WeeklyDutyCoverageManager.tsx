@@ -189,6 +189,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       // Clear custom layout selection when switching templates
       setCustomLayoutName("");
       setSelectedCustomLayout("");
+      setCustomTemplateId(null);
       
       toast({ title: "Success", description: "Template loaded" });
     }
@@ -729,6 +730,13 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       created_by: user?.id,
     };
 
+    console.log('Save mode:', customTemplateId ? 'UPDATE' : 'INSERT', {
+      customTemplateId,
+      week: currentWeek,
+      year: currentYear,
+      templateId: selectedTemplate
+    });
+
     const { data, error } = customTemplateId
       ? await supabase.from('custom_duty_email_templates').update(templateData).eq('id', customTemplateId).select().single()
       : await supabase.from('custom_duty_email_templates').insert([templateData]).select().single();
@@ -969,6 +977,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     if (data && !error) {
       const templateData = data.template_data as any;
       setCustomTemplateId(data.id);
+      setSelectedCustomLayout(data.id);
+      setCustomLayoutName(data.template_name || `Week ${currentWeek} Layout`);
       
       // Regenerate dates for loaded regions
       const weekDates = getWeekDates(currentWeek, currentYear);
@@ -1005,6 +1015,15 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
         title: "Loaded", 
         description: `Custom layout loaded for Week ${currentWeek}, ${currentYear}` 
       });
+    } else {
+      // No layout exists for this week - prepare for INSERT
+      setCustomTemplateId(null);
+      setSelectedCustomLayout("");
+      setCustomLayoutName("");
+      setCustomRegions([]);
+      setCustomNotes([]);
+      setCustomScreenshots([]);
+      console.log(`No custom layout found for Week ${currentWeek}, ${currentYear} - ready to create new`);
     }
   };
 
@@ -1262,22 +1281,27 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                     <p className="text-xs text-muted-foreground">
                       💡 Load any saved custom layout and it will adapt dates to the current week
                     </p>
-                    {selectedCustomLayout && customRegions.length > 0 && (
-                      <div className="flex items-center justify-between gap-2 p-2 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
-                        <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Custom layout active ({customRegions.length} table{customRegions.length > 1 ? 's' : ''})</span>
+                    {selectedCustomLayout && (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-md border">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          {customRegions.length > 0 && (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <span className="text-foreground">Custom layout active ({customRegions.length} table{customRegions.length > 1 ? 's' : ''})</span>
+                            </>
+                          )}
                         </div>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="destructive"
                           onClick={async () => {
-                            const confirmed = window.confirm('Delete this custom layout? This cannot be undone.');
+                            const layoutName = availableCustomLayouts.find(l => l.id === selectedCustomLayout)?.template_name || 'this layout';
+                            const confirmed = window.confirm(`Delete "${layoutName}"? This cannot be undone.`);
                             if (confirmed) {
                               await deleteCustomLayout(selectedCustomLayout);
                             }
                           }}
-                          className="h-auto p-1 text-destructive hover:text-destructive"
+                          className="h-auto py-1 px-2"
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -1308,6 +1332,22 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                 <p className="text-xs text-muted-foreground">
                   Give this custom layout a descriptive name so you can identify it later
                 </p>
+                
+                {customTemplateId ? (
+                  <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                    <Info className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      <strong>Editing existing layout</strong> for Week {currentWeek}. Click "Update Week {currentWeek} Layout" to save changes.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-3 rounded-md border border-green-200 dark:border-green-800">
+                    <Plus className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      <strong>Creating new layout</strong> for Week {currentWeek}. Click "Save Week {currentWeek} Layout" to create.
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 flex-wrap items-center">
@@ -1340,13 +1380,28 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                   <X className="h-4 w-4 mr-2" />
                   Clear Custom Content
                 </Button>
+                {customTemplateId && (
+                  <Button
+                    onClick={async () => {
+                      const confirmed = window.confirm(`Delete the saved layout for Week ${currentWeek}? This cannot be undone.`);
+                      if (confirmed) {
+                        await deleteCustomLayout(customTemplateId);
+                      }
+                    }}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Week {currentWeek} Layout
+                  </Button>
+                )}
                 <Button
                   onClick={() => saveTemplate(true)}
                   variant="default"
                   disabled={!selectedTemplate || customRegions.length === 0 || loading}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {customTemplateId ? 'Update Layout' : 'Save Layout'}
+                  {customTemplateId ? `Update Week ${currentWeek} Layout` : `Save Week ${currentWeek} Layout`}
                 </Button>
                 {customTemplateId && (
                   <Button
