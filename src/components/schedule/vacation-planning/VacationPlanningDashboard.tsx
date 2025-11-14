@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +14,7 @@ import { RecommendationEngine } from './RecommendationEngine';
 import { ExportTools } from './ExportTools';
 import { VacationAnalytics } from './VacationAnalytics';
 import { useVacationPlanning } from '@/hooks/useVacationPlanning';
+import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { addMonths, subMonths } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -26,6 +27,14 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
   const [startDate, setStartDate] = useState(new Date());
   const [monthsToShow, setMonthsToShow] = useState(3);
   const [view, setView] = useState<'calendar' | 'pipeline'>('calendar');
+
+  // Add access control for multi-team hierarchy
+  const {
+    canEditTeam,
+    isAdmin,
+    isPlanner,
+    isManager,
+  } = useScheduleAccessControl({ viewMode: 'multi-team' });
 
   const {
     vacationRequests,
@@ -41,6 +50,22 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
     startDate
   });
 
+  // Filter vacation requests to only show those the user can access
+  const visibleVacationRequests = useMemo(() => {
+    // Admins and planners see everything
+    if (isAdmin || isPlanner) return vacationRequests;
+    
+    // Managers only see requests from teams they can edit
+    return vacationRequests.filter(vr => canEditTeam(vr.team_id));
+  }, [vacationRequests, canEditTeam, isAdmin, isPlanner]);
+
+  // Filter capacity data similarly
+  const visibleCapacityData = useMemo(() => {
+    if (isAdmin || isPlanner) return capacityData;
+    
+    return capacityData.filter(cd => canEditTeam(cd.team_id));
+  }, [capacityData, canEditTeam, isAdmin, isPlanner]);
+
   const handlePreviousMonth = () => {
     setStartDate(prev => subMonths(prev, 1));
   };
@@ -53,8 +78,8 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
     setStartDate(new Date());
   };
 
-  const pendingRequests = vacationRequests.filter(vr => vr.status === 'pending');
-  const approvedRequests = vacationRequests.filter(vr => vr.status === 'approved');
+  const pendingRequests = visibleVacationRequests.filter(vr => vr.status === 'pending');
+  const approvedRequests = visibleVacationRequests.filter(vr => vr.status === 'approved');
 
   return (
     <div className="space-y-4">
@@ -124,22 +149,22 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
 
       {/* Capacity Overview */}
       <CapacityOverview 
-        capacityData={capacityData}
-        vacationRequests={vacationRequests}
+        capacityData={visibleCapacityData}
+        vacationRequests={visibleVacationRequests}
         teams={teams}
       />
 
       {/* Analysis Tools Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <ConflictDetector
-          capacityData={capacityData}
-          vacationRequests={vacationRequests}
+          capacityData={visibleCapacityData}
+          vacationRequests={visibleVacationRequests}
           teams={teams}
         />
         
         <WhatIfScenario
-          vacationRequests={vacationRequests}
-          capacityData={capacityData}
+          vacationRequests={visibleVacationRequests}
+          capacityData={visibleCapacityData}
           teams={teams}
         />
 
@@ -149,8 +174,8 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
             dateRange={dateRange}
           />
           <ExportTools
-            vacationRequests={vacationRequests}
-            capacityData={capacityData}
+            vacationRequests={visibleVacationRequests}
+            capacityData={visibleCapacityData}
             teams={teams}
             dateRange={dateRange}
           />
@@ -173,13 +198,16 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
               <MultiMonthVacationCalendar
                 startDate={startDate}
                 monthsToShow={monthsToShow}
-                vacationRequests={vacationRequests}
-                capacityData={capacityData}
+                vacationRequests={visibleVacationRequests}
+                capacityData={visibleCapacityData}
                 teams={teams}
                 loading={loading}
                 onApprove={approveRequest}
                 onReject={rejectRequest}
                 onRefresh={refresh}
+                canEditTeam={canEditTeam}
+                isAdmin={isAdmin}
+                isPlanner={isPlanner}
               />
             </CardContent>
           </Card>
@@ -189,13 +217,16 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
           <Card>
             <CardContent className="pt-6">
               <VacationPipeline
-                vacationRequests={vacationRequests}
-                capacityData={capacityData}
+                vacationRequests={visibleVacationRequests}
+                capacityData={visibleCapacityData}
                 teams={teams}
                 loading={loading}
                 onApprove={approveRequest}
                 onReject={rejectRequest}
                 onRefresh={refresh}
+                canEditTeam={canEditTeam}
+                isAdmin={isAdmin}
+                isPlanner={isPlanner}
               />
             </CardContent>
           </Card>
@@ -203,7 +234,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
 
         <TabsContent value="heatmap">
           <CoverageHeatmap
-            capacityData={capacityData}
+            capacityData={visibleCapacityData}
             teams={teams}
             dateRange={dateRange}
           />
@@ -211,7 +242,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
 
         <TabsContent value="fairness">
           <FairnessAnalysis
-            vacationRequests={vacationRequests}
+            vacationRequests={visibleVacationRequests}
             teams={teams}
             dateRange={dateRange}
           />
@@ -219,8 +250,8 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
 
         <TabsContent value="analytics">
           <VacationAnalytics
-            vacationRequests={vacationRequests}
-            capacityData={capacityData}
+            vacationRequests={visibleVacationRequests}
+            capacityData={visibleCapacityData}
             teams={teams}
             dateRange={dateRange}
           />

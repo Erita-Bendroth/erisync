@@ -82,13 +82,53 @@ const Schedule = () => {
 
   const fetchTeams = async () => {
     try {
-      const { data, error } = await supabase
+      // First check user roles
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user!.id);
+      
+      const roles = rolesData?.map(r => r.role) || [];
+      const isAdminRole = roles.includes('admin');
+      const isPlannerRole = roles.includes('planner');
+      const isManagerRole = roles.includes('manager');
+      
+      // Fetch all teams
+      const { data: allTeams, error } = await supabase
         .from("teams")
         .select("id, name, parent_team_id")
         .order("name");
 
       if (error) throw error;
-      setTeams(data || []);
+
+      // Filter based on access
+      let accessibleTeams = allTeams || [];
+      
+      if (!isAdminRole && !isPlannerRole && isManagerRole) {
+        // For managers: Get accessible team IDs from hierarchy
+        const { data: accessibleTeamIds } = await supabase
+          .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+        
+        if (accessibleTeamIds) {
+          // Filter teams to only those the manager can access
+          accessibleTeams = allTeams?.filter(t => 
+            accessibleTeamIds.includes(t.id)
+          ) || [];
+        }
+      } else if (!isAdminRole && !isPlannerRole && !isManagerRole) {
+        // For regular team members: Only their teams
+        const { data: memberTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user!.id);
+        
+        const memberTeamIds = memberTeams?.map(mt => mt.team_id) || [];
+        accessibleTeams = allTeams?.filter(t => 
+          memberTeamIds.includes(t.id)
+        ) || [];
+      }
+      
+      setTeams(accessibleTeams);
     } catch (error) {
       console.error("Error fetching teams:", error);
     }
