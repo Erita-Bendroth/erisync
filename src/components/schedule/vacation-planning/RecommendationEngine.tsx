@@ -77,6 +77,21 @@ export const RecommendationEngine = ({ teams, dateRange }: RecommendationEngineP
 
     setLoading(true);
     try {
+      // Verify we have an active session before calling the function
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to use this feature",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Calling vacation-recommendations with session:', !!session);
+      
       const { data, error } = await supabase.functions.invoke('vacation-recommendations', {
         body: {
           teamIds: [selectedTeam],
