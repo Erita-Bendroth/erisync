@@ -14,24 +14,54 @@ serve(async (req) => {
   try {
     console.log('vacation-recommendations: Request received');
     
+    // Log the authorization header for debugging
+    const authHeader = req.headers.get('Authorization');
+    console.log('vacation-recommendations: Auth header present:', !!authHeader);
+    
+    if (!authHeader) {
+      console.error('vacation-recommendations: No authorization header');
+      return new Response(JSON.stringify({ error: 'No authorization header provided' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('vacation-recommendations: Auth error', userError);
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    
+    if (userError) {
+      console.error('vacation-recommendations: Auth error', {
+        error: userError.message,
+        status: userError.status,
+        name: userError.name
+      });
+      return new Response(JSON.stringify({ 
+        error: 'Authentication failed',
+        details: userError.message 
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    if (!user) {
+      console.error('vacation-recommendations: No user found after auth');
+      return new Response(JSON.stringify({ error: 'User not authenticated' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log('vacation-recommendations: User authenticated:', user.id);
 
     const requestBody = await req.json();
     console.log('vacation-recommendations: Request body', JSON.stringify(requestBody));
