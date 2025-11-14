@@ -331,6 +331,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
         description: `Vacation for ${daysText} has been approved, added to the schedule, and notifications sent.`,
       });
 
+      await fetchRequests();
       onRequestProcessed?.();
     } catch (error: any) {
       console.error('Error approving request:', error);
@@ -390,6 +391,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       setRejectDialogOpen(false);
       setSelectedRequest(null);
       setRejectionReason('');
+      await fetchRequests();
       onRequestProcessed?.();
     } catch (error: any) {
       console.error('Error rejecting request:', error);
@@ -434,6 +436,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
       setCancelDialogOpen(false);
       setSelectedRequest(null);
+      await fetchRequests();
       onRequestProcessed?.();
     } catch (error: any) {
       console.error('Error cancelling request:', error);
