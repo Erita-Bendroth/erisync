@@ -58,6 +58,8 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const [customNotes, setCustomNotes] = useState<string[]>([]);
   const [useCustomLayout, setUseCustomLayout] = useState(false);
   const [customTemplateId, setCustomTemplateId] = useState<string | null>(null);
+  const [availableCustomLayouts, setAvailableCustomLayouts] = useState<any[]>([]);
+  const [selectedCustomLayout, setSelectedCustomLayout] = useState<string>("");
   const [customScreenshots, setCustomScreenshots] = useState<Array<{
     id: string;
     name: string;
@@ -78,6 +80,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   useEffect(() => {
     if (selectedTemplate) {
       loadTemplate(selectedTemplate);
+      fetchAvailableCustomLayouts(selectedTemplate);
     }
   }, [selectedTemplate]);
 
@@ -106,6 +109,20 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   const fetchTemplates = async () => {
     const { data, error } = await supabase.from('weekly_duty_templates').select('*').order('template_name');
     if (!error && data) setTemplates(data);
+  };
+
+  const fetchAvailableCustomLayouts = async (templateId: string) => {
+    const { data, error } = await supabase
+      .from('custom_duty_email_templates')
+      .select('id, template_name, week_number, year, created_at')
+      .eq('source_template_id', templateId)
+      .eq('mode', 'hybrid')
+      .order('year', { ascending: false })
+      .order('week_number', { ascending: false });
+    
+    if (!error && data) {
+      setAvailableCustomLayouts(data);
+    }
   };
 
   const loadTemplate = async (templateId: string) => {
@@ -731,6 +748,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       if (newData) {
         setCustomTemplateId(newData.id);
         console.log('Created new template with ID:', newData.id);
+        await fetchAvailableCustomLayouts(selectedTemplate);
         toast({ title: "Success", description: "Custom layout saved successfully" });
         return newData.id;
       }
@@ -743,11 +761,82 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     } else if (data) {
       setCustomTemplateId(data.id);
       console.log('Saved template with ID:', data.id);
+      await fetchAvailableCustomLayouts(selectedTemplate);
       toast({ title: "Success", description: "Custom layout saved successfully" });
       return data.id;
     }
 
     return null;
+  };
+
+  const saveCustomLayoutAsNew = async () => {
+    if (!selectedTemplate) {
+      toast({ title: "Error", description: "Please select a template first", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const templateData = {
+      source_template_id: selectedTemplate,
+      week_number: currentWeek,
+      year: currentYear,
+      template_name: templateName,
+      template_data: {
+        regions: customRegions,
+        notes: customNotes,
+        screenshots: customScreenshots,
+      } as any,
+      distribution_list: distributionList,
+      mode: 'hybrid',
+      created_by: user?.id,
+    };
+
+    // Always INSERT as new
+    const { data, error } = await supabase
+      .from('custom_duty_email_templates')
+      .insert([templateData])
+      .select()
+      .single();
+
+    setLoading(false);
+
+    if (error) {
+      console.error('Save error:', error);
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else if (data) {
+      setCustomTemplateId(data.id);
+      await fetchAvailableCustomLayouts(selectedTemplate);
+      toast({ 
+        title: "Success", 
+        description: `Custom layout saved as new for Week ${currentWeek}, ${currentYear}` 
+      });
+    }
+  };
+
+  const deleteCustomLayout = async (layoutId: string) => {
+    const confirmed = window.confirm('Delete this custom layout? This cannot be undone.');
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('custom_duty_email_templates')
+      .delete()
+      .eq('id', layoutId);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Custom layout deleted" });
+      await fetchAvailableCustomLayouts(selectedTemplate);
+      
+      // Clear current layout if it was deleted
+      if (layoutId === customTemplateId) {
+        setCustomRegions([]);
+        setCustomTemplateId(null);
+        setSelectedCustomLayout("");
+      }
+    }
   };
 
   const previewCustomLayout = async () => {
@@ -799,6 +888,64 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       setPreviewHtml(data.html);
       setShowPreview(true);
     }
+  };
+
+  const loadSpecificCustomLayout = async (layoutId: string) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('custom_duty_email_templates')
+      .select('*')
+      .eq('id', layoutId)
+      .single();
+
+    if (!error && data) {
+      const templateData = data.template_data as any;
+      setCustomTemplateId(data.id);
+      
+      // Regenerate dates for the CURRENT week (not the saved week)
+      const weekDates = getWeekDates(currentWeek, currentYear);
+      const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+      
+      const regionsWithUpdatedDates = (templateData?.regions || []).map((region: EmailRegionTable) => ({
+        ...region,
+        rows: region.rows.map((row: EmailTableRow, rowIndex: number) => {
+          if (rowIndex < weekDates.length) {
+            const date = weekDates[rowIndex];
+            const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+            const combinedDateWeekday = `${dateStr} ${weekdays[rowIndex]}`;
+            
+            return {
+              ...row,
+              cells: row.cells.map((cell: EmailTableCell, cellIndex: number) => {
+                if (cellIndex === 0) {
+                  return { ...cell, content: combinedDateWeekday };
+                }
+                return cell;
+              })
+            };
+          }
+          return row;
+        })
+      }));
+      
+      setCustomRegions(regionsWithUpdatedDates);
+      setCustomNotes(templateData?.notes || []);
+      setCustomScreenshots(templateData?.screenshots || []);
+      setDistributionList(data.distribution_list || []);
+      setUseCustomLayout(true);
+      
+      toast({ 
+        title: "Loaded", 
+        description: `Custom layout from Week ${data.week_number}, ${data.year} loaded (dates updated to Week ${currentWeek}, ${currentYear})` 
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to load custom layout",
+        variant: "destructive"
+      });
+    }
+    setLoading(false);
   };
 
   const loadCustomLayoutForTemplate = async (templateId: string) => {
@@ -858,7 +1005,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
   useEffect(() => {
     if (open) {
       // Clear stale state when modal opens
-      setCustomTemplateId(undefined);
+      setCustomTemplateId(null);
       
       // Then load if template is selected
       if (selectedTemplate) {
@@ -1061,23 +1208,56 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
           <TabsContent value="customize" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Week Selection</CardTitle>
+                <CardTitle>Week Selection & Custom Layout Manager</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center gap-4">
-                  <Button onClick={() => changeWeek(-1)} variant="outline">
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <div className="text-lg font-semibold">
-                    Week {currentWeek}, {currentYear}
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Current Week</Label>
+                  <div className="flex items-center justify-center gap-4">
+                    <Button onClick={() => changeWeek(-1)} variant="outline">
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <div className="text-lg font-semibold">
+                      Week {currentWeek}, {currentYear}
+                    </div>
+                    <Button onClick={() => changeWeek(1)} variant="outline">
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button onClick={() => changeWeek(1)} variant="outline">
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Custom tables will use dates from this week (Monday-Friday)
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground text-center mt-2">
-                  Custom tables will use dates from this week (Monday-Friday)
-                </p>
+
+                {availableCustomLayouts.length > 0 && (
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label>Saved Custom Layouts ({availableCustomLayouts.length})</Label>
+                    <Select 
+                      value={selectedCustomLayout} 
+                      onValueChange={(value) => {
+                        setSelectedCustomLayout(value);
+                        if (value) {
+                          loadSpecificCustomLayout(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Load a saved custom layout..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCustomLayouts.map((layout) => (
+                          <SelectItem key={layout.id} value={layout.id}>
+                            Week {layout.week_number}, {layout.year} 
+                            {layout.week_number === currentWeek && layout.year === currentYear && " (Current)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      💡 Load any saved custom layout and it will adapt dates to the current week
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1103,16 +1283,26 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                   <ImageIcon className="w-4 h-4 mr-2" />
                   Add Screenshot
                 </Button>
-                <div className="ml-auto">
+              <div className="ml-auto flex gap-2">
+                <Button
+                  onClick={() => saveTemplate(true)}
+                  variant="default"
+                  disabled={!selectedTemplate || customRegions.length === 0 || loading}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {customTemplateId ? 'Update Layout' : 'Save Layout'}
+                </Button>
+                {customTemplateId && (
                   <Button
-                    onClick={() => saveTemplate(true)}
-                    variant="default"
+                    onClick={saveCustomLayoutAsNew}
+                    variant="outline"
                     disabled={!selectedTemplate || customRegions.length === 0 || loading}
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save to Template
+                    <Plus className="h-4 w-4 mr-2" />
+                    Save as New
                   </Button>
-                </div>
+                )}
+              </div>
                 <input
                   id="screenshot-upload"
                   type="file"
