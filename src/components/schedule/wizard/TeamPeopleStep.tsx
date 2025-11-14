@@ -65,13 +65,22 @@ export const TeamPeopleStep = ({ wizardData, updateWizardData }: TeamPeopleStepP
       const { data, error } = await supabase
         .from("team_members")
         .select(`
-          user:users!inner(id, first_name, last_name, email, initials)
+          user:profiles!inner(user_id, first_name, last_name, email, initials)
         `)
         .eq("team_id", wizardData.selectedTeam);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching users:", error);
+        throw error;
+      }
 
-      const userList = data?.map((item: any) => item.user).filter(Boolean) || [];
+      const userList = data?.map((item: any) => ({
+        id: item.user.user_id,
+        first_name: item.user.first_name,
+        last_name: item.user.last_name,
+        email: item.user.email,
+        initials: item.user.initials
+      })).filter(Boolean) || [];
       setUsers(userList);
     } catch (error) {
       console.error("Error fetching users:", error);
