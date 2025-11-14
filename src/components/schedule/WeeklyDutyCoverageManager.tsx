@@ -127,7 +127,37 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       if (data.table_layout) {
         const layout = data.table_layout as any;
         if (layout.regions && Array.isArray(layout.regions)) {
-          setCustomRegions(layout.regions);
+          // Regenerate dates for the current week
+          const weekDates = getWeekDates(currentWeek, currentYear);
+          const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+          
+          const regionsWithUpdatedDates = layout.regions.map((region: EmailRegionTable) => ({
+            ...region,
+            rows: region.rows.map((row: EmailTableRow, rowIndex: number) => {
+              if (rowIndex < weekDates.length) {
+                const date = weekDates[rowIndex];
+                const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+                const combinedDateWeekday = `${dateStr} ${weekdays[rowIndex]}`;
+                
+                return {
+                  ...row,
+                  cells: row.cells.map((cell: EmailTableCell, cellIndex: number) => {
+                    // First cell is the date column - regenerate it
+                    if (cellIndex === 0) {
+                      return {
+                        ...cell,
+                        content: combinedDateWeekday
+                      };
+                    }
+                    return cell; // Keep other cells as-is
+                  })
+                };
+              }
+              return row;
+            })
+          }));
+          
+          setCustomRegions(regionsWithUpdatedDates);
           setUseCustomLayout(true);
         } else {
           setCustomRegions([]);
@@ -786,14 +816,41 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     if (data && !error) {
       const templateData = data.template_data as any;
       setCustomTemplateId(data.id);
-      setCustomRegions(templateData?.regions || []);
+      
+      // Regenerate dates for loaded regions
+      const weekDates = getWeekDates(currentWeek, currentYear);
+      const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+      
+      const regionsWithUpdatedDates = (templateData?.regions || []).map((region: EmailRegionTable) => ({
+        ...region,
+        rows: region.rows.map((row: EmailTableRow, rowIndex: number) => {
+          if (rowIndex < weekDates.length) {
+            const date = weekDates[rowIndex];
+            const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+            const combinedDateWeekday = `${dateStr} ${weekdays[rowIndex]}`;
+            
+            return {
+              ...row,
+              cells: row.cells.map((cell: EmailTableCell, cellIndex: number) => {
+                if (cellIndex === 0) {
+                  return { ...cell, content: combinedDateWeekday };
+                }
+                return cell;
+              })
+            };
+          }
+          return row;
+        })
+      }));
+      
+      setCustomRegions(regionsWithUpdatedDates);
       setCustomNotes(templateData?.notes || []);
       setCustomScreenshots(templateData?.screenshots || []);
       setDistributionList(data.distribution_list || []);
       console.log('Loaded existing custom layout:', data.id);
       toast({ 
         title: "Loaded", 
-        description: "Existing custom layout loaded for this week" 
+        description: `Custom layout loaded for Week ${currentWeek}, ${currentYear}` 
       });
     }
   };
@@ -809,6 +866,42 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       }
     }
   }, [open, selectedTemplate, currentWeek, currentYear]);
+
+  // Regenerate dates in custom regions when week changes
+  useEffect(() => {
+    if (customRegions.length > 0) {
+      const weekDates = getWeekDates(currentWeek, currentYear);
+      const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
+      
+      const updatedRegions = customRegions.map(region => ({
+        ...region,
+        rows: region.rows.map((row, rowIndex) => {
+          if (rowIndex < weekDates.length) {
+            const date = weekDates[rowIndex];
+            const dateStr = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+            const combinedDateWeekday = `${dateStr} ${weekdays[rowIndex]}`;
+            
+            return {
+              ...row,
+              cells: row.cells.map((cell, cellIndex) => {
+                // First cell (index 0) is always the date column
+                if (cellIndex === 0) {
+                  return {
+                    ...cell,
+                    content: combinedDateWeekday
+                  };
+                }
+                return cell;
+              })
+            };
+          }
+          return row;
+        })
+      }));
+      
+      setCustomRegions(updatedRegions);
+    }
+  }, [currentWeek, currentYear]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -993,6 +1086,7 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
               <AlertDescription>
                 Standard duty assignments (Weekend, Late Shift, Early Shift) for Week {currentWeek}, {currentYear} will automatically appear at the top of the email.
                 Use this tab to add additional custom content that will appear BELOW those tables.
+                <strong> Dates in custom tables will automatically update to match the selected week.</strong>
               </AlertDescription>
             </Alert>
 
@@ -1008,14 +1102,6 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                 >
                   <ImageIcon className="w-4 h-4 mr-2" />
                   Add Screenshot
-                </Button>
-                <Button 
-                  onClick={loadAutoGeneratedData} 
-                  variant="outline"
-                  disabled={loading || !selectedTemplate}
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Load Schedule Data
                 </Button>
                 <div className="ml-auto">
                   <Button
