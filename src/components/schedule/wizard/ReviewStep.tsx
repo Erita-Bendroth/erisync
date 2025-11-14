@@ -187,35 +187,63 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         return true;
       });
 
-      // Fetch holidays if needed (for the entire potential date range)
-      let holidays: string[] = [];
+      // Fetch holidays WITH location data (for the entire potential date range)
+      let holidaysMap: Map<string, { date: string; countryCode: string; regionCode: string | null }[]> = new Map();
       if (wizardData.skipHolidays && wizardData.selectedTeam) {
         const isRecurring = wizardData.enableRecurring && wizardData.mode === "rotation";
         const endDateForHolidays = isRecurring 
           ? addDays(wizardData.startDate, wizardData.rotationCycles * wizardData.rotationIntervalWeeks * 7)
           : wizardData.endDate;
 
-        const { data } = await supabase
+        const { data: holidaysData } = await supabase
           .from("holidays")
-          .select("date")
+          .select("date, country_code, region_code")
           .gte("date", format(wizardData.startDate, "yyyy-MM-dd"))
           .lte("date", format(endDateForHolidays, "yyyy-MM-dd"))
-          .eq("is_public", true);
+          .eq("is_public", true)
+          .is("user_id", null); // Only centrally managed holidays
         
-        holidays = data?.map(h => h.date) || [];
+        // Organize holidays by date
+        holidaysData?.forEach(h => {
+          if (!holidaysMap.has(h.date)) {
+            holidaysMap.set(h.date, []);
+          }
+          holidaysMap.get(h.date)!.push({
+            date: h.date,
+            countryCode: h.country_code,
+            regionCode: h.region_code
+          });
+        });
       }
 
-      // Get users to schedule
-      let usersToSchedule: string[] = [];
+      // Get users to schedule WITH their location data
+      let usersToSchedule: { userId: string; countryCode: string; regionCode: string | null }[] = [];
       if (wizardData.mode === "team") {
-        const { data } = await supabase
+        const { data: teamMembers } = await supabase
           .from("team_members")
-          .select("user_id")
+          .select("user_id, profiles!inner(country_code, region_code)")
           .eq("team_id", wizardData.selectedTeam);
         
-        usersToSchedule = data?.map(tm => tm.user_id) || [];
-      } else {
-        usersToSchedule = wizardData.selectedUsers;
+        usersToSchedule = teamMembers?.map(tm => ({
+          userId: tm.user_id,
+          countryCode: (tm.profiles as any).country_code || 'US',
+          regionCode: (tm.profiles as any).region_code
+        })) || [];
+      } else if (wizardData.mode === "rotation") {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, country_code, region_code")
+          .in("user_id", wizardData.selectedUsers || []);
+        
+        usersToSchedule = profiles?.map(p => ({
+          userId: p.user_id,
+          countryCode: p.country_code || 'US',
+          regionCode: p.region_code
+        })) || [];
+      }
+
+      if (usersToSchedule.length === 0) {
+        throw new Error("No users found to schedule");
       }
 
       // Create schedule entries
@@ -242,10 +270,8 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           const scheduledDate = addDays(day, offsetDays);
           const scheduledDateStr = format(scheduledDate, "yyyy-MM-dd");
           
-          // Skip if the SCHEDULED date is a holiday
-          if (wizardData.skipHolidays && holidays.includes(scheduledDateStr)) {
-            continue;
-          }
+          // Check if the SCHEDULED date is a holiday for ANY of the users
+          // We'll check per-user in the loop below
           
           // Use shift pattern info if available, otherwise fallback to wizard data
           const finalShiftInfo = shiftInfo ? {
@@ -260,10 +286,27 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             endTime: wizardData.endTime || "16:30",
           };
           
-          for (const userId of usersToSchedule) {
+          for (const userProfile of usersToSchedule) {
             // Validate user ID
-            if (!userId) {
+            if (!userProfile.userId) {
               console.warn("Skipping entry: user_id is undefined");
+              continue;
+            }
+
+            // Check if the SCHEDULED date is a holiday for THIS specific user
+            let skipDueToHoliday = false;
+            if (wizardData.skipHolidays && holidaysMap.has(scheduledDateStr)) {
+              const dateHolidays = holidaysMap.get(scheduledDateStr)!;
+              skipDueToHoliday = dateHolidays.some(holiday => {
+                // Holiday matches if country matches AND (no region specified OR region matches)
+                const countryMatches = holiday.countryCode === userProfile.countryCode;
+                const regionMatches = !holiday.regionCode || holiday.regionCode === userProfile.regionCode;
+                return countryMatches && regionMatches;
+              });
+            }
+
+            if (skipDueToHoliday) {
+              console.log(`Skipping ${scheduledDateStr} for user ${userProfile.userId} - holiday in their location`);
               continue;
             }
 
@@ -279,7 +322,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
               : `Auto-generated ${finalShiftInfo.shiftName}`;
             
             entries.push({
-              user_id: userId,
+              user_id: userProfile.userId,
               team_id: wizardData.selectedTeam,
               date: scheduledDateStr,
               shift_type: finalShiftInfo.shiftType as "early" | "late" | "normal" | "weekend",
@@ -307,11 +350,12 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
       });
 
       // Delete existing entries for this exact scope
+      const userIds = usersToSchedule.map(u => u.userId);
       const { error: deleteError } = await supabase
         .from("schedule_entries")
         .delete()
         .eq("team_id", wizardData.selectedTeam)
-        .in("user_id", usersToSchedule)
+        .in("user_id", userIds)
         .gte("date", format(fullDateRange.start, "yyyy-MM-dd"))
         .lte("date", format(fullDateRange.end, "yyyy-MM-dd"));
 
