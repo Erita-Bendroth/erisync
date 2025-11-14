@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { eachDayOfInterval, format } from "date-fns";
 import { ModeSelectionStep } from "./ModeSelectionStep";
 import { TeamPeopleStep } from "./TeamPeopleStep";
 import { DateRangeStep } from "./DateRangeStep";
@@ -152,17 +153,16 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
         // For rotation mode, check if all dates in range have shifts configured
         if (!wizardData.shiftPattern || !wizardData.startDate || !wizardData.endDate) return false;
         
-        const dates = [];
-        const currentDate = new Date(wizardData.startDate);
-        const end = new Date(wizardData.endDate);
+        // Use eachDayOfInterval and format() to match ShiftPatternStep's date keys
+        const dateRange = eachDayOfInterval({
+          start: wizardData.startDate,
+          end: wizardData.endDate,
+        });
         
-        while (currentDate <= end) {
-          const dateStr = currentDate.toISOString().split('T')[0];
-          dates.push(dateStr);
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-        
-        return dates.every(date => wizardData.shiftPattern?.[date]);
+        return dateRange.every(date => {
+          const dateStr = format(date, 'yyyy-MM-dd');
+          return wizardData.shiftPattern?.[dateStr];
+        });
       case "Options":
         return true; // Always valid, optional settings
       case "Review":
