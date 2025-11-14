@@ -1148,11 +1148,19 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           )}
         </div>
 
-        {/* Team Selection for Rotation Mode - Moved Above User Selection */}
-        {bulkMode === 'rotation' && (
+        {/* Team Selection - Show for all modes */}
+        {bulkMode && (
           <div className="space-y-2">
             <label className="text-sm font-medium">Team</label>
-            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+            <Select 
+              value={selectedTeam} 
+              onValueChange={(value) => {
+                setSelectedTeam(value);
+                if (bulkMode === 'users') {
+                  setSelectedUsers([]); // Clear selected users when team changes
+                }
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select a team" />
               </SelectTrigger>
@@ -1164,6 +1172,65 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {/* User Selection for Users Mode */}
+        {bulkMode === 'users' && selectedTeam && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">
+                Select Multiple Users ({selectedUsers.length} selected)
+              </label>
+              {users.length > 0 && (
+                <div className="flex gap-2">
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={selectAllUsers}
+                    className="h-7 text-xs"
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={deselectAllUsers}
+                    className="h-7 text-xs"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              {users.length === 0 ? (
+                <div className="text-sm text-muted-foreground p-4 border rounded-md text-center">
+                  No users available in this team
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto p-2 border rounded-md">
+                  {users.map((usr) => (
+                    <div
+                      key={usr.id}
+                      className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                      onClick={() => toggleUserSelection(usr.id)}
+                    >
+                      <Checkbox
+                        checked={selectedUsers.includes(usr.id)}
+                        onCheckedChange={() => toggleUserSelection(usr.id)}
+                      />
+                      <label className="text-sm cursor-pointer flex-1">
+                        {formatUserName(usr.first_name, usr.last_name, usr.initials)}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1743,109 +1810,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
           </div>
         )}
 
-        {/* Team/User selection */}
-        {bulkMode === "team" ? (
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Team</label>
-            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a team" />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                {teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : bulkMode === "users" ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                Select Multiple Users ({selectedUsers.length} selected)
-              </label>
-              {users.length > 0 && (
-                <div className="flex gap-2">
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={selectAllUsers}
-                    className="h-7 text-xs"
-                  >
-                    Select All
-                  </Button>
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={deselectAllUsers}
-                    className="h-7 text-xs"
-                  >
-                    Clear
-                  </Button>
-                </div>
-              )}
-            </div>
-            
-            {/* Team Selection */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Team</label>
-              <Select value={selectedTeam} onValueChange={(value) => {
-                setSelectedTeam(value);
-                setSelectedUsers([]);
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a team first" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
-            {/* User Selection */}
-            <div className="space-y-2">
-              {!selectedTeam ? (
-                <div className="text-sm text-muted-foreground p-4 border rounded-md text-center">
-                  Select a team first to see users
-                </div>
-              ) : users.length === 0 ? (
-                <div className="text-sm text-muted-foreground p-4 border rounded-md text-center">
-                  No users found in this team
-                </div>
-              ) : (
-                <div className="border rounded-md max-h-60 overflow-y-auto">
-                  {users.map((usr) => (
-                    <div
-                      key={usr.id}
-                      className="flex items-center space-x-2 p-3 hover:bg-muted/50 cursor-pointer border-b last:border-0"
-                      onClick={() => toggleUserSelection(usr.id)}
-                    >
-                      <Checkbox 
-                        checked={selectedUsers.includes(usr.id)}
-                        onCheckedChange={() => toggleUserSelection(usr.id)}
-                      />
-                      <Label className="flex-1 cursor-pointer">
-                        {formatUserName(usr.first_name, usr.last_name, usr.initials)}
-                      </Label>
-                      {selectedUsers.includes(usr.id) && (
-                        <CheckCircle2 className="w-4 w-4 text-primary" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : null}
-        
         {/* Fairness Parameters (when fairness mode is enabled) */}
         {fairnessMode && (bulkMode === "team" || bulkMode === "users") && (
           <FairnessParameters
