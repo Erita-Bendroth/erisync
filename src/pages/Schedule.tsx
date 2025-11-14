@@ -104,7 +104,40 @@ const Schedule = () => {
       // Filter based on access
       let accessibleTeams = allTeams || [];
       
-      if (!isAdminRole && !isPlannerRole && isManagerRole) {
+      if (isPlannerRole && !isAdminRole) {
+        // For planners: Get teams within their hierarchy
+        const { data: plannerTeams } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user!.id);
+        
+        const plannerTeamIds = plannerTeams?.map(pt => pt.team_id) || [];
+        
+        // For each team, get all descendant teams using the hierarchy
+        const allAccessibleTeamIds = new Set<string>();
+        
+        for (const teamId of plannerTeamIds) {
+          // Add the team itself
+          allAccessibleTeamIds.add(teamId);
+          
+          // Get all descendant teams recursively
+          const descendants = allTeams?.filter(t => {
+            // Check if this team is a child (direct or indirect) of the planner's team
+            let currentTeam = t;
+            while (currentTeam && currentTeam.parent_team_id) {
+              if (plannerTeamIds.includes(currentTeam.parent_team_id)) {
+                return true;
+              }
+              currentTeam = allTeams.find(at => at.id === currentTeam.parent_team_id) || null;
+            }
+            return false;
+          }) || [];
+          
+          descendants.forEach(d => allAccessibleTeamIds.add(d.id));
+        }
+        
+        accessibleTeams = allTeams?.filter(t => allAccessibleTeamIds.has(t.id)) || [];
+      } else if (!isAdminRole && !isPlannerRole && isManagerRole) {
         // For managers: Get accessible team IDs from hierarchy
         const { data: accessibleTeamIds } = await supabase
           .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
