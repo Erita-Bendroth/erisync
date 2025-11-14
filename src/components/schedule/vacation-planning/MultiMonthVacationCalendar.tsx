@@ -16,6 +16,9 @@ interface MultiMonthVacationCalendarProps {
   onApprove: (requestId: string) => Promise<void>;
   onReject: (requestId: string, reason: string) => Promise<void>;
   onRefresh: () => void;
+  canEditTeam: (teamId: string) => boolean;
+  isAdmin: boolean;
+  isPlanner: boolean;
 }
 
 export const MultiMonthVacationCalendar = ({
@@ -27,7 +30,10 @@ export const MultiMonthVacationCalendar = ({
   loading,
   onApprove,
   onReject,
-  onRefresh
+  onRefresh,
+  canEditTeam,
+  isAdmin,
+  isPlanner
 }: MultiMonthVacationCalendarProps) => {
   const months = useMemo(() => {
     return Array.from({ length: monthsToShow }, (_, i) => addMonths(startDate, i));
@@ -151,6 +157,9 @@ export const MultiMonthVacationCalendar = ({
                     onApprove={onApprove}
                     onReject={onReject}
                     onRefresh={onRefresh}
+                    canEditTeam={canEditTeam}
+                    isAdmin={isAdmin}
+                    isPlanner={isPlanner}
                   >
                     <div
                       className={cn(

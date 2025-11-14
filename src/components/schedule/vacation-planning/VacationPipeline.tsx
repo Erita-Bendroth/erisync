@@ -27,6 +27,9 @@ interface VacationPipelineProps {
   onApprove: (requestId: string) => Promise<void>;
   onReject: (requestId: string, reason: string) => Promise<void>;
   onRefresh: () => void;
+  canEditTeam: (teamId: string) => boolean;
+  isAdmin: boolean;
+  isPlanner: boolean;
 }
 
 export const VacationPipeline = ({
@@ -36,7 +39,10 @@ export const VacationPipeline = ({
   loading,
   onApprove,
   onReject,
-  onRefresh
+  onRefresh,
+  canEditTeam,
+  isAdmin,
+  isPlanner
 }: VacationPipelineProps) => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -78,89 +84,98 @@ export const VacationPipeline = ({
     );
   }
 
-  const RequestCard = ({ request }: { request: VacationRequest }) => (
-    <Card className="p-4">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="font-semibold">
-                {request.profiles?.first_name} {request.profiles?.last_name}
+  const RequestCard = ({ request }: { request: VacationRequest }) => {
+    const canEdit = isAdmin || isPlanner || canEditTeam(request.team_id);
+    
+    return (
+      <Card className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="font-semibold">
+                  {request.profiles?.first_name} {request.profiles?.last_name}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {request.teams?.name}
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">
-                {request.teams?.name}
-              </div>
+              {!canEdit && (
+                <Badge variant="outline" className="text-xs">
+                  Read Only
+                </Badge>
+              )}
             </div>
-          </div>
 
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              {format(parseISO(request.requested_date), 'MMM d, yyyy')}
-            </div>
-            {!request.is_full_day && request.start_time && request.end_time && (
+            <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-1 text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                {request.start_time} - {request.end_time}
+                <Calendar className="h-4 w-4" />
+                {format(parseISO(request.requested_date), 'MMM d, yyyy')}
+              </div>
+              {!request.is_full_day && request.start_time && request.end_time && (
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  {request.start_time} - {request.end_time}
+                </div>
+              )}
+              <Badge variant={request.is_full_day ? 'default' : 'outline'}>
+                {request.is_full_day ? 'Full Day' : 'Partial'}
+              </Badge>
+            </div>
+
+            {request.notes && (
+              <div className="text-sm text-muted-foreground">
+                Note: {request.notes}
               </div>
             )}
-            <Badge variant={request.is_full_day ? 'default' : 'outline'}>
-              {request.is_full_day ? 'Full Day' : 'Partial'}
-            </Badge>
+
+            {request.rejection_reason && (
+              <div className="text-sm text-destructive">
+                Reason: {request.rejection_reason}
+              </div>
+            )}
           </div>
 
-          {request.notes && (
-            <div className="text-sm text-muted-foreground">
-              Note: {request.notes}
+          {request.status === 'pending' && canEdit && (
+            <div className="flex gap-2 ml-4">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => handleApprove(request.id)}
+                disabled={processing}
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleRejectClick(request.id)}
+                disabled={processing}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Reject
+              </Button>
             </div>
           )}
 
-          {request.rejection_reason && (
-            <div className="text-sm text-destructive">
-              Reason: {request.rejection_reason}
-            </div>
+          {request.status === 'approved' && (
+            <Badge variant="default" className="bg-success text-success-foreground">
+              <Check className="h-3 w-3 mr-1" />
+              Approved
+            </Badge>
+          )}
+
+          {request.status === 'rejected' && (
+            <Badge variant="destructive">
+              <X className="h-3 w-3 mr-1" />
+              Rejected
+            </Badge>
           )}
         </div>
-
-        {request.status === 'pending' && (
-          <div className="flex gap-2 ml-4">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={() => handleApprove(request.id)}
-              disabled={processing}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => handleRejectClick(request.id)}
-              disabled={processing}
-            >
-              <X className="h-3 w-3 mr-1" />
-              Reject
-            </Button>
-          </div>
-        )}
-
-        {request.status === 'approved' && (
-          <Badge variant="default" className="bg-success text-success-foreground">
-            <Check className="h-3 w-3 mr-1" />
-            Approved
-          </Badge>
-        )}
-
-        {request.status === 'rejected' && (
-          <Badge variant="destructive">
-            <X className="h-3 w-3 mr-1" />
-            Rejected
-          </Badge>
-        )}
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   return (
     <>

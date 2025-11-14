@@ -38,6 +38,9 @@ interface VacationDayPopoverProps {
   onApprove: (requestId: string) => Promise<void>;
   onReject: (requestId: string, reason: string) => Promise<void>;
   onRefresh: () => void;
+  canEditTeam: (teamId: string) => boolean;
+  isAdmin: boolean;
+  isPlanner: boolean;
 }
 
 export const VacationDayPopover = ({
@@ -48,7 +51,10 @@ export const VacationDayPopover = ({
   children,
   onApprove,
   onReject,
-  onRefresh
+  onRefresh,
+  canEditTeam,
+  isAdmin,
+  isPlanner
 }: VacationDayPopoverProps) => {
   const [open, setOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
