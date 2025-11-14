@@ -10,6 +10,9 @@ import { ConflictDetector } from './ConflictDetector';
 import { FairnessAnalysis } from './FairnessAnalysis';
 import { WhatIfScenario } from './WhatIfScenario';
 import { CoverageHeatmap } from './CoverageHeatmap';
+import { RecommendationEngine } from './RecommendationEngine';
+import { ExportTools } from './ExportTools';
+import { VacationAnalytics } from './VacationAnalytics';
 import { useVacationPlanning } from '@/hooks/useVacationPlanning';
 import { addMonths, subMonths } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -127,7 +130,7 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
       />
 
       {/* Analysis Tools Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <ConflictDetector
           capacityData={capacityData}
           vacationRequests={vacationRequests}
@@ -139,15 +142,29 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
           capacityData={capacityData}
           teams={teams}
         />
+
+        <div className="space-y-4">
+          <RecommendationEngine
+            teams={teams}
+            dateRange={dateRange}
+          />
+          <ExportTools
+            vacationRequests={vacationRequests}
+            capacityData={capacityData}
+            teams={teams}
+            dateRange={dateRange}
+          />
+        </div>
       </div>
 
       {/* Main Content */}
       <Tabs defaultValue="calendar" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="heatmap">Heat Map</TabsTrigger>
           <TabsTrigger value="fairness">Fairness</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="calendar">
@@ -195,6 +212,15 @@ export const VacationPlanningDashboard = ({ teamIds, teams }: VacationPlanningDa
         <TabsContent value="fairness">
           <FairnessAnalysis
             vacationRequests={vacationRequests}
+            teams={teams}
+            dateRange={dateRange}
+          />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <VacationAnalytics
+            vacationRequests={vacationRequests}
+            capacityData={capacityData}
             teams={teams}
             dateRange={dateRange}
           />
