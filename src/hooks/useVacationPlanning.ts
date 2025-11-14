@@ -70,8 +70,8 @@ export const useVacationPlanning = ({
         .from('vacation_requests')
         .select(`
           *,
-          profiles!user_id(first_name, last_name, initials),
-          teams!team_id(name)
+          profiles!vacation_requests_user_id_fkey(first_name, last_name, initials),
+          teams!vacation_requests_team_id_fkey(name)
         `)
         .in('team_id', teamIds)
         .gte('requested_date', format(dateRange.start, 'yyyy-MM-dd'))
