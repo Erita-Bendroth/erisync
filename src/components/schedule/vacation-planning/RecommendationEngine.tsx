@@ -100,15 +100,25 @@ export const RecommendationEngine = ({ teams, dateRange }: RecommendationEngineP
       console.error('Error generating recommendations:', error);
       
       let errorMessage = 'Failed to generate recommendations';
+      let errorDetails = '';
+      
       if (error.message?.includes('Rate limit')) {
-        errorMessage = 'Rate limit exceeded. Please try again in a moment.';
+        errorMessage = 'Rate limit exceeded';
+        errorDetails = 'Please try again in a moment.';
       } else if (error.message?.includes('Payment required')) {
-        errorMessage = 'AI usage limit reached. Please add credits to continue.';
+        errorMessage = 'AI usage limit reached';
+        errorDetails = 'Please add credits to continue.';
+      } else if (error.message) {
+        errorMessage = 'Recommendation Error';
+        errorDetails = error.message;
       }
       
+      // Also log the full error for debugging
+      console.log('Full error object:', JSON.stringify(error, null, 2));
+      
       toast({
-        title: "Error",
-        description: errorMessage,
+        title: errorMessage,
+        description: errorDetails || 'An unexpected error occurred. Check console for details.',
         variant: "destructive"
       });
     } finally {

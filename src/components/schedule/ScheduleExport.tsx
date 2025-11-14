@@ -287,6 +287,71 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
     }
   };
 
+  const exportToCalendar = () => {
+    setExporting(true);
+    try {
+      if (!entries || entries.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No schedule entries to export",
+          variant: "destructive"
+        });
+        setExporting(false);
+        return;
+      }
+
+      let icsContent = 'BEGIN:VCALENDAR\n';
+      icsContent += 'VERSION:2.0\n';
+      icsContent += 'PRODID:-//My Schedule Export//EN\n';
+      icsContent += 'CALSCALE:GREGORIAN\n';
+
+      entries.forEach(entry => {
+        const date = new Date(entry.date);
+        const dateStr = format(date, 'yyyyMMdd');
+        const shiftType = entry.shift_type || 'normal';
+        const activityType = entry.activity_type || 'work';
+
+        icsContent += 'BEGIN:VEVENT\n';
+        icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
+        icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
+        icsContent += `SUMMARY:${shiftType} - ${activityType}\n`;
+        icsContent += `DESCRIPTION:Shift: ${shiftType}\\nActivity: ${activityType}\\nAvailability: ${entry.availability_status}`;
+        if (entry.notes) {
+          icsContent += `\\nNotes: ${entry.notes.replace(/\n/g, '\\n')}`;
+        }
+        icsContent += '\n';
+        icsContent += `UID:schedule-${dateStr}-${user?.id}@schedule-export\n`;
+        icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss'Z'")}\n`;
+        icsContent += 'END:VEVENT\n';
+      });
+
+      icsContent += 'END:VCALENDAR';
+
+      const blob = new Blob([icsContent], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const { start, end } = getRange();
+      link.download = `my-schedule-${format(start, 'yyyy-MM-dd')}.ics`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: `Exported ${entries.length} schedule entries to calendar (ICS file)`
+      });
+    } catch (error) {
+      console.error('Error exporting to calendar:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export to calendar",
+        variant: "destructive"
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleExport = () => {
     exportAsPDF();
   };
