@@ -135,15 +135,27 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let query = supabase
-        .from('vacation_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+    let query = supabase
+      .from('vacation_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      // If not a planner, only show own requests
-      if (!isPlanner) {
+    // Different filters based on role
+    if (isPlanner) {
+      // Planners see all requests (no filter)
+    } else {
+      // Check if user is a manager
+      const { data: managerTeams } = await supabase
+        .rpc('get_manager_accessible_teams', { _manager_id: user.id });
+      
+      if (managerTeams && managerTeams.length > 0) {
+        // Managers see requests from their team members + their own requests
+        query = query.or(`user_id.eq.${user.id},team_id.in.(${managerTeams.join(',')})`);
+      } else {
+        // Regular users only see their own requests
         query = query.eq('user_id', user.id);
       }
+    }
 
       const { data: requestsData, error } = await query;
       if (error) throw error;
