@@ -11,7 +11,7 @@ const importHolidaysSchema = z.object({
   country_code: z.string().length(2).toUpperCase(),
   year: z.number().int().min(1900).max(2100),
   user_id: z.string().uuid().optional(),
-  region_code: z.string().max(10).optional(),
+  region_code: z.string().max(10).nullish(), // Accept null, undefined, or string
 });
 
 // Error sanitizer
