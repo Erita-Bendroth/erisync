@@ -16,7 +16,7 @@ import AdminSetup from "@/components/admin/AdminSetup";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
-import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
+import { BulkScheduleWizard } from "@/components/schedule/wizard/BulkScheduleWizard";
 import ScheduleExport from "@/components/schedule/ScheduleExport";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import OutlookIntegration from "@/components/integrations/OutlookIntegration";
@@ -558,7 +558,7 @@ const Schedule = () => {
 
             {scheduleViewMode === "standard" ? (
               <>
-                <BulkScheduleGenerator onScheduleGenerated={() => setScheduleRefreshKey(prev => prev + 1)} />
+                <BulkScheduleWizard onScheduleGenerated={() => setScheduleRefreshKey(prev => prev + 1)} />
                 <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
               </>
             ) : (
