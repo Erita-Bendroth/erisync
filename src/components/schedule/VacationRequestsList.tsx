@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatUserName } from '@/lib/utils';
@@ -99,6 +100,9 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   const [rejectionReason, setRejectionReason] = useState('');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
+  const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
+  const [bulkRejectionReason, setBulkRejectionReason] = useState('');
 
   useEffect(() => {
     fetchCurrentUser();
@@ -466,6 +470,160 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     onEditRequest?.(request);
   };
 
+  const toggleRequestSelection = (requestId: string) => {
+    const newSelected = new Set(selectedRequestIds);
+    if (newSelected.has(requestId)) {
+      newSelected.delete(requestId);
+    } else {
+      newSelected.add(requestId);
+    }
+    setSelectedRequestIds(newSelected);
+  };
+
+  const toggleSelectAll = (requests: GroupedRequest[]) => {
+    if (selectedRequestIds.size === requests.length) {
+      setSelectedRequestIds(new Set());
+    } else {
+      setSelectedRequestIds(new Set(requests.map(r => r.id)));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedRequestIds.size === 0) return;
+
+    const requestsToApprove = groupedRequests.filter(r => selectedRequestIds.has(r.id));
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const request of requestsToApprove) {
+      try {
+        const { error: updateError } = await supabase
+          .from('vacation_requests')
+          .update({ 
+            status: 'approved',
+            approver_id: currentUserId 
+          })
+          .in('id', request.requestIds);
+
+        if (updateError) throw updateError;
+
+        // Create schedule entries for each date
+        const scheduleEntries = request.dates.map(date => ({
+          user_id: request.user_id,
+          team_id: request.team_id,
+          date: date,
+          shift_type: 'normal' as const,
+          activity_type: 'vacation' as const,
+          availability_status: 'unavailable' as const,
+          notes: request.notes || 'Approved vacation',
+          created_by: currentUserId,
+        }));
+
+        const { error: scheduleError } = await supabase
+          .from('schedule_entries')
+          .upsert(scheduleEntries, {
+            onConflict: 'user_id,date,team_id',
+            ignoreDuplicates: false
+          });
+
+        if (scheduleError) throw scheduleError;
+
+        // Send notification
+        await supabase.functions.invoke('vacation-request-notification', {
+          body: {
+            requestId: request.id,
+            userId: request.user_id,
+            status: 'approved',
+            dates: request.dates,
+          },
+        });
+
+        successCount++;
+      } catch (error: any) {
+        console.error('Error approving request:', error);
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast({
+        title: "Requests approved",
+        description: `${successCount} request(s) approved successfully.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`,
+      });
+    }
+
+    if (errorCount > 0 && successCount === 0) {
+      toast({
+        title: "Error",
+        description: "Failed to approve requests",
+        variant: "destructive",
+      });
+    }
+
+    setSelectedRequestIds(new Set());
+    await fetchRequests();
+    onRequestProcessed?.();
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedRequestIds.size === 0 || !bulkRejectionReason.trim()) return;
+
+    const requestsToReject = groupedRequests.filter(r => selectedRequestIds.has(r.id));
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const request of requestsToReject) {
+      try {
+        const { error: updateError } = await supabase
+          .from('vacation_requests')
+          .update({ 
+            status: 'rejected',
+            rejection_reason: bulkRejectionReason,
+            approver_id: currentUserId 
+          })
+          .in('id', request.requestIds);
+
+        if (updateError) throw updateError;
+
+        // Send notification
+        await supabase.functions.invoke('vacation-request-notification', {
+          body: {
+            requestId: request.id,
+            userId: request.user_id,
+            status: 'rejected',
+            rejectionReason: bulkRejectionReason,
+          },
+        });
+
+        successCount++;
+      } catch (error: any) {
+        console.error('Error rejecting request:', error);
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast({
+        title: "Requests rejected",
+        description: `${successCount} request(s) rejected.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`,
+      });
+    }
+
+    if (errorCount > 0 && successCount === 0) {
+      toast({
+        title: "Error",
+        description: "Failed to reject requests",
+        variant: "destructive",
+      });
+    }
+
+    setBulkRejectDialogOpen(false);
+    setBulkRejectionReason('');
+    setSelectedRequestIds(new Set());
+    await fetchRequests();
+    onRequestProcessed?.();
+  };
+
   const renderRequest = (request: GroupedRequest) => {
     const isMultiDay = request.dates.length > 1;
     
@@ -486,12 +644,23 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     const config = statusConfig[request.status as keyof typeof statusConfig] || statusConfig.pending;
     const StatusIcon = config.icon;
 
+    const isSelected = selectedRequestIds.has(request.id);
+    const showCheckbox = isPlanner && request.status === 'pending';
+
     return (
       <Card key={request.id} className="mb-3 hover:shadow-md transition-shadow">
         <CardContent className="pt-6">
           <div className="space-y-4">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
+              {showCheckbox && (
+                <div className="pt-1">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleRequestSelection(request.id)}
+                  />
+                </div>
+              )}
               <div className="flex-1">
                 {isPlanner && (
                   <div className="flex items-center gap-2 mb-3">
@@ -705,9 +874,51 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {pendingRequests.map(renderRequest)}
-                </div>
+                <>
+                  {isPlanner && pendingRequests.length > 0 && (
+                    <div className="mb-4 p-4 border rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedRequestIds.size === pendingRequests.length && pendingRequests.length > 0}
+                            onCheckedChange={() => toggleSelectAll(pendingRequests)}
+                          />
+                          <span className="text-sm font-medium">
+                            {selectedRequestIds.size > 0 
+                              ? `${selectedRequestIds.size} selected` 
+                              : 'Select all'}
+                          </span>
+                        </div>
+                        {selectedRequestIds.size > 0 && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={handleBulkApprove}
+                              disabled={processingId !== null}
+                              className="gap-1.5"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Approve Selected ({selectedRequestIds.size})
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setBulkRejectDialogOpen(true)}
+                              disabled={processingId !== null}
+                              className="gap-1.5"
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Reject Selected ({selectedRequestIds.size})
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {pendingRequests.map(renderRequest)}
+                  </div>
+                </>
               )}
             </TabsContent>
 
@@ -828,6 +1039,50 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             >
               {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Cancel Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Reject Dialog */}
+      <Dialog open={bulkRejectDialogOpen} onOpenChange={setBulkRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Multiple Requests</DialogTitle>
+            <DialogDescription>
+              Rejecting {selectedRequestIds.size} vacation request(s). Please provide a reason.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="bulk-rejection-reason">Reason *</Label>
+            <Textarea
+              id="bulk-rejection-reason"
+              value={bulkRejectionReason}
+              onChange={(e) => setBulkRejectionReason(e.target.value)}
+              placeholder="Explain why these requests cannot be approved..."
+              rows={4}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBulkRejectDialogOpen(false);
+                setBulkRejectionReason('');
+              }}
+              disabled={processingId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkReject}
+              disabled={processingId !== null || !bulkRejectionReason.trim()}
+            >
+              {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reject {selectedRequestIds.size} Request(s)
             </Button>
           </DialogFooter>
         </DialogContent>
