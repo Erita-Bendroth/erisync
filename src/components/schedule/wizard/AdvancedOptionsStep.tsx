@@ -189,12 +189,23 @@ export const AdvancedOptionsStep = ({ wizardData, updateWizardData }: AdvancedOp
                     value={[wizardData.rotationCycles]}
                     onValueChange={([value]) => updateWizardData({ rotationCycles: value })}
                     min={1}
-                    max={10}
+                    max={26}
                     step={1}
                     className="w-full"
                   />
                   <p className="text-xs text-muted-foreground">
                     How many times to repeat the rotation pattern
+                  </p>
+                </div>
+
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                  <p className="text-sm">
+                    <strong>Your rotation will repeat {wizardData.rotationCycles} time{wizardData.rotationCycles > 1 ? 's' : ''}</strong>, 
+                    every <strong>{wizardData.rotationIntervalWeeks} week{wizardData.rotationIntervalWeeks > 1 ? 's' : ''}</strong>.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total duration: ~{wizardData.rotationCycles * wizardData.rotationIntervalWeeks} weeks
+                    ({Math.round(wizardData.rotationCycles * wizardData.rotationIntervalWeeks / 4.33)} months)
                   </p>
                 </div>
               </>
