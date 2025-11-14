@@ -35,9 +35,8 @@ export interface WizardData {
   rotationIntervalWeeks: number;
   rotationCycles: number;
   perDateTimes?: { [dateStr: string]: { startTime: string; endTime: string } };
-  useShiftPattern: boolean;
   shiftPattern?: {
-    [dayOfWeek: string]: {
+    [dateStr: string]: {
       shiftType: string;
       shiftName: string;
       startTime: string;
@@ -76,7 +75,6 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     enableRecurring: false,
     rotationIntervalWeeks: 4,
     rotationCycles: 1,
-    useShiftPattern: false,
     shiftPattern: {},
   });
 
@@ -115,18 +113,23 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     setWizardData(prev => ({ ...prev, ...updates }));
   };
 
-  const steps = [
-    { id: 0, label: "Mode", component: ModeSelectionStep },
-    { id: 1, label: "Team & People", component: TeamPeopleStep },
-    { id: 2, label: "Dates", component: DateRangeStep },
-    { id: 3, label: "Shifts", component: ShiftConfigStep },
-    ...(wizardData.useShiftPattern && wizardData.mode === "rotation" 
-      ? [{ id: 4, label: "Pattern", component: ShiftPatternStep }] 
-      : []
-    ),
-    { id: wizardData.useShiftPattern && wizardData.mode === "rotation" ? 5 : 4, label: "Options", component: AdvancedOptionsStep },
-    { id: wizardData.useShiftPattern && wizardData.mode === "rotation" ? 6 : 5, label: "Review", component: ReviewStep },
-  ];
+  const steps = wizardData.mode === "rotation" 
+    ? [
+        { id: 0, label: "Mode", component: ModeSelectionStep },
+        { id: 1, label: "Team & People", component: TeamPeopleStep },
+        { id: 2, label: "Dates", component: DateRangeStep },
+        { id: 3, label: "Configure Shifts", component: ShiftPatternStep },
+        { id: 4, label: "Options", component: AdvancedOptionsStep },
+        { id: 5, label: "Review", component: ReviewStep },
+      ]
+    : [
+        { id: 0, label: "Mode", component: ModeSelectionStep },
+        { id: 1, label: "Team & People", component: TeamPeopleStep },
+        { id: 2, label: "Dates", component: DateRangeStep },
+        { id: 3, label: "Shifts", component: ShiftConfigStep },
+        { id: 4, label: "Options", component: AdvancedOptionsStep },
+        { id: 5, label: "Review", component: ReviewStep },
+      ];
 
   const canProceed = () => {
     const currentStepInfo = steps[currentStep];
@@ -144,17 +147,22 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
       case "Dates":
         return wizardData.startDate && wizardData.endDate;
       case "Shifts":
-        // If using pattern mode, can proceed to configure pattern
-        if (wizardData.useShiftPattern && wizardData.mode === "rotation") {
-          return true;
-        }
-        // Otherwise need shift times configured
         return wizardData.startTime && wizardData.endTime;
-      case "Pattern":
-        // Check if all days in pattern are configured
-        if (!wizardData.shiftPattern) return false;
-        const requiredDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-        return requiredDays.every(day => wizardData.shiftPattern?.[day]);
+      case "Configure Shifts":
+        // For rotation mode, check if all dates in range have shifts configured
+        if (!wizardData.shiftPattern || !wizardData.startDate || !wizardData.endDate) return false;
+        
+        const dates = [];
+        const currentDate = new Date(wizardData.startDate);
+        const end = new Date(wizardData.endDate);
+        
+        while (currentDate <= end) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          dates.push(dateStr);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        return dates.every(date => wizardData.shiftPattern?.[date]);
       case "Options":
         return true; // Always valid, optional settings
       case "Review":
