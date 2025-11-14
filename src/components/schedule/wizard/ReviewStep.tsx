@@ -219,19 +219,21 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         const offsetDays = cycle * wizardData.rotationIntervalWeeks * 7;
         
         for (const day of patternDays) {
-          const scheduledDate = addDays(day, offsetDays);
-          const dateStr = format(scheduledDate, "yyyy-MM-dd");
-          
-          // Get shift info for this specific date
-          const shiftInfo = wizardData.shiftPattern?.[dateStr];
+          // Use the ORIGINAL date to look up the pattern
+          const originalDateStr = format(day, "yyyy-MM-dd");
+          const shiftInfo = wizardData.shiftPattern?.[originalDateStr];
           
           // Skip if marked as day off
           if (shiftInfo?.isDayOff) {
             continue;
           }
           
-          // Skip if it's a holiday
-          if (wizardData.skipHolidays && holidays.includes(dateStr)) {
+          // Calculate the SCHEDULED date (with offset for recurring cycles)
+          const scheduledDate = addDays(day, offsetDays);
+          const scheduledDateStr = format(scheduledDate, "yyyy-MM-dd");
+          
+          // Skip if the SCHEDULED date is a holiday
+          if (wizardData.skipHolidays && holidays.includes(scheduledDateStr)) {
             continue;
           }
           
@@ -269,7 +271,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             entries.push({
               user_id: userId,
               team_id: wizardData.selectedTeam,
-              date: dateStr,
+              date: scheduledDateStr,
               shift_type: finalShiftInfo.shiftType as "early" | "late" | "normal" | "weekend",
               activity_type: "work" as const,
               availability_status: "available" as const,
