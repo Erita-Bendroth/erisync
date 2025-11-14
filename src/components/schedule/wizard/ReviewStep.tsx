@@ -135,9 +135,19 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
     });
 
     const workingDays = allDays.filter(day => {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const shiftInfo = wizardData.shiftPattern?.[dateStr];
+      
+      // Skip if marked as day off in pattern
+      if (wizardData.mode === "rotation" && shiftInfo?.isDayOff) {
+        return false;
+      }
+      
+      // Skip weekends if configured
       if (wizardData.skipWeekends && isWeekendDate(day)) {
         return false;
       }
+      
       return true;
     });
 
@@ -282,6 +292,36 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         }
       }
 
+      // Calculate the full date range including all recurring cycles
+      const fullDateRange = {
+        start: wizardData.startDate,
+        end: isRecurring 
+          ? addDays(wizardData.startDate, cycles * wizardData.rotationIntervalWeeks * 7)
+          : wizardData.endDate
+      };
+
+      console.log("Deleting existing entries for:", {
+        team: wizardData.selectedTeam,
+        users: usersToSchedule.length,
+        dateRange: [format(fullDateRange.start, "yyyy-MM-dd"), format(fullDateRange.end, "yyyy-MM-dd")]
+      });
+
+      // Delete existing entries for this exact scope
+      const { error: deleteError } = await supabase
+        .from("schedule_entries")
+        .delete()
+        .eq("team_id", wizardData.selectedTeam)
+        .in("user_id", usersToSchedule)
+        .gte("date", format(fullDateRange.start, "yyyy-MM-dd"))
+        .lte("date", format(fullDateRange.end, "yyyy-MM-dd"));
+
+      if (deleteError) {
+        console.error("Error deleting existing entries:", deleteError);
+        throw new Error(`Failed to clear existing schedule: ${deleteError.message}`);
+      }
+
+      console.log(`Cleared existing entries. Now inserting ${entries.length} new entries.`);
+
       // Insert in batches
       const batchSize = 100;
       for (let i = 0; i < entries.length; i += batchSize) {
@@ -306,10 +346,18 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
     } catch (error) {
       console.error("Error generating schedule:", error);
       
-      // Show more specific error message
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to generate schedule. Please check your configuration and try again.";
+      let errorMessage: string;
+      
+      // Check if it's a duplicate key error
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+        errorMessage = "Duplicate entries detected. Some schedule entries may already exist for these dates. Try deleting existing entries for this date range first, or contact support if the issue persists.";
+      } else if (error && typeof error === 'object' && 'code' in error && error.code === '409') {
+        errorMessage = "Conflict detected. Please refresh the page and try again. If the problem continues, try manually deleting entries for this date range first.";
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = "Failed to generate schedule. Please check your configuration and try again.";
+      }
       
       toast({
         title: "Error",
