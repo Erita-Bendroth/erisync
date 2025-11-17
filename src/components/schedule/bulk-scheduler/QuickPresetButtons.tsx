@@ -16,6 +16,7 @@ export const QuickPresetButtons = ({ onApplyPreset }: QuickPresetButtonsProps) =
       config: {
         dateRange: getThisWeek(),
         mode: 'users' as const,
+        excludedDays: [0, 6], // Exclude Sat & Sun
       }
     },
     {
@@ -25,6 +26,7 @@ export const QuickPresetButtons = ({ onApplyPreset }: QuickPresetButtonsProps) =
       config: {
         dateRange: getNextWeek(),
         mode: 'users' as const,
+        excludedDays: [0, 6], // Exclude Sat & Sun
       }
     },
     {
@@ -34,6 +36,7 @@ export const QuickPresetButtons = ({ onApplyPreset }: QuickPresetButtonsProps) =
       config: {
         dateRange: getThisMonth(),
         mode: 'users' as const,
+        excludedDays: [0, 6], // Exclude Sat & Sun
       }
     },
     {

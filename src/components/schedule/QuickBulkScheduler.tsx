@@ -228,13 +228,13 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
           <DateRangeQuickPicker
             startDate={config.dateRange.start}
             endDate={config.dateRange.end}
-            skipWeekends={config.skipWeekends}
+            excludedDays={config.excludedDays}
             skipHolidays={config.skipHolidays}
             onDateRangeChange={(start, end) =>
               setConfig({ ...config, dateRange: { start, end } })
             }
-            onSkipWeekendsChange={(skip) =>
-              setConfig({ ...config, skipWeekends: skip })
+            onExcludedDaysChange={(days) =>
+              setConfig({ ...config, excludedDays: days })
             }
             onSkipHolidaysChange={(skip) =>
               setConfig({ ...config, skipHolidays: skip })

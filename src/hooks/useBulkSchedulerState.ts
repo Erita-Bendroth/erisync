@@ -15,7 +15,7 @@ export interface BulkSchedulerConfig {
     start: string;
     end: string;
   };
-  skipWeekends: boolean;
+  excludedDays: number[]; // [0=Sunday, 1=Monday, ..., 6=Saturday]
   skipHolidays: boolean;
   advanced: {
     fairnessEnabled: boolean;
@@ -43,7 +43,7 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
       start: '08:00',
       end: '16:30',
     },
-    skipWeekends: true,
+    excludedDays: [0, 6], // Default: exclude Saturday and Sunday
     skipHolidays: false,
     advanced: {
       fairnessEnabled: false,
@@ -123,12 +123,15 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
 
     const start = config.dateRange.start;
     const end = config.dateRange.end;
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     
-    let workDays = days;
-    if (config.skipWeekends) {
-      // Rough estimate: 5/7 of days
-      workDays = Math.ceil(days * (5 / 7));
+    // Calculate actual work days by checking each day
+    let workDays = 0;
+    const current = new Date(start);
+    while (current <= end) {
+      if (!config.excludedDays.includes(current.getDay())) {
+        workDays++;
+      }
+      current.setDate(current.getDate() + 1);
     }
 
     const userCount = config.mode === 'team' 
