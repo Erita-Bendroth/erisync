@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,8 +7,11 @@ import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { QuickActionsToolbar } from './QuickActionsToolbar';
 import { SchedulerGrid } from './SchedulerGrid';
+import { OnlineUsersPanel } from './OnlineUsersPanel';
 import { useSchedulerState, ScheduleEntry } from '@/hooks/useSchedulerState';
 import { useSchedulerActions } from '@/hooks/useSchedulerActions';
+import { useSchedulerPresence } from '@/hooks/useSchedulerPresence';
+import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +38,11 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [weekStart, setWeekStart] = useState<Date>(getMonday(new Date()));
   const [showPartnerTeams, setShowPartnerTeams] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{
+    firstName: string;
+    lastName: string;
+    initials: string;
+  }>({ firstName: '', lastName: '', initials: '' });
 
   const {
     state,
@@ -67,8 +75,32 @@ export const UnifiedTeamScheduler: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchTeams();
+      fetchCurrentUserProfile();
     }
   }, [user]);
+
+  const fetchCurrentUserProfile = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, initials')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setCurrentUserProfile({
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          initials: data.initials || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   useEffect(() => {
     if (selectedTeamId) {
@@ -194,11 +226,35 @@ export const UnifiedTeamScheduler: React.FC = () => {
     clearSelection();
   };
 
+  // Debounce editing cell to avoid spamming presence updates
+  const debouncedEditingCell = useDebounce(state.editingCell, 300);
+
+  // Enable presence tracking
+  const { onlineUsers } = useSchedulerPresence(
+    selectedTeamId,
+    user?.id || '',
+    currentUserProfile,
+    debouncedEditingCell
+  );
+
+  // Calculate which cells are being edited by others
+  const cellsBeingEdited = useMemo(() => {
+    return onlineUsers.reduce((acc, user) => {
+      if (user.editing_cell) {
+        if (!acc[user.editing_cell]) {
+          acc[user.editing_cell] = [];
+        }
+        acc[user.editing_cell].push(user);
+      }
+      return acc;
+    }, {} as Record<string, typeof onlineUsers>);
+  }, [onlineUsers]);
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
               Unified Team Scheduler
@@ -208,6 +264,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
             </CardDescription>
           </div>
           <div className="flex items-center gap-4">
+            {onlineUsers.length > 0 && <OnlineUsersPanel users={onlineUsers} />}
             <div className="flex items-center gap-2">
               <Switch
                 id="partner-teams"
@@ -286,6 +343,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
               onUpdateEntry={handleUpdateEntry}
               teamId={selectedTeamId}
               currentUserId={user?.id || ''}
+              cellsBeingEdited={cellsBeingEdited}
             />
           )}
 
