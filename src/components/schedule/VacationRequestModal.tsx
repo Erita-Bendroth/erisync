@@ -97,24 +97,60 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
-        .rpc('get_planners_for_user_team', { _user_id: user.id });
+      // Get user's team
+      const { data: userTeam, error: teamError } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .single();
 
-      if (error) throw error;
+      if (teamError || !userTeam) {
+        console.error('Error fetching user team:', teamError);
+        setPlanners([]);
+        return;
+      }
 
-      setPlanners(data || []);
+      // Get managers from user's team
+      const { data: managers, error: managersError } = await supabase
+        .from('team_members')
+        .select(`
+          user_id,
+          profiles!team_members_user_id_fkey(
+            user_id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('team_id', userTeam.team_id)
+        .eq('is_manager', true);
+
+      if (managersError) throw managersError;
+
+      // Transform to expected format
+      const managerList = managers
+        ?.filter(m => m.profiles)
+        .map(m => ({
+          user_id: m.profiles.user_id,
+          first_name: m.profiles.first_name,
+          last_name: m.profiles.last_name,
+          email: m.profiles.email
+        })) || [];
+
+      setPlanners(managerList);
       
-      // Auto-select first planner if available
-      if (data && data.length > 0 && !selectedPlannerId) {
-        setSelectedPlannerId(data[0].user_id);
+      // Auto-select first manager
+      if (managerList.length > 0 && !selectedPlannerId) {
+        setSelectedPlannerId(managerList[0].user_id);
       }
     } catch (error) {
-      console.error('Error fetching planners:', error);
+      console.error('Error fetching managers:', error);
       toast({
         title: "Error",
-        description: "Failed to load planners list",
+        description: "Failed to load team manager",
         variant: "destructive",
       });
+      setPlanners([]);
     } finally {
       setLoadingPlanners(false);
     }
@@ -342,32 +378,32 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
           <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <AlertDescription className="text-sm text-blue-800 dark:text-blue-300">
-              Your request will be sent to the selected planner for approval. Your manager will be notified once approved.
+              Your vacation request will be sent to your team manager for review and approval.
             </AlertDescription>
           </Alert>
 
-          {/* Planner Selection */}
+          {/* Manager Display */}
           <div className="space-y-2">
             <Label className="text-base font-semibold flex items-center gap-2">
               <UserCheck className="h-4 w-4 text-muted-foreground" />
-              Send to Planner *
+              Manager
             </Label>
             {loadingPlanners ? (
               <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm text-muted-foreground">Loading planners...</span>
+                <span className="text-sm text-muted-foreground">Loading manager...</span>
               </div>
             ) : planners.length === 0 ? (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  No planners available for your team. Please contact your administrator.
+                  No manager assigned to your team. Please contact your administrator.
                 </AlertDescription>
               </Alert>
             ) : (
               <Select value={selectedPlannerId} onValueChange={setSelectedPlannerId}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a planner to review your request" />
+                  <SelectValue placeholder="Your team manager" />
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
                   {planners.map((planner) => (
