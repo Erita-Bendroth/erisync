@@ -44,7 +44,27 @@ export const TeamMemberManual = () => {
           <li><strong>Monthly View:</strong> Get an overview of the whole month</li>
         </ul>
 
-        <h3 className="text-xl font-semibold mb-3">Understanding Shift Types</h3>
+        <h3 className="text-xl font-semibold mb-3">Scrolling Through Dates</h3>
+        <p className="mb-4">
+          When viewing many days on the schedule, you can easily navigate:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Mouse Wheel:</strong> Scroll horizontally by moving your mouse wheel</li>
+          <li><strong>Trackpad:</strong> Swipe left/right with two fingers</li>
+          <li><strong>Click & Drag:</strong> Click and drag the schedule to move through dates</li>
+          <li><strong>Scrollbar:</strong> Use the scrollbar at the bottom of the schedule</li>
+        </ul>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Easy Navigation</AlertTitle>
+          <AlertDescription>
+            The schedule automatically adapts when viewing many days, making it easy to scroll 
+            through weeks or months of schedule entries.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Understanding Shift Types</h3>
         <p className="mb-2"><strong>Time Blocks:</strong></p>
         <ul className="list-disc list-inside space-y-2 mb-4">
           <li><strong>Day:</strong> 06:00 - 14:00</li>
@@ -209,6 +229,91 @@ export const TeamMemberManual = () => {
           <li>Discuss with your manager if you have questions</li>
           <li>Submit a new request for different dates</li>
         </ol>
+      </section>
+
+      <Separator />
+
+      <section id="shift-swaps">
+        <h2 className="text-2xl font-bold mb-4">4. Shift Swap Requests</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Need to swap a shift with a colleague? The Shift Swap Request feature lets you request 
+          to trade shifts with teammates, pending manager approval.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">When Can You Request a Swap?</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Future Shifts Only:</strong> You can only swap shifts scheduled for future dates</li>
+          <li><strong>Someone Else's Shift:</strong> Click the "Swap" button on a teammate's shift</li>
+          <li><strong>Not Your Own:</strong> You cannot request to swap your own shift (ask teammate to request it)</li>
+          <li><strong>Working Shifts:</strong> Typically applies to working shifts, not vacation or sick leave</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">How to Request a Shift Swap</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule</strong> and find the shift you want</li>
+          <li>Click the <strong>"Swap"</strong> button on your colleague's schedule entry
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li>The button only appears on future shifts</li>
+              <li>It won't appear on your own shifts or past dates</li>
+            </ul>
+          </li>
+          <li>The Shift Swap Request dialog opens with details pre-filled:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li>Target colleague and their shift details</li>
+              <li>The date and shift type</li>
+            </ul>
+          </li>
+          <li>Optionally select one of your own shifts to offer in exchange</li>
+          <li>Add notes explaining why you want to swap (optional but recommended)</li>
+          <li>Click <strong>"Submit Swap Request"</strong></li>
+        </ol>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Swap vs. Take Over</AlertTitle>
+          <AlertDescription>
+            If you select one of your shifts to trade, it's a proper "swap". If you just want 
+            to take their shift without offering one in return, leave your shift selection empty.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3">After Submitting a Request</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Your request goes to your manager/planner for approval</li>
+          <li>You can view your pending requests in <strong>Schedule → My Swap Requests</strong></li>
+          <li>You'll receive a notification when the request is approved or rejected</li>
+          <li>If approved, the shifts are automatically swapped in the schedule</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Tracking Your Swap Requests</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Pending:</strong> Request submitted, waiting for manager approval</li>
+          <li><strong>Approved:</strong> Swap approved, shifts have been exchanged</li>
+          <li><strong>Rejected:</strong> Request denied (check notes for reason)</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Tips for Successful Swaps</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Plan Ahead:</strong> Request swaps well in advance</li>
+          <li><strong>Talk First:</strong> Coordinate with the colleague before requesting</li>
+          <li><strong>Be Specific:</strong> Add clear notes explaining your situation</li>
+          <li><strong>Fair Trade:</strong> Offering one of your shifts improves approval chances</li>
+          <li><strong>Consider Coverage:</strong> Ensure you're qualified for the swapped shift</li>
+        </ul>
+
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Important Rules</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Swaps require manager/planner approval - they are not automatic</li>
+              <li>You cannot swap shifts on past dates</li>
+              <li>Both you and your colleague must be able to work the swapped shifts</li>
+              <li>Team coverage needs may result in rejection even if both parties agree</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
       </section>
 
       <Separator />
@@ -457,9 +562,9 @@ export const TeamMemberManual = () => {
 
         <h3 className="text-xl font-semibold mb-3">Can I swap shifts with a coworker?</h3>
         <p className="mb-4">
-          Shift swaps must be approved by your manager. Coordinate with your coworker first, 
-          then contact your manager to request the swap. Your manager will update the schedule 
-          if approved.
+          Yes! Use the Shift Swap Request feature by clicking the "Swap" button on your coworker's 
+          schedule entry. See section 4 (Shift Swap Requests) for detailed instructions. Swaps 
+          require manager/planner approval.
         </p>
 
         <h3 className="text-xl font-semibold mb-3">How far in advance should I request vacation?</h3>

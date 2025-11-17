@@ -279,6 +279,134 @@ export const PlannerManual = () => {
           <li>Choose the modification: change shift type, time block, or delete</li>
           <li>Apply changes</li>
         </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Unified Team Scheduler - Navigation Tips</h3>
+        <p className="mb-4">
+          When viewing schedules with many days (more than 14), the scheduler enables horizontal scrolling:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Mouse Wheel Scrolling:</strong> Use your mouse wheel to scroll horizontally across dates</li>
+          <li><strong>Trackpad Gestures:</strong> Swipe horizontally with two fingers on trackpad</li>
+          <li><strong>Drag to Scroll:</strong> Click and drag the grid content to navigate</li>
+          <li><strong>Scrollbar:</strong> Use the horizontal scrollbar at the bottom</li>
+          <li><strong>Shift + Mouse Wheel:</strong> Hold Shift while scrolling to move vertically</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Wide Schedule View</AlertTitle>
+          <AlertDescription>
+            The scheduler automatically adjusts column widths based on the number of days displayed. 
+            For 14 or fewer days, columns expand to fill the screen. For more days, columns are 
+            fixed at 80px to enable smooth horizontal scrolling.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Rotation Templates</h3>
+        <p className="mb-4">
+          Rotation templates allow you to save common scheduling patterns and reuse them across teams and dates.
+        </p>
+
+        <h4 className="font-semibold mb-2">Accessing Templates</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Dashboard → Admin Setup</strong></li>
+          <li>Click the <strong>"Templates"</strong> tab</li>
+          <li>View your templates and public templates created by others</li>
+        </ol>
+
+        <h4 className="font-semibold mb-2">Creating a New Template</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>In the Templates tab, click <strong>"Create New Template"</strong></li>
+          <li>Enter a template name and description</li>
+          <li>Select which teams can use this template</li>
+          <li>Choose the pattern type:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li><strong>Fixed Days:</strong> Specific dates get assigned shifts</li>
+              <li><strong>Repeating Sequence:</strong> Pattern repeats in order (e.g., Day, Night, Day, Off)</li>
+              <li><strong>Weekly Pattern:</strong> Different shifts for each day of the week</li>
+              <li><strong>Custom Pattern:</strong> Define your own complex rotation</li>
+            </ul>
+          </li>
+          <li>Configure the pattern details (days, shift types, time blocks)</li>
+          <li>Toggle <strong>"Make Public"</strong> if you want all teams to access this template</li>
+          <li>Click <strong>"Save Template"</strong></li>
+        </ol>
+
+        <h4 className="font-semibold mb-2">Applying Templates to Schedules</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Go to <strong>Schedule</strong> view</li>
+          <li>Select team members (use checkboxes on the left)</li>
+          <li>Click <strong>"Apply Template"</strong> in the quick actions toolbar</li>
+          <li>Choose a template from the list</li>
+          <li>Select the date range to apply the template</li>
+          <li>Review the preview and click <strong>"Apply"</strong></li>
+        </ol>
+
+        <h4 className="font-semibold mb-2">Editing and Deleting Templates</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Edit:</strong> Click the edit icon next to your template, modify settings, and save</li>
+          <li><strong>Delete:</strong> Click the delete icon and confirm removal</li>
+          <li><strong>Note:</strong> You can only edit/delete templates you created</li>
+          <li><strong>Public Templates:</strong> Visible to everyone but can only be modified by the creator</li>
+        </ul>
+
+        <Alert className="mb-4">
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Template Best Practices</AlertTitle>
+          <AlertDescription>
+            Create templates for commonly used rotation patterns (e.g., "2 weeks on-call rotation", 
+            "Weekend coverage cycle"). Make them public if other planners should use them, or keep 
+            them private for team-specific patterns.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Shift Swap Requests</h3>
+        <p className="mb-4">
+          Team members can request to swap shifts with their colleagues. As a Planner, you can monitor 
+          and manage these swap requests to ensure proper coverage.
+        </p>
+
+        <h4 className="font-semibold mb-2">Viewing Swap Requests</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Shift Swaps</strong></li>
+          <li>See all pending, approved, and rejected swap requests</li>
+          <li>Filter by team, date range, or status</li>
+          <li>Review request details: who's swapping with whom, which shifts, dates</li>
+        </ol>
+
+        <h4 className="font-semibold mb-2">Approving or Rejecting Swaps</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Click on a pending swap request</li>
+          <li>Review the swap details:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li>Requesting user and target user</li>
+              <li>Shift date and type being swapped</li>
+              <li>Any notes or reasons provided</li>
+            </ul>
+          </li>
+          <li>Verify that both users can work the swapped shifts</li>
+          <li>Check team coverage won't be impacted</li>
+          <li>Click <strong>"Approve"</strong> or <strong>"Reject"</strong></li>
+          <li>Add optional notes explaining your decision</li>
+        </ol>
+
+        <h4 className="font-semibold mb-2">What Happens When Approved</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Schedule entries are automatically swapped between the two users</li>
+          <li>Both users receive notification of approval</li>
+          <li>Calendar updates immediately to reflect the swap</li>
+          <li>Swap is logged in the system for audit purposes</li>
+        </ul>
+
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Swap Validation</AlertTitle>
+          <AlertDescription>
+            Before approving swaps, verify that both team members are qualified for the swapped 
+            shifts and that team coverage requirements are maintained. Consider any training, 
+            certification, or seniority requirements.
+          </AlertDescription>
+        </Alert>
       </section>
 
       <Separator />

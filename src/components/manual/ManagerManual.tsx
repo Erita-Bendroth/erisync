@@ -149,6 +149,26 @@ export const ManagerManual = () => {
             The weekly view shows more details about each shift.
           </AlertDescription>
         </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Navigating Wide Schedules</h3>
+        <p className="mb-4">
+          When viewing schedules spanning many days, use these navigation features:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Mouse Wheel:</strong> Scroll horizontally with your mouse wheel</li>
+          <li><strong>Trackpad:</strong> Two-finger horizontal swipe on trackpad</li>
+          <li><strong>Click & Drag:</strong> Click and drag to scroll through dates</li>
+          <li><strong>Scrollbar:</strong> Use the horizontal scrollbar at the bottom</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Viewing Many Days</AlertTitle>
+          <AlertDescription>
+            The scheduler adjusts automatically when viewing more than 14 days, enabling smooth 
+            horizontal scrolling to navigate through all dates.
+          </AlertDescription>
+        </Alert>
       </section>
 
       <Separator />
@@ -190,8 +210,66 @@ export const ManagerManual = () => {
 
       <Separator />
 
+      <section id="shift-swaps">
+        <h2 className="text-2xl font-bold mb-4">5. Shift Swap Requests</h2>
+        
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Managers Cannot Approve Shift Swaps</AlertTitle>
+          <AlertDescription>
+            Only Planners and Admins can approve or reject shift swap requests. As a Manager, 
+            you can view swap requests from your team but must contact a Planner for approval.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3">What Team Members Can Do</h3>
+        <p className="mb-4">
+          Team members can request to swap shifts with their colleagues by clicking the "Swap" 
+          button on any schedule entry (except their own and past shifts).
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Viewing Swap Requests</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Shift Swaps</strong></li>
+          <li>See pending swap requests from your team members</li>
+          <li>Review details: who wants to swap with whom, which shift, date</li>
+          <li>Monitor status: pending, approved, or rejected</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Monitor:</strong> Track swap requests from your team</li>
+          <li><strong>Coordinate:</strong> Help team members find swap partners</li>
+          <li><strong>Advise:</strong> Provide input on whether swaps would work for team coverage</li>
+          <li><strong>Escalate:</strong> Contact Planners to expedite important swap requests</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Communicating with Planners</h3>
+        <p className="mb-4">
+          If you need a swap approved or have concerns about a request:
+        </p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Review the swap request details</li>
+          <li>Check if both users can cover the swapped shifts</li>
+          <li>Verify team coverage won't be impacted</li>
+          <li>Contact your Planner or Admin with recommendation</li>
+          <li>Provide context: coverage status, user qualifications, urgency</li>
+        </ol>
+
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Proactive Management</AlertTitle>
+          <AlertDescription>
+            Review swap requests regularly and provide timely feedback to Planners. This helps 
+            ensure your team's swaps are processed quickly and coverage is maintained.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
       <section id="vacation-requests">
-        <h2 className="text-2xl font-bold mb-4">5. Vacation Requests</h2>
+        <h2 className="text-2xl font-bold mb-4">6. Vacation Requests</h2>
         
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -251,7 +329,7 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="role-management">
-        <h2 className="text-2xl font-bold mb-4">6. Role Management</h2>
+        <h2 className="text-2xl font-bold mb-4">7. Role Management</h2>
         
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -290,7 +368,7 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="notifications">
-        <h2 className="text-2xl font-bold mb-4">7. Notifications</h2>
+        <h2 className="text-2xl font-bold mb-4">8. Notifications</h2>
         
         <h3 className="text-xl font-semibold mb-3">Sending Schedule Summaries</h3>
         <p className="mb-2"><strong>Individual Notifications:</strong></p>
@@ -327,7 +405,7 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="holidays">
-        <h2 className="text-2xl font-bold mb-4">8. Calendar & Holidays</h2>
+        <h2 className="text-2xl font-bold mb-4">9. Calendar & Holidays</h2>
         
         <h3 className="text-xl font-semibold mb-3">Viewing Team Holidays</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
@@ -349,7 +427,7 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="delegation">
-        <h2 className="text-2xl font-bold mb-4">9. Delegation</h2>
+        <h2 className="text-2xl font-bold mb-4">10. Delegation</h2>
         
         <h3 className="text-xl font-semibold mb-3">Understanding Delegation</h3>
         <p className="mb-4">
@@ -374,7 +452,7 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="export">
-        <h2 className="text-2xl font-bold mb-4">10. Export & Reports</h2>
+        <h2 className="text-2xl font-bold mb-4">11. Export & Reports</h2>
         
         <h3 className="text-xl font-semibold mb-3">Exporting Your Team's Schedule</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
@@ -396,7 +474,7 @@ export const ManagerManual = () => {
       <Separator />
 
       <section id="best-practices">
-        <h2 className="text-2xl font-bold mb-4">11. Best Practices</h2>
+        <h2 className="text-2xl font-bold mb-4">12. Best Practices</h2>
         
         <h3 className="text-xl font-semibold mb-3">Balancing Workload Fairly</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
