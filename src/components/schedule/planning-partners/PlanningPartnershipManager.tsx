@@ -32,13 +32,28 @@ export function PlanningPartnershipManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [partnershipName, setPartnershipName] = useState('');
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchPartnerships();
       fetchTeams();
+      fetchUserRoles();
     }
   }, [user]);
+
+  const fetchUserRoles = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      setUserRoles(data?.map(r => r.role) || []);
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+    }
+  };
 
   const fetchPartnerships = async () => {
     try {
@@ -133,6 +148,16 @@ export function PlanningPartnershipManager() {
 
   if (loading) {
     return <div className="text-center py-8 text-muted-foreground">Loading planning partnerships...</div>;
+  }
+
+  if (!userRoles.includes('admin')) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">
+          Only administrators can manage planning partnerships.
+        </p>
+      </div>
+    );
   }
 
   return (

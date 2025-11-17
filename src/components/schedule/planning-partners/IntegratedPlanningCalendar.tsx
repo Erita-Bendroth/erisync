@@ -372,15 +372,15 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                 seeing availability without compromising privacy on activity details.
               </p>
             </div>
-            {(isAdmin || isPlanner || isManager) && (
+            {isAdmin && (
               <Button variant="outline" onClick={onCreatePartnership}>
                 <Users className="h-4 w-4 mr-2" />
                 Create Your First Partnership
               </Button>
             )}
-            {!(isAdmin || isPlanner || isManager) && (
+            {!isAdmin && (
               <p className="text-sm text-muted-foreground">
-                Contact your manager or planner to set up co-planning partnerships.
+                Contact your administrator to set up co-planning partnerships.
               </p>
             )}
           </div>
