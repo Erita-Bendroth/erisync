@@ -20,7 +20,8 @@ interface UserProfile {
 }
 
 export const useSchedulerPresence = (
-  teamId: string,
+  contextId: string, // Can be teamId or partnershipId
+  contextType: 'team' | 'partnership',
   currentUserId: string,
   currentUserProfile: UserProfile,
   editingCell: string | null
@@ -29,9 +30,12 @@ export const useSchedulerPresence = (
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   useEffect(() => {
-    if (!teamId || !currentUserId || !currentUserProfile.firstName) return;
+    if (!contextId || !currentUserId || !currentUserProfile.firstName) return;
 
-    const channelName = `scheduler:${teamId}`;
+    const channelName = contextType === 'partnership' 
+      ? `scheduler:partnership:${contextId}`
+      : `scheduler:${contextId}`;
+    
     const presenceChannel = supabase.channel(channelName, {
       config: { presence: { key: currentUserId } },
     });
@@ -74,7 +78,7 @@ export const useSchedulerPresence = (
     return () => {
       presenceChannel.unsubscribe();
     };
-  }, [teamId, currentUserId, currentUserProfile.firstName]);
+  }, [contextId, contextType, currentUserId, currentUserProfile.firstName]);
 
   // Update editing cell in real-time
   useEffect(() => {
