@@ -103,16 +103,16 @@ const handler = async (req: Request): Promise<Response> => {
     const endDate = dates[dates.length - 1];
 
     if (type === "request") {
-      // Get the selected planner's information
-      const { data: planner, error: plannerError } = await supabase
+      // Get the team manager's information
+      const { data: manager, error: managerError } = await supabase
         .from("profiles")
         .select("first_name, last_name, email")
         .eq("user_id", request.selected_planner_id)
         .single();
 
-      if (plannerError || !planner) {
-        console.error("Failed to find selected planner:", plannerError);
-        throw new Error(`Failed to find selected planner: ${plannerError?.message}`);
+      if (managerError || !manager) {
+        console.error("Failed to find team manager:", managerError);
+        throw new Error(`Failed to find team manager: ${managerError?.message}`);
       }
 
       const dateStr = isMultiDay
@@ -127,16 +127,16 @@ const handler = async (req: Request): Promise<Response> => {
       // Use production domain for approval URL (erisync.xyz)
       const approveUrl = `https://erisync.xyz/schedule?pendingApproval=${requestId}`;
 
-      // Send notification ONLY to the selected planner
+      // Send notification to the team manager
       await resend.emails.send({
         from: "EriSync <noreply@erisync.xyz>",
-        to: [planner.email],
-        subject: `Vacation Request Pending: ${request.requester.first_name} ${request.requester.last_name}`,
+        to: [manager.email],
+        subject: `New Vacation Request - ${request.requester.first_name} ${request.requester.last_name}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Vacation Request Pending Approval</h2>
-            <p>Hello ${planner.first_name},</p>
-            <p>A new vacation request requires your approval:</p>
+            <h2 style="color: #333;">New Vacation Request</h2>
+            <p>Hello ${manager.first_name},</p>
+            <p>A team member has submitted a vacation request for your review:</p>
             
             <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
@@ -154,13 +154,13 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             
             <p style="color: #666; font-size: 14px; margin-top: 30px;">
-              You were selected by ${request.requester.first_name} ${request.requester.last_name} to review this request.
+              As the team manager, you can review and approve/reject this request through the EriSync dashboard.
             </p>
           </div>
         `,
       });
 
-      console.log(`Request notification sent to planner: ${planner.email}`);
+      console.log(`Request notification sent to manager: ${manager.email}`);
     } else if (type === "approval") {
       const dateStr = isMultiDay
         ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
@@ -222,7 +222,7 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Team Member Vacation Approved</h2>
               <p>Hello ${teamMember.profiles.first_name},</p>
-              <p>A vacation request for your team member has been approved by a planner:</p>
+              <p>A vacation request for your team member has been approved by their manager:</p>
               
               <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
