@@ -123,7 +123,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
               </div>
 
               {/* Schedule Cells */}
-              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '80px' : 'minmax(80px, 1fr)'})` }}>
+              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '60px' : 'minmax(60px, 1fr)'})` }}>
                 {dates.map((date) => {
                   const entry = getEntry(member.user_id, date);
                   const cellId = `${member.user_id}:${date}`;
