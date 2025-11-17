@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DutyAssignmentGridProps {
   teamIds: string[];
@@ -490,6 +491,18 @@ export function DutyAssignmentGrid({
     availableShiftTypes.has('early') ||
     availableShiftTypes.size === 0
   );
+
+  // Show alert when no teams are selected
+  if (teamIds.length === 0) {
+    return (
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          Please select teams in the <strong>Template Setup</strong> tab to view duty assignments and scheduled personnel.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-4">
