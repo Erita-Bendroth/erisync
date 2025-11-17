@@ -24,10 +24,13 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useCoverageAnalysis } from '@/hooks/useCoverageAnalysis';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { useHolidayVisibility } from '@/hooks/useHolidayVisibility';
+import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { TeamFavoritesQuickAccess } from '../TeamFavoritesQuickAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 import { ApplyTemplateDialog } from '../ApplyTemplateDialog';
 import { EditScheduleModal } from '../EditScheduleModal';
 import { CoverageOverview } from '../CoverageOverview';
@@ -61,6 +64,11 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState<'partnership' | 'multi-team'>('partnership');
   const [selectedPartnershipId, setSelectedPartnershipId] = useState<string>('');
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  
+  // Access control for partnership views
+  const accessControl = useScheduleAccessControl({ 
+    viewMode: selectionMode === 'partnership' ? 'multi-team' : 'multi-team' 
+  });
   const [allTeams, setAllTeams] = useState<Array<{ id: string; name: string }>>([]);
   const [teamSections, setTeamSections] = useState<TeamSection[]>([]);
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
@@ -353,12 +361,25 @@ export const UnifiedTeamScheduler: React.FC = () => {
         const { data: members, error } = await supabase
           .rpc('get_team_members_safe', { _team_id: teamId });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching members for team', teamId, ':', error);
+          throw error;
+        }
+
+        // Log member data and validate
+        console.log(`Team members for ${team?.name || teamId}:`, members);
+        
+        const validMembers = (members || []).map(m => ({
+          user_id: m.user_id,
+          first_name: m.first_name || 'Unknown',
+          last_name: m.last_name || 'User',
+          initials: m.initials || '??',
+        }));
 
         sections.push({
           teamId,
           teamName: team?.name || 'Unknown Team',
-          members: members || [],
+          members: validMembers,
           color: getTeamColor(teamId),
         });
       }
@@ -734,6 +755,16 @@ export const UnifiedTeamScheduler: React.FC = () => {
             </div>
           )}
 
+          {/* Partnership Mode Notice */}
+          {selectionMode === 'partnership' && !accessControl.isAdmin && !accessControl.isPlanner && !accessControl.isManager && (
+            <Alert className="border-primary/50">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Partnership View: You can see shift types and availability for all teams in your partnership to coordinate shift swaps. Activity details are limited for privacy.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <DateRangeSelector
               startDate={dateStart}
@@ -957,6 +988,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
                           onCellDragEnd={endDrag}
                           onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
                           showHolidays={showHolidays}
+                          isPartnershipView={selectionMode === 'partnership'}
+                          canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner || accessControl.isManager}
                         />
                       ))}
 
@@ -991,6 +1024,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
                       shiftTypes={shiftTypes}
                       partnershipMode={selectionMode === 'partnership'}
                       partnershipConfig={partnershipConfig ?? undefined}
+                      isPartnershipView={selectionMode === 'partnership'}
+                      canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner || accessControl.isManager}
                     />
                   )}
                   

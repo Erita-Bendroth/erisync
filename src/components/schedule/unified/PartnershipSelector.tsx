@@ -54,6 +54,7 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
   const handleChange = (partnershipId: string) => {
     const partnership = partnerships.find(p => p.id === partnershipId);
     if (partnership) {
+      console.log('Partnership selected:', partnership.partnership_name, 'Teams:', partnership.team_ids);
       onChange(partnershipId, partnership.team_ids);
     }
   };

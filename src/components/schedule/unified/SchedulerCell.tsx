@@ -6,12 +6,14 @@ import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type AvailabilityStatus = Database['public']['Enums']['availability_status'];
+type ActivityType = Database['public']['Enums']['activity_type'];
 
 interface SchedulerCellProps {
   userId: string;
   date: string;
   shiftType: ShiftType | null;
   availabilityStatus: AvailabilityStatus;
+  activityType?: ActivityType;
   isSelected: boolean;
   isHovered: boolean;
   isEditing: boolean;
@@ -23,6 +25,8 @@ interface SchedulerCellProps {
   onMouseUp: () => void;
   editingBy?: OnlineUser[];
   enableQuickDialog?: boolean;
+  canViewActivityDetails?: boolean;
+  isPartnershipView?: boolean;
 }
 
 const SHIFT_TYPE_LABELS: Record<string, string> = {
@@ -44,6 +48,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   date,
   shiftType,
   availabilityStatus,
+  activityType,
   isSelected,
   isHovered,
   isEditing,
@@ -55,9 +60,14 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   onMouseUp,
   editingBy = [],
   enableQuickDialog = false,
+  canViewActivityDetails = true,
+  isPartnershipView = false,
 }) => {
   const cellId = `${userId}:${date}`;
   const isBeingEdited = editingBy.length > 0;
+  
+  // In partnership view for regular team members, hide activity details except shift type
+  const shouldHideActivityDetails = isPartnershipView && !canViewActivityDetails && activityType !== 'work';
   
   return (
     <div
@@ -99,8 +109,11 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
           {SHIFT_TYPE_LABELS[shiftType] || shiftType.charAt(0).toUpperCase()}
         </Badge>
       )}
-      {availabilityStatus === 'unavailable' && (
+      {availabilityStatus === 'unavailable' && !shouldHideActivityDetails && (
         <div className="w-2 h-2 rounded-full bg-destructive" />
+      )}
+      {shouldHideActivityDetails && (
+        <div className="w-2 h-2 rounded-full bg-muted-foreground" title="Unavailable" />
       )}
       
       {/* Collaboration avatars - show who's editing */}

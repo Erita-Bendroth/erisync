@@ -35,6 +35,8 @@ interface TeamSectionProps {
   onCellDragEnd: () => void;
   onSelectAllTeam: () => void;
   showHolidays?: boolean;
+  isPartnershipView?: boolean;
+  canViewActivityDetails?: boolean;
 }
 
 export const TeamSection: React.FC<TeamSectionProps> = ({
@@ -57,6 +59,8 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
   onCellDragEnd,
   onSelectAllTeam,
   showHolidays = true,
+  isPartnershipView = false,
+  canViewActivityDetails = true,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
@@ -131,6 +135,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                       date={date}
                       shiftType={entry?.shift_type || null}
                       availabilityStatus={entry?.availability_status || 'available'}
+                      activityType={entry?.activity_type}
                       isSelected={selectedCells.has(cellId)}
                       isHovered={hoveredCell === cellId}
                       isEditing={editingCell === cellId}
@@ -141,6 +146,8 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                       onMouseDown={() => onCellDragStart(cellId)}
                       onMouseUp={() => onCellDragEnd()}
                       editingBy={cellsBeingEdited[cellId] || []}
+                      isPartnershipView={isPartnershipView}
+                      canViewActivityDetails={canViewActivityDetails}
                     />
                   );
                 })}
