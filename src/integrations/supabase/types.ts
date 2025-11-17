@@ -703,6 +703,103 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_swap_requests: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          reason: string | null
+          requesting_entry_id: string
+          requesting_user_id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["shift_swap_status"]
+          swap_date: string
+          target_entry_id: string
+          target_user_id: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reason?: string | null
+          requesting_entry_id: string
+          requesting_user_id: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["shift_swap_status"]
+          swap_date: string
+          target_entry_id: string
+          target_user_id: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reason?: string | null
+          requesting_entry_id?: string
+          requesting_user_id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["shift_swap_status"]
+          swap_date?: string
+          target_entry_id?: string
+          target_user_id?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_swap_requests_requesting_entry_id_fkey"
+            columns: ["requesting_entry_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_swap_requests_requesting_user_id_fkey"
+            columns: ["requesting_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "shift_swap_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "shift_swap_requests_target_entry_id_fkey"
+            columns: ["target_entry_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_swap_requests_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "shift_swap_requests_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_time_definitions: {
         Row: {
           created_at: string
@@ -1600,6 +1697,12 @@ export type Database = {
       app_role: "manager" | "planner" | "teammember" | "admin"
       availability_status: "available" | "unavailable"
       duty_type: "weekend" | "lateshift" | "earlyshift"
+      shift_swap_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "cancelled"
+        | "expired"
       shift_type: "early" | "late" | "normal" | "weekend"
     }
     CompositeTypes: {
@@ -1741,6 +1844,13 @@ export const Constants = {
       app_role: ["manager", "planner", "teammember", "admin"],
       availability_status: ["available", "unavailable"],
       duty_type: ["weekend", "lateshift", "earlyshift"],
+      shift_swap_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "cancelled",
+        "expired",
+      ],
       shift_type: ["early", "late", "normal", "weekend"],
     },
   },
