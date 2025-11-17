@@ -138,23 +138,27 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
   const handleCellMouseDown = (cellId: string) => {
     setDragStartCell(cellId);
     setIsDragging(false);
-    if (!isLongRange) {
-      onCellDragStart(cellId);
-    }
+    // Always trigger drag start for both modes
+    onCellDragStart(cellId);
   };
 
   const handleCellMouseMove = (cellId: string) => {
-    if (dragStartCell && dragStartCell !== cellId) {
-      setIsDragging(true);
+    if (dragStartCell) {
+      if (dragStartCell !== cellId) {
+        setIsDragging(true);
+      }
+      // Always call hover handler to build selection
+      onCellHover(cellId);
     }
-    onCellHover(cellId);
   };
 
   const handleCellMouseUp = () => {
-    if (isDragging && isLongRange) {
-      // User was dragging - trigger drag end
+    if (isDragging) {
+      // User was dragging - trigger drag end for both modes
       onCellDragEnd();
     }
+    // Reset drag state
+    setDragStartCell(null);
     // Note: handleCellClick will be called after this, and it checks isDragging
   };
 
@@ -209,7 +213,7 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     return acc;
   }, {} as Record<string, number>);
 
-  const cellWidth = isLongRange ? 'minmax(60px, 1fr)' : 'minmax(80px, 1fr)';
+  const cellWidth = isLongRange ? '80px' : 'minmax(80px, 1fr)';
 
   return (
     <div className="border border-border rounded-lg overflow-x-auto overflow-y-hidden">
