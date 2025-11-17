@@ -61,18 +61,8 @@ export const useShiftTypes = (teamIds: string[]) => {
 
       const allShifts = [...teamSpecific, ...global];
 
-      // Deduplicate by shift_type to prevent duplicate keys
-      const seenTypes = new Set<ShiftType>();
-      const uniqueShifts = allShifts.filter(shift => {
-        if (seenTypes.has(shift.type)) {
-          return false;
-        }
-        seenTypes.add(shift.type);
-        return true;
-      });
-
       // If no specific definitions found, add defaults
-      if (uniqueShifts.length === 0) {
+      if (allShifts.length === 0) {
         const defaults: ShiftTypeOption[] = ['early', 'late', 'normal', 'weekend'].map((type) => ({
           id: `default-${type}`,
           type: type as ShiftType,
@@ -81,7 +71,7 @@ export const useShiftTypes = (teamIds: string[]) => {
         }));
         setShiftTypes(defaults);
       } else {
-        setShiftTypes(uniqueShifts);
+        setShiftTypes(allShifts);
       }
     } catch (error) {
       console.error('Error fetching shift types:', error);
