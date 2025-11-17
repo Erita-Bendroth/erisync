@@ -84,6 +84,12 @@ const germanStates = [
   { code: 'TH', name: 'Thuringia (Thüringen)' },
 ];
 
+const ukRegions = [
+  { code: 'GB-ENG', name: 'England & Wales' },
+  { code: 'GB-SCT', name: 'Scotland' },
+  { code: 'GB-NIR', name: 'Northern Ireland' },
+];
+
 const CountrySelector = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -191,7 +197,8 @@ const CountrySelector = () => {
 
       // Automatically import holidays for current and next year
       try {
-        await importHolidaysForYears(currentCountry, currentCountry === 'DE' ? currentRegion : null);
+        const regionToImport = (currentCountry === 'DE' || currentCountry === 'GB') ? currentRegion : null;
+        await importHolidaysForYears(currentCountry, regionToImport);
       } catch (importError) {
         console.error('Error importing holidays:', importError);
         // Don't block the user flow - they can manually import later
@@ -213,7 +220,13 @@ const CountrySelector = () => {
   };
 
   const getRegionName = (code: string) => {
-    return germanStates.find(s => s.code === code)?.name || code;
+    const germanState = germanStates.find(s => s.code === code);
+    if (germanState) return germanState.name;
+    
+    const ukRegion = ukRegions.find(r => r.code === code);
+    if (ukRegion) return ukRegion.name;
+    
+    return code;
   };
 
   return (
@@ -267,12 +280,36 @@ const CountrySelector = () => {
             </p>
           </div>
         )}
+
+        {currentCountry === 'GB' && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center">
+              <MapPin className="w-4 h-4 mr-1" />
+              UK Region
+            </label>
+            <Select value={currentRegion} onValueChange={setCurrentRegion}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select your region..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ukRegions.map((region) => (
+                  <SelectItem key={region.code} value={region.code}>
+                    {region.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              This ensures region-specific holidays like St Andrew's Day (Scotland) or St Patrick's Day (Northern Ireland) are correctly applied.
+            </p>
+          </div>
+        )}
         
         <div className="flex items-center justify-between pt-2">
           <div className="text-sm text-muted-foreground">
             <p>Country: {getCountryName(currentCountry)}</p>
-            {currentCountry === 'DE' && currentRegion && (
-              <p>State: {getRegionName(currentRegion)}</p>
+            {(currentCountry === 'DE' || currentCountry === 'GB') && currentRegion && (
+              <p>Region: {getRegionName(currentRegion)}</p>
             )}
           </div>
           <Button onClick={updateCountry} disabled={loading}>
