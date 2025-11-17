@@ -584,6 +584,7 @@ const Schedule = () => {
             {/* Integrated Co-Planning Calendar */}
             <IntegratedPlanningCalendar 
               onScheduleUpdate={() => setScheduleRefreshKey(prev => prev + 1)}
+              onCreatePartnership={() => setPartnershipDialogOpen(true)}
             />
           </TabsContent>
 

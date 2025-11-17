@@ -42,6 +42,7 @@ interface ScheduleEntry {
 
 interface IntegratedPlanningCalendarProps {
   onScheduleUpdate?: () => void;
+  onCreatePartnership?: () => void;
 }
 
 interface QuickScheduleData {
@@ -58,7 +59,7 @@ interface SelectedCell {
   teamId: string;
 }
 
-export function IntegratedPlanningCalendar({ onScheduleUpdate }: IntegratedPlanningCalendarProps) {
+export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnership }: IntegratedPlanningCalendarProps) {
   const { user } = useAuth();
   const [partnerships, setPartnerships] = useState<PlanningPartnership[]>([]);
   const [selectedPartnershipId, setSelectedPartnershipId] = useState<string>('');
@@ -287,8 +288,45 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate }: IntegratedPlann
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
+  // Show empty state if no partnerships exist
   if (partnerships.length === 0) {
-    return null; // Hide if no partnerships
+    return (
+      <Card className="border-primary/20">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">Co-Planning Calendar</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="py-8">
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-primary/10 p-4">
+                <Users className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg mb-2">No Planning Partnerships Yet</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Planning partnerships allow multiple teams to coordinate schedules together, 
+                seeing availability without compromising privacy on activity details.
+              </p>
+            </div>
+            {(isAdmin || isPlanner || isManager) && (
+              <Button variant="outline" onClick={onCreatePartnership}>
+                <Users className="h-4 w-4 mr-2" />
+                Create Your First Partnership
+              </Button>
+            )}
+            {!(isAdmin || isPlanner || isManager) && (
+              <p className="text-sm text-muted-foreground">
+                Contact your manager or planner to set up co-planning partnerships.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const selectedPartnership = partnerships.find(p => p.id === selectedPartnershipId);
