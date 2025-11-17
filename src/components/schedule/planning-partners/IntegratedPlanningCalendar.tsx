@@ -80,7 +80,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
   });
   const [teamNames, setTeamNames] = useState<Map<string, string>>(new Map());
 
-  const { isAdmin, isPlanner, isManager, editableTeams } = useScheduleAccessControl({ viewMode: 'standard' });
+  const { isAdmin, isPlanner, isManager, editableTeams, canViewActivityDetails } = useScheduleAccessControl({ viewMode: 'multi-team' });
 
   useEffect(() => {
     if (user) {
@@ -477,19 +477,23 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
 
                 {/* Team Sections */}
                 <div className="space-y-3">
-                  {Array.from(teamGroups.entries()).map(([teamId, members]) => (
-                    <TeamSection
-                      key={teamId}
-                      teamId={teamId}
-                      teamName={teamNames.get(teamId) || 'Unknown Team'}
-                      teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
-                      members={members}
-                      scheduleEntries={scheduleEntries}
-                      weekDates={weekDays}
-                      onCellClick={handleCellClick}
-                      canScheduleUser={canScheduleUser}
-                    />
-                  ))}
+                  {Array.from(teamGroups.entries()).map(([teamId, members]) => {
+                    console.log(`Rendering team ${teamNames.get(teamId)} (${teamId}) with ${members.length} members`);
+                    return (
+                      <TeamSection
+                        key={teamId}
+                        teamId={teamId}
+                        teamName={teamNames.get(teamId) || 'Unknown Team'}
+                        teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
+                        members={members}
+                        scheduleEntries={scheduleEntries}
+                        weekDates={weekDays}
+                        onCellClick={handleCellClick}
+                        canScheduleUser={canScheduleUser}
+                        canViewActivityDetails={canViewActivityDetails(user?.id || '')}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}

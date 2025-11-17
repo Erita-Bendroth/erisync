@@ -33,6 +33,7 @@ interface TeamSectionProps {
   weekDates: Date[];
   onCellClick: (userId: string, date: Date, teamId: string) => void;
   canScheduleUser: (userId: string, teamId: string) => boolean;
+  canViewActivityDetails?: boolean;
 }
 
 const getShiftBadgeColor = (shiftType: string) => {
@@ -55,15 +56,16 @@ const getShiftLabel = (shiftType: string) => {
   }
 };
 
-export function TeamSection({
+export function TeamSection({ 
   teamId,
-  teamName,
+  teamName, 
   teamColor,
-  members,
-  scheduleEntries,
+  members, 
+  scheduleEntries, 
   weekDates,
   onCellClick,
-  canScheduleUser
+  canScheduleUser,
+  canViewActivityDetails = false
 }: TeamSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -102,9 +104,8 @@ export function TeamSection({
           <table className="w-full">
             <tbody>
               {members.map((member) => {
-                const displayName = member.profiles 
-                  ? `${member.profiles.first_name} ${member.profiles.last_name}`
-                  : 'Unknown User';
+  // Use first_name which contains initials (e.g., "MAKAT", "ALREF")
+  const displayName = member.profiles?.first_name || 'Unknown';
                 
                 return (
                 <tr key={member.user_id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
@@ -156,11 +157,12 @@ export function TeamSection({
                                 {getShiftLabel(availability.shift_type)}
                               </Badge>
                             )}
-                            {availability.activity_type && availability.availability_status === 'unavailable' && (
-                              <span className="text-xs text-muted-foreground capitalize">
-                                {availability.activity_type}
-                              </span>
-                            )}
+                      {/* Only show activity types if user has permission */}
+                      {canViewActivityDetails && availability.activity_type && availability.availability_status === 'unavailable' && (
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {availability.activity_type}
+                        </span>
+                      )}
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
