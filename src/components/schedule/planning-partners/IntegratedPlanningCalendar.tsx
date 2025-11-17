@@ -159,7 +159,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
         .select(`
           user_id,
           team_id,
-          profiles!user_id(first_name, last_name)
+          profiles!team_members_user_id_fkey(first_name, last_name)
         `)
         .in('team_id', partnership.team_ids);
 
