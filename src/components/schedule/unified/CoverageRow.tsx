@@ -60,7 +60,7 @@ export const CoverageRow: React.FC<CoverageRowProps> = ({
         <div className="flex items-center px-4 py-2 font-semibold text-sm border-r border-border">
           Coverage
         </div>
-        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '80px' : 'minmax(80px, 1fr)'})` }}>
           {dates.map((date) => {
             const count = scheduledCounts[date] || 0;
             const level = getCoverageLevel(count, teamSize);
