@@ -8,10 +8,25 @@ type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
 type AvailabilityStatus = Database['public']['Enums']['availability_status'];
 
+interface TeamMember {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+}
+
+interface TeamSection {
+  teamId: string;
+  teamName: string;
+  members: TeamMember[];
+  color: string;
+}
+
 export const useSchedulerActions = (
   scheduleEntries: ScheduleEntry[],
   onUpdate: (entries: ScheduleEntry[]) => void,
-  userId: string
+  userId: string,
+  teamSections: TeamSection[]
 ) => {
   const { toast } = useToast();
 
@@ -38,8 +53,7 @@ export const useSchedulerActions = (
 
   const pastePattern = useCallback(async (
     pattern: ShiftPattern[],
-    targetCellIds: string[],
-    teamId: string
+    targetCellIds: string[]
   ) => {
     if (pattern.length === 0 || targetCellIds.length === 0) return;
 
@@ -54,7 +68,16 @@ export const useSchedulerActions = (
       
       targetCellIds.forEach(cellId => {
         const [user_id, date] = cellId.split(':');
-        const cellDate = new Date(date);
+        
+        // Find which team this user belongs to
+        const userTeam = teamSections.find(section =>
+          section.members.some(m => m.user_id === user_id)
+        );
+        
+        if (!userTeam) {
+          console.warn(`User ${user_id} not found in any team section`);
+          return;
+        }
         
         // Find matching pattern entry based on relative position
         const patternEntry = pattern.find(p => {
@@ -67,7 +90,7 @@ export const useSchedulerActions = (
         if (patternEntry) {
           newEntries.push({
             user_id,
-            team_id: teamId,
+            team_id: userTeam.teamId,
             date,
             shift_type: patternEntry.shift_type,
             activity_type: patternEntry.activity_type,
@@ -119,22 +142,32 @@ export const useSchedulerActions = (
 
   const bulkAssignShift = useCallback(async (
     cellIds: string[],
-    shiftType: ShiftType,
-    teamId: string
+    shiftType: ShiftType
   ) => {
     try {
       const newEntries: ScheduleEntry[] = cellIds.map(cellId => {
         const [user_id, date] = cellId.split(':');
+        
+        // Find which team this user belongs to
+        const userTeam = teamSections.find(section =>
+          section.members.some(m => m.user_id === user_id)
+        );
+        
+        if (!userTeam) {
+          console.warn(`User ${user_id} not found in any team section`);
+          return null;
+        }
+        
         return {
           user_id,
-          team_id: teamId,
+          team_id: userTeam.teamId,
           date,
           shift_type: shiftType,
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
           notes: 'Bulk assigned',
         };
-      });
+      }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
       
       // Optimistic update
       const updatedEntries = [...scheduleEntries];
@@ -174,14 +207,25 @@ export const useSchedulerActions = (
         variant: "destructive",
       });
     }
-  }, [scheduleEntries, onUpdate, userId, toast]);
+  }, [scheduleEntries, onUpdate, userId, toast, teamSections]);
 
-  const clearCells = useCallback(async (cellIds: string[], teamId: string) => {
+  const clearCells = useCallback(async (cellIds: string[]) => {
     try {
       const deletions = cellIds.map(cellId => {
         const [user_id, date] = cellId.split(':');
-        return { user_id, date, team_id: teamId };
-      });
+        
+        // Find which team this user belongs to
+        const userTeam = teamSections.find(section =>
+          section.members.some(m => m.user_id === user_id)
+        );
+        
+        if (!userTeam) {
+          console.warn(`User ${user_id} not found in any team section`);
+          return null;
+        }
+        
+        return { user_id, date, team_id: userTeam.teamId };
+      }).filter((deletion): deletion is { user_id: string; date: string; team_id: string } => deletion !== null);
       
       // Optimistic update
       const updatedEntries = scheduleEntries.filter(entry => 
@@ -211,7 +255,7 @@ export const useSchedulerActions = (
         variant: "destructive",
       });
     }
-  }, [scheduleEntries, onUpdate, toast]);
+  }, [scheduleEntries, onUpdate, toast, teamSections]);
 
   return {
     copyPattern,
