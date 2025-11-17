@@ -2,35 +2,49 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ShiftTypeOption } from '@/hooks/useShiftTypes';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
+import { ShiftDistributionPopover } from './ShiftDistributionPopover';
+
+interface TeamMember {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+}
+
+interface TeamSectionData {
+  teamId: string;
+  teamName: string;
+  members: TeamMember[];
+  color: string;
+}
 
 interface ShiftTypeCounterRowProps {
   dates: string[];
   scheduleEntries: ScheduleEntry[];
   shiftTypes: ShiftTypeOption[];
+  teamSections?: TeamSectionData[];
 }
 
 export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
   dates,
   scheduleEntries,
   shiftTypes,
+  teamSections,
 }) => {
   const countShiftTypes = (date: string): Record<string, number> => {
     const counts: Record<string, number> = {};
-    const uniqueEntries = new Map<string, ScheduleEntry>();
+    const uniqueKeys = new Set<string>();
     
-    // Deduplicate entries by ID to prevent duplicate counting
+    // Deduplicate by user_id + date + shift_type to prevent duplicate counting
     scheduleEntries
       .filter((e) => e.date === date && e.shift_type && e.activity_type === 'work')
       .forEach((e) => {
-        if (!uniqueEntries.has(e.id)) {
-          uniqueEntries.set(e.id, e);
+        const key = `${e.user_id}-${e.date}-${e.shift_type}`;
+        if (!uniqueKeys.has(key)) {
+          uniqueKeys.add(key);
+          counts[e.shift_type!] = (counts[e.shift_type!] || 0) + 1;
         }
       });
-    
-    // Count unique entries
-    uniqueEntries.forEach((entry) => {
-      counts[entry.shift_type!] = (counts[entry.shift_type!] || 0) + 1;
-    });
     
     return counts;
   };
@@ -69,26 +83,34 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
           const hasShifts = Object.keys(counts).length > 0;
 
           return (
-            <div
+            <ShiftDistributionPopover
               key={date}
-              className="px-2 py-2 border-r border-border flex flex-wrap gap-1 justify-center items-center min-h-[48px]"
+              date={date}
+              scheduleEntries={scheduleEntries}
+              shiftTypes={shiftTypes}
+              teamSections={teamSections}
+              showTeamBreakdown={!!teamSections}
             >
-              {hasShifts ? (
-                shiftTypes.map((shift) =>
-                  counts[shift.type] > 0 ? (
-                    <Badge
-                      key={shift.type}
-                      variant="outline"
-                      className={`text-xs px-1.5 py-0.5 ${getShiftColor(shift.type)}`}
-                    >
-                      {getShiftLabel(shift.type)}: {counts[shift.type]}
-                    </Badge>
-                  ) : null
-                )
-              ) : (
-                <span className="text-xs text-muted-foreground">-</span>
-              )}
-            </div>
+              <div
+                className="px-2 py-2 border-r border-border flex flex-wrap gap-1 justify-center items-center min-h-[48px] cursor-help hover:bg-accent/50 transition-colors"
+              >
+                {hasShifts ? (
+                  shiftTypes.map((shift) =>
+                    counts[shift.type] > 0 ? (
+                      <Badge
+                        key={shift.type}
+                        variant="outline"
+                        className={`text-xs px-1.5 py-0.5 ${getShiftColor(shift.type)}`}
+                      >
+                        {getShiftLabel(shift.type)}: {counts[shift.type]}
+                      </Badge>
+                    ) : null
+                  )
+                ) : (
+                  <span className="text-xs text-muted-foreground">-</span>
+                )}
+              </div>
+            </ShiftDistributionPopover>
           );
         })}
       </div>

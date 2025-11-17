@@ -146,6 +146,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
               dates={weekDates}
               scheduleEntries={scheduleEntries.filter(e => weekDates.includes(e.date))}
               shiftTypes={shiftTypes}
+              teamSections={teamSections}
             />
 
             {/* Team Sections */}
