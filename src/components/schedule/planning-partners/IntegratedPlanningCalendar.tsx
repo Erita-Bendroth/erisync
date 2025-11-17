@@ -176,17 +176,8 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
 
       if (scheduleError) throw scheduleError;
 
-      // Filter out members without profiles to prevent null reference errors
-      const validMembers = (membersData || []).filter(member => {
-        if (!member.profiles) {
-          console.warn('Team member missing profile data:', member.user_id);
-          return false;
-        }
-        return true;
-      });
-
-      console.log('Fetched team members:', validMembers.length);
-      setTeamMembers(validMembers);
+      console.log('Fetched team members:', membersData?.length || 0);
+      setTeamMembers(membersData || []);
       setScheduleEntries(scheduleData || []);
     } catch (error) {
       console.error('Error fetching partnership data:', error);
@@ -428,7 +419,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                           <td className="p-3">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">
-                                {member.profiles?.first_name || 'Unknown'} {member.profiles?.last_name || 'User'}
+                                {member.profiles.first_name} {member.profiles.last_name}
                               </span>
                               <Badge variant="outline" className="text-xs">
                                 {teamNames.get(member.team_id) || 'Unknown Team'}
