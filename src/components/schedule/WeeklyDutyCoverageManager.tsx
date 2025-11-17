@@ -788,11 +788,17 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       return;
     }
 
+  const saveCustomLayout = async () => {
+    if (!selectedTemplate) {
+      toast({ title: "Error", description: "No template selected", variant: "destructive" });
+      return null;
+    }
+
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
 
     const templateData = {
-      source_template_id: selectedTemplate,
+      source_template_id: selectedTemplate || null,
       week_number: currentWeek,
       year: currentYear,
       template_name: customLayoutName || `Week ${currentWeek} Layout`,
@@ -806,13 +812,19 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       created_by: user?.id,
     };
 
-    // Use UPSERT to avoid 409 conflicts
+    // Delete existing record if it exists, then insert new one
+    // This avoids issues with NULL values in unique constraints
+    await supabase
+      .from('custom_duty_email_templates')
+      .delete()
+      .eq('source_template_id', selectedTemplate)
+      .eq('week_number', currentWeek)
+      .eq('year', currentYear)
+      .eq('mode', 'hybrid');
+
     const { data, error } = await supabase
       .from('custom_duty_email_templates')
-      .upsert(templateData, {
-        onConflict: 'source_template_id,week_number,year,mode',
-        ignoreDuplicates: false
-      })
+      .insert([templateData])
       .select()
       .single();
 
@@ -821,14 +833,18 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
     if (error) {
       console.error('Save error:', error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
+      return null;
     } else if (data) {
       setCustomTemplateId(data.id);
       await fetchAvailableCustomLayouts(selectedTemplate);
       toast({ 
         title: "Success", 
-        description: `Custom layout saved as new for Week ${currentWeek}, ${currentYear}` 
+        description: `Custom layout saved for Week ${currentWeek}, ${currentYear}` 
       });
+      return data.id;
     }
+    return null;
+  };
   };
 
   const deleteCustomLayout = async (layoutId: string) => {
