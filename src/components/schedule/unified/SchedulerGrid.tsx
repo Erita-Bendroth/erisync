@@ -4,6 +4,7 @@ import { SchedulerCell } from './SchedulerCell';
 import { InlineEditPopover } from './InlineEditPopover';
 import { CoverageRow } from './CoverageRow';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
+import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
@@ -36,6 +37,7 @@ interface SchedulerGridProps {
   onUpdateEntry: (entry: ScheduleEntry) => void;
   teamId: string;
   currentUserId: string;
+  cellsBeingEdited: Record<string, OnlineUser[]>;
 }
 
 export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
@@ -55,6 +57,7 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
   onUpdateEntry,
   teamId,
   currentUserId,
+  cellsBeingEdited,
 }) => {
   const { toast } = useToast();
   const [editPopoverOpen, setEditPopoverOpen] = useState(false);
@@ -194,6 +197,7 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
                   onMouseEnter={() => onCellHover(cellId)}
                   onMouseLeave={() => onCellHover(null)}
                   onMouseDown={() => onCellDragStart(cellId)}
+                  editingBy={cellsBeingEdited[cellId] || []}
                 />
               );
             })}

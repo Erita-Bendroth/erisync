@@ -2,6 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
+import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type AvailabilityStatus = Database['public']['Enums']['availability_status'];
@@ -19,6 +20,7 @@ interface SchedulerCellProps {
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onMouseDown: () => void;
+  editingBy?: OnlineUser[];
 }
 
 const SHIFT_TYPE_LABELS: Record<string, string> = {
@@ -48,8 +50,10 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
+  editingBy = [],
 }) => {
   const cellId = `${userId}:${date}`;
+  const isBeingEdited = editingBy.length > 0;
   
   return (
     <div
@@ -59,8 +63,17 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
         isSelected && 'bg-accent',
         isHovered && !isSelected && 'bg-muted',
         isEditing && 'ring-2 ring-ring',
-        availabilityStatus === 'unavailable' && 'bg-destructive/10'
+        availabilityStatus === 'unavailable' && 'bg-destructive/10',
+        isBeingEdited && 'ring-2 ring-offset-1'
       )}
+      style={
+        isBeingEdited
+          ? {
+              // @ts-ignore - Custom property for ring color
+              '--tw-ring-color': editingBy[0].color,
+            }
+          : undefined
+      }
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onMouseEnter={onMouseEnter}
@@ -81,6 +94,31 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
       )}
       {availabilityStatus === 'unavailable' && (
         <div className="w-2 h-2 rounded-full bg-destructive" />
+      )}
+      
+      {/* Collaboration avatars - show who's editing */}
+      {isBeingEdited && (
+        <div className="absolute -top-1 -right-1 flex -space-x-1">
+          {editingBy.slice(0, 2).map((user) => (
+            <div
+              key={user.user_id}
+              className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
+              style={{ backgroundColor: user.color }}
+              title={`${user.first_name} ${user.last_name} is editing`}
+            >
+              {user.initials}
+            </div>
+          ))}
+          {editingBy.length > 2 && (
+            <div
+              className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
+              style={{ backgroundColor: 'hsl(var(--muted-foreground))' }}
+              title={`+${editingBy.length - 2} more`}
+            >
+              +{editingBy.length - 2}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
