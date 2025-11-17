@@ -16,11 +16,22 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
 }) => {
   const countShiftTypes = (date: string): Record<string, number> => {
     const counts: Record<string, number> = {};
+    const uniqueEntries = new Map<string, ScheduleEntry>();
+    
+    // Deduplicate entries by ID to prevent duplicate counting
     scheduleEntries
       .filter((e) => e.date === date && e.shift_type && e.activity_type === 'work')
       .forEach((e) => {
-        counts[e.shift_type!] = (counts[e.shift_type!] || 0) + 1;
+        if (!uniqueEntries.has(e.id)) {
+          uniqueEntries.set(e.id, e);
+        }
       });
+    
+    // Count unique entries
+    uniqueEntries.forEach((entry) => {
+      counts[entry.shift_type!] = (counts[entry.shift_type!] || 0) + 1;
+    });
+    
     return counts;
   };
 
