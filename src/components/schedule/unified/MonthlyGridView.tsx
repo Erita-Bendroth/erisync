@@ -4,6 +4,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
 import { ShiftTypeOption } from '@/hooks/useShiftTypes';
+import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
 
 interface TeamMember {
   user_id: string;
@@ -130,9 +131,16 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                 </div>
               </AccordionTrigger>
 
-              <AccordionContent className="pt-4">
+              <AccordionContent className="pt-0">
+                {/* Shift Type Counter */}
+                <ShiftTypeCounterRow
+                  dates={monthDates}
+                  scheduleEntries={scheduleEntries.filter(e => monthDates.includes(e.date))}
+                  shiftTypes={shiftTypes}
+                />
+                
                 {/* Calendar Grid */}
-                <div className="px-4 pb-4">
+                <div className="px-4 pb-4 pt-4">
                   <div className="grid grid-cols-7 gap-2">
                     {/* Day headers */}
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -176,7 +184,7 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                             </div>
                             {isInRange && dayEntries.length > 0 && (
                               <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
-                                {displayEntries.map(entry => {
+                                 {displayEntries.map(entry => {
                                   const team = teamSections.find(t => 
                                     t.members.some(m => m.user_id === entry.user_id)
                                   );
@@ -184,17 +192,14 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                                   
                                   return (
                                     <div key={entry.id} className="flex items-center gap-0.5 text-[9px] leading-tight">
-                                      {team && (
-                                        <Badge 
-                                          variant="outline" 
-                                          className={`px-0.5 h-3.5 min-w-[24px] text-center ${getTeamColor(team.color)}`}
-                                        >
-                                          {team.teamName.substring(0, 3).toUpperCase()}
-                                        </Badge>
-                                      )}
-                                      <span className="font-medium text-foreground truncate flex-1">
+                                      {/* Person initials with team color background */}
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`px-1 h-3.5 min-w-[20px] text-center font-semibold ${getTeamColor(team?.color || '')}`}
+                                      >
                                         {member?.initials || '??'}
-                                      </span>
+                                      </Badge>
+                                      {/* Shift type indicator */}
                                       {entry.shift_type && (
                                         <Badge 
                                           variant="outline"
