@@ -33,11 +33,6 @@ export function ShiftSwapRequestButton({
     return null;
   }
 
-  // Don't show if user doesn't have a shift on this date
-  if (!currentUserEntryId) {
-    return null;
-  }
-
   // Don't show for past dates
   const shiftDate = new Date(date);
   const today = new Date();
@@ -62,7 +57,6 @@ export function ShiftSwapRequestButton({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         requestingUserId={currentUserId}
-        requestingEntryId={currentUserEntryId}
         targetUserId={targetUserId}
         targetUserName={targetUserName}
         targetEntryId={targetEntryId}

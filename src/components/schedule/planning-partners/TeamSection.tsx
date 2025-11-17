@@ -169,13 +169,6 @@ export function TeamSection({
                                   shiftType={availability.shift_type}
                                   teamId={teamId}
                                   currentUserId={currentUserId}
-                                  currentUserEntryId={
-                                    scheduleEntries.find(e => 
-                                      e.user_id === currentUserId && 
-                                      e.date === format(date, 'yyyy-MM-dd') &&
-                                      e.availability_status === 'available'
-                                    )?.id
-                                  }
                                 />
                               </>
                             )}
