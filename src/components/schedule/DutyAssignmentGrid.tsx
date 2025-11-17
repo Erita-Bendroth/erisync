@@ -57,6 +57,7 @@ export function DutyAssignmentGrid({
   const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
 
   useEffect(() => {
+    console.log('[DutyAssignmentGrid] teamIds changed:', teamIds, 'weekNumber:', weekNumber, 'year:', year);
     fetchTeamMembers();
     fetchShiftTimeDefinitions();
     calculateWeekDates();
@@ -157,6 +158,16 @@ export function DutyAssignmentGrid({
         });
         
         shiftTypes.add(shiftType);
+      });
+      
+      console.log('[DutyAssignmentGrid] Fetching scheduled users:', {
+        teamIds,
+        startDate,
+        endDate,
+        dataLength: data?.length,
+        workEntriesLength: workEntries.length,
+        scheduledUsersMap: Object.keys(map).length,
+        map
       });
       
       setScheduledUsers(map);
@@ -364,7 +375,7 @@ export function DutyAssignmentGrid({
     }
   };
 
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const renderDutySection = (title: string, dutyType: 'weekend' | 'lateshift' | 'earlyshift', dates: Date[]) => (
     <Card className="mb-4">
@@ -394,7 +405,7 @@ export function DutyAssignmentGrid({
                 return (
                   <tr key={date.toISOString()} className="border-b hover:bg-muted/50">
                     <td className="p-2 text-sm">{date.toLocaleDateString('en-GB')}</td>
-                    <td className="p-2 text-sm">{dayNames[date.getDay()]}</td>
+                    <td className="p-2 text-sm">{dayNames[(date.getDay() + 6) % 7]}</td>
                     <td className="p-2 text-sm">
                       <div className="font-medium text-primary">
                         {scheduledInitials || <span className="text-muted-foreground">-</span>}
@@ -492,13 +503,14 @@ export function DutyAssignmentGrid({
     availableShiftTypes.size === 0
   );
 
-  // Show alert when no teams are selected
-  if (teamIds.length === 0) {
+  // Show proper empty state if teams selected but no data
+  if (teamIds.length > 0 && weekDates.length > 0 && Object.keys(scheduledUsers).length === 0) {
     return (
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Please select teams in the <strong>Template Setup</strong> tab to view duty assignments and scheduled personnel.
+          No scheduled team members found for week {weekNumber}, {year}. 
+          Make sure team members are scheduled in the main schedule view for the selected teams.
         </AlertDescription>
       </Alert>
     );
