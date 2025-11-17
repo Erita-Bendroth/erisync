@@ -81,6 +81,10 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     date: string;
   } | null>(null);
 
+  // Drag detection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartCell, setDragStartCell] = useState<string | null>(null);
+
   const getEntry = (userId: string, date: string) => {
     return scheduleEntries.find(e => e.user_id === userId && e.date === date);
   };
@@ -89,17 +93,22 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     const cellId = `${userId}:${date}`;
     
     if (isLongRange) {
-      // Long range: Open quick dialog on single click
-      const member = teamMembers.find(m => m.user_id === userId);
-      if (member) {
-        setQuickDialogData({
-          userId,
-          userName: `${member.first_name} ${member.last_name}`,
-          userInitials: member.initials || `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`,
-          date,
-        });
-        setQuickDialogOpen(true);
+      // Only open dialog if this was a true click (not after dragging)
+      if (!isDragging) {
+        const member = teamMembers.find(m => m.user_id === userId);
+        if (member) {
+          setQuickDialogData({
+            userId,
+            userName: `${member.first_name} ${member.last_name}`,
+            userInitials: member.initials || `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`,
+            date,
+          });
+          setQuickDialogOpen(true);
+        }
       }
+      // Reset dragging state
+      setIsDragging(false);
+      setDragStartCell(null);
     } else {
       // Short range: Use existing selection logic
       onCellClick(cellId);
@@ -177,14 +186,17 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     return acc;
   }, {} as Record<string, number>);
 
+  // Narrower cells for long ranges to fit more on screen
+  const cellWidth = isLongRange ? 'minmax(60px, 1fr)' : 'minmax(80px, 1fr)';
+
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className="border border-border rounded-lg overflow-x-auto overflow-y-hidden">
       {/* Header */}
       <div className="grid grid-cols-[200px_1fr] bg-muted">
         <div className="flex items-center px-4 py-3 font-semibold border-r border-b border-border">
           Team Member
         </div>
-        <div className="grid gap-0 border-b border-border" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+        <div className="grid gap-0 border-b border-border" style={{ gridTemplateColumns: `repeat(${dates.length}, ${cellWidth})` }}>
           {dates.map((date) => {
             const dateObj = new Date(date);
             return (
