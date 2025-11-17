@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SchedulerCell } from './SchedulerCell';
 import { InlineEditPopover } from './InlineEditPopover';
+import { QuickScheduleDialog } from './QuickScheduleDialog';
 import { CoverageRow } from './CoverageRow';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
 import type { OnlineUser } from '@/hooks/useSchedulerPresence';
@@ -60,10 +61,23 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
   cellsBeingEdited,
 }) => {
   const { toast } = useToast();
+  
+  // Determine if we should use quick dialog (for long date ranges)
+  const isLongRange = dates.length > 14; // More than 2 weeks
+  
   const [editPopoverOpen, setEditPopoverOpen] = useState(false);
   const [editingCellData, setEditingCellData] = useState<{
     userId: string;
     userName: string;
+    date: string;
+  } | null>(null);
+  
+  // Quick dialog state for long ranges
+  const [quickDialogOpen, setQuickDialogOpen] = useState(false);
+  const [quickDialogData, setQuickDialogData] = useState<{
+    userId: string;
+    userName: string;
+    userInitials: string;
     date: string;
   } | null>(null);
 
@@ -71,7 +85,35 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     return scheduleEntries.find(e => e.user_id === userId && e.date === date);
   };
 
+  const handleCellClick = (userId: string, date: string) => {
+    const cellId = `${userId}:${date}`;
+    
+    if (isLongRange) {
+      // Long range: Open quick dialog on single click
+      const member = teamMembers.find(m => m.user_id === userId);
+      if (member) {
+        setQuickDialogData({
+          userId,
+          userName: `${member.first_name} ${member.last_name}`,
+          userInitials: member.initials || `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`,
+          date,
+        });
+        setQuickDialogOpen(true);
+      }
+    } else {
+      // Short range: Use existing selection logic
+      onCellClick(cellId);
+    }
+  };
+
   const handleCellDoubleClick = (userId: string, date: string) => {
+    if (isLongRange) {
+      // In long range mode, double-click does same as single click
+      handleCellClick(userId, date);
+      return;
+    }
+    
+    // Short range: Open popover
     const member = teamMembers.find(m => m.user_id === userId);
     if (member) {
       setEditingCellData({
@@ -192,12 +234,13 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
                   isSelected={selectedCells.has(cellId)}
                   isHovered={hoveredCell === cellId}
                   isEditing={editingCell === cellId}
-                  onClick={() => onCellClick(cellId)}
+                  onClick={() => handleCellClick(member.user_id, date)}
                   onDoubleClick={() => handleCellDoubleClick(member.user_id, date)}
-                  onMouseEnter={() => onCellHover(cellId)}
-                  onMouseLeave={() => onCellHover(null)}
-                  onMouseDown={() => onCellDragStart(cellId)}
+                  onMouseEnter={() => !isLongRange && onCellHover(cellId)}
+                  onMouseLeave={() => !isLongRange && onCellHover(null)}
+                  onMouseDown={() => !isLongRange && onCellDragStart(cellId)}
                   editingBy={cellsBeingEdited[cellId] || []}
+                  enableQuickDialog={isLongRange}
                 />
               );
             })}
@@ -212,8 +255,8 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
         scheduledCounts={scheduledCounts}
       />
 
-      {/* Edit Popover */}
-      {editingCellData && (
+      {/* Edit Popover (for short ranges) */}
+      {!isLongRange && editingCellData && (
         <InlineEditPopover
           open={editPopoverOpen}
           onOpenChange={setEditPopoverOpen}
@@ -228,6 +271,22 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
         >
           <div />
         </InlineEditPopover>
+      )}
+      
+      {/* Quick Dialog (for long ranges) */}
+      {isLongRange && quickDialogData && (
+        <QuickScheduleDialog
+          open={quickDialogOpen}
+          onOpenChange={setQuickDialogOpen}
+          userId={quickDialogData.userId}
+          userName={quickDialogData.userName}
+          userInitials={quickDialogData.userInitials}
+          date={quickDialogData.date}
+          teamId={teamId}
+          teamName="Team"
+          currentEntry={getEntry(quickDialogData.userId, quickDialogData.date)}
+          onSave={handleSaveEdit}
+        />
       )}
     </div>
   );
