@@ -276,6 +276,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
         
         if (member && teamId) {
           setEditingEntry({
+            id: `temp-${userId}-${date}`,
             user_id: userId,
             team_id: teamId,
             date: date,
