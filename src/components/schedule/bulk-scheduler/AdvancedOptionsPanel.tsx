@@ -113,25 +113,36 @@ export const AdvancedOptionsPanel = ({
         </div>
 
         {advanced.rotationEnabled && (
-          <div className="pl-6">
+          <div className="pl-6 space-y-2">
             <Label className="text-xs">Pattern</Label>
             <RadioGroup
               value={advanced.rotationPattern}
               onValueChange={(value: 'sequential' | 'random') =>
                 onAdvancedChange({ ...advanced, rotationPattern: value })
               }
+              className="space-y-3"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="sequential" id="sequential" />
-                <Label htmlFor="sequential" className="cursor-pointer font-normal">
-                  Sequential
-                </Label>
+                <div className="flex-1">
+                  <Label htmlFor="sequential" className="cursor-pointer font-normal">
+                    Sequential
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Assigns shifts in order: Person A → Person B → Person C → repeat
+                  </p>
+                </div>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="random" id="random" />
-                <Label htmlFor="random" className="cursor-pointer font-normal">
-                  Random
-                </Label>
+                <div className="flex-1">
+                  <Label htmlFor="random" className="cursor-pointer font-normal">
+                    Random
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Randomly distributes shifts among selected team members
+                  </p>
+                </div>
               </div>
             </RadioGroup>
           </div>

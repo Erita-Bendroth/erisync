@@ -192,7 +192,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
       <div className="space-y-4">
         <Tabs
           value={config.mode}
-          onValueChange={(value: any) => setConfig({ ...config, mode: value })}
+          onValueChange={(value: any) => setConfig(prev => ({ ...prev, mode: value }))}
         >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="users">Selected People</TabsTrigger>

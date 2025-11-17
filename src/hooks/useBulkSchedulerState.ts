@@ -97,7 +97,7 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
       errors.push('Please select a team');
     }
 
-    if (config.mode === 'users' && config.selectedUserIds.length === 0) {
+    if ((config.mode === 'users' || config.mode === 'rotation') && config.selectedUserIds.length === 0) {
       errors.push('Please select at least one team member');
     }
 
