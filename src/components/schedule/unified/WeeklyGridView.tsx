@@ -63,12 +63,24 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
   partnershipMode,
   partnershipConfig,
 }) => {
-  const weeks = groupIntoWeeks(dates);
+  const weeks = useMemo(() => groupIntoWeeks(dates), [dates]);
 
-  // Calculate coverage metrics for each week
-  const getWeekMetrics = (weekDates: string[]) => {
+  // Memoize visible team IDs to prevent unnecessary recalculations
+  const visibleTeamIds = useMemo(() => 
+    teamSections.map(t => t.teamId), 
+    [teamSections]
+  );
+
+  // Memoize filtered schedule entries for visible teams only
+  const filteredScheduleEntries = useMemo(() => 
+    scheduleEntries.filter(e => visibleTeamIds.includes(e.team_id)),
+    [scheduleEntries, visibleTeamIds]
+  );
+
+  // Calculate coverage metrics for each week (memoized)
+  const getWeekMetrics = useMemo(() => (weekDates: string[]) => {
     const scheduledCounts = weekDates.reduce((acc, date) => {
-      acc[date] = scheduleEntries.filter(
+      acc[date] = filteredScheduleEntries.filter(
         e => e.date === date && e.availability_status === 'available'
       ).length;
       return acc;
@@ -77,7 +89,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
     const teamBreakdowns = weekDates.reduce((acc, date) => {
       acc[date] = teamSections.map(section => ({
         teamName: section.teamName,
-        count: scheduleEntries.filter(
+        count: filteredScheduleEntries.filter(
           e => e.date === date && 
           e.availability_status === 'available' &&
           section.members.some(m => m.user_id === e.user_id)
@@ -91,7 +103,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
     const totalMembers = teamSections.reduce((sum, section) => sum + section.members.length, 0);
 
     return { scheduledCounts, teamBreakdowns, totalMembers };
-  };
+  }, [filteredScheduleEntries, teamSections]);
 
   return (
     <div className="space-y-6 p-4">
@@ -144,7 +156,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
             {/* Shift Counter */}
             <ShiftTypeCounterRow
               dates={weekDates}
-              scheduleEntries={scheduleEntries.filter(e => weekDates.includes(e.date))}
+              scheduleEntries={filteredScheduleEntries.filter(e => weekDates.includes(e.date))}
               shiftTypes={shiftTypes}
               teamSections={teamSections}
             />

@@ -31,23 +31,44 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
   shiftTypes,
   teamSections,
 }) => {
-  const countShiftTypes = (date: string): Record<string, number> => {
+  // Memoize visible team IDs to prevent unnecessary recalculations
+  const visibleTeamIds = React.useMemo(() => 
+    teamSections?.map(t => t.teamId) || [],
+    [teamSections]
+  );
+
+  // Memoize the counting function
+  const countShiftTypes = React.useCallback((date: string): Record<string, number> => {
     const counts: Record<string, number> = {};
     const uniqueKeys = new Set<string>();
     
-    // Deduplicate by user_id + date + shift_type to prevent duplicate counting
-    scheduleEntries
-      .filter((e) => e.date === date && e.shift_type && e.activity_type === 'work')
-      .forEach((e) => {
-        const key = `${e.user_id}-${e.date}-${e.shift_type}`;
-        if (!uniqueKeys.has(key)) {
-          uniqueKeys.add(key);
-          counts[e.shift_type!] = (counts[e.shift_type!] || 0) + 1;
-        }
-      });
+    // Filter and deduplicate by user_id + date + shift_type
+    const filtered = scheduleEntries.filter((e) => 
+      e.date === date && 
+      e.shift_type && 
+      e.activity_type === 'work' &&
+      // Only count entries for visible teams
+      (visibleTeamIds.length === 0 || visibleTeamIds.includes(e.team_id))
+    );
+
+    filtered.forEach((e) => {
+      const key = `${e.user_id}-${e.date}-${e.shift_type}`;
+      if (!uniqueKeys.has(key)) {
+        uniqueKeys.add(key);
+        counts[e.shift_type!] = (counts[e.shift_type!] || 0) + 1;
+      }
+    });
     
     return counts;
-  };
+  }, [scheduleEntries, visibleTeamIds]);
+
+  // Memoize shift counts for all dates
+  const shiftCounts = React.useMemo(() => {
+    return dates.reduce((acc, date) => {
+      acc[date] = countShiftTypes(date);
+      return acc;
+    }, {} as Record<string, Record<string, number>>);
+  }, [dates, countShiftTypes]);
 
   const getShiftColor = (shiftType: string): string => {
     switch (shiftType) {
@@ -79,7 +100,7 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
         style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}
       >
         {dates.map((date) => {
-          const counts = countShiftTypes(date);
+          const counts = shiftCounts[date];
           const hasShifts = Object.keys(counts).length > 0;
 
           return (

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
 import { ShiftTypeOption } from '@/hooks/useShiftTypes';
 import { CalendarDays, Users } from 'lucide-react';
@@ -34,7 +35,7 @@ interface ShiftDetail {
   users: Array<{ userId: string; name: string; initials: string; teamName?: string }>;
 }
 
-export const ShiftDistributionPopover: React.FC<ShiftDistributionPopoverProps> = ({
+const ShiftDistributionPopoverComponent: React.FC<ShiftDistributionPopoverProps> = ({
   date,
   scheduleEntries,
   shiftTypes,
@@ -42,12 +43,24 @@ export const ShiftDistributionPopover: React.FC<ShiftDistributionPopoverProps> =
   children,
   showTeamBreakdown = false,
 }) => {
+  // Memoize visible team IDs
+  const visibleTeamIds = useMemo(() => 
+    teamSections?.map(t => t.teamId) || [],
+    [teamSections]
+  );
+
   const shiftDetails = useMemo(() => {
     const details: Record<string, ShiftDetail> = {};
     const uniqueKeys = new Set<string>();
 
     scheduleEntries
-      .filter((e) => e.date === date && e.shift_type && e.activity_type === 'work')
+      .filter((e) => 
+        e.date === date && 
+        e.shift_type && 
+        e.activity_type === 'work' &&
+        // Only count entries for visible teams
+        (visibleTeamIds.length === 0 || visibleTeamIds.includes(e.team_id))
+      )
       .forEach((entry) => {
         const key = `${entry.user_id}-${entry.date}-${entry.shift_type}`;
         
@@ -77,7 +90,7 @@ export const ShiftDistributionPopover: React.FC<ShiftDistributionPopoverProps> =
       });
 
     return Object.values(details);
-  }, [date, scheduleEntries, teamSections]);
+  }, [date, scheduleEntries, teamSections, visibleTeamIds]);
 
   const getShiftColor = (shiftType: string): string => {
     switch (shiftType) {
@@ -153,3 +166,6 @@ export const ShiftDistributionPopover: React.FC<ShiftDistributionPopoverProps> =
     </HoverCard>
   );
 };
+
+// Wrap with React.memo to prevent unnecessary re-renders
+export const ShiftDistributionPopover = React.memo(ShiftDistributionPopoverComponent);
