@@ -8,7 +8,8 @@ import { groupTeamsByHierarchy } from "@/lib/teamHierarchyUtils";
 
 interface TeamCoverageGridProps {
   teamIds: string[];
-  currentDate: Date;
+  startDate: Date;
+  endDate: Date;
   showHolidays: boolean;
 }
 
@@ -78,21 +79,25 @@ const getCellColor = (
   return 'bg-green-100 dark:bg-green-950/30';
 };
 
-export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCoverageGridProps) {
+export function TeamCoverageGrid({ teamIds, startDate, endDate, showHolidays }: TeamCoverageGridProps) {
   const [coverage, setCoverage] = useState<Record<string, Record<string, DayCoverageCell>>>({});
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // Generate all days in the date range
+  const gridDays: Date[] = [];
+  let currentDay = new Date(startDate);
+  while (currentDay <= endDate) {
+    gridDays.push(new Date(currentDay));
+    currentDay = addDays(currentDay, 1);
+  }
 
   useEffect(() => {
     if (teamIds.length > 0) {
       fetchCoverageData();
     }
-  }, [teamIds, currentDate]);
+  }, [teamIds, startDate, endDate]);
 
   const fetchCoverageData = async () => {
     setLoading(true);
@@ -127,13 +132,13 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
         `)
         .in('team_id', teamIds);
 
-      // Fetch schedule entries
+      // Fetch schedule entries for the entire date range
       const { data: scheduleEntries } = await supabase
         .from('schedule_entries')
         .select('*')
         .in('team_id', teamIds)
-        .gte('date', format(weekStart, 'yyyy-MM-dd'))
-        .lte('date', format(weekEnd, 'yyyy-MM-dd'))
+        .gte('date', format(startDate, 'yyyy-MM-dd'))
+        .lte('date', format(endDate, 'yyyy-MM-dd'))
         .eq('activity_type', 'work');
 
       // Fetch shift definitions
@@ -142,12 +147,12 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
         .select('*')
         .or(`team_id.in.(${teamIds.join(',')}),team_id.is.null`);
 
-      // Fetch holidays
+      // Fetch holidays for the entire date range
       const { data: holidays } = await supabase
         .from('holidays')
         .select('date, name')
-        .gte('date', format(weekStart, 'yyyy-MM-dd'))
-        .lte('date', format(weekEnd, 'yyyy-MM-dd'))
+        .gte('date', format(startDate, 'yyyy-MM-dd'))
+        .lte('date', format(endDate, 'yyyy-MM-dd'))
         .eq('is_public', true);
 
       // Fetch capacity configs
@@ -165,7 +170,7 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
 
       const coverageData: Record<string, Record<string, DayCoverageCell>> = {};
 
-      weekDays.forEach(day => {
+      gridDays.forEach(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const isWeekend = day.getDay() === 0 || day.getDay() === 6;
         const holiday = holidayMap.get(dateStr);
@@ -392,7 +397,7 @@ export function TeamCoverageGrid({ teamIds, currentDate, showHolidays }: TeamCov
             </tr>
           </thead>
           <tbody>
-            {weekDays.map(day => {
+            {gridDays.map(day => {
               const dateStr = format(day, 'yyyy-MM-dd');
               const dayName = format(day, 'EEE');
               const isWeekend = day.getDay() === 0 || day.getDay() === 6;

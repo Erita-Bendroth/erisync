@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, AlertCircle, Info } from 'lucide-react';
@@ -14,6 +15,8 @@ interface CoverageAlertsProps {
 
 export function CoverageAlerts({ analysis, partnershipName, partnershipConfig }: CoverageAlertsProps) {
   const { gaps, belowThreshold, threshold, coveragePercentage } = analysis;
+  const [showAllCritical, setShowAllCritical] = useState(false);
+  const [showAllWarnings, setShowAllWarnings] = useState(false);
 
   // Categorize gaps by severity
   const criticalGaps = gaps.filter((gap) => gap.actual === 0);
@@ -76,7 +79,7 @@ export function CoverageAlerts({ analysis, partnershipName, partnershipConfig }:
             <div className="space-y-2 mt-2">
               <p>The following days have no staff assigned:</p>
               <div className="flex flex-wrap gap-2">
-                {criticalGaps.slice(0, 5).map((gap, index) => (
+                {(showAllCritical ? criticalGaps : criticalGaps.slice(0, 5)).map((gap, index) => (
                   <Badge key={`${gap.teamId}-${gap.date}-${index}`} variant="destructive">
                     {gap.teamName}: {new Date(gap.date).toLocaleDateString('en-US', {
                       month: 'short',
@@ -85,7 +88,13 @@ export function CoverageAlerts({ analysis, partnershipName, partnershipConfig }:
                   </Badge>
                 ))}
                 {criticalGaps.length > 5 && (
-                  <Badge variant="outline">+{criticalGaps.length - 5} more</Badge>
+                  <Badge 
+                    variant="outline" 
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => setShowAllCritical(!showAllCritical)}
+                  >
+                    {showAllCritical ? 'Show less' : `+${criticalGaps.length - 5} more`}
+                  </Badge>
                 )}
               </div>
             </div>
@@ -101,7 +110,28 @@ export function CoverageAlerts({ analysis, partnershipName, partnershipConfig }:
             {warningGaps.length} Understaffed Day{warningGaps.length !== 1 ? 's' : ''}
           </AlertTitle>
           <AlertDescription>
-            Some days are below minimum staffing requirements but have partial coverage.
+            <div className="space-y-2 mt-2">
+              <p>Some days are below minimum staffing requirements but have partial coverage:</p>
+              <div className="flex flex-wrap gap-2">
+                {(showAllWarnings ? warningGaps : warningGaps.slice(0, 5)).map((gap, index) => (
+                  <Badge key={`${gap.teamId}-${gap.date}-${index}`} variant="secondary">
+                    {gap.teamName}: {new Date(gap.date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })} ({gap.actual}/{gap.required})
+                  </Badge>
+                ))}
+                {warningGaps.length > 5 && (
+                  <Badge 
+                    variant="outline" 
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => setShowAllWarnings(!showAllWarnings)}
+                  >
+                    {showAllWarnings ? 'Show less' : `+${warningGaps.length - 5} more`}
+                  </Badge>
+                )}
+              </div>
+            </div>
           </AlertDescription>
         </Alert>
       )}

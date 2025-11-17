@@ -889,7 +889,8 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
               <TabsContent value="grid" className="mt-4">
                 <TeamCoverageGrid
                   teamIds={selectedTeams}
-                  currentDate={currentDate}
+                  startDate={weekStart}
+                  endDate={weekEnd}
                   showHolidays={showHolidays}
                 />
               </TabsContent>

@@ -14,6 +14,7 @@ import UserCreation from "./UserCreation";
 import AdminHolidayManager from "./AdminHolidayManager";
 import { ShiftTimeDefinitions } from "../schedule/ShiftTimeDefinitions";
 import { TeamGroupManager } from "../schedule/TeamGroupManager";
+import { ShiftRotationTemplateManager } from "../schedule/ShiftRotationTemplateManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
@@ -39,6 +40,7 @@ const AdminSetup = () => {
   const [currentUserRoles, setCurrentUserRoles] = useState<string[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [managedTeamIds, setManagedTeamIds] = useState<string[]>([]);
+  const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     if (user) {
@@ -50,6 +52,7 @@ const AdminSetup = () => {
     if (user && (currentUserRole || currentUserRoles.length > 0)) {
       fetchProfiles();
       fetchUserRoles();
+      fetchTeams();
     }
   }, [user, currentUserRole, managedTeamIds]);
 
@@ -135,6 +138,21 @@ const AdminSetup = () => {
       setUserRoles(data || []);
     } catch (error) {
       console.error("Error fetching user roles:", error);
+    }
+  };
+
+  const fetchTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name")
+        .order("name");
+      
+      if (error) throw error;
+      
+      setTeams(data || []);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
     }
   };
 

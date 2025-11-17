@@ -1018,7 +1018,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
           <TabsContent value="coverage" className="mt-0">
             <TeamCoverageGrid
               teamIds={teamIds}
-              currentDate={dateStart}
+              startDate={dateStart}
+              endDate={endDate}
               showHolidays={showHolidays}
             />
           </TabsContent>
