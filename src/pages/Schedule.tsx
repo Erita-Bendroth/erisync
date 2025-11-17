@@ -416,7 +416,7 @@ const Schedule = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {(isPlanner() || isAdmin() || isManager()) && (
+                {isAdmin() && (
                   <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline">
