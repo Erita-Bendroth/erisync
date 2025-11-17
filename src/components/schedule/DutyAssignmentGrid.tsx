@@ -57,7 +57,14 @@ export function DutyAssignmentGrid({
   const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
 
   useEffect(() => {
-    console.log('[DutyAssignmentGrid] teamIds changed:', teamIds, 'weekNumber:', weekNumber, 'year:', year);
+    console.log('========== [DutyAssignmentGrid] Props Changed ==========');
+    console.log('[DutyAssignmentGrid] teamIds:', teamIds, 'count:', teamIds?.length);
+    console.log('[DutyAssignmentGrid] weekNumber:', weekNumber);
+    console.log('[DutyAssignmentGrid] year:', year);
+    console.log('[DutyAssignmentGrid] includeWeekend:', includeWeekend);
+    console.log('[DutyAssignmentGrid] includeLateshift:', includeLateshift);
+    console.log('[DutyAssignmentGrid] includeEarlyshift:', includeEarlyshift);
+    console.log('========================================================');
     fetchTeamMembers();
     fetchShiftTimeDefinitions();
     calculateWeekDates();
@@ -71,6 +78,9 @@ export function DutyAssignmentGrid({
   }, [weekDates, teamIds]);
 
   const calculateWeekDates = () => {
+    console.log('========== [DutyAssignmentGrid] Calculating Week Dates ==========');
+    console.log('[DutyAssignmentGrid] Input - weekNumber:', weekNumber, 'year:', year);
+    
     // Use ISO week calculation (same as edge function)
     const jan4 = new Date(Date.UTC(year, 0, 4)); // January 4th is always in week 1
     const jan4Day = jan4.getUTCDay() || 7; // Sunday is 7, not 0
@@ -78,12 +88,19 @@ export function DutyAssignmentGrid({
     weekStart.setUTCDate(jan4.getUTCDate() - (jan4Day - 1)); // Go back to Monday of week 1
     weekStart.setUTCDate(weekStart.getUTCDate() + (weekNumber - 1) * 7); // Add weeks
 
+    console.log('[DutyAssignmentGrid] Week start (Monday):', weekStart.toISOString().split('T')[0]);
+
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
       date.setUTCDate(weekStart.getUTCDate() + i);
       dates.push(date);
     }
+    
+    console.log('[DutyAssignmentGrid] Week dates:', dates.map(d => d.toISOString().split('T')[0]));
+    console.log('[DutyAssignmentGrid] Date range:', dates[0].toISOString().split('T')[0], 'to', dates[6].toISOString().split('T')[0]);
+    console.log('================================================================');
+    
     setWeekDates(dates);
   };
 
@@ -129,10 +146,19 @@ export function DutyAssignmentGrid({
   };
 
   const fetchScheduledUsers = async () => {
-    if (weekDates.length === 0) return;
+    if (weekDates.length === 0) {
+      console.log('[DutyAssignmentGrid] fetchScheduledUsers - weekDates is empty, skipping');
+      return;
+    }
     
     const startDate = weekDates[0].toISOString().split('T')[0];
     const endDate = weekDates[6].toISOString().split('T')[0];
+    
+    console.log('========== [DutyAssignmentGrid] Fetching Scheduled Users ==========');
+    console.log('[DutyAssignmentGrid] Query params:');
+    console.log('  - teamIds:', teamIds);
+    console.log('  - startDate:', startDate);
+    console.log('  - endDate:', endDate);
     
     const { data, error } = await supabase
       .from('schedule_entries')
@@ -142,13 +168,38 @@ export function DutyAssignmentGrid({
         shift_type, 
         availability_status, 
         activity_type,
+        team_id,
         profiles!inner(first_name, last_name, initials)
       `)
       .in('team_id', teamIds)
       .gte('date', startDate)
       .lte('date', endDate);
+    
+    console.log('[DutyAssignmentGrid] Query result:');
+    console.log('  - error:', error);
+    console.log('  - data length:', data?.length);
+    console.log('  - raw data:', data);
       
     if (!error && data) {
+      // Log data breakdown
+      const byTeam = data.reduce((acc: any, entry: any) => {
+        acc[entry.team_id] = (acc[entry.team_id] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('[DutyAssignmentGrid] Entries by team:', byTeam);
+      
+      const byAvailability = data.reduce((acc: any, entry: any) => {
+        acc[entry.availability_status] = (acc[entry.availability_status] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('[DutyAssignmentGrid] Entries by availability:', byAvailability);
+      
+      const byActivity = data.reduce((acc: any, entry: any) => {
+        acc[entry.activity_type] = (acc[entry.activity_type] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('[DutyAssignmentGrid] Entries by activity:', byActivity);
+      
       // Merge scheduled users into teamMembers
       const scheduledUserProfiles = Array.from(
         new Map(
@@ -164,6 +215,9 @@ export function DutyAssignmentGrid({
         ).values()
       );
       
+      console.log('[DutyAssignmentGrid] Unique scheduled user profiles:', scheduledUserProfiles.length);
+      console.log('[DutyAssignmentGrid] User names:', scheduledUserProfiles.map(p => `${p.first_name} ${p.last_name}`));
+      
       // Merge with existing teamMembers
       const mergedMembers = [...teamMembers];
       scheduledUserProfiles.forEach(profile => {
@@ -171,12 +225,18 @@ export function DutyAssignmentGrid({
           mergedMembers.push(profile);
         }
       });
+      console.log('[DutyAssignmentGrid] Team members before merge:', teamMembers.length);
+      console.log('[DutyAssignmentGrid] Team members after merge:', mergedMembers.length);
       setTeamMembers(mergedMembers);
       
+      // Apply filter
+      console.log('[DutyAssignmentGrid] Applying filter: availability_status === "available" && activity_type === "work"');
       const workEntries = data.filter(entry => 
         entry.availability_status === 'available' && 
         entry.activity_type === 'work'
       );
+      console.log('[DutyAssignmentGrid] Work entries after filter:', workEntries.length);
+      console.log('[DutyAssignmentGrid] Work entries:', workEntries);
       
       const shiftTypes = new Set<string>();
       const map: Record<string, ScheduledUser[]> = {};
@@ -194,20 +254,18 @@ export function DutyAssignmentGrid({
         shiftTypes.add(shiftType);
       });
       
-      console.log('[DutyAssignmentGrid] Fetched scheduled users with profiles:', {
-        teamIds,
-        startDate,
-        endDate,
-        scheduledUserProfilesCount: scheduledUserProfiles.length,
-        mergedMembersCount: mergedMembers.length,
-        workEntriesLength: workEntries.length,
-        scheduledUsersMap: Object.keys(map).length
-      });
+      console.log('[DutyAssignmentGrid] Final scheduledUsers map:');
+      console.log('  - Dates with scheduled users:', Object.keys(map));
+      console.log('  - Users per date:', Object.entries(map).map(([date, users]) => ({ date, count: users.length })));
+      console.log('  - Full map:', map);
+      console.log('  - Available shift types:', Array.from(shiftTypes));
+      console.log('===================================================================');
       
       setScheduledUsers(map);
       setAvailableShiftTypes(shiftTypes);
     } else if (error) {
       console.error('[DutyAssignmentGrid] Error fetching scheduled users:', error);
+      console.log('===================================================================');
     }
   };
 
@@ -548,6 +606,15 @@ export function DutyAssignmentGrid({
 
   // Show proper empty state if teams selected but no data
   if (teamIds.length > 0 && weekDates.length > 0 && Object.keys(scheduledUsers).length === 0) {
+    console.log('========== [DutyAssignmentGrid] SHOWING EMPTY STATE ==========');
+    console.log('[DutyAssignmentGrid] teamIds.length:', teamIds.length);
+    console.log('[DutyAssignmentGrid] weekDates.length:', weekDates.length);
+    console.log('[DutyAssignmentGrid] scheduledUsers keys:', Object.keys(scheduledUsers).length);
+    console.log('[DutyAssignmentGrid] scheduledUsers:', scheduledUsers);
+    console.log('[DutyAssignmentGrid] teamMembers:', teamMembers.length);
+    console.log('[DutyAssignmentGrid] availableShiftTypes:', Array.from(availableShiftTypes));
+    console.log('==============================================================');
+    
     return (
       <Alert>
         <Info className="h-4 w-4" />
