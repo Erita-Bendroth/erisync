@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Camera, Download } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QuickActionsToolbar } from './QuickActionsToolbar';
 import { TeamSection } from './TeamSection';
 import { OnlineUsersPanel } from './OnlineUsersPanel';
@@ -14,10 +15,16 @@ import { useSchedulerPresence } from '@/hooks/useSchedulerPresence';
 import { useShiftTypes } from '@/hooks/useShiftTypes';
 import { useRotationTemplates } from '@/hooks/useRotationTemplates';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useCoverageAnalysis } from '@/hooks/useCoverageAnalysis';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { ApplyTemplateDialog } from '../ApplyTemplateDialog';
+import { CoverageOverview } from '../CoverageOverview';
+import { CoverageHeatmap } from '../CoverageHeatmap';
+import { CoverageAlerts } from '../CoverageAlerts';
+import { TeamCoverageGrid } from '../TeamCoverageGrid';
+import * as XLSX from 'xlsx';
 
 interface TeamMember {
   user_id: string;
@@ -45,6 +52,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [applyTemplateDialogOpen, setApplyTemplateDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [screenshotMode, setScreenshotMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('schedule');
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     firstName: string;
     lastName: string;
@@ -73,6 +82,19 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
   const { shiftTypes } = useShiftTypes(teamIds);
   const { templates } = useRotationTemplates(teamIds);
+  
+  const endDate = useMemo(() => {
+    const end = new Date(dateStart);
+    end.setDate(end.getDate() + getDaysCount(rangeType) - 1);
+    return end;
+  }, [dateStart, rangeType]);
+  
+  const coverageAnalysis = useCoverageAnalysis({
+    teamIds,
+    startDate: dateStart,
+    endDate,
+    scheduleData: scheduleEntries,
+  });
 
   // Generate dates based on range type
   const dates = useMemo(() => {
