@@ -371,14 +371,18 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
             </TabsTrigger>
             <TabsTrigger value="unified-scheduler" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
-              Team Scheduler
+              Quick Scheduler
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              Schedule
             </TabsTrigger>
             <TabsTrigger value="vacation-planning" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
@@ -399,30 +403,237 @@ const Schedule = () => {
           </TabsContent>
 
           <TabsContent value="unified-scheduler" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Team Scheduler</CardTitle>
-                    <CardDescription>Unified scheduling interface for single teams, partnerships, and multi-team views</CardDescription>
-                  </div>
-                  {(isPlanner() || isAdmin() || isManager()) && (
-                    <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline">
-                          <Users className="w-4 h-4 mr-2" />
-                          Manage Partnerships
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                        <PlanningPartnershipManager />
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </CardHeader>
-            </Card>
             <UnifiedTeamScheduler />
+          </TabsContent>
+
+          <TabsContent value="schedule" className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">Schedule Overview</h2>
+                <p className="text-muted-foreground">
+                  View and manage team schedules
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {(isPlanner() || isAdmin() || isManager()) && (
+                  <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Users className="w-4 h-4 mr-2" />
+                        Manage Partnerships
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <PlanningPartnershipManager />
+                    </DialogContent>
+                  </Dialog>
+                )}
+                <Select value={scheduleViewMode} onValueChange={(value: "standard" | "multi-team") => setScheduleViewMode(value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">📅 Standard View</SelectItem>
+                    <SelectItem value="multi-team">📊 Multi-Team Overview</SelectItem>
+                  </SelectContent>
+                </Select>
+                {scheduleViewMode === "standard" && (
+                  <>
+                    <ScheduleEntryForm onSuccess={() => setScheduleRefreshKey(prev => prev + 1)}>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Entry
+                      </Button>
+                    </ScheduleEntryForm>
+                    <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
+                      Generate Bulk
+                    </Button>
+                    <Button variant="outline" onClick={() => setActiveTab('settings')}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Schedule
+                    </Button>
+                    {(isPlanner() || isManager()) && (
+                      <>
+                        <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" onClick={openNotify}>
+                              <Mail className="w-4 h-4 mr-2" />
+                              2-week Summary
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+                            <DialogHeader className="flex-shrink-0">
+                              <DialogTitle className="flex items-center gap-2">
+                                <Mail className="w-5 h-5" />
+                                Send 2-Week Schedule Summary
+                              </DialogTitle>
+                              <DialogDescription>
+                                Send personalized 2-week schedule summaries to individual users or entire teams.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                              <div className="space-y-3">
+                                <label className="text-sm font-medium">Send Mode</label>
+                                <Select value={sendMode} onValueChange={(value: "individual" | "team") => setSendMode(value)}>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                     <SelectItem value="individual">📧 Individual User</SelectItem>
+                                     {(isPlanner() || isManager()) && (
+                                       <SelectItem value="team">👥 Entire Team</SelectItem>
+                                     )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {sendMode === "individual" ? (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Select Recipient</label>
+                                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Choose a user to send the summary to..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {recipients.map(r => (
+                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Select Team</label>
+                                  <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Choose a team to send summaries to all members..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availableTeams.map(t => (
+                                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                              
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-medium">
+                                    {sendMode === "team" ? "Team Preview" : "Email Preview"}
+                                  </h4>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={previewTwoWeekEmail} 
+                                    disabled={
+                                      loadingPreview || 
+                                      (sendMode === "individual" && !selectedUserId) ||
+                                      (sendMode === "team" && !selectedTeamId)
+                                    }
+                                  >
+                                    {loadingPreview ? 'Generating...' : 'Generate Preview'}
+                                  </Button>
+                                </div>
+                                
+                                <div className="border rounded-lg bg-background h-64 overflow-auto">
+                                  {previewHtml ? (
+                                    <div className="p-4 prose prose-sm max-w-none">
+                                      <div className="whitespace-pre-wrap">{previewHtml}</div>
+                                    </div>
+                                  ) : (
+                                    <div className="p-6 text-center text-muted-foreground h-full flex flex-col justify-center">
+                                      <Mail className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                                      <p className="font-medium text-sm">No preview available</p>
+                                      <p className="text-xs mt-1">
+                                        {sendMode === "individual" 
+                                          ? "Select a recipient and click 'Generate Preview' to see the email content."
+                                          : "Select a team and click 'Generate Preview' to see who will receive emails."
+                                        }
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          
+                            <DialogFooter className="gap-2">
+                              <Button variant="outline" onClick={() => setNotifyOpen(false)}>
+                                Cancel
+                              </Button>
+                               <Button 
+                                 onClick={sendTwoWeekEmail} 
+                                 disabled={
+                                   loadingPreview || 
+                                   sending || 
+                                   !previewHtml ||
+                                   (sendMode === "individual" && !selectedUserId) ||
+                                   (sendMode === "team" && !selectedTeamId)
+                                 }
+                                 className="min-w-24"
+                               >
+                                 {sending ? 'Sending...' : (sendMode === "team" ? 'Send to Team' : 'Send Email')}
+                               </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                        <Button variant="outline" onClick={() => setShowDutyCoverageModal(true)}>
+                          <Mail className="w-4 h-4 mr-2" />
+                          Weekly Duty Coverage
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {scheduleViewMode === "standard" ? (
+              <>
+                {/* Bulk Schedule Generator Modal */}
+                <Dialog open={showBulkWizard} onOpenChange={setShowBulkWizard}>
+                  <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <div className="flex items-center justify-between">
+                        <DialogTitle>Bulk Schedule Generator</DialogTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setUseLegacyWizard(!useLegacyWizard)}
+                        >
+                          {useLegacyWizard ? "Use Quick Mode" : "Use Step-by-Step Wizard"}
+                        </Button>
+                      </div>
+                    </DialogHeader>
+                    {useLegacyWizard ? (
+                      <BulkScheduleWizard 
+                        onScheduleGenerated={() => {
+                          setShowBulkWizard(false);
+                          setScheduleRefreshKey(prev => prev + 1);
+                        }}
+                      />
+                    ) : (
+                      <QuickBulkScheduler
+                        userId={user?.id}
+                        onScheduleGenerated={() => {
+                          setShowBulkWizard(false);
+                          setScheduleRefreshKey(prev => prev + 1);
+                        }}
+                      />
+                    )}
+                  </DialogContent>
+                </Dialog>
+                <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
+              </>
+            ) : (
+              <MultiTeamScheduleView teams={teams} />
+            )}
+
+            {/* Integrated Co-Planning Calendar */}
+            <IntegratedPlanningCalendar 
+              onScheduleUpdate={() => setScheduleRefreshKey(prev => prev + 1)}
+              onCreatePartnership={() => setPartnershipDialogOpen(true)}
+            />
           </TabsContent>
 
           <TabsContent value="vacation-planning" className="space-y-6">

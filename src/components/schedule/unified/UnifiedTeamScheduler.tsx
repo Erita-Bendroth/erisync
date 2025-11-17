@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Camera, Download, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Camera, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { QuickActionsToolbar } from './QuickActionsToolbar';
 import { TeamSection } from './TeamSection';
 import { OnlineUsersPanel } from './OnlineUsersPanel';
@@ -24,8 +22,6 @@ import { useCoverageAnalysis } from '@/hooks/useCoverageAnalysis';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { useHolidayVisibility } from '@/hooks/useHolidayVisibility';
 import { TeamFavoritesQuickAccess } from '../TeamFavoritesQuickAccess';
-import { PlanningPartnershipManager } from '../planning-partners/PlanningPartnershipManager';
-import { CoverageSummaryPanel } from '../planning-partners/CoverageSummaryPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
@@ -50,18 +46,10 @@ interface TeamSection {
   color: string;
 }
 
-interface UnifiedTeamSchedulerProps {
-  partnershipDialogOpen?: boolean;
-  setPartnershipDialogOpen?: (open: boolean) => void;
-}
-
-export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({ 
-  partnershipDialogOpen, 
-  setPartnershipDialogOpen 
-}) => {
+export const UnifiedTeamScheduler: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectionMode, setSelectionMode] = useState<'single' | 'partnership' | 'multi-team'>('single');
+  const [selectionMode, setSelectionMode] = useState<'partnership' | 'multi-team'>('partnership');
   const [selectedPartnershipId, setSelectedPartnershipId] = useState<string>('');
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [allTeams, setAllTeams] = useState<Array<{ id: string; name: string }>>([]);
@@ -74,7 +62,6 @@ export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [screenshotMode, setScreenshotMode] = useState(false);
   const [activeTab, setActiveTab] = useState('schedule');
-  const [showCoverageSummary, setShowCoverageSummary] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     firstName: string;
     lastName: string;
@@ -84,7 +71,7 @@ export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
 
-  // Fetch all available teams
+  // Fetch all available teams for multi-team mode
   useEffect(() => {
     const fetchAllTeams = async () => {
       try {
@@ -100,138 +87,150 @@ export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({
       }
     };
 
-    fetchAllTeams();
-  }, []);
+    if (selectionMode === 'multi-team') {
+      fetchAllTeams();
+    }
+  }, [selectionMode]);
 
-  const state = useSchedulerState();
-  const { copyPattern, pastePattern, bulkAssignShift, clearCells } = useSchedulerActions(
-    teamSections,
-    scheduleEntries,
-    setScheduleEntries,
-    dateStart
-  );
+  const {
+    state,
+    toggleUserSelection,
+    toggleCellSelection,
+    selectAllUsers,
+    clearSelection,
+    setClipboard,
+    setHoveredCell,
+    setEditingCell,
+    startDrag,
+    endDrag,
+  } = useSchedulerState();
 
-  const { shiftTypes } = useShiftTypes();
+  const {
+    copyPattern,
+    pastePattern,
+    bulkAssignShift,
+    clearCells,
+  } = useSchedulerActions(scheduleEntries, setScheduleEntries, user?.id || '', teamSections);
+
+  const { shiftTypes } = useShiftTypes(teamIds);
   const { templates } = useRotationTemplates(teamIds);
   
-  const debouncedScheduleEntries = useDebounce(scheduleEntries, 300);
-  
-  const dateEnd = useMemo(() => {
+  const endDate = useMemo(() => {
     const end = new Date(dateStart);
     end.setDate(end.getDate() + getDaysCount(rangeType) - 1);
     return end;
   }, [dateStart, rangeType]);
-
+  
   const coverageAnalysis = useCoverageAnalysis({
     teamIds,
     startDate: dateStart,
-    endDate: dateEnd,
-    threshold: 1,
-    preloadedScheduleEntries: debouncedScheduleEntries,
-    preloadedTeams: teamSections.map(ts => ({ id: ts.teamId, name: ts.teamName })),
+    endDate,
+    scheduleData: scheduleEntries,
   });
 
-  const { selectAllUsers, clearSelection, setClipboard } = state;
-  const { onlineUsers } = useSchedulerPresence(teamIds, dateStart, dateEnd);
-
-  useEffect(() => {
-    if (teamIds.length > 0 && user) {
-      fetchTeamSections();
-      fetchScheduleEntries();
-    }
-  }, [teamIds, user]);
-
-  useEffect(() => {
-    if (teamIds.length > 0) {
-      fetchScheduleEntries();
-    }
+  // Generate dates based on range type
+  const dates = useMemo(() => {
+    const count = getDaysCount(rangeType);
+    return Array.from({ length: count }, (_, i) => {
+      const date = new Date(dateStart);
+      date.setDate(date.getDate() + i);
+      return date.toISOString().split('T')[0];
+    });
   }, [dateStart, rangeType]);
 
+  const debouncedEditingCell = useDebounce(state.editingCell, 300);
+
+  const { onlineUsers } = useSchedulerPresence(
+    selectedPartnershipId,
+    'partnership',
+    user?.id || '',
+    currentUserProfile,
+    debouncedEditingCell
+  );
+
+  const cellsBeingEdited = useMemo(() => {
+    return onlineUsers.reduce((acc, user) => {
+      if (user.editing_cell) {
+        if (!acc[user.editing_cell]) {
+          acc[user.editing_cell] = [];
+        }
+        acc[user.editing_cell].push(user);
+      }
+      return acc;
+    }, {} as Record<string, typeof onlineUsers>);
+  }, [onlineUsers]);
+
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user) return;
-      
+    if (user) {
+      fetchCurrentUserProfile();
+    }
+  }, [user]);
+
+  const fetchCurrentUserProfile = async () => {
+    if (!user?.id) return;
+    
+    try {
       const { data, error } = await supabase
         .from('profiles')
         .select('first_name, last_name, initials')
         .eq('user_id', user.id)
         .single();
 
+      if (error) throw error;
       if (data) {
         setCurrentUserProfile({
-          firstName: data.first_name,
-          lastName: data.last_name,
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
           initials: data.initials || '',
         });
       }
-    };
-
-    fetchUserProfile();
-  }, [user]);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   useEffect(() => {
-    if (teamIds.length === 0) return;
-
-    const channel = supabase
-      .channel(`unified-scheduler-${teamIds.join('-')}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'schedule_entries',
-        filter: teamIds.length > 0 ? `team_id=in.(${teamIds.join(',')})` : undefined,
-      }, () => {
-        fetchScheduleEntries();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [teamIds]);
+    if (teamIds.length > 0) {
+      fetchTeamSections();
+      fetchScheduleEntries();
+    }
+  }, [teamIds, dateStart, rangeType]);
 
   const fetchTeamSections = async () => {
-    if (teamIds.length === 0) return;
-    
+    setLoading(true);
     try {
       const sections: TeamSection[] = [];
       
       for (const teamId of teamIds) {
-        const { data: teamData } = await supabase
+        const { data: team } = await supabase
           .from('teams')
           .select('name')
           .eq('id', teamId)
           .single();
+        
+        const { data: members, error } = await supabase
+          .rpc('get_team_members_safe', { _team_id: teamId });
 
-        const { data: membersData } = await supabase
-          .from('team_members')
-          .select(`
-            user_id,
-            profiles:user_id (
-              first_name,
-              last_name,
-              initials
-            )
-          `)
-          .eq('team_id', teamId);
+        if (error) throw error;
 
-        if (teamData && membersData) {
-          sections.push({
-            teamId,
-            teamName: teamData.name,
-            members: membersData.map((m: any) => ({
-              user_id: m.user_id,
-              first_name: m.profiles.first_name,
-              last_name: m.profiles.last_name,
-              initials: m.profiles.initials,
-            })),
-            color: getTeamColor(teamId),
-          });
-        }
+        sections.push({
+          teamId,
+          teamName: team?.name || 'Unknown Team',
+          members: members || [],
+          color: getTeamColor(teamId),
+        });
       }
 
       setTeamSections(sections);
     } catch (error) {
-      console.error('Error fetching team sections:', error);
+      console.error('Error fetching teams:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load team members",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -239,19 +238,15 @@ export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({
     if (teamIds.length === 0) return;
 
     try {
-      setLoading(true);
-      const endDate = new Date(dateStart);
-      endDate.setDate(endDate.getDate() + getDaysCount(rangeType));
-
       const { data, error } = await supabase
         .from('schedule_entries')
         .select('*')
         .in('team_id', teamIds)
-        .gte('date', dateStart.toISOString().split('T')[0])
-        .lt('date', endDate.toISOString().split('T')[0]);
+        .gte('date', dates[0])
+        .lte('date', dates[dates.length - 1]);
 
       if (error) throw error;
-      setScheduleEntries((data as ScheduleEntry[]) || []);
+      setScheduleEntries(data || []);
     } catch (error) {
       console.error('Error fetching schedule:', error);
       toast({
@@ -259,8 +254,6 @@ export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({
         description: "Failed to load schedule",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -371,326 +364,346 @@ export const UnifiedTeamScheduler: React.FC<UnifiedTeamSchedulerProps> = ({
     setDateStart(newDate);
   };
 
-  const coverageByDateTeam = useMemo(() => {
-    const coverage: Record<string, Record<string, number>> = {};
-    
-    for (let i = 0; i < getDaysCount(rangeType); i++) {
-      const date = new Date(dateStart);
-      date.setDate(date.getDate() + i);
-      const dateKey = date.toISOString().split('T')[0];
-      coverage[dateKey] = {};
-      
-      teamIds.forEach(teamId => {
-        const count = scheduleEntries.filter(
-          e => e.date === dateKey && 
-               e.team_id === teamId && 
-               e.availability_status === 'available'
-        ).length;
-        coverage[dateKey][teamId] = count;
-      });
-    }
-    
-    return coverage;
-  }, [scheduleEntries, dateStart, rangeType, teamIds]);
+  // Calculate coverage by date and team
+  const scheduledCounts = useMemo(() => {
+    return dates.reduce((acc, date) => {
+      acc[date] = scheduleEntries.filter(
+        e => e.date === date && e.availability_status === 'available'
+      ).length;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [dates, scheduleEntries]);
+
+  const teamBreakdowns = useMemo(() => {
+    return dates.reduce((acc, date) => {
+      acc[date] = teamSections.map(section => ({
+        teamName: section.teamName,
+        count: scheduleEntries.filter(
+          e => e.date === date && 
+          e.availability_status === 'available' &&
+          section.members.some(m => m.user_id === e.user_id)
+        ).length,
+        total: section.members.length,
+        color: section.color,
+      }));
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [dates, scheduleEntries, teamSections]);
+
+  const totalMembers = teamSections.reduce((sum, section) => sum + section.members.length, 0);
 
   const exportToExcel = () => {
-    const wb = XLSX.utils.book_new();
+    const workbook = XLSX.utils.book_new();
     
     teamSections.forEach(section => {
-      const data: any[][] = [
-        ['Name', ...Array.from({ length: getDaysCount(rangeType) }, (_, i) => {
-          const d = new Date(dateStart);
-          d.setDate(d.getDate() + i);
-          return d.toLocaleDateString();
-        })],
+      const data = [
+        ['Team', section.teamName],
+        [],
+        ['Member', ...dates.map(d => new Date(d).toLocaleDateString())],
       ];
-
+      
       section.members.forEach(member => {
-        const row = [`${member.first_name} ${member.last_name}`];
-        for (let i = 0; i < getDaysCount(rangeType); i++) {
-          const d = new Date(dateStart);
-          d.setDate(d.getDate() + i);
-          const dateKey = d.toISOString().split('T')[0];
-          const entry = scheduleEntries.find(
-            e => e.user_id === member.user_id && 
-                 e.date === dateKey && 
-                 e.team_id === section.teamId
-          );
-          row.push(entry ? entry.shift_type || entry.activity_type : '');
-        }
+        const row = [
+          `${member.first_name} ${member.last_name}`,
+          ...dates.map(date => {
+            const entry = scheduleEntries.find(e => e.user_id === member.user_id && e.date === date);
+            return entry?.shift_type || entry?.activity_type || '';
+          })
+        ];
         data.push(row);
       });
-
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, section.teamName.substring(0, 31));
+      
+      const worksheet = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(workbook, worksheet, section.teamName.substring(0, 31));
     });
-
-    XLSX.writeFile(wb, `schedule-${dateStart.toISOString().split('T')[0]}.xlsx`);
-  };
-
-  const captureScreenshot = async () => {
-    setScreenshotMode(true);
     
-    setTimeout(async () => {
-      const element = document.getElementById('scheduler-content');
-      if (!element) return;
-
-      try {
-        const html2canvas = (await import('html2canvas')).default;
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          backgroundColor: '#ffffff',
-        });
-
-        const jsPDF = (await import('jspdf')).default;
-        const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'mm',
-          format: 'a4',
-        });
-
-        const imgWidth = 297;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight);
-        pdf.save(`schedule-${dateStart.toISOString().split('T')[0]}.pdf`);
-
-        toast({
-          title: 'Screenshot saved',
-          description: 'Schedule has been exported as PDF',
-        });
-      } catch (error) {
-        console.error('Error capturing screenshot:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to capture screenshot',
-          variant: 'destructive',
-        });
-      } finally {
-        setScreenshotMode(false);
-      }
-    }, 100);
+    XLSX.writeFile(workbook, `schedule-${dateStart.toISOString().split('T')[0]}.xlsx`);
+    toast({ title: 'Exported', description: 'Schedule exported to Excel' });
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <CardTitle>Team Scheduler</CardTitle>
-              
-              {setPartnershipDialogOpen && (
-                <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Users className="w-4 h-4 mr-2" />
-                      Manage Partnerships
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                    <PlanningPartnershipManager />
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-            
-            <Tabs value={selectionMode} onValueChange={(v) => setSelectionMode(v as any)}>
-              <TabsList>
-                <TabsTrigger value="single">Single Team</TabsTrigger>
-                <TabsTrigger value="partnership">Partnership</TabsTrigger>
-                <TabsTrigger value="multi-team">Multi-Team</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {selectionMode === 'single' ? (
-                <Select 
-                  value={teamIds[0] || ''} 
-                  onValueChange={(value) => setTeamIds([value])}
+    <>
+      <Card className="w-full">
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <CardTitle>Team Scheduler</CardTitle>
+            <CardDescription>
+              Collaborative scheduling across partnerships and multiple teams
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-3">
+            {!screenshotMode && (
+              <>
+                <div className="flex items-center gap-2 border-r pr-3">
+                  <Switch 
+                    id="show-holidays" 
+                    checked={showHolidays} 
+                    onCheckedChange={toggleHolidays}
+                  />
+                  <Label htmlFor="show-holidays" className="text-sm cursor-pointer">
+                    Show Holidays
+                  </Label>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setScreenshotMode(!screenshotMode)}
                 >
-                  <SelectTrigger className="w-[300px]">
-                    <SelectValue placeholder="Select a team..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allTeams.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : selectionMode === 'partnership' ? (
-                <PartnershipSelector
-                  value={selectedPartnershipId}
-                  onChange={(id, ids) => {
-                    setSelectedPartnershipId(id);
+                  <Camera className="h-4 w-4 mr-2" />
+                  Screenshot
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportToExcel}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </>
+            )}
+            {onlineUsers.length > 0 && (
+              <OnlineUsersPanel users={onlineUsers} />
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 mt-4">
+          {/* Mode Selection Tabs */}
+          <Tabs value={selectionMode} onValueChange={(v) => setSelectionMode(v as 'partnership' | 'multi-team')}>
+            <TabsList>
+              <TabsTrigger value="partnership">Partnership</TabsTrigger>
+              <TabsTrigger value="multi-team">Multi-Team</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Conditional Team Selection */}
+          {selectionMode === 'partnership' ? (
+            <PartnershipSelector
+              value={selectedPartnershipId}
+              onChange={(id, ids) => {
+                setSelectedPartnershipId(id);
+                setTeamIds(ids);
+              }}
+            />
+          ) : (
+            <div className="space-y-3">
+              {favorites.length > 0 && (
+                <TeamFavoritesQuickAccess
+                  favorites={favorites}
+                  currentSelectedTeamIds={teamIds}
+                  onApplyFavorite={(ids, name) => {
                     setTeamIds(ids);
+                    toast({ 
+                      title: 'Applied Favorite', 
+                      description: `Viewing teams from "${name}"` 
+                    });
                   }}
                 />
-              ) : (
-                <div className="flex items-center gap-2 flex-1">
-                  <MultiSelectTeams
-                    selectedTeams={teamIds}
-                    onTeamsChange={setTeamIds}
-                    placeholder="Select teams..."
-                  />
-                  <TeamFavoritesQuickAccess
-                    favorites={favorites}
-                    currentSelectedTeamIds={teamIds}
-                    onApplyFavorite={(favorite) => setTeamIds(favorite.team_ids)}
-                  />
-                </div>
               )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <DateRangeSelector
-                startDate={dateStart}
-                onStartDateChange={(date) => date && setDateStart(date)}
-                rangeType={rangeType}
-                onRangeTypeChange={setRangeType}
+              <MultiSelectTeams
+                teams={allTeams}
+                selectedTeamIds={teamIds}
+                onValueChange={(ids) => setTeamIds(ids)}
+                placeholder="Select teams to view"
               />
+            </div>
+          )}
 
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => navigateDate('prev')}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigateDate('next')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <DateRangeSelector
+              startDate={dateStart}
+              onStartDateChange={(date) => date && setDateStart(date)}
+              rangeType={rangeType}
+              onRangeTypeChange={(type) => setRangeType(type as DateRangeType)}
+            />
 
-              <div className="flex items-center gap-2">
-                <Switch id="show-holidays" checked={showHolidays} onCheckedChange={toggleHolidays} />
-                <Label htmlFor="show-holidays" className="text-sm">Holidays</Label>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setShowCoverageSummary(!showCoverageSummary)}>
-                {showCoverageSummary ? <ChevronUp className="h-4 w-4 mr-2" /> : <ChevronDown className="h-4 w-4 mr-2" />}
-                Coverage
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateDate('prev')}
+              >
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={teamSections.length === 0}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDateStart(getMonday(new Date()))}
+              >
+                Today
               </Button>
-              <Button variant="outline" size="sm" onClick={captureScreenshot} disabled={teamSections.length === 0}>
-                <Camera className="h-4 w-4 mr-2" />
-                Screenshot
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateDate('next')}
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        </CardHeader>
-      </Card>
+        </div>
 
-      {showCoverageSummary && teamIds.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <CoverageSummaryPanel
-              teamIds={teamIds}
-              weekStart={dateStart}
-              dailyCoverage={[]}
-              totalMembers={teamSections.reduce((acc, ts) => acc + ts.members.length, 0)}
+        {!screenshotMode && coverageAnalysis && (
+          <CoverageAlerts analysis={coverageAnalysis} />
+        )}
+      </CardHeader>
+
+      <CardContent className="p-0">
+        {!screenshotMode && (
+          <QuickActionsToolbar
+            hasSelection={state.selectedCells.size > 0}
+            hasClipboard={state.clipboardPattern.length > 0}
+            shiftTypes={shiftTypes}
+            onSelectAll={handleSelectAll}
+            onCopy={handleCopy}
+            onPaste={handlePaste}
+            onClear={handleClear}
+            onQuickAssign={handleQuickAssign}
+            onApplyTemplate={handleApplyTemplateClick}
+          />
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full justify-start border-b rounded-none h-auto p-0">
+            <TabsTrigger value="schedule" className="rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
+              Schedule
+            </TabsTrigger>
+            <TabsTrigger value="coverage" className="rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
+              Coverage Grid
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary">
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="schedule" className="mt-0">
+            {loading ? (
+              <div className="flex items-center justify-center p-12">
+                <div className="text-muted-foreground">Loading teams...</div>
+              </div>
+            ) : teamSections.length === 0 ? (
+              <div className="flex items-center justify-center p-12">
+                <div className="text-muted-foreground">
+                  {selectionMode === 'partnership' 
+                    ? 'Select a partnership to view teams' 
+                    : 'Select teams to view schedule'}
+                </div>
+              </div>
+            ) : (
+              <>
+            {/* Header Row with Dates */}
+            <div className="grid grid-cols-[200px_1fr] border-b border-border bg-muted/30 sticky top-0 z-10">
+              <div className="px-4 py-2 font-semibold text-sm border-r border-border">
+                Team Members
+              </div>
+              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+                {dates.map((date) => {
+                  const dateObj = new Date(date);
+                  return (
+                    <div
+                      key={date}
+                      className="px-2 py-2 text-center border-r border-border text-xs font-medium"
+                    >
+                      <div>{dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="text-muted-foreground">
+                        {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Team Sections */}
+            {teamSections.map((section) => (
+              <TeamSection
+                key={section.teamId}
+                teamId={section.teamId}
+                teamName={section.teamName}
+                teamColor={section.color}
+                members={section.members}
+                dates={dates}
+                scheduleEntries={scheduleEntries}
+                selectedUsers={state.selectedUsers}
+                selectedCells={state.selectedCells}
+                hoveredCell={state.hoveredCell}
+                editingCell={state.editingCell}
+                cellsBeingEdited={cellsBeingEdited}
+                onUserToggle={toggleUserSelection}
+                onCellClick={toggleCellSelection}
+                onCellDoubleClick={setEditingCell}
+                onCellHover={setHoveredCell}
+                onCellDragStart={startDrag}
+                onCellDragEnd={endDrag}
+                onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
+                showHolidays={showHolidays}
+              />
+            ))}
+
+            {/* Coverage Row */}
+            <CoverageRow
+              dates={dates}
+              teamSize={totalMembers}
+              scheduledCounts={scheduledCounts}
+              teamBreakdowns={teamBreakdowns}
             />
-          </CardContent>
-        </Card>
-      )}
+          </>
+            )}
 
-      {!screenshotMode && (
-        <QuickActionsToolbar
-          onCopy={handleCopy}
-          onPaste={handlePaste}
-          onClear={handleClear}
-          onQuickAssign={handleQuickAssign}
-          onSelectAll={handleSelectAll}
-          onClearSelection={clearSelection}
-          onApplyTemplate={handleApplyTemplateClick}
-          selectedCount={state.selectedCells.size}
-          hasClipboard={!!state.clipboardPattern && state.clipboardPattern.length > 0}
-          shiftTypes={shiftTypes}
-        />
-      )}
+            {/* Keyboard Shortcuts Info */}
+            {!screenshotMode && (
+              <div className="p-4 border-t border-border bg-muted/30">
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-semibold">Shortcuts:</span> Click to select • Double-click to edit • Drag to select range
+                </div>
+              </div>
+            )}
+          </TabsContent>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
-          <TabsTrigger value="coverage-grid">Coverage Grid</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="schedule" id="scheduler-content" className="space-y-4">
-          {loading && <div className="text-center py-8">Loading schedule...</div>}
-          
-          {!loading && teamSections.length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Select teams to view their schedules
-              </CardContent>
-            </Card>
-          )}
-
-          {!loading && teamSections.map((section) => (
-            <TeamSection
-              key={section.teamId}
-              section={section}
-              dateStart={dateStart}
-              daysCount={getDaysCount(rangeType)}
-              scheduleEntries={scheduleEntries}
-              state={state}
-              onScheduleUpdate={fetchScheduleEntries}
-              screenshotMode={screenshotMode}
-              onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
+          <TabsContent value="coverage" className="mt-0">
+            <TeamCoverageGrid
+              teamIds={teamIds}
+              currentDate={dateStart}
               showHolidays={showHolidays}
             />
-          ))}
+          </TabsContent>
 
-          {!screenshotMode && <OnlineUsersPanel onlineUsers={onlineUsers} />}
-
-          {teamSections.map(section => (
-            <CoverageRow
-              key={`coverage-${section.teamId}`}
-              teamId={section.teamId}
-              teamName={section.teamName}
-              dateStart={dateStart}
-              daysCount={getDaysCount(rangeType)}
-              coverageData={coverageByDateTeam}
-              color={section.color}
-            />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="coverage-grid" className="space-y-4">
-          <TeamCoverageGrid
-            teams={teamSections.map(ts => ({ id: ts.teamId, name: ts.teamName }))}
-            teamIds={teamIds}
-            currentDate={dateStart}
-            showHolidays={showHolidays}
-          />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <CoverageOverview analysis={coverageAnalysis} />
-          <CoverageAlerts gaps={coverageAnalysis.gaps} />
-          <CoverageHeatmap
-            teams={teamSections.map(ts => ({ id: ts.teamId, name: ts.teamName }))}
-            teamIds={teamIds}
-            startDate={dateStart}
-            endDate={dateEnd}
-          />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="analytics" className="mt-0 p-6 space-y-6">
+            {coverageAnalysis && (
+              <>
+                <CoverageOverview analysis={coverageAnalysis} />
+                <CoverageHeatmap
+                  teamIds={teamIds}
+                  startDate={dateStart}
+                  endDate={endDate}
+                  teams={teamSections.map(t => ({ id: t.teamId, name: t.teamName }))}
+                />
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+      </Card>
 
       {selectedTemplate && (
         <ApplyTemplateDialog
           open={applyTemplateDialogOpen}
           onOpenChange={setApplyTemplateDialogOpen}
           template={selectedTemplate}
+          selectedUsers={teamSections
+            .flatMap(s => s.members)
+            .filter(m => state.selectedUsers.has(m.user_id))
+            .map(m => ({ user_id: m.user_id, name: `${m.first_name} ${m.last_name}` }))}
+          selectedDates={dates.filter(d => 
+            Array.from(state.selectedCells).some(cellId => cellId.endsWith(`-${d}`))
+          )}
+          teamId={teamSections[0]?.teamId || ''}
           onApply={handleApplyTemplate}
-          selectedCells={Array.from(state.selectedCells)}
-          teamSections={teamSections}
-          startDate={dateStart}
         />
       )}
-    </div>
+    </>
   );
 };
 
@@ -698,19 +711,22 @@ function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(d.setDate(diff));
 }
 
-function getTeamColor(teamId: string): string {
+const getTeamColor = (teamId: string): string => {
   const colors = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
+    'hsl(217, 91%, 60%)',
+    'hsl(142, 71%, 45%)',
+    'hsl(38, 92%, 50%)',
+    'hsl(330, 81%, 60%)',
+    'hsl(173, 80%, 40%)',
+    'hsl(258, 90%, 66%)',
   ];
-  const hash = teamId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return colors[hash % colors.length];
-}
+  
+  let hash = 0;
+  for (let i = 0; i < teamId.length; i++) {
+    hash = teamId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
