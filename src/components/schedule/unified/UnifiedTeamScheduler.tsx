@@ -72,9 +72,57 @@ export const UnifiedTeamScheduler: React.FC = () => {
     lastName: string;
     initials: string;
   }>({ firstName: '', lastName: '', initials: '' });
+  const [partnershipConfig, setPartnershipConfig] = useState<{
+    min_staff_required: number;
+    max_staff_allowed?: number | null;
+  } | null>(null);
+  const [partnershipName, setPartnershipName] = useState<string>('');
 
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
+
+  // Load partnership capacity config
+  useEffect(() => {
+    if (selectionMode === 'partnership' && selectedPartnershipId) {
+      loadPartnershipConfig();
+    } else {
+      setPartnershipConfig(null);
+      setPartnershipName('');
+    }
+  }, [selectionMode, selectedPartnershipId]);
+
+  const loadPartnershipConfig = async () => {
+    try {
+      // Load partnership name
+      const { data: partnership } = await supabase
+        .from('team_planning_partners')
+        .select('partnership_name')
+        .eq('id', selectedPartnershipId)
+        .single();
+
+      if (partnership) {
+        setPartnershipName(partnership.partnership_name);
+      }
+
+      // Load capacity config
+      const { data, error } = await supabase
+        .from('partnership_capacity_config')
+        .select('min_staff_required, max_staff_allowed')
+        .eq('partnership_id', selectedPartnershipId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading partnership config:', error);
+        return;
+      }
+
+      if (data) {
+        setPartnershipConfig(data);
+      }
+    } catch (error) {
+      console.error('Error loading partnership config:', error);
+    }
+  };
 
   // Auto-select view mode based on date range
   useEffect(() => {
@@ -562,7 +610,11 @@ export const UnifiedTeamScheduler: React.FC = () => {
         </div>
 
         {!screenshotMode && coverageAnalysis && (
-          <CoverageAlerts analysis={coverageAnalysis} />
+          <CoverageAlerts 
+            analysis={coverageAnalysis}
+            partnershipName={selectionMode === 'partnership' ? partnershipName : undefined}
+            partnershipConfig={selectionMode === 'partnership' ? partnershipConfig ?? undefined : undefined}
+          />
         )}
       </CardHeader>
 
@@ -677,6 +729,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
                         teamSize={totalMembers}
                         scheduledCounts={scheduledCounts}
                         teamBreakdowns={teamBreakdowns}
+                        partnershipMode={selectionMode === 'partnership'}
+                        partnershipConfig={partnershipConfig ?? undefined}
                       />
                     </>
                   )}
@@ -698,6 +752,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
                       }}
                       showHolidays={showHolidays}
                       shiftTypes={shiftTypes}
+                      partnershipMode={selectionMode === 'partnership'}
+                      partnershipConfig={partnershipConfig ?? undefined}
                     />
                   )}
                   

@@ -387,6 +387,50 @@ export type Database = {
         }
         Relationships: []
       }
+      partnership_capacity_config: {
+        Row: {
+          applies_to_weekends: boolean | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          max_staff_allowed: number | null
+          min_staff_required: number
+          notes: string | null
+          partnership_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to_weekends?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          max_staff_allowed?: number | null
+          min_staff_required?: number
+          notes?: string | null
+          partnership_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to_weekends?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          max_staff_allowed?: number | null
+          min_staff_required?: number
+          notes?: string | null
+          partnership_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_capacity_config_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: true
+            referencedRelation: "team_planning_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_access_log: {
         Row: {
           access_time: string

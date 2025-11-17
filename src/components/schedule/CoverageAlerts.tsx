@@ -5,9 +5,14 @@ import { CoverageAnalysis } from '@/hooks/useCoverageAnalysis';
 
 interface CoverageAlertsProps {
   analysis: CoverageAnalysis;
+  partnershipName?: string;
+  partnershipConfig?: {
+    min_staff_required: number;
+    max_staff_allowed?: number | null;
+  };
 }
 
-export function CoverageAlerts({ analysis }: CoverageAlertsProps) {
+export function CoverageAlerts({ analysis, partnershipName, partnershipConfig }: CoverageAlertsProps) {
   const { gaps, belowThreshold, threshold, coveragePercentage } = analysis;
 
   // Categorize gaps by severity
@@ -33,8 +38,23 @@ export function CoverageAlerts({ analysis }: CoverageAlertsProps) {
         </Alert>
       )}
 
+      {/* Partnership capacity warning */}
+      {partnershipName && partnershipConfig && belowThreshold && (
+        <Alert variant="default" className="border-orange-600 dark:border-orange-400">
+          <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+          <AlertTitle>Partnership Below Minimum Capacity</AlertTitle>
+          <AlertDescription>
+            Partnership <strong>"{partnershipName}"</strong> has coverage below the configured minimum
+            of {partnershipConfig.min_staff_required} staff on some days.
+            {partnershipConfig.max_staff_allowed && (
+              <span> Maximum allowed: {partnershipConfig.max_staff_allowed}</span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Warning alert if below threshold but not critical */}
-      {belowThreshold && coveragePercentage >= threshold - 20 && (
+      {belowThreshold && coveragePercentage >= threshold - 20 && !partnershipConfig && (
         <Alert variant="default" className="border-yellow-600 dark:border-yellow-400">
           <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
           <AlertTitle>Coverage Below Threshold</AlertTitle>
