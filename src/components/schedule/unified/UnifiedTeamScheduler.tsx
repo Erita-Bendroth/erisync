@@ -170,7 +170,9 @@ export const UnifiedTeamScheduler: React.FC = () => {
     setHoveredCell,
     setEditingCell,
     startDrag,
+    updateDragEnd,
     endDrag,
+    selectRange,
   } = useSchedulerState();
 
   const {
@@ -227,6 +229,23 @@ export const UnifiedTeamScheduler: React.FC = () => {
       return acc;
     }, {} as Record<string, typeof onlineUsers>);
   }, [onlineUsers]);
+
+  // Build drag selection rectangle as user drags
+  useEffect(() => {
+    if (state.isDragging && state.dragStart && state.hoveredCell) {
+      // Get user IDs to include in selection
+      const userIds = Array.from(state.selectedUsers);
+      
+      // If no users explicitly selected, use the user from drag start
+      if (userIds.length === 0) {
+        const [startUserId] = state.dragStart.split(':');
+        userIds.push(startUserId);
+      }
+      
+      // Build rectangular selection
+      selectRange(state.dragStart, state.hoveredCell, userIds);
+    }
+  }, [state.isDragging, state.dragStart, state.hoveredCell, state.selectedUsers, selectRange]);
 
   useEffect(() => {
     if (user) {
@@ -823,7 +842,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                         <div className="px-4 py-2 font-semibold text-sm border-r border-border">
                           Team Members
                         </div>
-                        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+                        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '80px' : 'minmax(80px, 1fr)'})` }}>
                           {dates.map((date) => {
                             const dateObj = new Date(date);
                             return (
