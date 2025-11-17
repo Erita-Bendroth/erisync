@@ -34,6 +34,7 @@ interface TeamSectionProps {
   onCellDragStart: (cellId: string) => void;
   onCellDragEnd: () => void;
   onSelectAllTeam: () => void;
+  showHolidays?: boolean;
 }
 
 export const TeamSection: React.FC<TeamSectionProps> = ({
@@ -55,6 +56,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
   onCellDragStart,
   onCellDragEnd,
   onSelectAllTeam,
+  showHolidays = true,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
