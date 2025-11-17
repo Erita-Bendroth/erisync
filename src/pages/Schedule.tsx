@@ -27,6 +27,8 @@ import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCover
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
 import { VacationPlanningDashboard } from "@/components/schedule/vacation-planning/VacationPlanningDashboard";
+import { PlanningPartnershipManager } from "@/components/schedule/planning-partners/PlanningPartnershipManager";
+import { SharedPlanningCalendar } from "@/components/schedule/planning-partners/SharedPlanningCalendar";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -363,7 +365,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -375,6 +377,10 @@ const Schedule = () => {
             <TabsTrigger value="vacation-planning" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Vacation Planning
+            </TabsTrigger>
+            <TabsTrigger value="planning-partners" className="flex items-center">
+              <Users className="w-4 h-4 mr-2" />
+              Co-Planning
             </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
@@ -571,6 +577,17 @@ const Schedule = () => {
               teamIds={teams.map(t => t.id)}
               teams={teams}
             />
+          </TabsContent>
+
+          <TabsContent value="planning-partners" className="space-y-6">
+            {isPlanner() || isAdmin() || isManager() ? (
+              <>
+                <PlanningPartnershipManager />
+                <SharedPlanningCalendar />
+              </>
+            ) : (
+              <SharedPlanningCalendar />
+            )}
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
