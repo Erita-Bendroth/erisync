@@ -254,11 +254,11 @@ export function PersonalMonthlyCalendar() {
                       key={entry.id}
                       variant="outline"
                       className={cn(
-                        "text-[8px] px-1 py-0 h-4 leading-none",
+                        "text-xs px-2 py-0.5 h-5 leading-tight font-medium",
                         getShiftColor(entry.shift_type, entry.activity_type)
                       )}
                     >
-                      {getShiftLabel(entry.shift_type, entry.activity_type).substring(0, 3)}
+                      {getShiftLabel(entry.shift_type, entry.activity_type)}
                     </Badge>
                   ))}
                 </div>

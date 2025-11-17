@@ -104,7 +104,7 @@ export function TeamSection({
       </button>
 
       {isExpanded && (
-        <div className="overflow-x-auto">
+        <div>
           <table className="w-full">
             <tbody>
               {members.map((member) => {
@@ -113,8 +113,8 @@ export function TeamSection({
                 
                 return (
                 <tr key={member.user_id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
-                  <td className="p-3 sticky left-0 bg-card border-r z-10">
-                    <div className="flex items-center gap-2 min-w-[160px]">
+                  <td className="p-3 w-[200px] sticky left-0 z-10 bg-card border-r">
+                    <div className="flex items-center gap-2">
                       <Circle className="h-2 w-2 flex-shrink-0" fill={teamColor} color={teamColor} />
                       <span className="font-medium text-sm">
                         {displayName}
