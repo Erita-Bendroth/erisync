@@ -940,7 +940,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                         <div className="px-4 py-2 font-semibold text-sm border-r border-border">
                           Team Members
                         </div>
-                        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '80px' : 'minmax(80px, 1fr)'})` }}>
+                        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '60px' : 'minmax(60px, 1fr)'})` }}>
                           {dates.map((date) => {
                             const dateObj = new Date(date);
                             return (

@@ -213,7 +213,7 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     return acc;
   }, {} as Record<string, number>);
 
-  const cellWidth = isLongRange ? '80px' : 'minmax(80px, 1fr)';
+  const cellWidth = isLongRange ? '60px' : 'minmax(60px, 1fr)';
 
   return (
     <div className="border border-border rounded-lg overflow-x-auto overflow-y-hidden">
