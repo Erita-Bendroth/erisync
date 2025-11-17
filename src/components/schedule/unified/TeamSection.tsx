@@ -139,6 +139,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                       onMouseEnter={() => onCellHover(cellId)}
                       onMouseLeave={() => onCellHover(null)}
                       onMouseDown={() => onCellDragStart(cellId)}
+                      onMouseUp={() => onCellDragEnd()}
                       editingBy={cellsBeingEdited[cellId] || []}
                     />
                   );
