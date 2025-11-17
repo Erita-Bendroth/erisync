@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { format, startOfWeek, addDays } from 'date-fns';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Users, Check, X, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Users, Loader2 } from 'lucide-react';
 import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { cn } from '@/lib/utils';
+import { CoverageSummaryPanel } from './CoverageSummaryPanel';
+import { TeamSection } from './TeamSection';
 
 interface PlanningPartnership {
   id: string;
@@ -289,6 +291,49 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
+  // Group members by team
+  const teamGroups = useMemo(() => {
+    const groups = new Map<string, TeamMember[]>();
+    teamMembers.forEach(member => {
+      const existing = groups.get(member.team_id) || [];
+      groups.set(member.team_id, [...existing, member]);
+    });
+    return groups;
+  }, [teamMembers]);
+
+  // Calculate daily coverage for summary
+  const dailyCoverage = useMemo(() => {
+    return weekDays.slice(0, 5).map(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const dayEntries = scheduleEntries.filter(e => e.date === dateStr);
+      const available = dayEntries.filter(e => e.availability_status === 'available').length;
+      const unavailable = dayEntries.filter(e => e.availability_status === 'unavailable').length;
+      return {
+        date,
+        available,
+        unavailable,
+        total: teamMembers.length
+      };
+    });
+  }, [weekDays, scheduleEntries, teamMembers]);
+
+  // Team colors for visual distinction
+  const teamColors = useMemo(() => {
+    const colors = [
+      'hsl(142, 76%, 36%)', // green
+      'hsl(221, 83%, 53%)', // blue
+      'hsl(262, 83%, 58%)', // purple
+      'hsl(38, 92%, 50%)', // orange
+      'hsl(346, 77%, 50%)', // pink
+      'hsl(198, 93%, 60%)', // cyan
+    ];
+    const colorMap = new Map<string, string>();
+    Array.from(teamGroups.keys()).forEach((teamId, index) => {
+      colorMap.set(teamId, colors[index % colors.length]);
+    });
+    return colorMap;
+  }, [teamGroups]);
+
   // Show empty state if no partnerships exist
   if (partnerships.length === 0) {
     return (
@@ -392,77 +437,60 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                 <p>No team members found in this partnership</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left p-3 font-medium">Team Member</th>
-                      {weekDays.map(day => (
-                        <th key={day.toISOString()} className="text-center p-3 font-medium min-w-[100px]">
-                          <div className="text-xs text-muted-foreground">
-                            {format(day, 'EEE')}
-                          </div>
-                          <div className="text-sm">
-                            {format(day, 'MMM d')}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teamMembers.map(member => {
-                      const availability = getAvailabilityForUserAndDate(member.user_id, member.team_id, weekDays[0]);
-                      const isSchedulable = canScheduleUser(member.user_id, member.team_id);
-                      
-                      return (
-                        <tr key={`${member.user_id}-${member.team_id}`} className="border-b border-border hover:bg-muted/50">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">
-                                {member.profiles.first_name} {member.profiles.last_name}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {teamNames.get(member.team_id) || 'Unknown Team'}
-                              </Badge>
+              <div className="space-y-4">
+                {/* Coverage Summary Panel */}
+                <CoverageSummaryPanel
+                  totalMembers={teamMembers.length}
+                  dailyCoverage={dailyCoverage}
+                  weekStart={currentWeekStart}
+                />
+
+                {/* Week Headers - Sticky */}
+                <div className="sticky top-0 z-20 bg-background border-b pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-[200px] font-medium text-sm text-muted-foreground">
+                      Team / Member
+                    </div>
+                    <div className="flex-1 grid grid-cols-7 gap-2">
+                      {weekDays.map((day, index) => {
+                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                        return (
+                          <div
+                            key={index}
+                            className={cn(
+                              "text-center p-2 rounded-lg border",
+                              isWeekend && "bg-muted/50"
+                            )}
+                          >
+                            <div className="text-xs text-muted-foreground font-medium">
+                              {format(day, 'EEE')}
                             </div>
-                          </td>
-                          {weekDays.map(day => {
-                            const availability = getAvailabilityForUserAndDate(member.user_id, member.team_id, day);
-                            const isSchedulable = canScheduleUser(member.user_id, member.team_id);
-                            
-                            return (
-                              <td
-                                key={day.toISOString()}
-                                className={cn(
-                                  "border border-border p-2 text-center transition-colors",
-                                  isSchedulable && "cursor-pointer hover:bg-primary/5",
-                                  !isSchedulable && "cursor-default",
-                                  availability === 'available' && "bg-green-50 dark:bg-green-950/20",
-                                  availability === 'unavailable' && "bg-red-50 dark:bg-red-950/20"
-                                )}
-                                onClick={() => {
-                                  if (isSchedulable) {
-                                    handleCellClick(member.user_id, day, member.team_id);
-                                  }
-                                }}
-                              >
-                                {availability === 'available' && (
-                                  <Check className="h-5 w-5 text-green-600 dark:text-green-400 mx-auto" />
-                                )}
-                                {availability === 'unavailable' && (
-                                  <X className="h-5 w-5 text-red-600 dark:text-red-400 mx-auto" />
-                                )}
-                                {!availability && (
-                                  <span className="text-muted-foreground text-xs">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            <div className="text-sm font-semibold">
+                              {format(day, 'MMM d')}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Team Sections */}
+                <div className="space-y-3">
+                  {Array.from(teamGroups.entries()).map(([teamId, members]) => (
+                    <TeamSection
+                      key={teamId}
+                      teamId={teamId}
+                      teamName={teamNames.get(teamId) || 'Unknown Team'}
+                      teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
+                      members={members}
+                      scheduleEntries={scheduleEntries}
+                      weekDates={weekDays}
+                      onCellClick={handleCellClick}
+                      canScheduleUser={canScheduleUser}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
