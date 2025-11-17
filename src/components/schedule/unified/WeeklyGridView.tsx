@@ -141,6 +141,13 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
               </div>
             </div>
 
+            {/* Shift Counter */}
+            <ShiftTypeCounterRow
+              dates={weekDates}
+              scheduleEntries={scheduleEntries.filter(e => weekDates.includes(e.date))}
+              shiftTypes={shiftTypes}
+            />
+
             {/* Team Sections */}
             {teamSections.map((section) => (
               <TeamSection
@@ -167,12 +174,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
               />
             ))}
 
-            {/* Shift Counter and Coverage */}
-            <ShiftTypeCounterRow
-              dates={weekDates}
-              scheduleEntries={scheduleEntries.filter(e => weekDates.includes(e.date))}
-              shiftTypes={shiftTypes}
-            />
+            {/* Coverage Row */}
             <CoverageRow
               dates={weekDates}
               teamSize={totalMembers}

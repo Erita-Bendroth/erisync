@@ -81,6 +81,20 @@ const getShiftColor = (shiftType: string): string => {
   }
 };
 
+const getTeamColor = (color: string): string => {
+  const colorMap: Record<string, string> = {
+    'blue': 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950 dark:text-blue-300',
+    'green': 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300',
+    'purple': 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-950 dark:text-purple-300',
+    'orange': 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950 dark:text-orange-300',
+    'red': 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300',
+    'yellow': 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300',
+    'pink': 'bg-pink-100 text-pink-700 border-pink-300 dark:bg-pink-950 dark:text-pink-300',
+    'indigo': 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-950 dark:text-indigo-300',
+  };
+  return colorMap[color] || 'bg-muted text-muted-foreground border-border';
+};
+
 export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
   teamSections,
   dates,
@@ -88,6 +102,10 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
   shiftTypes,
 }) => {
   const monthGroups = groupByMonth(dates);
+
+  const getEntriesForDate = (dateStr: string): ScheduleEntry[] => {
+    return scheduleEntries.filter(e => e.date === dateStr && e.activity_type === 'work');
+  };
 
   return (
     <div className="p-4">
@@ -136,10 +154,15 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                       const totalScheduled = Object.values(shiftCounts).reduce((a, b) => a + b, 0);
                       const isWeekend = getDay(day) === 0 || getDay(day) === 6;
 
+                      const dayEntries = getEntriesForDate(dateStr);
+                      const displayEntries = dayEntries.slice(0, 3);
+                      const remainingCount = dayEntries.length - 3;
+
                       return (
                         <div
                           key={dateStr}
-                          className={`aspect-square border rounded-lg p-2 ${
+                          data-date={dateStr}
+                          className={`aspect-square border rounded-lg p-1.5 ${
                             isInRange
                               ? isWeekend
                                 ? 'bg-muted/50 border-border'
@@ -147,28 +170,47 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                               : 'bg-muted/20 border-border/50'
                           }`}
                         >
-                          <div className="flex flex-col h-full">
+                          <div className="flex flex-col h-full gap-0.5">
                             <div className={`text-xs font-medium ${isInRange ? 'text-foreground' : 'text-muted-foreground'}`}>
                               {format(day, 'd')}
                             </div>
-                            {isInRange && totalScheduled > 0 && (
-                              <div className="flex-1 flex flex-col gap-0.5 mt-1">
-                                <div className="text-xs font-semibold text-foreground">
-                                  {totalScheduled} staff
-                                </div>
-                                <div className="flex flex-wrap gap-0.5">
-                                  {shiftTypes.map(shift =>
-                                    shiftCounts[shift.type] > 0 ? (
-                                      <Badge
-                                        key={shift.type}
-                                        variant="outline"
-                                        className={`text-[10px] px-1 py-0 h-4 ${getShiftColor(shift.type)}`}
-                                      >
-                                        {shift.label.charAt(0)}{shiftCounts[shift.type]}
-                                      </Badge>
-                                    ) : null
-                                  )}
-                                </div>
+                            {isInRange && dayEntries.length > 0 && (
+                              <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
+                                {displayEntries.map(entry => {
+                                  const team = teamSections.find(t => 
+                                    t.members.some(m => m.user_id === entry.user_id)
+                                  );
+                                  const member = team?.members.find(m => m.user_id === entry.user_id);
+                                  
+                                  return (
+                                    <div key={entry.id} className="flex items-center gap-0.5 text-[9px] leading-tight">
+                                      {team && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`px-0.5 h-3.5 min-w-[24px] text-center ${getTeamColor(team.color)}`}
+                                        >
+                                          {team.teamName.substring(0, 3).toUpperCase()}
+                                        </Badge>
+                                      )}
+                                      <span className="font-medium text-foreground truncate flex-1">
+                                        {member?.initials || '??'}
+                                      </span>
+                                      {entry.shift_type && (
+                                        <Badge 
+                                          variant="outline"
+                                          className={`px-0.5 h-3.5 min-w-[12px] text-center ${getShiftColor(entry.shift_type)}`}
+                                        >
+                                          {entry.shift_type.charAt(0).toUpperCase()}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {remainingCount > 0 && (
+                                  <div className="text-[9px] text-muted-foreground font-medium">
+                                    +{remainingCount} more
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

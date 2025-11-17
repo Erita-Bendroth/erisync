@@ -132,7 +132,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   useEffect(() => {
     if (rangeType === 'week' || rangeType === '2weeks') {
       setViewMode('grid');
-    } else if (rangeType === 'month' || rangeType === 'quarter') {
+    } else if (rangeType === 'quarter') {
       setViewMode('weekly');
     } else {
       setViewMode('monthly');
@@ -841,6 +841,13 @@ export const UnifiedTeamScheduler: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Shift Type Counter Row */}
+                      <ShiftTypeCounterRow
+                        dates={dates}
+                        scheduleEntries={scheduleEntries.filter(e => dates.includes(e.date))}
+                        shiftTypes={shiftTypes}
+                      />
+
                       {/* Team Sections */}
                       {teamSections.map((section) => (
                         <TeamSection
@@ -866,13 +873,6 @@ export const UnifiedTeamScheduler: React.FC = () => {
                           showHolidays={showHolidays}
                         />
                       ))}
-
-                      {/* Shift Type Counter Row */}
-                      <ShiftTypeCounterRow
-                        dates={dates}
-                        scheduleEntries={scheduleEntries}
-                        shiftTypes={shiftTypes}
-                      />
 
                       {/* Coverage Row */}
                       <CoverageRow
