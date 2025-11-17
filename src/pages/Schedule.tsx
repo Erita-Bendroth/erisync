@@ -27,7 +27,7 @@ import { escapeHtml } from "@/lib/validation";
 import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
-import { VacationPlanningDashboard } from "@/components/schedule/vacation-planning/VacationPlanningDashboard";
+
 import { PlanningPartnershipManager } from "@/components/schedule/planning-partners/PlanningPartnershipManager";
 import { IntegratedPlanningCalendar } from "@/components/schedule/planning-partners/IntegratedPlanningCalendar";
 import { UnifiedTeamScheduler } from "@/components/schedule/unified/UnifiedTeamScheduler";
@@ -389,10 +389,6 @@ const Schedule = () => {
               <ArrowLeftRight className="w-4 h-4 mr-2" />
               Shift Swaps
             </TabsTrigger>
-            <TabsTrigger value="vacation-planning" className="flex items-center">
-              <Calendar className="w-4 h-4 mr-2" />
-              Vacation Planning
-            </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
               Teams
@@ -647,12 +643,6 @@ const Schedule = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="vacation-planning" className="space-y-6">
-            <VacationPlanningDashboard 
-              teamIds={teams.map(t => t.id)}
-              teams={teams}
-            />
-          </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
             <EnhancedTeamManagement />
