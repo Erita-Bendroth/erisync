@@ -33,6 +33,7 @@ import { IntegratedPlanningCalendar } from "@/components/schedule/planning-partn
 import { UnifiedTeamScheduler } from "@/components/schedule/unified/UnifiedTeamScheduler";
 import { ShiftSwapRequestsList } from "@/components/schedule/swap/ShiftSwapRequestsList";
 import { ManagerSwapApprovals } from "@/components/schedule/swap/ManagerSwapApprovals";
+import { PersonalMonthlyCalendar } from "@/components/schedule/PersonalMonthlyCalendar";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -372,7 +373,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -386,6 +387,10 @@ const Schedule = () => {
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
+            </TabsTrigger>
+            <TabsTrigger value="my-calendar" className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              My Calendar
             </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
@@ -406,6 +411,10 @@ const Schedule = () => {
               <UnifiedTeamScheduler />
             </TabsContent>
           )}
+
+          <TabsContent value="my-calendar" className="space-y-6">
+            <PersonalMonthlyCalendar />
+          </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
             <div className="flex items-center justify-between mb-6">
