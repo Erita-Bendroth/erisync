@@ -136,7 +136,7 @@ const ShiftDistributionPopoverComponent: React.FC<ShiftDistributionPopoverProps>
 
           <div className="space-y-3">
             {shiftDetails.map((detail) => (
-              <div key={detail.shiftType} className="space-y-1">
+              <div key={`${date}-${detail.shiftType}`} className="space-y-1">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className={`${getShiftColor(detail.shiftType)} font-medium`}>
                     {getShiftLabel(detail.shiftType)}

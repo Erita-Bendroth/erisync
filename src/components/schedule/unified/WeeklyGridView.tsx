@@ -77,6 +77,14 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
     [scheduleEntries, visibleTeamIds]
   );
 
+  // Pre-filter schedule entries per week for stable references
+  const weeklyFilteredEntries = useMemo(() => 
+    weeks.map(weekDates => 
+      filteredScheduleEntries.filter(e => weekDates.includes(e.date))
+    ),
+    [weeks, filteredScheduleEntries]
+  );
+
   // Calculate coverage metrics for each week (memoized)
   const getWeekMetrics = useMemo(() => (weekDates: string[]) => {
     const scheduledCounts = weekDates.reduce((acc, date) => {
@@ -156,7 +164,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
             {/* Shift Counter */}
             <ShiftTypeCounterRow
               dates={weekDates}
-              scheduleEntries={filteredScheduleEntries.filter(e => weekDates.includes(e.date))}
+              scheduleEntries={weeklyFilteredEntries[weekIndex]}
               shiftTypes={shiftTypes}
               teamSections={teamSections}
             />
