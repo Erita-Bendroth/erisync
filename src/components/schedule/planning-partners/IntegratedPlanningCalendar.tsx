@@ -452,12 +452,14 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Coverage Summary Panel */}
+              {/* Coverage Summary Panel - Only for managers/planners/admins */}
+              {(isAdmin || isPlanner || isManager) && (
                 <CoverageSummaryPanel
                   totalMembers={teamMembers.length}
                   dailyCoverage={dailyCoverage}
                   weekStart={currentWeekStart}
                 />
+              )}
 
                 {/* Week Headers - Sticky */}
                 <div className="sticky top-0 z-20 bg-background border-b pb-2">
@@ -505,6 +507,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                         onCellClick={handleCellClick}
                         canScheduleUser={canScheduleUser}
                         canViewActivityDetails={isAdmin || isPlanner || isManager}
+                        currentUserId={user?.id || ''}
                       />
                     );
                   })}

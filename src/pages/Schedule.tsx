@@ -439,9 +439,11 @@ const Schedule = () => {
                     Add Entry
                   </Button>
                 </ScheduleEntryForm>
-                    <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
-                      Generate Bulk
-                    </Button>
+                {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && (
+                  <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
+                    Generate Bulk
+                  </Button>
+                )}
                     <Button variant="outline" onClick={() => setActiveTab('settings')}>
                       <Download className="w-4 h-4 mr-2" />
                       Export Schedule
