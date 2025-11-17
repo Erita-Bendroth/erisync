@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -299,7 +300,8 @@ export function ManagerSwapApprovals() {
               </CardContent>
             </Card>
           );
-        })}
+        })
+        )}
       </div>
 
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
