@@ -166,6 +166,24 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     fetchScheduleEntries();
   };
 
+  // Helper function to clean notes from system-generated messages
+  const getCleanNotesForDisplay = (notes: string | null | undefined): string => {
+    if (!notes) return "";
+    
+    // Remove system-generated notes and JSON artifacts
+    let cleanNotes = notes
+      .replace(/Times:\s*\[.*?\]/g, "")                           // Remove JSON time data
+      .replace(/Shift:\s*.+?(?:\n|$)/g, "")                      // Remove shift name
+      .replace(/Auto-generated.*?\)/g, "")                       // Remove auto-generated text
+      .replace(/Bulk assigned/gi, "")                            // Remove "Bulk assigned"
+      .replace(/Bulk generated.*?(?:\n|$)/gi, "")                // Remove "Bulk generated" and variations
+      .replace(/Shift swapped via approved request on.*?(?:\n|$)/gi, "")  // Remove swap notes
+      .replace(/^\s*\n+/g, "")                                   // Remove leading newlines
+      .trim();
+    
+    return cleanNotes;
+  };
+
   const handleDateClick = async (userId: string, date: Date) => {
     if (!isManager() && !isPlanner()) return;
     
@@ -2177,11 +2195,14 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       </Badge>
                                     )}
 
-                                    {canView && entry.notes && !entry.notes.includes("Auto-generated") && !entry.notes.includes("Times:") && (
-                                      <p className="text-xs text-muted-foreground truncate" title={entry.notes}>
-                                        {entry.notes.length > 20 ? `${entry.notes.substring(0, 20)}...` : entry.notes}
-                                      </p>
-                                    )}
+                                    {(() => {
+                                      const cleanNotes = getCleanNotesForDisplay(entry.notes);
+                                      return canView && cleanNotes && (
+                                        <p className="text-xs text-muted-foreground truncate" title={cleanNotes}>
+                                          {cleanNotes.length > 20 ? `${cleanNotes.substring(0, 20)}...` : cleanNotes}
+                                        </p>
+                                      );
+                                    })()}
                                   </div>
                                 );
                               })
