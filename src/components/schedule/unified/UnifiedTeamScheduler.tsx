@@ -243,6 +243,35 @@ export const UnifiedTeamScheduler: React.FC = () => {
     }, {} as Record<string, typeof onlineUsers>);
   }, [onlineUsers]);
 
+  // Enable horizontal scrolling with mouse wheel
+  useEffect(() => {
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+    
+    if (!scrollElement) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Check if there's horizontal overflow
+      const hasHorizontalScroll = scrollElement.scrollWidth > scrollElement.clientWidth;
+      
+      if (!hasHorizontalScroll) return;
+
+      // Allow Shift + wheel for vertical scrolling
+      if (e.shiftKey) return;
+
+      // Convert vertical wheel to horizontal scroll
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        scrollElement.scrollLeft += e.deltaY;
+      }
+    };
+
+    scrollElement.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      scrollElement.removeEventListener('wheel', handleWheel);
+    };
+  }, [dates, viewMode, teamSections]);
+
   // Build drag selection rectangle as user drags
   useEffect(() => {
     if (state.isDragging && state.dragStart && state.hoveredCell) {
