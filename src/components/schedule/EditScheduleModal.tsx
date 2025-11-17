@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { TimeSelect } from "@/components/ui/time-select";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { formatUserName } from "@/lib/utils";
+import { useShiftTypes } from "@/hooks/useShiftTypes";
 
 interface ScheduleEntry {
   id: string;
@@ -49,12 +50,7 @@ interface EditScheduleModalProps {
   onDelete?: () => void;
 }
 
-const shiftTypes = [
-  { value: "normal", label: "Normal" },
-  { value: "early", label: "Early" },
-  { value: "late", label: "Late" },
-  { value: "weekend", label: "Weekend / National Holiday" }
-];
+// Shift types are now loaded dynamically from admin definitions
 
 const activityTypes = [
   { value: "work", label: "Work" },
@@ -81,6 +77,8 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 }) => {
   const { toast } = useToast();
   const { showScheduleChangeNotification } = useDesktopNotifications();
+  const teamIds = entry?.team_id ? [entry.team_id] : [];
+  const { shiftTypes, loading: loadingShiftTypes } = useShiftTypes(teamIds);
   const [loading, setLoading] = useState(false);
   const [useHourSplit, setUseHourSplit] = useState(false);
   const [sendNotification, setSendNotification] = useState(false);
@@ -349,21 +347,25 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="shift_type">Shift Type</Label>
-            <Select
-              value={formData.shift_type}
-              onValueChange={(value: "normal" | "early" | "late" | "weekend") => setFormData({ ...formData, shift_type: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select shift type" />
-              </SelectTrigger>
-              <SelectContent>
-                {shiftTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {loadingShiftTypes ? (
+              <div className="h-10 bg-muted animate-pulse rounded-md" />
+            ) : (
+              <Select
+                value={formData.shift_type}
+                onValueChange={(value: "normal" | "early" | "late" | "weekend") => setFormData({ ...formData, shift_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select shift type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {shiftTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.type}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Hour split toggle */}
