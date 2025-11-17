@@ -42,8 +42,8 @@ export const calculateBulkEntries = (
 
   // Generate entries
   for (const day of days) {
-    // Skip weekends if configured
-    if (config.skipWeekends && isWeekend(day)) {
+    // Skip any days in the excluded list
+    if (config.excludedDays.includes(day.getDay())) {
       continue;
     }
 
