@@ -494,56 +494,61 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                 />
               )}
 
-                {/* Week Headers - Sticky */}
-                <div className="sticky top-0 z-20 bg-background border-b pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-[200px] font-medium text-sm text-muted-foreground sticky left-0 bg-background">
-                      Team / Member
+                {/* Unified Scroll Container */}
+                <div className="overflow-x-auto">
+                  <div className="min-w-max">
+                    {/* Week Headers - Sticky */}
+                    <div className="sticky top-0 z-20 bg-background border-b pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-[200px] font-medium text-sm text-muted-foreground sticky left-0 z-10 bg-background">
+                          Team / Member
+                        </div>
+                        <div className="flex gap-2">
+                          {displayDays.map((day, index) => {
+                            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                            return (
+                              <div
+                                key={index}
+                                className={cn(
+                                  "text-center p-2 rounded-lg border",
+                                  isWeekend && "bg-muted/50"
+                                )}
+                              >
+                                <div className="text-xs text-muted-foreground font-medium">
+                                  {format(day, 'EEE')}
+                                </div>
+                                <div className="text-sm font-semibold">
+                                  {format(day, 'MMM d')}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-2 overflow-x-auto">
-                      {displayDays.map((day, index) => {
-                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+                    {/* Team Sections */}
+                    <div className="space-y-3">
+                      {Array.from(teamGroups.entries()).map(([teamId, members]) => {
+                        console.log(`Rendering team ${teamNames.get(teamId)} (${teamId}) with ${members.length} members`);
                         return (
-                          <div
-                            key={index}
-                            className={cn(
-                              "text-center p-2 rounded-lg border",
-                              isWeekend && "bg-muted/50"
-                            )}
-                          >
-                            <div className="text-xs text-muted-foreground font-medium">
-                              {format(day, 'EEE')}
-                            </div>
-                            <div className="text-sm font-semibold">
-                              {format(day, 'MMM d')}
-                            </div>
-                          </div>
+                          <TeamSection
+                            key={teamId}
+                            teamId={teamId}
+                            teamName={teamNames.get(teamId) || 'Unknown Team'}
+                            teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
+                            members={members}
+                            scheduleEntries={scheduleEntries}
+                            weekDates={displayDays}
+                            onCellClick={handleCellClick}
+                            canScheduleUser={canScheduleUser}
+                            canViewActivityDetails={isAdmin || isPlanner || isManager}
+                            currentUserId={user?.id || ''}
+                          />
                         );
                       })}
                     </div>
                   </div>
-                </div>
-
-                {/* Team Sections */}
-                <div className="space-y-3">
-                  {Array.from(teamGroups.entries()).map(([teamId, members]) => {
-                    console.log(`Rendering team ${teamNames.get(teamId)} (${teamId}) with ${members.length} members`);
-                    return (
-                      <TeamSection
-                        key={teamId}
-                        teamId={teamId}
-                        teamName={teamNames.get(teamId) || 'Unknown Team'}
-                        teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
-                        members={members}
-                        scheduleEntries={scheduleEntries}
-                        weekDates={displayDays}
-                        onCellClick={handleCellClick}
-                        canScheduleUser={canScheduleUser}
-                        canViewActivityDetails={isAdmin || isPlanner || isManager}
-                        currentUserId={user?.id || ''}
-                      />
-                    );
-                  })}
                 </div>
               </div>
             )}
