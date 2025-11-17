@@ -110,13 +110,11 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                   checked={selectedUsers.has(member.user_id)}
                   onCheckedChange={() => onUserToggle(member.user_id)}
                 />
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold">
-                    {member.initials}
-                  </div>
-                  <span className="text-sm font-medium">
-                    {member.first_name} {member.last_name}
-                  </span>
+                <div 
+                  className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold"
+                  title={`${member.first_name} ${member.last_name}`}
+                >
+                  {member.initials}
                 </div>
               </div>
 

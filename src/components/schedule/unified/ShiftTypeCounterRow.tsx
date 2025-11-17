@@ -86,8 +86,19 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
   };
 
   const getShiftLabel = (shiftType: string): string => {
-    const shift = shiftTypes.find((s) => s.type === shiftType);
-    return shift ? shift.label.split(' ')[0] : shiftType;
+    switch (shiftType) {
+      case 'early':
+        return 'Early';
+      case 'late':
+        return 'Late';
+      case 'normal':
+        return 'Normal';
+      case 'weekend':
+        return 'Weekend';
+      default:
+        const shift = shiftTypes.find((s) => s.type === shiftType);
+        return shift ? shift.label.split(' ')[0] : shiftType;
+    }
   };
 
   return (

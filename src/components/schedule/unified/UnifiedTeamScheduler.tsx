@@ -846,6 +846,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                         dates={dates}
                         scheduleEntries={scheduleEntries.filter(e => dates.includes(e.date))}
                         shiftTypes={shiftTypes}
+                        teamSections={teamSections}
                       />
 
                       {/* Team Sections */}
