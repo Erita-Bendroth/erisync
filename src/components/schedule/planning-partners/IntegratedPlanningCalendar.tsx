@@ -155,17 +155,31 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
         setTeamNames(namesMap);
       }
 
-      // Fetch team members
-      const { data: membersData, error: membersError } = await supabase
-        .from('team_members')
-        .select(`
-          user_id,
-          team_id,
-          profiles!team_members_user_id_fkey(first_name, last_name)
-        `)
-        .in('team_id', partnership.team_ids);
-
-      if (membersError) throw membersError;
+      // Fetch team members using RPC to bypass RLS
+      const allMembers = [];
+      for (const teamId of partnership.team_ids) {
+        const { data, error } = await supabase
+          .rpc('get_team_members_safe', { _team_id: teamId });
+        
+        if (error) {
+          console.error(`Error fetching members for team ${teamId}:`, error);
+          continue;
+        }
+        
+        if (data) {
+          // Map to expected structure
+          const members = data.map(m => ({
+            user_id: m.user_id,
+            team_id: teamId,
+            profiles: {
+              first_name: m.first_name || m.initials || 'Unknown',
+              last_name: m.last_name || '',
+              initials: m.initials || '??'
+            }
+          }));
+          allMembers.push(...members);
+        }
+      }
 
       // Fetch schedule entries
       const weekEnd = addDays(currentWeekStart, 6);
@@ -178,8 +192,8 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
 
       if (scheduleError) throw scheduleError;
 
-      console.log('Fetched team members:', membersData?.length || 0);
-      setTeamMembers(membersData || []);
+      console.log('Fetched team members:', allMembers.length);
+      setTeamMembers(allMembers);
       setScheduleEntries(scheduleData || []);
     } catch (error) {
       console.error('Error fetching partnership data:', error);
@@ -201,7 +215,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
     const member = teamMembers.find(m => m.user_id === userId);
     if (!member || !member.profiles) return;
 
-    const userName = `${member.profiles.first_name} ${member.profiles.last_name}`;
+    const userName = member.profiles.first_name || 'Unknown';
     setSelectedCell({ userId, userName, date, teamId });
     
     // Pre-fill form with existing data if available
@@ -490,7 +504,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                         weekDates={weekDays}
                         onCellClick={handleCellClick}
                         canScheduleUser={canScheduleUser}
-                        canViewActivityDetails={canViewActivityDetails(user?.id || '')}
+                        canViewActivityDetails={isAdmin || isPlanner || isManager}
                       />
                     );
                   })}
