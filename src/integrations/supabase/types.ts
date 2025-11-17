@@ -620,6 +620,45 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_rotation_templates: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_public: boolean | null
+          pattern_config: Json
+          pattern_type: string
+          team_ids: string[]
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          pattern_config: Json
+          pattern_type: string
+          team_ids: string[]
+          template_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          pattern_config?: Json
+          pattern_type?: string
+          team_ids?: string[]
+          template_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shift_time_definitions: {
         Row: {
           created_at: string

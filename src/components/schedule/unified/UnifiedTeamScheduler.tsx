@@ -12,10 +12,12 @@ import { useSchedulerState, ScheduleEntry } from '@/hooks/useSchedulerState';
 import { useSchedulerActions } from '@/hooks/useSchedulerActions';
 import { useSchedulerPresence } from '@/hooks/useSchedulerPresence';
 import { useShiftTypes } from '@/hooks/useShiftTypes';
+import { useRotationTemplates } from '@/hooks/useRotationTemplates';
 import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
+import { ApplyTemplateDialog } from '../ApplyTemplateDialog';
 
 interface TeamMember {
   user_id: string;
@@ -41,6 +43,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [dateStart, setDateStart] = useState<Date>(getMonday(new Date()));
   const [rangeType, setRangeType] = useState<DateRangeType>('week');
   const [loading, setLoading] = useState(false);
+  const [applyTemplateDialogOpen, setApplyTemplateDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     firstName: string;
     lastName: string;
@@ -68,6 +72,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   } = useSchedulerActions(scheduleEntries, setScheduleEntries, user?.id || '');
 
   const { shiftTypes } = useShiftTypes(teamIds);
+  const { templates } = useRotationTemplates(teamIds);
 
   // Generate dates based on range type
   const dates = useMemo(() => {
@@ -258,6 +263,52 @@ export const UnifiedTeamScheduler: React.FC = () => {
     }
   };
 
+  const handleApplyTemplateClick = () => {
+    if (templates.length === 0) {
+      toast({
+        title: 'No Templates',
+        description: 'Create rotation templates first in Admin settings',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSelectedTemplate(templates[0]);
+    setApplyTemplateDialogOpen(true);
+  };
+
+  const handleApplyTemplate = async (entries: any[]) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const entriesToInsert = entries.map(entry => ({
+        ...entry,
+        created_by: userData.user.id,
+      }));
+
+      const { error } = await supabase
+        .from('schedule_entries')
+        .upsert(entriesToInsert, { onConflict: 'user_id,date,team_id' });
+
+      if (error) throw error;
+
+      await fetchScheduleEntries();
+      clearSelection();
+      
+      toast({
+        title: 'Success',
+        description: `Applied rotation pattern to ${entries.length} entries`,
+      });
+    } catch (error) {
+      console.error('Error applying template:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to apply rotation pattern',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const navigateDate = (direction: 'prev' | 'next') => {
     const count = getDaysCount(rangeType);
     const newDate = new Date(dateStart);
@@ -362,6 +413,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
           onPaste={handlePaste}
           onClear={handleClear}
           onQuickAssign={handleQuickAssign}
+          onApplyTemplate={handleApplyTemplateClick}
         />
 
         {loading ? (
@@ -442,7 +494,25 @@ export const UnifiedTeamScheduler: React.FC = () => {
         </div>
       </CardContent>
     </Card>
-  );
+
+    {selectedTemplate && (
+      <ApplyTemplateDialog
+        open={applyTemplateDialogOpen}
+        onOpenChange={setApplyTemplateDialogOpen}
+        template={selectedTemplate}
+        selectedUsers={teamSections
+          .flatMap(s => s.members)
+          .filter(m => state.selectedUsers.has(m.user_id))
+          .map(m => ({ user_id: m.user_id, name: `${m.first_name} ${m.last_name}` }))}
+        selectedDates={dates.filter(d => 
+          Array.from(state.selectedCells).some(cellId => cellId.endsWith(`-${d}`))
+        )}
+        teamId={teamSections[0]?.teamId || ''}
+        onApply={handleApplyTemplate}
+      />
+    )}
+  </div>
+);
 };
 
 function getMonday(date: Date): Date {
