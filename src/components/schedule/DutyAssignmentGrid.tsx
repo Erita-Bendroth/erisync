@@ -136,12 +136,43 @@ export function DutyAssignmentGrid({
     
     const { data, error } = await supabase
       .from('schedule_entries')
-      .select('date, user_id, shift_type, availability_status, activity_type')
+      .select(`
+        date, 
+        user_id, 
+        shift_type, 
+        availability_status, 
+        activity_type,
+        profiles!inner(first_name, last_name, initials)
+      `)
       .in('team_id', teamIds)
       .gte('date', startDate)
       .lte('date', endDate);
       
     if (!error && data) {
+      // Merge scheduled users into teamMembers
+      const scheduledUserProfiles = Array.from(
+        new Map(
+          data.map((entry: any) => [
+            entry.user_id,
+            {
+              user_id: entry.user_id,
+              first_name: entry.profiles.first_name,
+              last_name: entry.profiles.last_name,
+              initials: entry.profiles.initials || `${entry.profiles.first_name?.charAt(0) || ''}${entry.profiles.last_name?.charAt(0) || ''}`,
+            }
+          ])
+        ).values()
+      );
+      
+      // Merge with existing teamMembers
+      const mergedMembers = [...teamMembers];
+      scheduledUserProfiles.forEach(profile => {
+        if (!mergedMembers.find(m => m.user_id === profile.user_id)) {
+          mergedMembers.push(profile);
+        }
+      });
+      setTeamMembers(mergedMembers);
+      
       const workEntries = data.filter(entry => 
         entry.availability_status === 'available' && 
         entry.activity_type === 'work'
@@ -163,18 +194,20 @@ export function DutyAssignmentGrid({
         shiftTypes.add(shiftType);
       });
       
-      console.log('[DutyAssignmentGrid] Fetching scheduled users:', {
+      console.log('[DutyAssignmentGrid] Fetched scheduled users with profiles:', {
         teamIds,
         startDate,
         endDate,
-        dataLength: data?.length,
+        scheduledUserProfilesCount: scheduledUserProfiles.length,
+        mergedMembersCount: mergedMembers.length,
         workEntriesLength: workEntries.length,
-        scheduledUsersMap: Object.keys(map).length,
-        map
+        scheduledUsersMap: Object.keys(map).length
       });
       
       setScheduledUsers(map);
       setAvailableShiftTypes(shiftTypes);
+    } else if (error) {
+      console.error('[DutyAssignmentGrid] Error fetching scheduled users:', error);
     }
   };
 
