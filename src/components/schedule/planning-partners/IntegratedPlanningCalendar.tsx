@@ -527,26 +527,28 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                       </div>
                     </div>
 
-                    {/* Team Sections */}
-                    <div className="space-y-3">
-                      {Array.from(teamGroups.entries()).map(([teamId, members]) => {
-                        console.log(`Rendering team ${teamNames.get(teamId)} (${teamId}) with ${members.length} members`);
-                        return (
-                          <TeamSection
-                            key={teamId}
-                            teamId={teamId}
-                            teamName={teamNames.get(teamId) || 'Unknown Team'}
-                            teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
-                            members={members}
-                            scheduleEntries={scheduleEntries}
-                            weekDates={displayDays}
-                            onCellClick={handleCellClick}
-                            canScheduleUser={canScheduleUser}
-                            canViewActivityDetails={isAdmin || isPlanner || isManager}
-                            currentUserId={user?.id || ''}
-                          />
-                        );
-                      })}
+                    {/* Team Sections with Vertical Scroll */}
+                    <div className="max-h-[600px] overflow-y-auto">
+                      <div className="space-y-3">
+                        {Array.from(teamGroups.entries()).map(([teamId, members]) => {
+                          console.log(`Rendering team ${teamNames.get(teamId)} (${teamId}) with ${members.length} members`);
+                          return (
+                            <TeamSection
+                              key={teamId}
+                              teamId={teamId}
+                              teamName={teamNames.get(teamId) || 'Unknown Team'}
+                              teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
+                              members={members}
+                              scheduleEntries={scheduleEntries}
+                              weekDates={displayDays}
+                              onCellClick={handleCellClick}
+                              canScheduleUser={canScheduleUser}
+                              canViewActivityDetails={isAdmin || isPlanner || isManager}
+                              currentUserId={user?.id || ''}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
