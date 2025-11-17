@@ -43,24 +43,23 @@ export const TeamPeopleSelector = ({
     const fetchTeamMembers = async () => {
       if (!teamId) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('team_members')
-        .select(`
-          user_id,
-          profiles:user_id (
-            first_name,
-            last_name,
-            initials
-          )
-        `)
+        .select('user_id, profiles!team_members_user_id_fkey(first_name, last_name, initials)')
         .eq('team_id', teamId);
+
+      if (error) {
+        console.error('[TeamPeopleSelector] Error fetching team members:', error);
+        return;
+      }
 
       if (data) {
         const members = data.map(m => ({
           user_id: m.user_id,
           first_name: (m.profiles as any)?.first_name || '',
           last_name: (m.profiles as any)?.last_name || '',
-          initials: (m.profiles as any)?.initials || '',
+          initials: (m.profiles as any)?.initials || 
+            ((m.profiles as any)?.first_name?.[0] || '') + ((m.profiles as any)?.last_name?.[0] || ''),
         }));
         setTeamMembers(members);
       }
