@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useShiftTypes } from "@/hooks/useShiftTypes";
 
 interface BulkGenerationPreviewProps {
   totalShifts: number;
@@ -9,6 +10,7 @@ interface BulkGenerationPreviewProps {
   startDate: Date | null;
   endDate: Date | null;
   shiftType: string | null;
+  teamId: string | null;
 }
 
 export const BulkGenerationPreview = ({
@@ -18,7 +20,10 @@ export const BulkGenerationPreview = ({
   startDate,
   endDate,
   shiftType,
+  teamId,
 }: BulkGenerationPreviewProps) => {
+  const { shiftTypes } = useShiftTypes(teamId ? [teamId] : []);
+  const selectedShift = shiftTypes.find(s => s.type === shiftType);
   if (!startDate || !endDate || !shiftType) {
     return (
       <Card className="p-4 bg-muted/30">
@@ -53,7 +58,18 @@ export const BulkGenerationPreview = ({
 
         <div className="flex justify-between">
           <span className="text-muted-foreground">Shift type:</span>
-          <span className="font-medium capitalize">{shiftType}</span>
+          {selectedShift ? (
+            <div className="flex flex-col items-end">
+              <span className="font-medium">{selectedShift.label}</span>
+              {selectedShift.startTime && selectedShift.endTime && (
+                <span className="text-xs text-muted-foreground">
+                  {selectedShift.startTime}-{selectedShift.endTime}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="font-medium capitalize">{shiftType}</span>
+          )}
         </div>
 
         <div className="pt-2 mt-2 border-t flex justify-between">
