@@ -71,9 +71,8 @@ export const DateRangeStep = ({ wizardData, updateWizardData }: DateRangeStepPro
     
     while (current <= end) {
       const day = current.getDay();
-      const isWeekend = day === 0 || day === 6;
       
-      if (!wizardData.skipWeekends || !isWeekend) {
+      if (!wizardData.excludedDays.includes(day)) {
         count++;
       }
       
@@ -146,17 +145,69 @@ export const DateRangeStep = ({ wizardData, updateWizardData }: DateRangeStepPro
 
       {/* Options */}
       <div className="space-y-3">
-        <div className="flex items-center space-x-3">
-          <Checkbox
-            id="skip-weekends"
-            checked={wizardData.skipWeekends}
-            onCheckedChange={(checked) => 
-              updateWizardData({ skipWeekends: checked as boolean })
-            }
-          />
-          <Label htmlFor="skip-weekends" className="cursor-pointer">
-            Skip weekends (Saturday & Sunday)
-          </Label>
+        <Label className="text-sm font-medium">Days to Exclude</Label>
+        
+        <div className="space-y-2 pl-1">
+          {/* Quick toggle for both weekend days */}
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="excludeBothWeekendDays"
+              checked={wizardData.excludedDays.includes(0) && wizardData.excludedDays.includes(6)}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  const newDays = [...new Set([...wizardData.excludedDays, 0, 6])];
+                  updateWizardData({ excludedDays: newDays });
+                } else {
+                  const newDays = wizardData.excludedDays.filter(d => d !== 0 && d !== 6);
+                  updateWizardData({ excludedDays: newDays });
+                }
+              }}
+            />
+            <Label htmlFor="excludeBothWeekendDays" className="cursor-pointer font-medium">
+              Skip Weekends (Sat & Sun)
+            </Label>
+          </div>
+
+          {/* Individual day checkboxes */}
+          <div className="pl-6 space-y-2 border-l-2 border-border">
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="excludeSaturday"
+                checked={wizardData.excludedDays.includes(6)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateWizardData({ excludedDays: [...wizardData.excludedDays, 6] });
+                  } else {
+                    updateWizardData({ 
+                      excludedDays: wizardData.excludedDays.filter(d => d !== 6) 
+                    });
+                  }
+                }}
+              />
+              <Label htmlFor="excludeSaturday" className="cursor-pointer">
+                Saturdays
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="excludeSunday"
+                checked={wizardData.excludedDays.includes(0)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    updateWizardData({ excludedDays: [...wizardData.excludedDays, 0] });
+                  } else {
+                    updateWizardData({ 
+                      excludedDays: wizardData.excludedDays.filter(d => d !== 0) 
+                    });
+                  }
+                }}
+              />
+              <Label htmlFor="excludeSunday" className="cursor-pointer">
+                Sundays
+              </Label>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center space-x-3">
@@ -181,7 +232,7 @@ export const DateRangeStep = ({ wizardData, updateWizardData }: DateRangeStepPro
               Selected: {format(wizardData.startDate, "MMM d")} - {format(wizardData.endDate, "MMM d, yyyy")}
             </p>
             <p className="text-sm text-muted-foreground">
-              {getWorkingDaysCount()} {wizardData.skipWeekends ? "working " : ""}days
+              {getWorkingDaysCount()} working days
             </p>
           </div>
         </div>

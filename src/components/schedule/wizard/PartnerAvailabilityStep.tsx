@@ -131,10 +131,10 @@ export function PartnerAvailabilityStep({ wizardData }: PartnerAvailabilityStepP
       end: wizardData.endDate
     });
 
-    // Filter out weekends if skipWeekends is enabled
-    const filteredDates = wizardData.skipWeekends 
-      ? dateRange.filter(date => date.getDay() !== 0 && date.getDay() !== 6)
-      : dateRange;
+    // Filter out excluded days
+    const filteredDates = dateRange.filter(date => 
+      !wizardData.excludedDays.includes(date.getDay())
+    );
 
     const coverage: DailyCoverage[] = filteredDates.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');

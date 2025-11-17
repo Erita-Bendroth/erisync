@@ -22,7 +22,7 @@ export interface WizardData {
   selectedUsers: string[];
   startDate?: Date;
   endDate?: Date;
-  skipWeekends: boolean;
+  excludedDays: number[];
   skipHolidays: boolean;
   shiftType: string;
   shiftName: string;
@@ -64,7 +64,7 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     mode: "users",
     selectedTeam: "",
     selectedUsers: [],
-    skipWeekends: true,
+    excludedDays: [0, 6],
     skipHolidays: true,
     shiftType: "custom",
     shiftName: "Day Shift",

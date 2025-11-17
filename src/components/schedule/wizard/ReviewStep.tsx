@@ -53,7 +53,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
     });
 
     const filteredDays = allDays.filter(day => {
-      if (wizardData.skipWeekends && isWeekendDate(day)) {
+      if (wizardData.excludedDays.includes(day.getDay())) {
         return false;
       }
       return true;
@@ -145,8 +145,8 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         return false;
       }
       
-      // Skip weekends if configured
-      if (wizardData.skipWeekends && isWeekendDate(day)) {
+      // Skip excluded days if configured
+      if (wizardData.excludedDays.includes(day.getDay())) {
         return false;
       }
       
@@ -183,7 +183,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         start: wizardData.startDate,
         end: wizardData.endDate,
       }).filter(day => {
-        if (wizardData.skipWeekends && isWeekendDate(day)) {
+        if (wizardData.excludedDays.includes(day.getDay())) {
           return false;
         }
         return true;
@@ -495,8 +495,16 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             <span className="font-medium">{getTotalShifts()}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Skip Weekends:</span>
-            <span className="font-medium">{wizardData.skipWeekends ? "Yes" : "No"}</span>
+            <span className="text-muted-foreground">Excluded Days:</span>
+            <span className="font-medium">
+              {wizardData.excludedDays.includes(0) && wizardData.excludedDays.includes(6) 
+                ? "Weekends" 
+                : wizardData.excludedDays.includes(6) 
+                ? "Saturdays" 
+                : wizardData.excludedDays.includes(0) 
+                ? "Sundays" 
+                : "None"}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Skip Holidays:</span>
