@@ -275,12 +275,14 @@ export const UnifiedTeamScheduler: React.FC = () => {
         )?.teamId;
         
         if (member && teamId) {
+          const teamName = teamSections.find(s => s.teamId === teamId)?.teamName || '';
+          
           setEditingEntry({
             id: `temp-${userId}-${date}`,
             user_id: userId,
             team_id: teamId,
             date: date,
-            shift_type: null,
+            shift_type: 'normal',
             activity_type: 'work',
             availability_status: 'available',
             notes: '',
@@ -290,7 +292,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
               initials: member.initials,
             },
             teams: {
-              name: teamSections.find(s => s.teamId === teamId)?.teamName || '',
+              name: teamName,
             },
           });
         }
