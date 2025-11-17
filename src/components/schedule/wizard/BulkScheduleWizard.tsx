@@ -9,6 +9,7 @@ import { eachDayOfInterval, format } from "date-fns";
 import { ModeSelectionStep } from "./ModeSelectionStep";
 import { TeamPeopleStep } from "./TeamPeopleStep";
 import { DateRangeStep } from "./DateRangeStep";
+import { PartnerAvailabilityStep } from "./PartnerAvailabilityStep";
 import { ShiftConfigStep } from "./ShiftConfigStep";
 import { ShiftPatternStep } from "./ShiftPatternStep";
 import { AdvancedOptionsStep } from "./AdvancedOptionsStep";
@@ -120,17 +121,19 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
         { id: 0, label: "Mode", component: ModeSelectionStep },
         { id: 1, label: "Team & People", component: TeamPeopleStep },
         { id: 2, label: "Dates", component: DateRangeStep },
-        { id: 3, label: "Configure Shifts", component: ShiftPatternStep },
-        { id: 4, label: "Options", component: AdvancedOptionsStep },
-        { id: 5, label: "Review", component: ReviewStep },
+        { id: 3, label: "Partner Coverage", component: PartnerAvailabilityStep },
+        { id: 4, label: "Configure Shifts", component: ShiftPatternStep },
+        { id: 5, label: "Options", component: AdvancedOptionsStep },
+        { id: 6, label: "Review", component: ReviewStep },
       ]
     : [
         { id: 0, label: "Mode", component: ModeSelectionStep },
         { id: 1, label: "Team & People", component: TeamPeopleStep },
         { id: 2, label: "Dates", component: DateRangeStep },
-        { id: 3, label: "Shifts", component: ShiftConfigStep },
-        { id: 4, label: "Options", component: AdvancedOptionsStep },
-        { id: 5, label: "Review", component: ReviewStep },
+        { id: 3, label: "Partner Coverage", component: PartnerAvailabilityStep },
+        { id: 4, label: "Shifts", component: ShiftConfigStep },
+        { id: 5, label: "Options", component: AdvancedOptionsStep },
+        { id: 6, label: "Review", component: ReviewStep },
       ];
 
   const canProceed = () => {
@@ -148,6 +151,8 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
         return wizardData.selectedTeam !== "" && wizardData.selectedUsers.length > 0;
       case "Dates":
         return wizardData.startDate && wizardData.endDate;
+      case "Partner Coverage":
+        return true; // Always valid, informational step
       case "Shifts":
         return wizardData.startTime && wizardData.endTime;
       case "Configure Shifts":
