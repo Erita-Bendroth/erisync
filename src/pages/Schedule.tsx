@@ -28,7 +28,7 @@ import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleVi
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
 import { VacationPlanningDashboard } from "@/components/schedule/vacation-planning/VacationPlanningDashboard";
 import { PlanningPartnershipManager } from "@/components/schedule/planning-partners/PlanningPartnershipManager";
-import { SharedPlanningCalendar } from "@/components/schedule/planning-partners/SharedPlanningCalendar";
+import { IntegratedPlanningCalendar } from "@/components/schedule/planning-partners/IntegratedPlanningCalendar";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -54,6 +54,7 @@ const Schedule = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDutyCoverageModal, setShowDutyCoverageModal] = useState(false);
+  const [partnershipDialogOpen, setPartnershipDialogOpen] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -365,7 +366,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -377,10 +378,6 @@ const Schedule = () => {
             <TabsTrigger value="vacation-planning" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Vacation Planning
-            </TabsTrigger>
-            <TabsTrigger value="planning-partners" className="flex items-center">
-              <Users className="w-4 h-4 mr-2" />
-              Co-Planning
             </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
@@ -405,6 +402,19 @@ const Schedule = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {(isPlanner() || isAdmin() || isManager()) && (
+                  <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Users className="w-4 h-4 mr-2" />
+                        Manage Partnerships
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <PlanningPartnershipManager />
+                    </DialogContent>
+                  </Dialog>
+                )}
                 <Select value={scheduleViewMode} onValueChange={(value: "standard" | "multi-team") => setScheduleViewMode(value)}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue />
@@ -570,6 +580,11 @@ const Schedule = () => {
             ) : (
               <MultiTeamScheduleView teams={teams} />
             )}
+
+            {/* Integrated Co-Planning Calendar */}
+            <IntegratedPlanningCalendar 
+              onScheduleUpdate={() => setScheduleRefreshKey(prev => prev + 1)}
+            />
           </TabsContent>
 
           <TabsContent value="vacation-planning" className="space-y-6">
@@ -577,17 +592,6 @@ const Schedule = () => {
               teamIds={teams.map(t => t.id)}
               teams={teams}
             />
-          </TabsContent>
-
-          <TabsContent value="planning-partners" className="space-y-6">
-            {isPlanner() || isAdmin() || isManager() ? (
-              <>
-                <PlanningPartnershipManager />
-                <SharedPlanningCalendar />
-              </>
-            ) : (
-              <SharedPlanningCalendar />
-            )}
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
