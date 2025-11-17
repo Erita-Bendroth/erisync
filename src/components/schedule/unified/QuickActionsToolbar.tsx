@@ -5,12 +5,13 @@ import {
   CheckSquare, 
   Copy, 
   ClipboardPaste, 
-  Repeat, 
   Trash2,
   Sun,
   Moon,
   Calendar,
   Clock,
+  Sunrise,
+  Sunset,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -18,20 +19,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ShiftTypeOption } from '@/hooks/useShiftTypes';
 
 interface QuickActionsToolbarProps {
   hasSelection: boolean;
   hasClipboard: boolean;
+  shiftTypes: ShiftTypeOption[];
   onSelectAll: () => void;
   onCopy: () => void;
   onPaste: () => void;
   onClear: () => void;
-  onQuickAssign: (shiftType: 'early' | 'late' | 'normal' | 'weekend') => void;
+  onQuickAssign: (shiftType: string) => void;
 }
 
 export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
   hasSelection,
   hasClipboard,
+  shiftTypes,
   onSelectAll,
   onCopy,
   onPaste,
@@ -85,22 +89,23 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem onClick={() => onQuickAssign('early')}>
-            <Sun className="h-4 w-4 mr-2" />
-            Early Shift
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onQuickAssign('late')}>
-            <Moon className="h-4 w-4 mr-2" />
-            Late Shift
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onQuickAssign('normal')}>
-            <Calendar className="h-4 w-4 mr-2" />
-            Day Shift
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onQuickAssign('weekend')}>
-            <Calendar className="h-4 w-4 mr-2" />
-            Weekend
-          </DropdownMenuItem>
+          {shiftTypes.map((shift) => {
+            const Icon = getShiftIcon(shift.type);
+            return (
+              <DropdownMenuItem 
+                key={shift.type}
+                onClick={() => onQuickAssign(shift.type)}
+              >
+                <Icon className="h-4 w-4 mr-2" />
+                {shift.label}
+                {shift.description && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({shift.description})
+                  </span>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -115,4 +120,19 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
       </Button>
     </div>
   );
+};
+
+const getShiftIcon = (shiftType: string) => {
+  switch (shiftType) {
+    case 'early':
+      return Sunrise;
+    case 'late':
+      return Sunset;
+    case 'normal':
+      return Sun;
+    case 'weekend':
+      return Calendar;
+    default:
+      return Clock;
+  }
 };

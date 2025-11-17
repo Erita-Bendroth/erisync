@@ -1,25 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { QuickActionsToolbar } from './QuickActionsToolbar';
-import { SchedulerGrid } from './SchedulerGrid';
+import { TeamSection } from './TeamSection';
 import { OnlineUsersPanel } from './OnlineUsersPanel';
+import { CoverageRow } from './CoverageRow';
+import { PartnershipSelector } from './PartnershipSelector';
+import { DateRangeSelector, DateRangeType, getDaysCount } from './DateRangeSelector';
 import { useSchedulerState, ScheduleEntry } from '@/hooks/useSchedulerState';
 import { useSchedulerActions } from '@/hooks/useSchedulerActions';
 import { useSchedulerPresence } from '@/hooks/useSchedulerPresence';
+import { useShiftTypes } from '@/hooks/useShiftTypes';
 import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
-
-interface Team {
-  id: string;
-  name: string;
-}
 
 interface TeamMember {
   user_id: string;
@@ -28,15 +24,22 @@ interface TeamMember {
   initials: string;
 }
 
+interface TeamSection {
+  teamId: string;
+  teamName: string;
+  members: TeamMember[];
+  color: string;
+}
+
 export const UnifiedTeamScheduler: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [selectedPartnershipId, setSelectedPartnershipId] = useState<string>('');
+  const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [teamSections, setTeamSections] = useState<TeamSection[]>([]);
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
-  const [weekStart, setWeekStart] = useState<Date>(getMonday(new Date()));
-  const [showPartnerTeams, setShowPartnerTeams] = useState(false);
+  const [dateStart, setDateStart] = useState<Date>(getMonday(new Date()));
+  const [rangeType, setRangeType] = useState<DateRangeType>('week');
   const [loading, setLoading] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     firstName: string;
@@ -55,7 +58,6 @@ export const UnifiedTeamScheduler: React.FC = () => {
     setEditingCell,
     startDrag,
     endDrag,
-    selectRange,
   } = useSchedulerState();
 
   const {
@@ -65,16 +67,42 @@ export const UnifiedTeamScheduler: React.FC = () => {
     clearCells,
   } = useSchedulerActions(scheduleEntries, setScheduleEntries, user?.id || '');
 
-  // Generate dates for current week
-  const dates = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + i);
-    return date.toISOString().split('T')[0];
-  });
+  const { shiftTypes } = useShiftTypes(teamIds);
+
+  // Generate dates based on range type
+  const dates = useMemo(() => {
+    const count = getDaysCount(rangeType);
+    return Array.from({ length: count }, (_, i) => {
+      const date = new Date(dateStart);
+      date.setDate(date.getDate() + i);
+      return date.toISOString().split('T')[0];
+    });
+  }, [dateStart, rangeType]);
+
+  const debouncedEditingCell = useDebounce(state.editingCell, 300);
+
+  const { onlineUsers } = useSchedulerPresence(
+    selectedPartnershipId,
+    'partnership',
+    user?.id || '',
+    currentUserProfile,
+    debouncedEditingCell
+  );
+
+  const cellsBeingEdited = useMemo(() => {
+    return onlineUsers.reduce((acc, user) => {
+      if (user.editing_cell) {
+        if (!acc[user.editing_cell]) {
+          acc[user.editing_cell] = [];
+        }
+        acc[user.editing_cell].push(user);
+      }
+      return acc;
+    }, {} as Record<string, typeof onlineUsers>);
+  }, [onlineUsers]);
 
   useEffect(() => {
     if (user) {
-      fetchTeams();
       fetchCurrentUserProfile();
     }
   }, [user]);
@@ -103,39 +131,40 @@ export const UnifiedTeamScheduler: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedTeamId) {
-      fetchTeamMembers();
+    if (teamIds.length > 0) {
+      fetchTeamSections();
       fetchScheduleEntries();
     }
-  }, [selectedTeamId, weekStart]);
+  }, [teamIds, dateStart, rangeType]);
 
-  const fetchTeams = async () => {
+  const fetchTeamSections = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('id, name')
-        .order('name');
+      const sections: TeamSection[] = [];
+      
+      for (const teamId of teamIds) {
+        const { data: team } = await supabase
+          .from('teams')
+          .select('name')
+          .eq('id', teamId)
+          .single();
+        
+        const { data: members, error } = await supabase
+          .rpc('get_team_members_safe', { _team_id: teamId });
 
-      if (error) throw error;
-      setTeams(data || []);
-      if (data && data.length > 0) {
-        setSelectedTeamId(data[0].id);
+        if (error) throw error;
+
+        sections.push({
+          teamId,
+          teamName: team?.name || 'Unknown Team',
+          members: members || [],
+          color: getTeamColor(teamId),
+        });
       }
+
+      setTeamSections(sections);
     } catch (error) {
       console.error('Error fetching teams:', error);
-    }
-  };
-
-  const fetchTeamMembers = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .rpc('get_team_members_safe', { _team_id: selectedTeamId });
-
-      if (error) throw error;
-      setTeamMembers(data || []);
-    } catch (error) {
-      console.error('Error fetching team members:', error);
       toast({
         title: "Error",
         description: "Failed to load team members",
@@ -147,216 +176,268 @@ export const UnifiedTeamScheduler: React.FC = () => {
   };
 
   const fetchScheduleEntries = async () => {
-    try {
-      const startDate = weekStart.toISOString().split('T')[0];
-      const endDate = new Date(weekStart);
-      endDate.setDate(endDate.getDate() + 6);
-      const endDateStr = endDate.toISOString().split('T')[0];
+    if (teamIds.length === 0) return;
 
+    try {
       const { data, error } = await supabase
         .from('schedule_entries')
         .select('*')
-        .eq('team_id', selectedTeamId)
-        .gte('date', startDate)
-        .lte('date', endDateStr);
+        .in('team_id', teamIds)
+        .gte('date', dates[0])
+        .lte('date', dates[dates.length - 1]);
 
       if (error) throw error;
       setScheduleEntries(data || []);
     } catch (error) {
-      console.error('Error fetching schedule entries:', error);
+      console.error('Error fetching schedule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load schedule",
+        variant: "destructive",
+      });
     }
   };
 
   const handleCopy = () => {
-    const selectedCellIds = Array.from(state.selectedCells);
-    const pattern = copyPattern(selectedCellIds);
+    if (state.selectedCells.size === 0) {
+      toast({ title: "No cells selected", description: "Please select cells to copy" });
+      return;
+    }
+    const pattern = copyPattern(Array.from(state.selectedCells));
     setClipboard(pattern);
-    toast({
-      title: "Pattern copied",
-      description: `Copied ${pattern.length} cells`,
-    });
+    toast({ title: "Copied", description: `Copied ${pattern.length} entries` });
   };
 
   const handlePaste = () => {
-    const selectedCellIds = Array.from(state.selectedCells);
-    pastePattern(state.clipboardPattern, selectedCellIds, selectedTeamId);
+    if (!state.clipboardPattern || state.clipboardPattern.length === 0) {
+      toast({ title: "Nothing to paste", description: "Please copy cells first" });
+      return;
+    }
+    if (state.selectedCells.size === 0) {
+      toast({ title: "No destination", description: "Please select target cells" });
+      return;
+    }
+    const firstTeamId = teamIds[0];
+    if (firstTeamId) {
+      pastePattern(state.clipboardPattern, Array.from(state.selectedCells), firstTeamId);
+      toast({ title: "Pasted", description: "Schedule pattern applied" });
+    }
   };
 
-  const handleQuickAssign = (shiftType: 'early' | 'late' | 'normal' | 'weekend') => {
-    const selectedCellIds = Array.from(state.selectedCells);
-    if (selectedCellIds.length === 0) {
-      // Use selected users with all dates
-      const userIds = Array.from(state.selectedUsers);
-      const cellIds = userIds.flatMap(userId => 
-        dates.map(date => `${userId}:${date}`)
-      );
-      bulkAssignShift(cellIds, shiftType, selectedTeamId);
-    } else {
-      bulkAssignShift(selectedCellIds, shiftType, selectedTeamId);
+  const handleQuickAssign = (shiftType: string) => {
+    if (state.selectedCells.size === 0) {
+      toast({ title: "No cells selected", description: "Please select cells to assign" });
+      return;
+    }
+    const firstTeamId = teamIds[0];
+    if (firstTeamId) {
+      bulkAssignShift(Array.from(state.selectedCells), shiftType as any, firstTeamId);
+      toast({ title: "Assigned", description: `${shiftType} shift assigned` });
     }
   };
 
   const handleClear = () => {
-    const selectedCellIds = Array.from(state.selectedCells);
-    clearCells(selectedCellIds, selectedTeamId);
+    if (state.selectedCells.size === 0) {
+      toast({ title: "No cells selected", description: "Please select cells to clear" });
+      return;
+    }
+    clearCells(Array.from(state.selectedCells), teamIds[0]);
+    toast({ title: "Cleared", description: "Selected cells cleared" });
   };
 
   const handleSelectAll = () => {
-    selectAllUsers(teamMembers.map(m => m.user_id));
+    const allUserIds = teamSections.flatMap(section => section.members.map(m => m.user_id));
+    selectAllUsers(allUserIds);
   };
 
-  const handleUpdateEntry = (entry: ScheduleEntry) => {
-    setScheduleEntries(prev => {
-      const existing = prev.findIndex(
-        e => e.user_id === entry.user_id && e.date === entry.date && e.team_id === entry.team_id
-      );
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = { ...updated[existing], ...entry };
-        return updated;
-      }
-      return [...prev, entry];
-    });
+  const handleSelectAllTeam = (teamId: string) => {
+    const section = teamSections.find(s => s.teamId === teamId);
+    if (section) {
+      const userIds = section.members.map(m => m.user_id);
+      selectAllUsers(userIds);
+    }
   };
 
-  const navigateWeek = (direction: 'prev' | 'next') => {
-    const newDate = new Date(weekStart);
-    newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
-    setWeekStart(newDate);
-    clearSelection();
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const count = getDaysCount(rangeType);
+    const newDate = new Date(dateStart);
+    newDate.setDate(newDate.getDate() + (direction === 'next' ? count : -count));
+    setDateStart(newDate);
   };
 
-  // Debounce editing cell to avoid spamming presence updates
-  const debouncedEditingCell = useDebounce(state.editingCell, 300);
-
-  // Enable presence tracking
-  const { onlineUsers } = useSchedulerPresence(
-    selectedTeamId,
-    user?.id || '',
-    currentUserProfile,
-    debouncedEditingCell
-  );
-
-  // Calculate which cells are being edited by others
-  const cellsBeingEdited = useMemo(() => {
-    return onlineUsers.reduce((acc, user) => {
-      if (user.editing_cell) {
-        if (!acc[user.editing_cell]) {
-          acc[user.editing_cell] = [];
-        }
-        acc[user.editing_cell].push(user);
-      }
+  // Calculate coverage by date and team
+  const scheduledCounts = useMemo(() => {
+    return dates.reduce((acc, date) => {
+      acc[date] = scheduleEntries.filter(
+        e => e.date === date && e.availability_status === 'available'
+      ).length;
       return acc;
-    }, {} as Record<string, typeof onlineUsers>);
-  }, [onlineUsers]);
+    }, {} as Record<string, number>);
+  }, [dates, scheduleEntries]);
+
+  const teamBreakdowns = useMemo(() => {
+    return dates.reduce((acc, date) => {
+      acc[date] = teamSections.map(section => ({
+        teamName: section.teamName,
+        count: scheduleEntries.filter(
+          e => e.date === date && 
+          e.availability_status === 'available' &&
+          section.members.some(m => m.user_id === e.user_id)
+        ).length,
+        total: section.members.length,
+        color: section.color,
+      }));
+      return acc;
+    }, {} as Record<string, any[]>);
+  }, [dates, scheduleEntries, teamSections]);
+
+  const totalMembers = teamSections.reduce((sum, section) => sum + section.members.length, 0);
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Unified Team Scheduler
-            </CardTitle>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <CardTitle>Partnership Scheduler</CardTitle>
             <CardDescription>
-              Fast, collaborative team scheduling with multi-select and partner team visibility
+              Collaborative scheduling across planning partnerships
             </CardDescription>
           </div>
-          <div className="flex items-center gap-4">
-            {onlineUsers.length > 0 && <OnlineUsersPanel users={onlineUsers} />}
+          {onlineUsers.length > 0 && (
+            <OnlineUsersPanel users={onlineUsers} />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4 mt-4">
+          <PartnershipSelector
+            value={selectedPartnershipId}
+            onChange={(id, ids) => {
+              setSelectedPartnershipId(id);
+              setTeamIds(ids);
+            }}
+          />
+
+          <div className="flex items-center justify-between gap-4">
+            <DateRangeSelector
+              startDate={dateStart}
+              onStartDateChange={(date) => date && setDateStart(date)}
+              rangeType={rangeType}
+              onRangeTypeChange={(type) => setRangeType(type as DateRangeType)}
+            />
+
             <div className="flex items-center gap-2">
-              <Switch
-                id="partner-teams"
-                checked={showPartnerTeams}
-                onCheckedChange={setShowPartnerTeams}
-              />
-              <Label htmlFor="partner-teams">Show Partner Teams</Label>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateDate('prev')}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDateStart(getMonday(new Date()))}
+              >
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigateDate('next')}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select team" />
-              </SelectTrigger>
-              <SelectContent>
-                {teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Week Navigation */}
-          <div className="flex items-center justify-between">
-            <Button variant="outline" size="sm" onClick={() => navigateWeek('prev')}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous Week
-            </Button>
-            <div className="text-sm font-medium">
-              Week of {weekStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigateWeek('next')}>
-              Next Week
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
+
+      <CardContent className="p-0">
+        <QuickActionsToolbar
+          hasSelection={state.selectedCells.size > 0}
+          hasClipboard={state.clipboardPattern.length > 0}
+          shiftTypes={shiftTypes}
+          onSelectAll={handleSelectAll}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onClear={handleClear}
+          onQuickAssign={handleQuickAssign}
+        />
+
+        {loading ? (
+          <div className="flex items-center justify-center p-12">
+            <div className="text-muted-foreground">Loading teams...</div>
           </div>
-
-          {/* Quick Actions Toolbar */}
-          <QuickActionsToolbar
-            hasSelection={state.selectedCells.size > 0 || state.selectedUsers.size > 0}
-            hasClipboard={state.clipboardPattern.length > 0}
-            onSelectAll={handleSelectAll}
-            onCopy={handleCopy}
-            onPaste={handlePaste}
-            onClear={handleClear}
-            onQuickAssign={handleQuickAssign}
-          />
-
-          {/* Scheduler Grid */}
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <p className="text-muted-foreground">Loading team members...</p>
+        ) : teamSections.length === 0 ? (
+          <div className="flex items-center justify-center p-12">
+            <div className="text-muted-foreground">
+              No teams in this partnership
             </div>
-          ) : teamMembers.length === 0 ? (
-            <div className="flex items-center justify-center h-64 border border-border rounded-lg">
-              <p className="text-muted-foreground">No team members found</p>
+          </div>
+        ) : (
+          <>
+            {/* Header Row with Dates */}
+            <div className="grid grid-cols-[200px_1fr] border-b border-border bg-muted/30 sticky top-0 z-10">
+              <div className="px-4 py-2 font-semibold text-sm border-r border-border">
+                Team Members
+              </div>
+              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+                {dates.map((date) => {
+                  const dateObj = new Date(date);
+                  return (
+                    <div
+                      key={date}
+                      className="px-2 py-2 text-center border-r border-border text-xs font-medium"
+                    >
+                      <div>{dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="text-muted-foreground">
+                        {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            <SchedulerGrid
-              teamMembers={teamMembers}
+
+            {/* Team Sections */}
+            {teamSections.map((section) => (
+              <TeamSection
+                key={section.teamId}
+                teamId={section.teamId}
+                teamName={section.teamName}
+                teamColor={section.color}
+                members={section.members}
+                dates={dates}
+                scheduleEntries={scheduleEntries}
+                selectedUsers={state.selectedUsers}
+                selectedCells={state.selectedCells}
+                hoveredCell={state.hoveredCell}
+                editingCell={state.editingCell}
+                cellsBeingEdited={cellsBeingEdited}
+                onUserToggle={toggleUserSelection}
+                onCellClick={toggleCellSelection}
+                onCellDoubleClick={setEditingCell}
+                onCellHover={setHoveredCell}
+                onCellDragStart={startDrag}
+                onCellDragEnd={endDrag}
+                onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
+              />
+            ))}
+
+            {/* Coverage Row */}
+            <CoverageRow
               dates={dates}
-              scheduleEntries={scheduleEntries}
-              selectedUsers={state.selectedUsers}
-              selectedCells={state.selectedCells}
-              hoveredCell={state.hoveredCell}
-              editingCell={state.editingCell}
-              onUserToggle={toggleUserSelection}
-              onCellClick={toggleCellSelection}
-              onCellDoubleClick={setEditingCell}
-              onCellHover={setHoveredCell}
-              onCellDragStart={startDrag}
-              onCellDragEnd={endDrag}
-              onUpdateEntry={handleUpdateEntry}
-              teamId={selectedTeamId}
-              currentUserId={user?.id || ''}
-              cellsBeingEdited={cellsBeingEdited}
+              teamSize={totalMembers}
+              scheduledCounts={scheduledCounts}
+              teamBreakdowns={teamBreakdowns}
             />
-          )}
+          </>
+        )}
 
-          {/* Keyboard Shortcuts Help */}
-          <div className="text-xs text-muted-foreground pt-4 border-t border-border">
-            <p className="font-semibold mb-1">Keyboard Shortcuts:</p>
-            <div className="grid grid-cols-2 gap-x-4">
-              <p><kbd className="px-1 py-0.5 bg-muted rounded">Ctrl+A</kbd> Select all team</p>
-              <p><kbd className="px-1 py-0.5 bg-muted rounded">Ctrl+C</kbd> Copy selection</p>
-              <p><kbd className="px-1 py-0.5 bg-muted rounded">Ctrl+V</kbd> Paste pattern</p>
-              <p><kbd className="px-1 py-0.5 bg-muted rounded">Delete</kbd> Clear selection</p>
-              <p><kbd className="px-1 py-0.5 bg-muted rounded">Double-click</kbd> Quick edit cell</p>
-            </div>
+        {/* Keyboard Shortcuts Info */}
+        <div className="p-4 border-t border-border bg-muted/30">
+          <div className="text-xs text-muted-foreground">
+            <span className="font-semibold">Shortcuts:</span> Click to select • Double-click to edit • Drag to select range
           </div>
         </div>
       </CardContent>
@@ -364,10 +445,26 @@ export const UnifiedTeamScheduler: React.FC = () => {
   );
 };
 
-// Helper function to get Monday of current week
 function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   return new Date(d.setDate(diff));
 }
+
+const getTeamColor = (teamId: string): string => {
+  const colors = [
+    'hsl(217, 91%, 60%)',
+    'hsl(142, 71%, 45%)',
+    'hsl(38, 92%, 50%)',
+    'hsl(330, 81%, 60%)',
+    'hsl(173, 80%, 40%)',
+    'hsl(258, 90%, 66%)',
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < teamId.length; i++) {
+    hash = teamId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
