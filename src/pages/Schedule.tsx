@@ -377,10 +377,12 @@ const Schedule = () => {
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
             </TabsTrigger>
-            <TabsTrigger value="unified-scheduler" className="flex items-center">
-              <Calendar className="w-4 h-4 mr-2" />
-              Team Scheduler
-            </TabsTrigger>
+            {(isAdmin() || isPlanner() || isManager()) && (
+              <TabsTrigger value="unified-scheduler" className="flex items-center">
+                <Calendar className="w-4 h-4 mr-2" />
+                Team Scheduler
+              </TabsTrigger>
+            )}
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
@@ -403,9 +405,11 @@ const Schedule = () => {
             <AdminSetup />
           </TabsContent>
 
-          <TabsContent value="unified-scheduler" className="space-y-6">
-            <UnifiedTeamScheduler />
-          </TabsContent>
+          {(isAdmin() || isPlanner() || isManager()) && (
+            <TabsContent value="unified-scheduler" className="space-y-6">
+              <UnifiedTeamScheduler />
+            </TabsContent>
+          )}
 
           <TabsContent value="schedule" className="space-y-6">
             <div className="flex items-center justify-between mb-6">

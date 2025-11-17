@@ -41,6 +41,8 @@ interface WeeklyGridViewProps {
     min_staff_required: number;
     max_staff_allowed?: number | null;
   };
+  isPartnershipView?: boolean;
+  canViewActivityDetails?: boolean;
 }
 
 const groupIntoWeeks = (dates: string[]): string[][] => {
@@ -62,6 +64,8 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
   shiftTypes,
   partnershipMode,
   partnershipConfig,
+  isPartnershipView = false,
+  canViewActivityDetails = true,
 }) => {
   const weeks = useMemo(() => groupIntoWeeks(dates), [dates]);
 
@@ -192,6 +196,8 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
                 onCellDragEnd={handlers.endDrag}
                 onSelectAllTeam={() => {}}
                 showHolidays={showHolidays}
+                isPartnershipView={isPartnershipView}
+                canViewActivityDetails={canViewActivityDetails}
               />
             ))}
 
