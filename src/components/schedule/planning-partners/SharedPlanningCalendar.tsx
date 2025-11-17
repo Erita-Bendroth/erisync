@@ -29,6 +29,8 @@ interface ScheduleEntry {
   availability_status: 'available' | 'unavailable';
 }
 
+type DateRangeType = '1M' | '3M' | '6M' | '1Y';
+
 export function SharedPlanningCalendar() {
   const { user } = useAuth();
   const [partnerships, setPartnerships] = useState<PlanningPartnership[]>([]);
@@ -36,7 +38,17 @@ export function SharedPlanningCalendar() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [dateRangeType, setDateRangeType] = useState<DateRangeType>('1M');
   const [loading, setLoading] = useState(false);
+
+  const getDaysCount = (range: DateRangeType): number => {
+    switch (range) {
+      case '1M': return 30;
+      case '3M': return 90;
+      case '6M': return 180;
+      case '1Y': return 365;
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -48,7 +60,7 @@ export function SharedPlanningCalendar() {
     if (selectedPartnershipId) {
       fetchPartnershipData();
     }
-  }, [selectedPartnershipId, currentWeekStart]);
+  }, [selectedPartnershipId, currentWeekStart, dateRangeType]);
 
   const fetchPartnerships = async () => {
     try {
@@ -87,14 +99,15 @@ export function SharedPlanningCalendar() {
 
       if (membersError) throw membersError;
 
-      // Fetch schedule entries for the week (availability only)
-      const weekEnd = addDays(currentWeekStart, 6);
+      // Fetch schedule entries for the selected date range (availability only)
+      const daysCount = getDaysCount(dateRangeType);
+      const rangeEnd = addDays(currentWeekStart, daysCount - 1);
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('schedule_entries')
         .select('date, user_id, availability_status')
         .in('team_id', partnership.team_ids)
         .gte('date', format(currentWeekStart, 'yyyy-MM-dd'))
-        .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+        .lte('date', format(rangeEnd, 'yyyy-MM-dd'));
 
       if (scheduleError) throw scheduleError;
 
@@ -116,9 +129,11 @@ export function SharedPlanningCalendar() {
     return entry ? entry.availability_status : null;
   };
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
-
   const selectedPartnership = partnerships.find(p => p.id === selectedPartnershipId);
+  
+  // Generate days array based on date range
+  const daysCount = getDaysCount(dateRangeType);
+  const displayDays = Array.from({ length: daysCount }, (_, i) => addDays(currentWeekStart, i));
 
   return (
     <div className="space-y-4">
@@ -158,24 +173,43 @@ export function SharedPlanningCalendar() {
             </div>
           ) : (
             <>
+              {/* Date Range Selector */}
               <div className="flex items-center justify-between mb-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="font-medium">
-                  Week of {format(currentWeekStart, 'MMM d, yyyy')}
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium">Timeframe:</span>
+                  <div className="flex rounded-lg border bg-muted p-1">
+                    {(['1M', '3M', '6M', '1Y'] as DateRangeType[]).map(range => (
+                      <Button
+                        key={range}
+                        variant={dateRangeType === range ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setDateRangeType(range)}
+                      >
+                        {range}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -daysCount))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="font-medium">
+                    {format(currentWeekStart, 'MMM d, yyyy')} - {format(displayDays[displayDays.length - 1], 'MMM d, yyyy')}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentWeekStart(addDays(currentWeekStart, daysCount))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {loading ? (
@@ -185,18 +219,18 @@ export function SharedPlanningCalendar() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        <th className="border border-border p-2 text-left bg-muted/50 font-medium">
+                        <th className="border border-border p-2 text-left bg-muted/50 font-medium sticky left-0 bg-background z-10">
                           Team Member
                         </th>
-                        {weekDays.map(day => (
+                        {displayDays.map(day => (
                           <th
                             key={day.toISOString()}
-                            className={`border border-border p-2 text-center bg-muted/50 font-medium ${
+                            className={`border border-border p-2 text-center bg-muted/50 font-medium min-w-[60px] ${
                               isSameDay(day, new Date()) ? 'bg-primary/10' : ''
                             }`}
                           >
                             <div className="text-xs">{format(day, 'EEE')}</div>
-                            <div>{format(day, 'd')}</div>
+                            <div>{format(day, 'MMM d')}</div>
                           </th>
                         ))}
                       </tr>
@@ -204,10 +238,10 @@ export function SharedPlanningCalendar() {
                     <tbody>
                       {teamMembers.map(member => (
                         <tr key={member.user_id}>
-                          <td className="border border-border p-2 font-medium">
+                          <td className="border border-border p-2 font-medium sticky left-0 bg-background z-10">
                             {member.profiles.first_name} {member.profiles.last_name}
                           </td>
-                          {weekDays.map(day => {
+                          {displayDays.map(day => {
                             const availability = getAvailabilityForUserAndDate(member.user_id, day);
                             return (
                               <td

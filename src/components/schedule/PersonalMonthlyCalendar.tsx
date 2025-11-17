@@ -290,21 +290,28 @@ export function PersonalMonthlyCalendar() {
             </div>
             <div className="flex items-center gap-2">
               {/* View Mode Toggle */}
-              <div className="flex rounded-lg border bg-muted p-1">
-                <Button
-                  variant={viewMode === "single" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("single")}
-                >
-                  Single
-                </Button>
-                <Button
-                  variant={viewMode === "multi" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setViewMode("multi")}
-                >
-                  Multi
-                </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">View:</span>
+                <div className="flex rounded-lg border bg-muted p-1">
+                  <Button
+                    variant={viewMode === "single" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("single")}
+                    title="Show one month at a time with navigation arrows"
+                  >
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Calendar
+                  </Button>
+                  <Button
+                    variant={viewMode === "multi" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("multi")}
+                    title="Show multiple months in expandable sections"
+                  >
+                    <TrendingUp className="h-4 w-4 mr-1" />
+                    Accordion
+                  </Button>
+                </div>
               </div>
 
               {/* Date Range Selector */}
