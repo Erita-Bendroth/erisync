@@ -31,6 +31,8 @@ import { CoverageHeatmap } from '../CoverageHeatmap';
 import { CoverageAlerts } from '../CoverageAlerts';
 import { TeamCoverageGrid } from '../TeamCoverageGrid';
 import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
+import { WeeklyGridView } from './WeeklyGridView';
+import { MonthlyGridView } from './MonthlyGridView';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
 
@@ -59,6 +61,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [dateStart, setDateStart] = useState<Date>(getMonday(new Date()));
   const [rangeType, setRangeType] = useState<DateRangeType>('week');
+  const [viewMode, setViewMode] = useState<'grid' | 'weekly' | 'monthly'>('grid');
   const [loading, setLoading] = useState(false);
   const [applyTemplateDialogOpen, setApplyTemplateDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
@@ -72,6 +75,17 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
+
+  // Auto-select view mode based on date range
+  useEffect(() => {
+    if (rangeType === 'week' || rangeType === '2weeks') {
+      setViewMode('grid');
+    } else if (rangeType === 'month' || rangeType === 'quarter') {
+      setViewMode('weekly');
+    } else {
+      setViewMode('monthly');
+    }
+  }, [rangeType]);
 
   // Fetch all available teams for multi-team mode
   useEffect(() => {
@@ -598,80 +612,115 @@ export const UnifiedTeamScheduler: React.FC = () => {
                 </div>
               ) : (
                 <>
-            {/* Header Row with Dates */}
-            <div className="grid grid-cols-[200px_1fr] border-b border-border bg-muted/30 sticky top-0 z-10">
-              <div className="px-4 py-2 font-semibold text-sm border-r border-border">
-                Team Members
-              </div>
-              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
-                {dates.map((date) => {
-                  const dateObj = new Date(date);
-                  return (
-                    <div
-                      key={date}
-                      className="px-2 py-2 text-center border-r border-border text-xs font-medium"
-                    >
-                      <div>{dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                      <div className="text-muted-foreground">
-                        {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {/* Conditional rendering based on view mode */}
+                  {viewMode === 'grid' && (
+                    <>
+                      {/* Header Row with Dates */}
+                      <div className="grid grid-cols-[200px_1fr] border-b border-border bg-muted/30 sticky top-0 z-10">
+                        <div className="px-4 py-2 font-semibold text-sm border-r border-border">
+                          Team Members
+                        </div>
+                        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+                          {dates.map((date) => {
+                            const dateObj = new Date(date);
+                            return (
+                              <div
+                                key={date}
+                                className="px-2 py-2 text-center border-r border-border text-xs font-medium"
+                              >
+                                <div>{dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                                <div className="text-muted-foreground">
+                                  {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Team Sections */}
-            {teamSections.map((section) => (
-              <TeamSection
-                key={section.teamId}
-                teamId={section.teamId}
-                teamName={section.teamName}
-                teamColor={section.color}
-                members={section.members}
-                dates={dates}
-                scheduleEntries={scheduleEntries}
-                selectedUsers={state.selectedUsers}
-                selectedCells={state.selectedCells}
-                hoveredCell={state.hoveredCell}
-                editingCell={state.editingCell}
-                cellsBeingEdited={cellsBeingEdited}
-                onUserToggle={toggleUserSelection}
-                onCellClick={toggleCellSelection}
-                onCellDoubleClick={setEditingCell}
-                onCellHover={setHoveredCell}
-                onCellDragStart={startDrag}
-                onCellDragEnd={endDrag}
-                onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
-                showHolidays={showHolidays}
-              />
-            ))}
+                      {/* Team Sections */}
+                      {teamSections.map((section) => (
+                        <TeamSection
+                          key={section.teamId}
+                          teamId={section.teamId}
+                          teamName={section.teamName}
+                          teamColor={section.color}
+                          members={section.members}
+                          dates={dates}
+                          scheduleEntries={scheduleEntries}
+                          selectedUsers={state.selectedUsers}
+                          selectedCells={state.selectedCells}
+                          hoveredCell={state.hoveredCell}
+                          editingCell={state.editingCell}
+                          cellsBeingEdited={cellsBeingEdited}
+                          onUserToggle={toggleUserSelection}
+                          onCellClick={toggleCellSelection}
+                          onCellDoubleClick={setEditingCell}
+                          onCellHover={setHoveredCell}
+                          onCellDragStart={startDrag}
+                          onCellDragEnd={endDrag}
+                          onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
+                          showHolidays={showHolidays}
+                        />
+                      ))}
 
-            {/* Shift Type Counter Row */}
-            <ShiftTypeCounterRow
-              dates={dates}
-              scheduleEntries={scheduleEntries}
-              shiftTypes={shiftTypes}
-            />
+                      {/* Shift Type Counter Row */}
+                      <ShiftTypeCounterRow
+                        dates={dates}
+                        scheduleEntries={scheduleEntries}
+                        shiftTypes={shiftTypes}
+                      />
 
-            {/* Coverage Row */}
-            <CoverageRow
-              dates={dates}
-              teamSize={totalMembers}
-              scheduledCounts={scheduledCounts}
-              teamBreakdowns={teamBreakdowns}
-            />
-          </>
-            )}
+                      {/* Coverage Row */}
+                      <CoverageRow
+                        dates={dates}
+                        teamSize={totalMembers}
+                        scheduledCounts={scheduledCounts}
+                        teamBreakdowns={teamBreakdowns}
+                      />
+                    </>
+                  )}
+                  
+                  {viewMode === 'weekly' && (
+                    <WeeklyGridView
+                      teamSections={teamSections}
+                      dates={dates}
+                      scheduleEntries={scheduleEntries}
+                      state={state}
+                      cellsBeingEdited={cellsBeingEdited}
+                      handlers={{
+                        toggleUserSelection,
+                        toggleCellSelection,
+                        setEditingCell,
+                        setHoveredCell,
+                        startDrag,
+                        endDrag,
+                      }}
+                      showHolidays={showHolidays}
+                      shiftTypes={shiftTypes}
+                    />
+                  )}
+                  
+                  {viewMode === 'monthly' && (
+                    <MonthlyGridView
+                      teamSections={teamSections}
+                      dates={dates}
+                      scheduleEntries={scheduleEntries}
+                      shiftTypes={shiftTypes}
+                      showHolidays={showHolidays}
+                    />
+                  )}
+                </>
+              )}
 
-            {/* Keyboard Shortcuts Info */}
-            {!screenshotMode && (
-              <div className="p-4 border-t border-border bg-muted/30">
-                <div className="text-xs text-muted-foreground">
-                  <span className="font-semibold">Shortcuts:</span> Click to select • Double-click to edit • Drag to select range
+              {/* Keyboard Shortcuts Info */}
+              {!screenshotMode && (
+                <div className="p-4 border-t border-border bg-muted/30">
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-semibold">Shortcuts:</span> Click to select • Double-click to edit • Drag to select range
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             </ScrollArea>
           </TabsContent>
 
