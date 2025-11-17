@@ -41,7 +41,6 @@ const Schedule = () => {
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
-  const [scheduleViewMode, setScheduleViewMode] = useState<"standard" | "multi-team">("standard");
   const [managerCoverageWeek, setManagerCoverageWeek] = useState<Date>(new Date());
   const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
 
@@ -428,23 +427,12 @@ const Schedule = () => {
                     </DialogContent>
                   </Dialog>
                 )}
-                <Select value={scheduleViewMode} onValueChange={(value: "standard" | "multi-team") => setScheduleViewMode(value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="standard">📅 Standard View</SelectItem>
-                    <SelectItem value="multi-team">📊 Multi-Team Overview</SelectItem>
-                  </SelectContent>
-                </Select>
-                {scheduleViewMode === "standard" && (
-                  <>
-                    <ScheduleEntryForm onSuccess={() => setScheduleRefreshKey(prev => prev + 1)}>
-                      <Button>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Entry
-                      </Button>
-                    </ScheduleEntryForm>
+                <ScheduleEntryForm onSuccess={() => setScheduleRefreshKey(prev => prev + 1)}>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Entry
+                  </Button>
+                </ScheduleEntryForm>
                     <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
                       Generate Bulk
                     </Button>
@@ -583,51 +571,43 @@ const Schedule = () => {
                         </Button>
                       </>
                     )}
-                  </>
-                )}
               </div>
             </div>
 
-            {scheduleViewMode === "standard" ? (
-              <>
-                {/* Bulk Schedule Generator Modal */}
-                <Dialog open={showBulkWizard} onOpenChange={setShowBulkWizard}>
-                  <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <div className="flex items-center justify-between">
-                        <DialogTitle>Bulk Schedule Generator</DialogTitle>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setUseLegacyWizard(!useLegacyWizard)}
-                        >
-                          {useLegacyWizard ? "Use Quick Mode" : "Use Step-by-Step Wizard"}
-                        </Button>
-                      </div>
-                    </DialogHeader>
-                    {useLegacyWizard ? (
-                      <BulkScheduleWizard 
-                        onScheduleGenerated={() => {
-                          setShowBulkWizard(false);
-                          setScheduleRefreshKey(prev => prev + 1);
-                        }}
-                      />
-                    ) : (
-                      <QuickBulkScheduler
-                        userId={user?.id}
-                        onScheduleGenerated={() => {
-                          setShowBulkWizard(false);
-                          setScheduleRefreshKey(prev => prev + 1);
-                        }}
-                      />
-                    )}
-                  </DialogContent>
-                </Dialog>
-                <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
-              </>
-            ) : (
-              <MultiTeamScheduleView teams={teams} />
-            )}
+            {/* Bulk Schedule Generator Modal */}
+            <Dialog open={showBulkWizard} onOpenChange={setShowBulkWizard}>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <div className="flex items-center justify-between">
+                    <DialogTitle>Bulk Schedule Generator</DialogTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setUseLegacyWizard(!useLegacyWizard)}
+                    >
+                      {useLegacyWizard ? "Use Quick Mode" : "Use Step-by-Step Wizard"}
+                    </Button>
+                  </div>
+                </DialogHeader>
+                {useLegacyWizard ? (
+                  <BulkScheduleWizard 
+                    onScheduleGenerated={() => {
+                      setShowBulkWizard(false);
+                      setScheduleRefreshKey(prev => prev + 1);
+                    }}
+                  />
+                ) : (
+                  <QuickBulkScheduler
+                    userId={user?.id}
+                    onScheduleGenerated={() => {
+                      setShowBulkWizard(false);
+                      setScheduleRefreshKey(prev => prev + 1);
+                    }}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
+            <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
 
             {/* Integrated Co-Planning Calendar */}
             <IntegratedPlanningCalendar 
