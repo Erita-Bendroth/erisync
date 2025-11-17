@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Camera, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Camera, Download, ZoomIn, ZoomOut, Calendar as CalendarIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
 import { QuickActionsToolbar } from './QuickActionsToolbar';
 import { TeamSection } from './TeamSection';
 import { OnlineUsersPanel } from './OnlineUsersPanel';
@@ -77,6 +80,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
     max_staff_allowed?: number | null;
   } | null>(null);
   const [partnershipName, setPartnershipName] = useState<string>('');
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
@@ -428,6 +432,76 @@ export const UnifiedTeamScheduler: React.FC = () => {
     setDateStart(newDate);
   };
 
+  // Zoom controls
+  const zoomLevels: DateRangeType[] = ['week', '2weeks', 'month', 'quarter', '6months', 'year'];
+
+  const handleZoomIn = () => {
+    const currentIndex = zoomLevels.indexOf(rangeType);
+    if (currentIndex > 0) {
+      const newRangeType = zoomLevels[currentIndex - 1];
+      setRangeType(newRangeType);
+      // Adjust start date to keep center date roughly the same
+      const currentCenter = new Date(dateStart);
+      currentCenter.setDate(currentCenter.getDate() + Math.floor(getDaysCount(rangeType) / 2));
+      const newStart = new Date(currentCenter);
+      newStart.setDate(newStart.getDate() - Math.floor(getDaysCount(newRangeType) / 2));
+      setDateStart(getMonday(newStart));
+    }
+  };
+
+  const handleZoomOut = () => {
+    const currentIndex = zoomLevels.indexOf(rangeType);
+    if (currentIndex < zoomLevels.length - 1) {
+      const newRangeType = zoomLevels[currentIndex + 1];
+      setRangeType(newRangeType);
+      // Adjust start date to keep center date roughly the same
+      const currentCenter = new Date(dateStart);
+      currentCenter.setDate(currentCenter.getDate() + Math.floor(getDaysCount(rangeType) / 2));
+      const newStart = new Date(currentCenter);
+      newStart.setDate(newStart.getDate() - Math.floor(getDaysCount(newRangeType) / 2));
+      setDateStart(getMonday(newStart));
+    }
+  };
+
+  // Scroll to specific date
+  const scrollToDate = (targetDate: Date) => {
+    const dateStr = targetDate.toISOString().split('T')[0];
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    
+    // For grid view, find the date column
+    if (viewMode === 'grid') {
+      const dateCell = document.querySelector(`[data-date="${dateStr}"]`);
+      if (dateCell && scrollElement) {
+        dateCell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+    
+    // For weekly view, find the week containing the date
+    if (viewMode === 'weekly') {
+      const weekIndex = Math.floor(dates.indexOf(dateStr) / 7);
+      const weekSection = document.querySelector(`[data-week-index="${weekIndex}"]`);
+      if (weekSection && scrollElement) {
+        weekSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+    
+    // For monthly view, find the month accordion
+    if (viewMode === 'monthly') {
+      const monthKey = dateStr.substring(0, 7); // "2025-11"
+      const monthSection = document.querySelector(`[data-month="${monthKey}"]`);
+      if (monthSection && scrollElement) {
+        monthSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
+
+  // Helper to get automatic view mode based on range
+  const getAutoViewMode = (range: DateRangeType): 'grid' | 'weekly' | 'monthly' => {
+    if (range === 'week' || range === '2weeks') return 'grid';
+    if (range === 'month' || range === 'quarter') return 'weekly';
+    return 'monthly';
+  };
+
   // Calculate coverage by date and team
   const scheduledCounts = useMemo(() => {
     return dates.reduce((acc, date) => {
@@ -583,11 +657,38 @@ export const UnifiedTeamScheduler: React.FC = () => {
               onRangeTypeChange={(type) => setRangeType(type as DateRangeType)}
             />
 
+            {/* Manual View Mode Toggle - only show for long date ranges */}
+            {dates.length > 14 && (
+              <div className="flex items-center gap-2 border-l pl-3">
+                <Label className="text-sm text-muted-foreground">View:</Label>
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grid' | 'weekly' | 'monthly')}>
+                  <TabsList className="h-8">
+                    <TabsTrigger value="grid" className="text-xs px-3">
+                      Grid
+                    </TabsTrigger>
+                    <TabsTrigger value="weekly" className="text-xs px-3">
+                      Weekly
+                    </TabsTrigger>
+                    <TabsTrigger value="monthly" className="text-xs px-3">
+                      Monthly
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <span>{dates.length} days</span>
+                  {viewMode !== getAutoViewMode(rangeType) && (
+                    <Badge variant="outline" className="text-xs">Manual</Badge>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => navigateDate('prev')}
+                title="Previous period"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -602,10 +703,60 @@ export const UnifiedTeamScheduler: React.FC = () => {
                 variant="outline"
                 size="icon"
                 onClick={() => navigateDate('next')}
+                title="Next period"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1 border-l pl-2 ml-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleZoomOut}
+                title="Zoom out (show more days)"
+                className="h-8 px-2"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleZoomIn}
+                title="Zoom in (show fewer days)"
+                className="h-8 px-2"
+                disabled={rangeType === 'week'}
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Jump to Date */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Jump to Date
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateStart}
+                  onSelect={(date) => {
+                    if (date) {
+                      setDateStart(getMonday(date));
+                      // Auto-scroll to that date in the view
+                      setTimeout(() => {
+                        scrollToDate(date);
+                      }, 100);
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -649,7 +800,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="mt-0">
-            <ScrollArea className="h-[calc(100vh-400px)]">
+            <ScrollArea ref={scrollAreaRef} className="h-[calc(100vh-400px)]">
               {loading ? (
                 <div className="flex items-center justify-center p-12">
                   <div className="text-muted-foreground">Loading teams...</div>
