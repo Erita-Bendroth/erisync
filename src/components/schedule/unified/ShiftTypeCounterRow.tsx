@@ -102,7 +102,7 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-[200px_1fr] border-t border-border bg-blue-50/30 dark:bg-blue-950/20">
+    <div className="grid grid-cols-[200px_auto] border-t border-border bg-blue-50/30 dark:bg-blue-950/20">
       <div className="px-4 py-3 font-semibold text-sm border-r border-border flex items-center">
         Shift Distribution
       </div>
