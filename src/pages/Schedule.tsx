@@ -29,6 +29,7 @@ import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
 import { VacationPlanningDashboard } from "@/components/schedule/vacation-planning/VacationPlanningDashboard";
 import { PlanningPartnershipManager } from "@/components/schedule/planning-partners/PlanningPartnershipManager";
 import { IntegratedPlanningCalendar } from "@/components/schedule/planning-partners/IntegratedPlanningCalendar";
+import { UnifiedTeamScheduler } from "@/components/schedule/unified/UnifiedTeamScheduler";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -366,10 +367,14 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
+            </TabsTrigger>
+            <TabsTrigger value="unified-scheduler" className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
+              Quick Scheduler
             </TabsTrigger>
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
@@ -391,6 +396,10 @@ const Schedule = () => {
 
           <TabsContent value="admin" className="space-y-6">
             <AdminSetup />
+          </TabsContent>
+
+          <TabsContent value="unified-scheduler" className="space-y-6">
+            <UnifiedTeamScheduler />
           </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
