@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { ShiftSwapRequestButton } from '../swap/ShiftSwapRequestButton';
 
 interface TeamMember {
   user_id: string;
@@ -15,6 +16,7 @@ interface TeamMember {
 }
 
 interface ScheduleEntry {
+  id?: string;
   date: string;
   user_id: string;
   team_id: string;
@@ -34,6 +36,7 @@ interface TeamSectionProps {
   onCellClick: (userId: string, date: Date, teamId: string) => void;
   canScheduleUser: (userId: string, teamId: string) => boolean;
   canViewActivityDetails?: boolean;
+  currentUserId: string;
 }
 
 const getShiftBadgeColor = (shiftType: string) => {
@@ -65,7 +68,8 @@ export function TeamSection({
   weekDates,
   onCellClick,
   canScheduleUser,
-  canViewActivityDetails = false
+  canViewActivityDetails = false,
+  currentUserId
 }: TeamSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -150,12 +154,30 @@ export function TeamSection({
                               </span>
                             </div>
                             {availability.shift_type && availability.availability_status === 'available' && (
-                              <Badge
-                                variant="outline"
-                                className={cn("text-xs", getShiftBadgeColor(availability.shift_type))}
-                              >
-                                {getShiftLabel(availability.shift_type)}
-                              </Badge>
+                              <>
+                                <Badge
+                                  variant="outline"
+                                  className={cn("text-xs", getShiftBadgeColor(availability.shift_type))}
+                                >
+                                  {getShiftLabel(availability.shift_type)}
+                                </Badge>
+                                <ShiftSwapRequestButton
+                                  targetUserId={member.user_id}
+                                  targetUserName={displayName}
+                                  targetEntryId={availability.id || ''}
+                                  date={format(date, 'yyyy-MM-dd')}
+                                  shiftType={availability.shift_type}
+                                  teamId={teamId}
+                                  currentUserId={currentUserId}
+                                  currentUserEntryId={
+                                    scheduleEntries.find(e => 
+                                      e.user_id === currentUserId && 
+                                      e.date === format(date, 'yyyy-MM-dd') &&
+                                      e.availability_status === 'available'
+                                    )?.id
+                                  }
+                                />
+                              </>
                             )}
                       {/* Only show activity types if user has permission */}
                       {canViewActivityDetails && availability.activity_type && availability.availability_status === 'unavailable' && (
