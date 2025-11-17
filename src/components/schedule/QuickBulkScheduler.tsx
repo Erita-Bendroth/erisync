@@ -215,6 +215,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
           />
 
           <ShiftTypeSelector
+            teamId={config.teamId}
             shiftType={config.shiftType}
             customTimes={config.customTimes}
             onShiftTypeChange={(type) => setConfig({ ...config, shiftType: type })}
@@ -241,14 +242,15 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
             }
           />
 
-          <BulkGenerationPreview
-            totalShifts={preview.totalShifts}
-            workDays={preview.workDays}
-            userCount={preview.userCount}
-            startDate={config.dateRange.start}
-            endDate={config.dateRange.end}
-            shiftType={config.shiftType}
-          />
+                <BulkGenerationPreview
+                  totalShifts={preview.totalShifts}
+                  workDays={preview.workDays}
+                  userCount={preview.userCount}
+                  startDate={config.dateRange.start}
+                  endDate={config.dateRange.end}
+                  shiftType={config.shiftType}
+                  teamId={config.teamId}
+                />
         </div>
       </div>
 

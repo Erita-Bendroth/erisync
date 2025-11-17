@@ -1,8 +1,11 @@
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from "@/components/ui/input";
+import { useShiftTypes } from "@/hooks/useShiftTypes";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ShiftTypeSelectorProps {
+  teamId: string | null;
   shiftType: string | null;
   customTimes: {
     start: string;
@@ -13,53 +16,57 @@ interface ShiftTypeSelectorProps {
 }
 
 export const ShiftTypeSelector = ({
+  teamId,
   shiftType,
   customTimes,
   onShiftTypeChange,
   onCustomTimesChange,
 }: ShiftTypeSelectorProps) => {
+  const { shiftTypes, loading } = useShiftTypes(teamId ? [teamId] : []);
+
   return (
     <div className="space-y-4">
       <Label>Shift Type</Label>
       
-      <RadioGroup value={shiftType || ''} onValueChange={onShiftTypeChange}>
+      {loading ? (
         <div className="space-y-3">
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="normal" id="normal" />
-            <Label htmlFor="normal" className="cursor-pointer font-normal">
-              Standard Day
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="early" id="early" />
-            <Label htmlFor="early" className="cursor-pointer font-normal">
-              Early Shift
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="late" id="late" />
-            <Label htmlFor="late" className="cursor-pointer font-normal">
-              Late Shift
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="weekend" id="weekend" />
-            <Label htmlFor="weekend" className="cursor-pointer font-normal">
-              Weekend Shift
-            </Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="custom" id="custom" />
-            <Label htmlFor="custom" className="cursor-pointer font-normal">
-              Custom Times
-            </Label>
-          </div>
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
         </div>
-      </RadioGroup>
+      ) : (
+        <RadioGroup value={shiftType || ''} onValueChange={onShiftTypeChange}>
+          <div className="space-y-3">
+            {shiftTypes.map((shift) => (
+              <div key={shift.type} className="flex items-center space-x-2">
+                <RadioGroupItem value={shift.type} id={shift.type} />
+                <Label htmlFor={shift.type} className="cursor-pointer font-normal flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span>{shift.label}</span>
+                    {shift.startTime && shift.endTime && (
+                      <span className="text-xs text-muted-foreground">
+                        {shift.startTime}-{shift.endTime}
+                      </span>
+                    )}
+                  </div>
+                  {shift.description && (
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {shift.description}
+                    </div>
+                  )}
+                </Label>
+              </div>
+            ))}
+
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="custom" id="custom" />
+              <Label htmlFor="custom" className="cursor-pointer font-normal">
+                Custom Times
+              </Label>
+            </div>
+          </div>
+        </RadioGroup>
+      )}
 
       {shiftType === 'custom' && (
         <div className="flex items-center gap-4 pl-6">
