@@ -372,7 +372,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -386,10 +386,6 @@ const Schedule = () => {
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
-            </TabsTrigger>
-            <TabsTrigger value="shift-swaps" className="flex items-center">
-              <ArrowLeftRight className="w-4 h-4 mr-2" />
-              Shift Swaps
             </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center">
               <Users className="w-4 h-4 mr-2" />
@@ -623,32 +619,6 @@ const Schedule = () => {
               onCreatePartnership={() => setPartnershipDialogOpen(true)}
             />
           </TabsContent>
-
-          <TabsContent value="shift-swaps" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Shift Swap Requests</CardTitle>
-                <CardDescription>
-                  Request to swap shifts with your team members or {isManager || isPlanner || isAdmin ? 'review pending swap requests' : 'view your swap request history'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(isManager || isPlanner || isAdmin) && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-4">Pending Approvals</h3>
-                    <ManagerSwapApprovals />
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">
-                    {(isManager || isPlanner || isAdmin) ? 'All Swap Requests' : 'Your Swap Requests'}
-                  </h3>
-                  <ShiftSwapRequestsList />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
 
           <TabsContent value="teams" className="space-y-6">
             <EnhancedTeamManagement />
