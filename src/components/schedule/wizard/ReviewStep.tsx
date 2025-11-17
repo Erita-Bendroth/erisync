@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WizardData } from "./BulkScheduleWizard";
 import { format, eachDayOfInterval, isWeekend as isWeekendDate, addDays, getDay } from "date-fns";
-import { Calendar, Users, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { Calendar, Users, Clock, CheckCircle2, Loader2, ArrowLeftRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SharedPlanningCalendar } from "./SharedPlanningCalendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ReviewStepProps {
   wizardData: WizardData;
@@ -420,6 +422,17 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         <p className="text-muted-foreground">Check everything before generating</p>
       </div>
 
+      <Tabs defaultValue="summary" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="summary">Summary & Preview</TabsTrigger>
+          <TabsTrigger value="planning" className="flex items-center gap-2">
+            <ArrowLeftRight className="w-4 h-4" />
+            Side-by-Side Planning
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="summary" className="space-y-6 mt-6">
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="border rounded-lg p-4">
@@ -624,6 +637,13 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           </div>
         </div>
       )}
+
+        </TabsContent>
+
+        <TabsContent value="planning" className="mt-6">
+          <SharedPlanningCalendar wizardData={wizardData} />
+        </TabsContent>
+      </Tabs>
 
       {/* Generate Button */}
       <Button
