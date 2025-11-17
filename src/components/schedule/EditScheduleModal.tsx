@@ -26,12 +26,12 @@ interface ScheduleEntry {
   notes?: string;
   created_by?: string;
   creator_name?: string;
-  profiles: {
+  profiles?: {
     first_name: string;
     last_name: string;
     initials?: string;
   };
-  teams: {
+  teams?: {
     name: string;
   };
 }
@@ -332,7 +332,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         <DialogHeader>
           <DialogTitle>Edit Schedule Entry</DialogTitle>
           <DialogDescription>
-            Editing shift for {formatUserName(entry.profiles.first_name, entry.profiles.last_name, entry.profiles.initials)} on{" "}
+            Editing shift for {entry.profiles ? formatUserName(entry.profiles.first_name, entry.profiles.last_name, entry.profiles.initials) : 'User'} on{" "}
             {format(new Date(entry.date), "EEEE, MMMM d, yyyy")}
           </DialogDescription>
         </DialogHeader>
