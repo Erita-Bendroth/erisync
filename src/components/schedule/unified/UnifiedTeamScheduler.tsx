@@ -936,7 +936,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                   {viewMode === 'grid' && (
                     <>
                       {/* Header Row with Dates */}
-                      <div className="grid grid-cols-[200px_1fr] border-b border-border bg-muted/30 sticky top-0 z-10">
+                      <div className="grid grid-cols-[200px_auto] border-b border-border bg-muted/30 sticky top-0 z-10">
                         <div className="px-4 py-2 font-semibold text-sm border-r border-border">
                           Team Members
                         </div>

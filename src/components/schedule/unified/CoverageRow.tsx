@@ -56,7 +56,7 @@ export const CoverageRow: React.FC<CoverageRowProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="grid grid-cols-[200px_1fr] border-t-2 border-border bg-muted/50">
+      <div className="grid grid-cols-[200px_auto] border-t-2 border-border bg-muted/50">
         <div className="flex items-center px-4 py-2 font-semibold text-sm border-r border-border">
           Coverage
         </div>
