@@ -21,6 +21,7 @@ interface SchedulerCellProps {
   onMouseLeave: () => void;
   onMouseDown: () => void;
   editingBy?: OnlineUser[];
+  enableQuickDialog?: boolean;
 }
 
 const SHIFT_TYPE_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   onMouseLeave,
   onMouseDown,
   editingBy = [],
+  enableQuickDialog = false,
 }) => {
   const cellId = `${userId}:${date}`;
   const isBeingEdited = editingBy.length > 0;
@@ -58,8 +60,9 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   return (
     <div
       className={cn(
-        'relative h-12 border-r border-b border-border cursor-pointer transition-colors',
+        'relative h-12 border-r border-b border-border transition-colors',
         'flex items-center justify-center',
+        enableQuickDialog ? 'cursor-pointer hover:ring-2 hover:ring-primary/50' : 'cursor-pointer',
         isSelected && 'bg-accent',
         isHovered && !isSelected && 'bg-muted',
         isEditing && 'ring-2 ring-ring',
@@ -80,6 +83,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
       onMouseLeave={onMouseLeave}
       onMouseDown={onMouseDown}
       data-cell-id={cellId}
+      title={enableQuickDialog ? 'Click to schedule' : undefined}
     >
       {shiftType && availabilityStatus === 'available' && (
         <Badge
