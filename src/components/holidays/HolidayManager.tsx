@@ -68,7 +68,11 @@ const countries = [
   { code: "CH", name: "Switzerland" },
   { code: "NO", name: "Norway" },
   { code: "IS", name: "Iceland" },
-  { code: "GB", name: "United Kingdom" },
+  { code: "GB", name: "United Kingdom", regions: [
+    { code: "GB-ENG", name: "England & Wales" },
+    { code: "GB-SCT", name: "Scotland" },
+    { code: "GB-NIR", name: "Northern Ireland" }
+  ]},
   { code: "US", name: "United States" },
   { code: "CA", name: "Canada" },
   { code: "AU", name: "Australia" },

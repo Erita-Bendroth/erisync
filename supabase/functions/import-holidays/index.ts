@@ -55,6 +55,13 @@ const germanRegionalHolidays: Record<string, string[]> = {
   'TH': ['Weltkindertag', 'Reformationstag'], // Thuringia
 };
 
+// UK regional holiday mapping
+const ukRegionalHolidays: Record<string, string[]> = {
+  'GB-SCT': ['St Andrew\'s Day'], // Scotland-specific
+  'GB-NIR': ['St Patrick\'s Day', 'Battle of the Boyne'], // Northern Ireland-specific
+  'GB-ENG': [], // England & Wales use standard UK holidays
+};
+
 // Countries to exclude non-official holidays/observances
 const holidayFilters: Record<string, string[]> = {
   'SE': ['Julafton'], // Exclude Christmas Eve (not official)
@@ -268,6 +275,15 @@ Deno.serve(async (req) => {
       if (!regionalCode && country_code === 'DE' && region_code) {
         const holidayName = holiday.localName || holiday.name;
         const regionalHolidays = germanRegionalHolidays[region_code] || [];
+        if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+          regionalCode = region_code;
+        }
+      }
+
+      // UK regional holiday mapping by name
+      if (!regionalCode && country_code === 'GB' && region_code) {
+        const holidayName = holiday.localName || holiday.name;
+        const regionalHolidays = ukRegionalHolidays[region_code] || [];
         if (regionalHolidays.some(regional => holidayName.includes(regional))) {
           regionalCode = region_code;
         }
