@@ -186,12 +186,15 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   const getCleanNotes = () => {
     if (!entry.notes) return "";
     
-    // Remove JSON time data, shift name, and auto-generated text
+    // Remove system-generated notes and JSON artifacts
     let cleanNotes = entry.notes
-      .replace(/Times:\s*\[.*?\]/g, "")
-      .replace(/Shift:\s*.+?(?:\n|$)/g, "")
-      .replace(/Auto-generated.*?\)/g, "")
-      .replace(/^\s*\n+/g, "")
+      .replace(/Times:\s*\[.*?\]/g, "")                           // Remove JSON time data
+      .replace(/Shift:\s*.+?(?:\n|$)/g, "")                      // Remove shift name
+      .replace(/Auto-generated.*?\)/g, "")                       // Remove auto-generated text
+      .replace(/Bulk assigned/gi, "")                            // Remove "Bulk assigned"
+      .replace(/Bulk generated.*?(?:\n|$)/gi, "")                // Remove "Bulk generated" and variations
+      .replace(/Shift swapped via approved request on.*?(?:\n|$)/gi, "")  // Remove swap notes
+      .replace(/^\s*\n+/g, "")                                   // Remove leading newlines
       .trim();
     
     return cleanNotes;
