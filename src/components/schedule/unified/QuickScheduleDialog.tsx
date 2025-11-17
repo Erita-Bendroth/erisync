@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Database } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
 import { Calendar, User } from 'lucide-react';
+import { useShiftTypes } from '@/hooks/useShiftTypes';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -61,6 +62,10 @@ export const QuickScheduleDialog: React.FC<QuickScheduleDialogProps> = ({
     currentEntry?.shift_type || null
   );
   const [notes, setNotes] = useState(currentEntry?.notes || '');
+
+  const { shiftTypes, loading: loadingShiftTypes } = useShiftTypes(
+    teamId ? [teamId] : []
+  );
 
   // Reset form when dialog opens with new data
   useEffect(() => {
@@ -167,15 +172,26 @@ export const QuickScheduleDialog: React.FC<QuickScheduleDialogProps> = ({
               <Select 
                 value={shiftType || ''} 
                 onValueChange={(val) => setShiftType(val as ShiftType)}
+                disabled={loadingShiftTypes}
               >
                 <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select shift type" />
+                  <SelectValue placeholder={
+                    loadingShiftTypes ? "Loading shifts..." : "Select shift type"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="normal">Day Shift (Normal)</SelectItem>
-                  <SelectItem value="early">Early Shift</SelectItem>
-                  <SelectItem value="late">Late Shift</SelectItem>
-                  <SelectItem value="weekend">Weekend Shift</SelectItem>
+                  {shiftTypes.map((shift) => (
+                    <SelectItem key={shift.id} value={shift.type}>
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{shift.label}</span>
+                        {shift.startTime && shift.endTime && (
+                          <span className="text-xs text-muted-foreground">
+                            {shift.startTime} - {shift.endTime}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

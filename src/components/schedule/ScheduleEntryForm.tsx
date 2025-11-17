@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { cn, formatUserName } from "@/lib/utils";
+import { useShiftTypes } from '@/hooks/useShiftTypes';
 
 interface Team {
   id: string;
@@ -57,6 +58,10 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
     availability_status: "available",
     notes: "",
   });
+
+  const { shiftTypes, loading: loadingShiftTypes } = useShiftTypes(
+    formData.team_id ? [formData.team_id] : []
+  );
 
   useEffect(() => {
     fetchUserRoles();
@@ -296,14 +301,30 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
               <Select
                 value={formData.shift_type}
                 onValueChange={(value) => setFormData({ ...formData, shift_type: value })}
+                disabled={!formData.team_id || loadingShiftTypes}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={
+                    !formData.team_id 
+                      ? "Select a team first" 
+                      : loadingShiftTypes 
+                        ? "Loading shifts..." 
+                        : "Select shift type"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="early">Early</SelectItem>
-                  <SelectItem value="late">Late</SelectItem>
+                  {shiftTypes.map((shift) => (
+                    <SelectItem key={shift.id} value={shift.type}>
+                      <div className="flex flex-col items-start">
+                        <span>{shift.label}</span>
+                        {shift.startTime && shift.endTime && (
+                          <span className="text-xs text-muted-foreground">
+                            {shift.startTime} - {shift.endTime}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
