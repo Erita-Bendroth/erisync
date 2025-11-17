@@ -51,7 +51,7 @@ export function ShiftSwapRequestsList() {
         requesting_entry:schedule_entries!shift_swap_requests_requesting_entry_id_fkey(shift_type, team_id, teams(name)),
         target_entry:schedule_entries!shift_swap_requests_target_entry_id_fkey(shift_type, team_id, teams(name))
       `)
-      .or(`requesting_user_id.eq.${user.id},target_user_id.eq.${user.id}`)
+      .or(`requesting_user_id.eq.${user.id},target_user_id.eq.${user.id},reviewed_by.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
     if (error) {
