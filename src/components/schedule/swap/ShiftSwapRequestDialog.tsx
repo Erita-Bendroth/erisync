@@ -35,6 +35,8 @@ export function ShiftSwapRequestDialog({
   const [loading, setLoading] = useState(false);
   const [requestingShift, setRequestingShift] = useState<any>(null);
   const [targetShift, setTargetShift] = useState<any>(null);
+  const [requestingTeam, setRequestingTeam] = useState<any>(null);
+  const [targetTeam, setTargetTeam] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function ShiftSwapRequestDialog({
   const fetchShiftDetails = async () => {
     const { data, error } = await supabase
       .from('schedule_entries')
-      .select('id, shift_type, activity_type')
+      .select('id, shift_type, activity_type, team_id, teams(name)')
       .in('id', [requestingEntryId, targetEntryId]);
 
     if (error) {
@@ -59,8 +61,13 @@ export function ShiftSwapRequestDialog({
     }
 
     if (data) {
-      setRequestingShift(data.find(e => e.id === requestingEntryId));
-      setTargetShift(data.find(e => e.id === targetEntryId));
+      const reqShift = data.find(e => e.id === requestingEntryId);
+      const tgtShift = data.find(e => e.id === targetEntryId);
+      
+      setRequestingShift(reqShift);
+      setTargetShift(tgtShift);
+      setRequestingTeam(reqShift?.teams);
+      setTargetTeam(tgtShift?.teams);
     }
   };
 
@@ -165,6 +172,9 @@ export function ShiftSwapRequestDialog({
           <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-center">
             <div className="space-y-1 p-3 rounded-lg border bg-muted/50">
               <p className="text-xs text-muted-foreground">Your Shift</p>
+              {requestingTeam && (
+                <p className="text-xs text-muted-foreground">Team: {requestingTeam.name}</p>
+              )}
               <p className="font-medium">{requestingShift ? getShiftLabel(requestingShift.shift_type) : 'Loading...'}</p>
             </div>
             
@@ -172,9 +182,20 @@ export function ShiftSwapRequestDialog({
             
             <div className="space-y-1 p-3 rounded-lg border bg-muted/50">
               <p className="text-xs text-muted-foreground">{targetUserName}'s Shift</p>
+              {targetTeam && (
+                <p className="text-xs text-muted-foreground">Team: {targetTeam.name}</p>
+              )}
               <p className="font-medium">{targetShift ? getShiftLabel(targetShift.shift_type) : 'Loading...'}</p>
             </div>
           </div>
+
+          {requestingShift && targetShift && requestingShift.team_id !== targetShift.team_id && (
+            <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
+              <p className="text-sm text-foreground">
+                This is a cross-team swap within your planning partnership. Your manager will review this request.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="reason">Reason (Optional)</Label>

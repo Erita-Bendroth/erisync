@@ -30,8 +30,8 @@ interface SwapRequest {
   team_id: string;
   requesting_user: { first_name: string; last_name: string };
   target_user: { first_name: string; last_name: string };
-  requesting_entry: { shift_type: string };
-  target_entry: { shift_type: string };
+  requesting_entry: { shift_type: string; team_id: string; teams: { name: string } };
+  target_entry: { shift_type: string; team_id: string; teams: { name: string } };
 }
 
 export function ManagerSwapApprovals() {
@@ -60,8 +60,8 @@ export function ManagerSwapApprovals() {
         *,
         requesting_user:profiles!shift_swap_requests_requesting_user_id_fkey(first_name, last_name),
         target_user:profiles!shift_swap_requests_target_user_id_fkey(first_name, last_name),
-        requesting_entry:schedule_entries!shift_swap_requests_requesting_entry_id_fkey(shift_type),
-        target_entry:schedule_entries!shift_swap_requests_target_entry_id_fkey(shift_type)
+        requesting_entry:schedule_entries!shift_swap_requests_requesting_entry_id_fkey(shift_type, team_id, teams(name)),
+        target_entry:schedule_entries!shift_swap_requests_target_entry_id_fkey(shift_type, team_id, teams(name))
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
@@ -225,13 +225,26 @@ export function ManagerSwapApprovals() {
             </CardContent>
           </Card>
         ) : (
-          swapRequests.map(request => (
+          swapRequests.map(request => {
+            const isCrossTeam = request.requesting_entry.team_id !== request.target_entry.team_id;
+            
+            return (
             <Card key={request.id}>
               <CardHeader>
-                <CardTitle className="text-base">
-                  {request.requesting_user.first_name} {request.requesting_user.last_name} ↔️{' '}
-                  {request.target_user.first_name} {request.target_user.last_name}
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                    <span>{request.requesting_user.first_name} {request.requesting_user.last_name}</span>
+                    <span className="text-xs text-muted-foreground">({request.requesting_entry.teams?.name})</span>
+                    <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                    <span>{request.target_user.first_name} {request.target_user.last_name}</span>
+                    <span className="text-xs text-muted-foreground">({request.target_entry.teams?.name})</span>
+                    {isCrossTeam && (
+                      <Badge variant="outline" className="text-xs ml-2">
+                        Cross-team Partnership
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </div>
                 <CardDescription>
                   {format(new Date(request.swap_date), 'EEEE, MMMM d, yyyy')}
                 </CardDescription>
@@ -285,8 +298,8 @@ export function ManagerSwapApprovals() {
                 </p>
               </CardContent>
             </Card>
-          ))
-        )}
+          );
+        })}
       </div>
 
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
