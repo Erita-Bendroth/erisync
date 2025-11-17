@@ -96,16 +96,18 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
             const Icon = getShiftIcon(shift.type);
             return (
               <DropdownMenuItem 
-                key={shift.type}
+                key={shift.id}
                 onClick={() => onQuickAssign(shift.type)}
               >
                 <Icon className="h-4 w-4 mr-2" />
-                {shift.label}
-                {shift.description && (
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({shift.description})
-                  </span>
-                )}
+                <div className="flex flex-col">
+                  <span>{shift.label}</span>
+                  {shift.startTime && shift.endTime && (
+                    <span className="text-xs text-muted-foreground">
+                      {shift.startTime}-{shift.endTime}
+                    </span>
+                  )}
+                </div>
               </DropdownMenuItem>
             );
           })}

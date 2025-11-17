@@ -38,9 +38,9 @@ export const ShiftTypeSelector = ({
         <RadioGroup value={shiftType || ''} onValueChange={onShiftTypeChange}>
           <div className="space-y-3">
             {shiftTypes.map((shift) => (
-              <div key={shift.type} className="flex items-center space-x-2">
-                <RadioGroupItem value={shift.type} id={shift.type} />
-                <Label htmlFor={shift.type} className="cursor-pointer font-normal flex-1">
+              <div key={shift.id} className="flex items-center space-x-2">
+                <RadioGroupItem value={shift.type} id={shift.id} />
+                <Label htmlFor={shift.id} className="cursor-pointer font-normal flex-1">
                   <div className="flex items-baseline gap-2">
                     <span>{shift.label}</span>
                     {shift.startTime && shift.endTime && (
@@ -49,7 +49,7 @@ export const ShiftTypeSelector = ({
                       </span>
                     )}
                   </div>
-                  {shift.description && (
+                  {shift.description && shift.description !== shift.label && (
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {shift.description}
                     </div>
