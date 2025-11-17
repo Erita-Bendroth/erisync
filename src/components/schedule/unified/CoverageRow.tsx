@@ -21,6 +21,11 @@ interface CoverageRowProps {
   teamSize: number;
   scheduledCounts: Record<string, number>;
   teamBreakdowns?: Record<string, TeamBreakdown[]>;
+  partnershipMode?: boolean;
+  partnershipConfig?: {
+    min_staff_required: number;
+    max_staff_allowed?: number | null;
+  };
 }
 
 export const CoverageRow: React.FC<CoverageRowProps> = ({
@@ -28,13 +33,25 @@ export const CoverageRow: React.FC<CoverageRowProps> = ({
   teamSize,
   scheduledCounts,
   teamBreakdowns,
+  partnershipMode,
+  partnershipConfig,
 }) => {
   const getCoverageLevel = (count: number, total: number): 'good' | 'medium' | 'low' | 'critical' => {
-    const percentage = (count / total) * 100;
-    if (percentage >= 70) return 'good';
-    if (percentage >= 50) return 'medium';
-    if (percentage >= 30) return 'low';
-    return 'critical';
+    if (partnershipMode && partnershipConfig) {
+      // Use partnership threshold
+      const min = partnershipConfig.min_staff_required;
+      if (count >= min) return 'good';
+      if (count >= min * 0.8) return 'medium';
+      if (count >= min * 0.5) return 'low';
+      return 'critical';
+    } else {
+      // Use percentage-based logic (existing)
+      const percentage = (count / total) * 100;
+      if (percentage >= 70) return 'good';
+      if (percentage >= 50) return 'medium';
+      if (percentage >= 30) return 'low';
+      return 'critical';
+    }
   };
 
   return (
@@ -67,7 +84,14 @@ export const CoverageRow: React.FC<CoverageRowProps> = ({
                     <AlertCircle className="h-3 w-3" />
                   )}
                 </span>
-                <span>{count}/{teamSize}</span>
+                <span>
+                  {count}/{teamSize}
+                  {partnershipMode && partnershipConfig && (
+                    <span className="text-[10px] opacity-75 ml-1">
+                      (Min: {partnershipConfig.min_staff_required})
+                    </span>
+                  )}
+                </span>
                 {breakdown && breakdown.length > 0 && (
                   <Tooltip>
                     <TooltipTrigger asChild>

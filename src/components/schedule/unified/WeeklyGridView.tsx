@@ -36,6 +36,11 @@ interface WeeklyGridViewProps {
   };
   showHolidays: boolean;
   shiftTypes: ShiftTypeOption[];
+  partnershipMode?: boolean;
+  partnershipConfig?: {
+    min_staff_required: number;
+    max_staff_allowed?: number | null;
+  };
 }
 
 const groupIntoWeeks = (dates: string[]): string[][] => {
@@ -55,6 +60,8 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
   handlers,
   showHolidays,
   shiftTypes,
+  partnershipMode,
+  partnershipConfig,
 }) => {
   const weeks = groupIntoWeeks(dates);
 
@@ -171,6 +178,8 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
               teamSize={totalMembers}
               scheduledCounts={scheduledCounts}
               teamBreakdowns={teamBreakdowns}
+              partnershipMode={partnershipMode}
+              partnershipConfig={partnershipConfig}
             />
           </div>
         );
