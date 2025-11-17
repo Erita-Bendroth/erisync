@@ -3,16 +3,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { validateSwapRequest } from '@/lib/swapValidation';
 import { ArrowLeftRight, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ShiftSwapRequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   requestingUserId: string;
-  requestingEntryId: string;
   targetUserId: string;
   targetUserName: string;
   targetEntryId: string;
@@ -20,11 +21,18 @@ interface ShiftSwapRequestDialogProps {
   teamId: string;
 }
 
+interface UserShift {
+  id: string;
+  date: string;
+  shift_type: string | null;
+  team_id: string;
+  teams: { name: string } | null;
+}
+
 export function ShiftSwapRequestDialog({
   open,
   onOpenChange,
   requestingUserId,
-  requestingEntryId,
   targetUserId,
   targetUserName,
   targetEntryId,
@@ -33,23 +41,25 @@ export function ShiftSwapRequestDialog({
 }: ShiftSwapRequestDialogProps) {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
-  const [requestingShift, setRequestingShift] = useState<any>(null);
+  const [userShifts, setUserShifts] = useState<UserShift[]>([]);
+  const [selectedShiftId, setSelectedShiftId] = useState<string>('');
   const [targetShift, setTargetShift] = useState<any>(null);
-  const [requestingTeam, setRequestingTeam] = useState<any>(null);
   const [targetTeam, setTargetTeam] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
-      fetchShiftDetails();
+      fetchTargetShift();
+      fetchUserShifts();
     }
-  }, [open, requestingEntryId, targetEntryId]);
+  }, [open, targetEntryId, requestingUserId]);
 
-  const fetchShiftDetails = async () => {
+  const fetchTargetShift = async () => {
     const { data, error } = await supabase
       .from('schedule_entries')
-      .select('id, shift_type, activity_type, team_id, teams(name)')
-      .in('id', [requestingEntryId, targetEntryId]);
+      .select('id, date, shift_type, activity_type, team_id, teams(name)')
+      .eq('id', targetEntryId)
+      .single();
 
     if (error) {
       toast({
@@ -60,24 +70,56 @@ export function ShiftSwapRequestDialog({
       return;
     }
 
-    if (data) {
-      const reqShift = data.find(e => e.id === requestingEntryId);
-      const tgtShift = data.find(e => e.id === targetEntryId);
-      
-      setRequestingShift(reqShift);
-      setTargetShift(tgtShift);
-      setRequestingTeam(reqShift?.teams);
-      setTargetTeam(tgtShift?.teams);
+    setTargetShift(data);
+    setTargetTeam(data?.teams);
+  };
+
+  const fetchUserShifts = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('schedule_entries')
+      .select('id, date, shift_type, team_id, teams(name)')
+      .eq('user_id', requestingUserId)
+      .eq('activity_type', 'work')
+      .eq('availability_status', 'available')
+      .gte('date', today.toISOString().split('T')[0])
+      .order('date', { ascending: true });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch your shifts',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setUserShifts(data || []);
+    
+    // Auto-select first shift if available
+    if (data && data.length > 0) {
+      setSelectedShiftId(data[0].id);
     }
   };
 
   const handleSubmit = async () => {
+    if (!selectedShiftId) {
+      toast({
+        title: 'No Shift Selected',
+        description: 'Please select one of your shifts to offer in exchange',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Validate the swap request
       const validation = await validateSwapRequest(
         requestingUserId,
-        requestingEntryId,
+        selectedShiftId,
         targetUserId,
         targetEntryId,
         new Date(swapDate),
@@ -99,7 +141,7 @@ export function ShiftSwapRequestDialog({
         .from('shift_swap_requests')
         .insert({
           requesting_user_id: requestingUserId,
-          requesting_entry_id: requestingEntryId,
+          requesting_entry_id: selectedShiftId,
           target_user_id: targetUserId,
           target_entry_id: targetEntryId,
           swap_date: swapDate,
@@ -135,6 +177,7 @@ export function ShiftSwapRequestDialog({
       });
 
       setReason('');
+      setSelectedShiftId('');
       onOpenChange(false);
     } catch (error) {
       toast({
@@ -158,38 +201,93 @@ export function ShiftSwapRequestDialog({
     return labels[shiftType] || 'Normal Shift';
   };
 
+  const formatShiftOption = (shift: UserShift) => {
+    const date = new Date(shift.date);
+    const dateStr = format(date, 'EEE, MMM d, yyyy');
+    const shiftLabel = getShiftLabel(shift.shift_type);
+    const teamName = shift.teams?.name || 'Unknown Team';
+    return `${dateStr} - ${shiftLabel} (${teamName})`;
+  };
+
+  const selectedShift = userShifts.find(s => s.id === selectedShiftId);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Request Shift Swap</DialogTitle>
           <DialogDescription>
-            Request to swap shifts with {targetUserName} on {new Date(swapDate).toLocaleDateString()}
+            Choose which of your shifts to offer in exchange for {targetUserName}'s shift
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-center">
-            <div className="space-y-1 p-3 rounded-lg border bg-muted/50">
-              <p className="text-xs text-muted-foreground">Your Shift</p>
-              {requestingTeam && (
-                <p className="text-xs text-muted-foreground">Team: {requestingTeam.name}</p>
-              )}
-              <p className="font-medium">{requestingShift ? getShiftLabel(requestingShift.shift_type) : 'Loading...'}</p>
-            </div>
-            
-            <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
-            
-            <div className="space-y-1 p-3 rounded-lg border bg-muted/50">
-              <p className="text-xs text-muted-foreground">{targetUserName}'s Shift</p>
-              {targetTeam && (
-                <p className="text-xs text-muted-foreground">Team: {targetTeam.name}</p>
-              )}
-              <p className="font-medium">{targetShift ? getShiftLabel(targetShift.shift_type) : 'Loading...'}</p>
+        <div className="space-y-6 py-4">
+          {/* Target Shift (What you want) */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Shift You Want</Label>
+            <div className="p-4 rounded-lg border bg-primary/5 border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm font-medium">{targetUserName}'s Shift</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Date:</span>{' '}
+                  {targetShift && format(new Date(targetShift.date), 'EEEE, MMMM d, yyyy')}
+                </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Shift:</span>{' '}
+                  {targetShift && getShiftLabel(targetShift.shift_type)}
+                </p>
+                {targetTeam && (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Team:</span> {targetTeam.name}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          {requestingShift && targetShift && requestingShift.team_id !== targetShift.team_id && (
+          <div className="flex justify-center">
+            <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
+          </div>
+
+          {/* Your Shift (What you offer) */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Your Shift to Offer</Label>
+            {userShifts.length > 0 ? (
+              <>
+                <Select value={selectedShiftId} onValueChange={setSelectedShiftId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select one of your shifts..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userShifts.map((shift) => (
+                      <SelectItem key={shift.id} value={shift.id}>
+                        {formatShiftOption(shift)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedShift && (
+                  <div className="p-3 rounded-lg border bg-muted/50 text-sm">
+                    <p>
+                      <span className="text-muted-foreground">Selected:</span>{' '}
+                      {format(new Date(selectedShift.date), 'EEEE, MMMM d')} -{' '}
+                      {getShiftLabel(selectedShift.shift_type)}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="p-4 rounded-lg border bg-muted/50 text-center">
+                <p className="text-sm text-muted-foreground">
+                  You don't have any available shifts to offer in exchange.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {selectedShift && targetShift && selectedShift.team_id !== targetShift.team_id && (
             <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
               <p className="text-sm text-foreground">
                 This is a cross-team swap within your planning partnership. Your manager will review this request.
@@ -213,7 +311,7 @@ export function ShiftSwapRequestDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+          <Button onClick={handleSubmit} disabled={loading || !selectedShiftId || userShifts.length === 0}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Send Request
           </Button>
