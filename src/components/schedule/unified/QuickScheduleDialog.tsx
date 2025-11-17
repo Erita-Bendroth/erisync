@@ -117,15 +117,15 @@ export const QuickScheduleDialog: React.FC<QuickScheduleDialogProps> = ({
         <div className="space-y-6 py-4">
           {/* User and Date Info */}
           <div className="flex items-center justify-between pb-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-base font-bold">
-                {userInitials}
-              </div>
-              <div>
-                <p className="font-semibold text-base">{userName}</p>
-                <p className="text-sm text-muted-foreground">{teamName}</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-base font-bold cursor-help"
+              title={`${userName} - ${teamName}`}
+            >
+              {userInitials}
             </div>
+            <p className="text-sm text-muted-foreground">{teamName}</p>
+          </div>
             <Badge variant="outline" className="gap-1">
               <Calendar className="h-3 w-3" />
               {format(new Date(date), 'MMM d')}
