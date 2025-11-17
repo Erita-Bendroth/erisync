@@ -108,7 +108,7 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
       </div>
       <div
         className="grid gap-0"
-        style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '80px' : 'minmax(80px, 1fr)'})` }}
       >
         {dates.map((date) => {
           const counts = shiftCounts[date];
