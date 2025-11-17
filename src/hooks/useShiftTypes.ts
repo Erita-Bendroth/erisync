@@ -30,7 +30,7 @@ export const useShiftTypes = (teamIds: string[]) => {
       const { data, error } = await supabase
         .from('shift_time_definitions')
         .select('id, shift_type, description, start_time, end_time, day_of_week, team_ids, team_id')
-        .or(`team_ids.cs.{${teamIds.join(',')}},team_id.in.(${teamIds.join(',')}),team_id.is.null`);
+        .or(`team_ids.cs.{${teamIds.join(',')}},team_id.in.(${teamIds.join(',')}),and(team_id.is.null,team_ids.is.null)`);
 
       if (error) throw error;
 
