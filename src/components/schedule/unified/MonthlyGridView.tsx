@@ -96,6 +96,26 @@ const getTeamColor = (color: string): string => {
   return colorMap[color] || 'bg-muted text-muted-foreground border-border';
 };
 
+const getTeamAbbreviation = (teamName: string): string => {
+  // Handle teams with " - " separator (e.g., "Turbine Troubleshooting Central - South" → "TTC-S")
+  if (teamName.includes(' - ')) {
+    const [main, sub] = teamName.split(' - ');
+    const mainAbbr = main.split(' ')
+      .filter(word => word.length > 3) // Only significant words
+      .map(word => word.charAt(0).toUpperCase())
+      .join('');
+    const subAbbr = sub.charAt(0).toUpperCase();
+    return `${mainAbbr}-${subAbbr}`;
+  }
+  
+  // For simple names, take first letters of significant words
+  return teamName.split(' ')
+    .filter(word => word.length > 3)
+    .map(word => word.charAt(0).toUpperCase())
+    .join('')
+    .substring(0, 4); // Max 4 letters
+};
+
 export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
   teamSections,
   dates,
@@ -106,6 +126,26 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
 
   const getEntriesForDate = (dateStr: string): ScheduleEntry[] => {
     return scheduleEntries.filter(e => e.date === dateStr && e.activity_type === 'work');
+  };
+
+  const groupEntriesByTeam = (entries: ScheduleEntry[]) => {
+    const grouped = new Map<string, { team: TeamSectionData; entries: ScheduleEntry[] }>();
+    
+    entries.forEach(entry => {
+      const team = teamSections.find(t => 
+        t.members.some(m => m.user_id === entry.user_id)
+      );
+      
+      if (team) {
+        const key = team.teamId;
+        if (!grouped.has(key)) {
+          grouped.set(key, { team, entries: [] });
+        }
+        grouped.get(key)!.entries.push(entry);
+      }
+    });
+    
+    return Array.from(grouped.values());
   };
 
   return (
@@ -141,7 +181,7 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                 
                 {/* Calendar Grid */}
                 <div className="px-4 pb-4 pt-4">
-                  <div className="grid grid-cols-7 gap-2">
+                  <div className="grid grid-cols-7 gap-1">
                     {/* Day headers */}
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                       <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-2">
@@ -170,7 +210,7 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                         <div
                           key={dateStr}
                           data-date={dateStr}
-                          className={`aspect-square border rounded-lg p-1.5 ${
+                          className={`aspect-square border rounded-lg p-1 ${
                             isInRange
                               ? isWeekend
                                 ? 'bg-muted/50 border-border'
@@ -179,43 +219,49 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                           }`}
                         >
                           <div className="flex flex-col h-full gap-0.5">
-                            <div className={`text-xs font-medium ${isInRange ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            <div className={`text-[10px] font-medium ${isInRange ? 'text-foreground' : 'text-muted-foreground'}`}>
                               {format(day, 'd')}
                             </div>
                             {isInRange && dayEntries.length > 0 && (
-                              <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
-                                 {displayEntries.map(entry => {
-                                  const team = teamSections.find(t => 
-                                    t.members.some(m => m.user_id === entry.user_id)
-                                  );
-                                  const member = team?.members.find(m => m.user_id === entry.user_id);
-                                  
-                                  return (
-                                    <div key={entry.id} className="flex items-center gap-0.5 text-[9px] leading-tight">
-                                      {/* Person initials with team color background */}
-                                      <Badge 
-                                        variant="outline" 
-                                        className={`px-1 h-3.5 min-w-[20px] text-center font-semibold ${getTeamColor(team?.color || '')}`}
-                                      >
-                                        {member?.initials || '??'}
-                                      </Badge>
-                                      {/* Shift type indicator */}
-                                      {entry.shift_type && (
-                                        <Badge 
-                                          variant="outline"
-                                          className={`px-0.5 h-3.5 min-w-[12px] text-center ${getShiftColor(entry.shift_type)}`}
-                                        >
-                                          {entry.shift_type.charAt(0).toUpperCase()}
-                                        </Badge>
-                                      )}
+                              <div className="flex-1 flex flex-col gap-1 overflow-hidden mt-0.5">
+                                {groupEntriesByTeam(dayEntries).map(({ team, entries }) => (
+                                  <div key={team.teamId} className="flex flex-col gap-0.5">
+                                    {/* Team abbreviation header */}
+                                    <div className={`text-[8px] font-bold ${getTeamColor(team.color)} px-0.5 py-0 rounded`}>
+                                      {getTeamAbbreviation(team.teamName)}
                                     </div>
-                                  );
-                                })}
-                                {remainingCount > 0 && (
-                                  <div className="text-[9px] text-muted-foreground font-medium">
-                                    +{remainingCount} more
+                                    
+                                    {/* Team members */}
+                                    {entries.slice(0, 3).map(entry => {
+                                      const member = team.members.find(m => m.user_id === entry.user_id);
+                                      
+                                      return (
+                                        <div key={entry.id} className="flex items-center gap-0.5 text-[8px] leading-tight pl-1">
+                                          {/* Person initials */}
+                                          <span className="font-medium text-foreground min-w-[22px]">
+                                            {member?.initials || '??'}
+                                          </span>
+                                          {/* Shift type badge */}
+                                          {entry.shift_type && (
+                                            <Badge 
+                                              variant="outline"
+                                              className={`px-0.5 h-3 min-w-[10px] text-[7px] ${getShiftColor(entry.shift_type)}`}
+                                            >
+                                              {entry.shift_type.charAt(0).toUpperCase()}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                    
+                                    {/* Show count if more entries */}
+                                    {entries.length > 3 && (
+                                      <div className="text-[7px] text-muted-foreground pl-1">
+                                        +{entries.length - 3}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                ))}
                               </div>
                             )}
                           </div>
