@@ -102,49 +102,48 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-[200px_auto] border-t border-border bg-blue-50/30 dark:bg-blue-950/20">
-      <div className="px-4 py-3 font-semibold text-sm border-r border-border flex items-center">
+    <div className="border-t border-border bg-blue-50/30 dark:bg-blue-950/20">
+      <div className="px-4 py-3 font-semibold text-sm border-b border-border flex items-center">
         Shift Distribution
       </div>
-      <div
-        className="grid gap-0"
-        style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '80px' : 'minmax(80px, 1fr)'})` }}
-      >
-        {dates.map((date) => {
-          const counts = shiftCounts[date];
-          const hasShifts = Object.keys(counts).length > 0;
+      <div className="overflow-x-auto">
+        <div className="flex min-w-max">
+          {dates.map((date) => {
+            const counts = shiftCounts[date];
+            const hasShifts = Object.keys(counts).length > 0;
 
-          return (
-            <ShiftDistributionPopover
-              key={date}
-              date={date}
-              scheduleEntries={scheduleEntries}
-              shiftTypes={shiftTypes}
-              teamSections={teamSections}
-              showTeamBreakdown={!!teamSections}
-            >
-              <div className="px-1 py-2 border-r border-border min-h-[3rem] hover:bg-muted/50 cursor-pointer transition-colors">
-                {hasShifts ? (
-                  <div className="flex flex-wrap gap-1 justify-center items-center">
-                    {shiftTypes.map((shift) =>
-                      counts[shift.type] > 0 ? (
-                        <Badge
-                          key={`${date}-${shift.id}`}
-                          variant="outline"
-                          className={`text-xs px-1.5 py-0 h-5 ${getShiftColor(shift.type)}`}
-                        >
-                          {getShiftLabel(shift.type)}:{counts[shift.type]}
-                        </Badge>
-                      ) : null
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center text-muted-foreground text-xs">-</div>
-                )}
-              </div>
-            </ShiftDistributionPopover>
-          );
-        })}
+            return (
+              <ShiftDistributionPopover
+                key={date}
+                date={date}
+                scheduleEntries={scheduleEntries}
+                shiftTypes={shiftTypes}
+                teamSections={teamSections}
+                showTeamBreakdown={!!teamSections}
+              >
+                <div className="px-2 py-2 border-r border-border min-h-[3rem] hover:bg-muted/50 cursor-pointer transition-colors min-w-[80px] flex-shrink-0">
+                  {hasShifts ? (
+                    <div className="flex flex-wrap gap-1 justify-center items-center">
+                      {Object.entries(counts)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([shiftType, count]) => (
+                          <Badge
+                            key={`${date}-${shiftType}`}
+                            variant="outline"
+                            className={`text-xs px-1.5 py-0 h-5 ${getShiftColor(shiftType)}`}
+                          >
+                            {getShiftLabel(shiftType)}:{count}
+                          </Badge>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground text-xs">-</div>
+                  )}
+                </div>
+              </ShiftDistributionPopover>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
