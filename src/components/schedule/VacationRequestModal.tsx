@@ -97,35 +97,107 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get user's team
-      const { data: userTeam, error: teamError } = await supabase
+      // Get user's team AND check if they're a manager
+      const { data: userTeamMember, error: teamError } = await supabase
         .from('team_members')
-        .select('team_id')
+        .select('team_id, is_manager')
         .eq('user_id', user.id)
         .single();
 
-      if (teamError || !userTeam) {
+      if (teamError || !userTeamMember) {
         console.error('Error fetching user team:', teamError);
         setPlanners([]);
         return;
       }
 
-      // Get managers from user's team
-      const { data: managers, error: managersError } = await supabase
-        .from('team_members')
-        .select(`
-          user_id,
-          profiles!team_members_user_id_fkey(
-            user_id,
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('team_id', userTeam.team_id)
-        .eq('is_manager', true);
+      let managers: any[] = [];
 
-      if (managersError) throw managersError;
+      // If user is a manager, look for approvers in the parent team hierarchy
+      if (userTeamMember.is_manager) {
+        // Get the team hierarchy to find parent team
+        const { data: team, error: teamInfoError } = await supabase
+          .from('teams')
+          .select('id, name, parent_team_id')
+          .eq('id', userTeamMember.team_id)
+          .single();
+
+        if (teamInfoError) throw teamInfoError;
+
+        // Look for managers in parent team(s)
+        if (team.parent_team_id) {
+          // Get managers from parent team
+          const { data: parentManagers, error: parentManagersError } = await supabase
+            .from('team_members')
+            .select(`
+              user_id,
+              profiles!team_members_user_id_fkey(
+                user_id,
+                first_name,
+                last_name,
+                email
+              )
+            `)
+            .eq('team_id', team.parent_team_id)
+            .eq('is_manager', true);
+
+          if (parentManagersError) throw parentManagersError;
+          managers = parentManagers || [];
+
+          // If no managers in parent, try to find planners/admins
+          if (managers.length === 0) {
+            const { data: plannersList, error: plannersError } = await supabase
+              .from('user_roles')
+              .select(`
+                user_id,
+                profiles!user_roles_user_id_fkey(
+                  user_id,
+                  first_name,
+                  last_name,
+                  email
+                )
+              `)
+              .in('role', ['planner', 'admin']);
+
+            if (plannersError) throw plannersError;
+            managers = plannersList || [];
+          }
+        } else {
+          // No parent team, look for planners/admins globally
+          const { data: plannersList, error: plannersError } = await supabase
+            .from('user_roles')
+            .select(`
+              user_id,
+              profiles!user_roles_user_id_fkey(
+                user_id,
+                first_name,
+                last_name,
+                email
+              )
+            `)
+            .in('role', ['planner', 'admin']);
+
+          if (plannersError) throw plannersError;
+          managers = plannersList || [];
+        }
+      } else {
+        // Regular team member: get managers from their own team
+        const { data: teamManagers, error: managersError } = await supabase
+          .from('team_members')
+          .select(`
+            user_id,
+            profiles!team_members_user_id_fkey(
+              user_id,
+              first_name,
+              last_name,
+              email
+            )
+          `)
+          .eq('team_id', userTeamMember.team_id)
+          .eq('is_manager', true);
+
+        if (managersError) throw managersError;
+        managers = teamManagers || [];
+      }
 
       // Transform to expected format
       const managerList = managers
