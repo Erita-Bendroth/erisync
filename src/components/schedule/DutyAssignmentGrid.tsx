@@ -103,12 +103,15 @@ export function DutyAssignmentGrid({
               user_id: tm.user_id,
               first_name: tm.profiles.first_name,
               last_name: tm.profiles.last_name,
-              initials: tm.profiles.initials,
+              initials: tm.profiles.initials || `${tm.profiles.first_name?.charAt(0) || ''}${tm.profiles.last_name?.charAt(0) || ''}`,
             }
           ])
         ).values()
       );
+      console.log('[DutyAssignmentGrid] Fetched team members:', uniqueMembers.length, 'unique members');
       setTeamMembers(uniqueMembers);
+    } else if (error) {
+      console.error('[DutyAssignmentGrid] Error fetching team members:', error);
     }
   };
 
@@ -397,7 +400,14 @@ export function DutyAssignmentGrid({
               {dates.map(date => {
                 const scheduled = getScheduledUsersForDate(date, dutyType);
                 const scheduledInitials = scheduled
-                  .map(s => teamMembers.find(m => m.user_id === s.user_id)?.initials)
+                  .map(s => {
+                    const member = teamMembers.find(m => m.user_id === s.user_id);
+                    if (!member) {
+                      console.warn('[DutyAssignmentGrid] User not in teamMembers:', s.user_id, 'for date', date.toISOString().split('T')[0], 'duty:', dutyType);
+                      return null;
+                    }
+                    return member.initials || `${member.first_name?.charAt(0) || ''}${member.last_name?.charAt(0) || ''}`;
+                  })
                   .filter(Boolean)
                   .join(', ');
                 const currentAssignments = getAssignments(date, dutyType);

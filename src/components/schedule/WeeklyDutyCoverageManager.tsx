@@ -806,10 +806,13 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
       created_by: user?.id,
     };
 
-    // Always INSERT as new
+    // Use UPSERT to avoid 409 conflicts
     const { data, error } = await supabase
       .from('custom_duty_email_templates')
-      .insert([templateData])
+      .upsert(templateData, {
+        onConflict: 'source_template_id,week_number,year,mode',
+        ignoreDuplicates: false
+      })
       .select()
       .single();
 
