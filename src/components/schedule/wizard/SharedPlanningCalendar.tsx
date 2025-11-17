@@ -49,7 +49,7 @@ export const SharedPlanningCalendar = ({ wizardData }: SharedPlanningCalendarPro
           end: wizardData.endDate,
         });
         const filteredDays = allDays.filter(day => {
-          if (wizardData.skipWeekends && isWeekendDate(day)) return false;
+          if (wizardData.excludedDays.includes(day.getDay())) return false;
           return true;
         });
         setDateRange(filteredDays.slice(0, 14)); // First 14 days
