@@ -1,0 +1,230 @@
+import React, { useState } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { SchedulerCell } from './SchedulerCell';
+import { InlineEditPopover } from './InlineEditPopover';
+import { CoverageRow } from './CoverageRow';
+import { ScheduleEntry } from '@/hooks/useSchedulerState';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Database } from '@/integrations/supabase/types';
+
+type ShiftType = Database['public']['Enums']['shift_type'];
+type ActivityType = Database['public']['Enums']['activity_type'];
+type AvailabilityStatus = Database['public']['Enums']['availability_status'];
+
+interface TeamMember {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  initials: string;
+}
+
+interface SchedulerGridProps {
+  teamMembers: TeamMember[];
+  dates: string[];
+  scheduleEntries: ScheduleEntry[];
+  selectedUsers: Set<string>;
+  selectedCells: Set<string>;
+  hoveredCell: string | null;
+  editingCell: string | null;
+  onUserToggle: (userId: string) => void;
+  onCellClick: (cellId: string) => void;
+  onCellDoubleClick: (cellId: string) => void;
+  onCellHover: (cellId: string | null) => void;
+  onCellDragStart: (cellId: string) => void;
+  onCellDragEnd: () => void;
+  onUpdateEntry: (entry: ScheduleEntry) => void;
+  teamId: string;
+  currentUserId: string;
+}
+
+export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
+  teamMembers,
+  dates,
+  scheduleEntries,
+  selectedUsers,
+  selectedCells,
+  hoveredCell,
+  editingCell,
+  onUserToggle,
+  onCellClick,
+  onCellDoubleClick,
+  onCellHover,
+  onCellDragStart,
+  onCellDragEnd,
+  onUpdateEntry,
+  teamId,
+  currentUserId,
+}) => {
+  const { toast } = useToast();
+  const [editPopoverOpen, setEditPopoverOpen] = useState(false);
+  const [editingCellData, setEditingCellData] = useState<{
+    userId: string;
+    userName: string;
+    date: string;
+  } | null>(null);
+
+  const getEntry = (userId: string, date: string) => {
+    return scheduleEntries.find(e => e.user_id === userId && e.date === date);
+  };
+
+  const handleCellDoubleClick = (userId: string, date: string) => {
+    const member = teamMembers.find(m => m.user_id === userId);
+    if (member) {
+      setEditingCellData({
+        userId,
+        userName: `${member.first_name} ${member.last_name}`,
+        date,
+      });
+      setEditPopoverOpen(true);
+    }
+    onCellDoubleClick(`${userId}:${date}`);
+  };
+
+  const handleSaveEdit = async (data: {
+    shift_type: ShiftType | null;
+    activity_type: ActivityType;
+    availability_status: AvailabilityStatus;
+    notes?: string;
+  }) => {
+    if (!editingCellData) return;
+
+    try {
+      const entry: ScheduleEntry = {
+        user_id: editingCellData.userId,
+        team_id: teamId,
+        date: editingCellData.date,
+        ...data,
+      };
+
+      // Save to database
+      const { error } = await supabase
+        .from('schedule_entries')
+        .upsert({
+          ...entry,
+          created_by: currentUserId,
+        }, {
+          onConflict: 'user_id,date,team_id',
+        });
+
+      if (error) throw error;
+
+      onUpdateEntry(entry);
+
+      toast({
+        title: "Schedule updated",
+        description: "Changes saved successfully",
+      });
+    } catch (error) {
+      console.error('Error saving schedule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const scheduledCounts = dates.reduce((acc, date) => {
+    acc[date] = scheduleEntries.filter(e => 
+      e.date === date && e.availability_status === 'available'
+    ).length;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return (
+    <div className="border border-border rounded-lg overflow-hidden">
+      {/* Header */}
+      <div className="grid grid-cols-[200px_1fr] bg-muted">
+        <div className="flex items-center px-4 py-3 font-semibold border-r border-b border-border">
+          Team Member
+        </div>
+        <div className="grid gap-0 border-b border-border" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+          {dates.map((date) => {
+            const dateObj = new Date(date);
+            return (
+              <div key={date} className="flex flex-col items-center justify-center px-2 py-2 border-r border-border">
+                <div className="text-xs font-semibold">
+                  {dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Team Member Rows */}
+      {teamMembers.map((member) => (
+        <div key={member.user_id} className="grid grid-cols-[200px_1fr] hover:bg-muted/50">
+          <div className="flex items-center px-4 py-2 border-r border-b border-border">
+            <Checkbox
+              checked={selectedUsers.has(member.user_id)}
+              onCheckedChange={() => onUserToggle(member.user_id)}
+              className="mr-2"
+            />
+            <div>
+              <div className="font-medium text-sm">
+                {member.initials || `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {member.first_name} {member.last_name}
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(80px, 1fr))` }}>
+            {dates.map((date) => {
+              const entry = getEntry(member.user_id, date);
+              const cellId = `${member.user_id}:${date}`;
+              
+              return (
+                <SchedulerCell
+                  key={cellId}
+                  userId={member.user_id}
+                  date={date}
+                  shiftType={entry?.shift_type || null}
+                  availabilityStatus={entry?.availability_status || 'available'}
+                  isSelected={selectedCells.has(cellId)}
+                  isHovered={hoveredCell === cellId}
+                  isEditing={editingCell === cellId}
+                  onClick={() => onCellClick(cellId)}
+                  onDoubleClick={() => handleCellDoubleClick(member.user_id, date)}
+                  onMouseEnter={() => onCellHover(cellId)}
+                  onMouseLeave={() => onCellHover(null)}
+                  onMouseDown={() => onCellDragStart(cellId)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Coverage Row */}
+      <CoverageRow
+        dates={dates}
+        teamSize={teamMembers.length}
+        scheduledCounts={scheduledCounts}
+      />
+
+      {/* Edit Popover */}
+      {editingCellData && (
+        <InlineEditPopover
+          open={editPopoverOpen}
+          onOpenChange={setEditPopoverOpen}
+          userId={editingCellData.userId}
+          userName={editingCellData.userName}
+          date={editingCellData.date}
+          currentShiftType={getEntry(editingCellData.userId, editingCellData.date)?.shift_type || null}
+          currentActivityType={getEntry(editingCellData.userId, editingCellData.date)?.activity_type || 'work'}
+          currentAvailabilityStatus={getEntry(editingCellData.userId, editingCellData.date)?.availability_status || 'available'}
+          currentNotes={getEntry(editingCellData.userId, editingCellData.date)?.notes}
+          onSave={handleSaveEdit}
+        >
+          <div />
+        </InlineEditPopover>
+      )}
+    </div>
+  );
+};
