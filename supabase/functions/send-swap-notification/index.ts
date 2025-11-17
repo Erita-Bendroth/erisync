@@ -43,11 +43,31 @@ serve(async (req) => {
     const requestingUser = profiles.find(p => p.user_id === requesting_user_id);
     const targetUser = profiles.find(p => p.user_id === target_user_id);
 
-    // Fetch team managers for notifications
+    // Fetch schedule entries to check if cross-team
+    const { data: swapRequest } = await supabase
+      .from('shift_swap_requests')
+      .select(`
+        requesting_entry:schedule_entries!shift_swap_requests_requesting_entry_id_fkey(team_id, teams(name)),
+        target_entry:schedule_entries!shift_swap_requests_target_entry_id_fkey(team_id, teams(name))
+      `)
+      .eq('requesting_user_id', requesting_user_id)
+      .eq('target_user_id', target_user_id)
+      .eq('swap_date', swap_date)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const isCrossTeam = swapRequest?.requesting_entry?.team_id !== swapRequest?.target_entry?.team_id;
+
+    // Fetch managers from both teams if cross-team
+    const teamsToCheck = isCrossTeam 
+      ? [swapRequest?.requesting_entry?.team_id, swapRequest?.target_entry?.team_id].filter(Boolean)
+      : [team_id];
+
     const { data: managers } = await supabase
       .from('team_members')
       .select('user_id, profiles!team_members_user_id_fkey(email, first_name, last_name)')
-      .eq('team_id', team_id)
+      .in('team_id', teamsToCheck)
       .eq('is_manager', true);
 
     let notificationMessage = '';
@@ -55,8 +75,11 @@ serve(async (req) => {
 
     switch (type) {
       case 'request_created':
-        notificationMessage = `${requestingUser?.first_name} ${requestingUser?.last_name} has requested to swap shifts with ${targetUser?.first_name} ${targetUser?.last_name} on ${new Date(swap_date).toLocaleDateString()}.`;
-        // Notify target user and managers
+        const teamContext = isCrossTeam 
+          ? ` (Cross-team: ${swapRequest?.requesting_entry?.teams?.name} ↔ ${swapRequest?.target_entry?.teams?.name})`
+          : '';
+        notificationMessage = `${requestingUser?.first_name} ${requestingUser?.last_name} has requested to swap shifts with ${targetUser?.first_name} ${targetUser?.last_name} on ${new Date(swap_date).toLocaleDateString()}${teamContext}.`;
+        // Notify target user and managers from both teams
         recipients = [
           ...(targetUser?.email ? [targetUser.email] : []),
           ...(managers?.map(m => (m.profiles as any)?.email).filter(Boolean) || [])

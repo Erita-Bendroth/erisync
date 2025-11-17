@@ -19,10 +19,11 @@ interface SwapRequest {
   reviewed_at: string | null;
   review_notes: string | null;
   created_at: string;
+  team_id: string;
   requesting_user: { first_name: string; last_name: string };
   target_user: { first_name: string; last_name: string };
-  requesting_entry: { shift_type: string };
-  target_entry: { shift_type: string };
+  requesting_entry: { shift_type: string; team_id: string; teams: { name: string } };
+  target_entry: { shift_type: string; team_id: string; teams: { name: string } };
 }
 
 export function ShiftSwapRequestsList() {
@@ -47,8 +48,8 @@ export function ShiftSwapRequestsList() {
         *,
         requesting_user:profiles!shift_swap_requests_requesting_user_id_fkey(first_name, last_name),
         target_user:profiles!shift_swap_requests_target_user_id_fkey(first_name, last_name),
-        requesting_entry:schedule_entries!shift_swap_requests_requesting_entry_id_fkey(shift_type),
-        target_entry:schedule_entries!shift_swap_requests_target_entry_id_fkey(shift_type)
+        requesting_entry:schedule_entries!shift_swap_requests_requesting_entry_id_fkey(shift_type, team_id, teams(name)),
+        target_entry:schedule_entries!shift_swap_requests_target_entry_id_fkey(shift_type, team_id, teams(name))
       `)
       .or(`requesting_user_id.eq.${user.id},target_user_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
@@ -142,18 +143,29 @@ export function ShiftSwapRequestsList() {
     const otherUser = isRequester ? request.target_user : request.requesting_user;
     const myShift = isRequester ? request.requesting_entry : request.target_entry;
     const theirShift = isRequester ? request.target_entry : request.requesting_entry;
+    const isCrossTeam = request.requesting_entry.team_id !== request.target_entry.team_id;
 
     return (
       <Card key={request.id}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <CardTitle className="text-base">
+              <CardTitle className="text-base flex items-center gap-2">
                 Swap with {otherUser.first_name} {otherUser.last_name}
+                {isCrossTeam && (
+                  <Badge variant="outline" className="text-xs">
+                    Cross-team
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 {format(new Date(request.swap_date), 'EEEE, MMMM d, yyyy')}
               </CardDescription>
+              {isCrossTeam && (
+                <p className="text-xs text-muted-foreground">
+                  {myShift.teams?.name} ↔ {theirShift.teams?.name}
+                </p>
+              )}
             </div>
             {getStatusBadge(request.status)}
           </div>

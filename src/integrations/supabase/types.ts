@@ -1397,6 +1397,10 @@ export type Database = {
         Args: { _lookback_months?: number; _team_id: string }
         Returns: Json
       }
+      are_teams_in_partnership: {
+        Args: { team_a: string; team_b: string }
+        Returns: boolean
+      }
       can_view_sensitive_profile_data: {
         Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean

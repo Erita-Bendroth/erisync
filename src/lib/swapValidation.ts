@@ -6,6 +6,26 @@ export interface SwapValidationResult {
 }
 
 /**
+ * Checks if two teams are in the same planning partnership
+ */
+async function areTeamsInPartnership(teamIdA: string, teamIdB: string): Promise<boolean> {
+  if (teamIdA === teamIdB) return true; // Same team always valid
+  
+  const { data, error } = await supabase
+    .from('team_planning_partners')
+    .select('team_ids')
+    .contains('team_ids', [teamIdA])
+    .contains('team_ids', [teamIdB]);
+  
+  if (error) {
+    console.error('Error checking partnership:', error);
+    return false;
+  }
+  
+  return data && data.length > 0;
+}
+
+/**
  * Validates if a shift swap request can be created
  */
 export async function validateSwapRequest(
@@ -45,9 +65,22 @@ export async function validateSwapRequest(
     return { valid: false, error: 'Schedule entries not found' };
   }
 
-  // Validate both users are in the same team
-  if (requestingEntry.team_id !== targetEntry.team_id || requestingEntry.team_id !== teamId) {
-    return { valid: false, error: 'Users must be in the same team' };
+  // Validate teams are in partnership
+  const teamsInPartnership = await areTeamsInPartnership(
+    requestingEntry.team_id,
+    targetEntry.team_id
+  );
+
+  if (!teamsInPartnership) {
+    return { 
+      valid: false, 
+      error: 'Users must be in the same team or in a planning partnership' 
+    };
+  }
+
+  // Verify the requesting user's team matches the provided teamId
+  if (requestingEntry.team_id !== teamId) {
+    return { valid: false, error: 'Invalid team ID for requesting user' };
   }
 
   // Validate both entries are on the same date

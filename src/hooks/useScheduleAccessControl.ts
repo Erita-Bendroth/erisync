@@ -22,6 +22,8 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
   const [directlyManagedUsers, setDirectlyManagedUsers] = useState<Set<string>>(new Set());
   const [directlyManagedTeams, setDirectlyManagedTeams] = useState<Set<string>>(new Set());
   const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
+  const [partnershipTeams, setPartnershipTeams] = useState<Set<string>>(new Set());
+  const [userTeams, setUserTeams] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -76,6 +78,37 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
             if (members) {
               setDirectlyManagedUsers(new Set(members.map(m => m.user_id)));
             }
+          }
+        }
+      }
+
+      // Fetch user's own teams
+      const { data: myTeams } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id);
+
+      if (myTeams) {
+        const teamIds = myTeams.map(t => t.team_id);
+        setUserTeams(new Set(teamIds));
+
+        // Fetch partnership teams for those teams
+        if (teamIds.length > 0) {
+          const { data: partnerships } = await supabase
+            .from('team_planning_partners')
+            .select('team_ids');
+
+          if (partnerships) {
+            const allPartnerTeams = new Set<string>();
+            partnerships.forEach(p => {
+              // Check if any of user's teams are in this partnership
+              const hasUserTeam = p.team_ids.some(tid => teamIds.includes(tid));
+              if (hasUserTeam) {
+                // Add all teams from this partnership
+                p.team_ids.forEach(teamId => allPartnerTeams.add(teamId));
+              }
+            });
+            setPartnershipTeams(allPartnerTeams);
           }
         }
       }
@@ -141,9 +174,10 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
     // Managers can see shifts for accessible teams
     if (isManager) return true;
 
-    // Team members can see shifts for their team members
-    // Check if the current user is in the target team
-    return user !== null;
+    // Team members can see shifts for:
+    // 1. Their own team members
+    // 2. Members of partnership teams
+    return userTeams.has(targetTeamId) || partnershipTeams.has(targetTeamId);
   };
 
   return {
@@ -156,5 +190,7 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
     directlyManagedTeams,
     directlyManagedUsers,
     editableTeams,
+    partnershipTeams,
+    userTeams
   };
 }
