@@ -83,10 +83,7 @@ export async function validateSwapRequest(
     return { valid: false, error: 'Invalid team ID for requesting user' };
   }
 
-  // Validate both entries are on the same date
-  if (requestingEntry.date !== targetEntry.date) {
-    return { valid: false, error: 'Shifts must be on the same date' };
-  }
+  // Cross-date swaps are allowed - removed same-date restriction
 
   // Validate shifts are swappable (must be work activities)
   const nonSwappableActivities = ['vacation', 'sick', 'out_of_office'];
@@ -102,21 +99,19 @@ export async function validateSwapRequest(
     return { valid: false, error: 'Both shifts must be available' };
   }
 
-  // Check for existing pending swap requests for the same date/users
+  // Check for existing pending swap requests involving these schedule entries
   const { data: existingSwaps, error: swapsError } = await supabase
     .from('shift_swap_requests')
     .select('id')
-    .eq('swap_date', swapDate.toISOString().split('T')[0])
     .eq('status', 'pending')
-    .or(`requesting_user_id.eq.${requestingUserId},target_user_id.eq.${requestingUserId}`)
-    .or(`requesting_user_id.eq.${targetUserId},target_user_id.eq.${targetUserId}`);
+    .or(`requesting_entry_id.eq.${requestingEntryId},requesting_entry_id.eq.${targetEntryId},target_entry_id.eq.${requestingEntryId},target_entry_id.eq.${targetEntryId}`);
 
   if (swapsError) {
     return { valid: false, error: 'Failed to check for existing swap requests' };
   }
 
   if (existingSwaps && existingSwaps.length > 0) {
-    return { valid: false, error: 'A pending swap request already exists for this date' };
+    return { valid: false, error: 'One or both shifts are already involved in a pending swap request' };
   }
 
   return { valid: true };
