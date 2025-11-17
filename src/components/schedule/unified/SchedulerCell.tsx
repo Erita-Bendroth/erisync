@@ -20,6 +20,7 @@ interface SchedulerCellProps {
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onMouseDown: () => void;
+  onMouseUp: () => void;
   editingBy?: OnlineUser[];
   enableQuickDialog?: boolean;
 }
@@ -51,6 +52,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
+  onMouseUp,
   editingBy = [],
   enableQuickDialog = false,
 }) => {
@@ -82,6 +84,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
       data-cell-id={cellId}
       title={enableQuickDialog ? 'Click to schedule' : undefined}
     >
