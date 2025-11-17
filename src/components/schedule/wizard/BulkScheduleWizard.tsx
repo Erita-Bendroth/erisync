@@ -96,7 +96,7 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
       if (error) throw error;
 
       const roles = data.map(r => r.role);
-      const canCreate = roles.includes("admin") || roles.includes("planner");
+      const canCreate = roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
       setHasPermission(canCreate);
 
       if (!canCreate) {
