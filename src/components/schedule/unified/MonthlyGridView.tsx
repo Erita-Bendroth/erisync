@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
 import { ShiftTypeOption } from '@/hooks/useShiftTypes';
 import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
+import { ShiftDistributionPopover } from './ShiftDistributionPopover';
+import { Users } from 'lucide-react';
 
 interface TeamMember {
   user_id: string;
@@ -200,82 +202,96 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                       const remainingCount = dayEntries.length - 3;
 
                       return (
-                        <div
+                        <ShiftDistributionPopover
                           key={dateStr}
-                          data-date={dateStr}
-                          className={`aspect-square border rounded-lg p-1 ${
-                            isInRange
-                              ? isWeekend
-                                ? 'bg-muted/50 border-border'
-                                : 'bg-card border-border'
-                              : 'bg-muted/20 border-border/50'
-                          }`}
+                          date={dateStr}
+                          scheduleEntries={scheduleEntries}
+                          shiftTypes={shiftTypes}
+                          teamSections={teamSections}
+                          showTeamBreakdown={true}
                         >
-                          <div className="flex flex-col h-full gap-0.5">
-                            <div className={`text-[10px] font-medium ${isInRange ? 'text-foreground' : 'text-muted-foreground'}`}>
-                              {format(day, 'd')}
-                            </div>
-                            {isInRange && dayEntries.length > 0 && (
-                              <>
-                                <div className="flex-1 flex flex-col gap-1 overflow-hidden mt-0.5">
-                                  {groupEntriesByTeam(dayEntries).map(({ team, entries }) => (
-                                    <div key={team.teamId} className="flex flex-col gap-0.5">
-                                      {/* Team abbreviation header */}
-                                      <div className={`text-[8px] font-bold ${getTeamColor(team.color)} px-0.5 py-0 rounded`}>
-                                        {getTeamAbbreviation(team.teamName)}
-                                      </div>
-                                      
-                                      {/* Team members */}
-                                      {entries.slice(0, 3).map(entry => {
-                                        const member = team.members.find(m => m.user_id === entry.user_id);
-                                        
-                                        return (
-                                          <div key={entry.id} className="flex items-center gap-0.5 text-[8px] leading-tight pl-1">
-                                            {/* Person initials */}
-                                            <span className="font-medium text-foreground min-w-[22px]">
-                                              {member?.initials || '??'}
-                                            </span>
-                                            {/* Shift type badge */}
-                                            {entry.shift_type && (
-                                              <Badge 
-                                                variant="outline"
-                                                className={`px-0.5 h-3 min-w-[10px] text-[7px] ${getShiftColor(entry.shift_type)}`}
-                                              >
-                                                {entry.shift_type.charAt(0).toUpperCase()}
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                      
-                                      {/* Show count if more entries */}
-                                      {entries.length > 3 && (
-                                        <div className="text-[7px] text-muted-foreground pl-1">
-                                          +{entries.length - 3}
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                                
-                                {/* Shift counts at bottom of cell */}
-                                {Object.keys(shiftCounts).length > 0 && (
-                                  <div className="flex flex-wrap gap-0.5 mt-auto pt-0.5 border-t border-border/50">
-                                    {Object.entries(shiftCounts).map(([shiftType, count]) => (
-                                      <Badge
-                                        key={shiftType}
-                                        variant="outline"
-                                        className={`px-1 h-3 text-[7px] ${getShiftColor(shiftType)}`}
-                                      >
-                                        {shiftType.charAt(0).toUpperCase()}: {count}
-                                      </Badge>
-                                    ))}
+                          <div
+                            data-date={dateStr}
+                            className={`aspect-square border rounded-lg p-1 cursor-help hover:ring-2 hover:ring-primary/20 transition-all ${
+                              isInRange
+                                ? isWeekend
+                                  ? 'bg-muted/50 border-border'
+                                  : 'bg-card border-border'
+                                : 'bg-muted/20 border-border/50'
+                            }`}
+                          >
+                            <div className="flex flex-col h-full gap-0.5">
+                              <div className={`text-[10px] font-medium flex items-center justify-between ${isInRange ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                <span>{format(day, 'd')}</span>
+                                {isInRange && dayEntries.length > 0 && (
+                                  <div className="flex items-center gap-0.5">
+                                    <Users className="h-2 w-2 text-muted-foreground" />
+                                    <span className="text-[8px] text-muted-foreground">{dayEntries.length}</span>
                                   </div>
                                 )}
-                              </>
-                            )}
+                              </div>
+                              {isInRange && dayEntries.length > 0 && (
+                                <>
+                                  <div className="flex-1 flex flex-col gap-1 overflow-hidden mt-0.5">
+                                    {groupEntriesByTeam(dayEntries).map(({ team, entries }) => (
+                                      <div key={team.teamId} className="flex flex-col gap-0.5">
+                                        {/* Team abbreviation header */}
+                                        <div className={`text-[8px] font-bold ${getTeamColor(team.color)} px-0.5 py-0 rounded`}>
+                                          {getTeamAbbreviation(team.teamName)}
+                                        </div>
+                                        
+                                        {/* Team members */}
+                                        {entries.slice(0, 3).map(entry => {
+                                          const member = team.members.find(m => m.user_id === entry.user_id);
+                                          
+                                          return (
+                                            <div key={entry.id} className="flex items-center gap-0.5 text-[8px] leading-tight pl-1">
+                                              {/* Person initials */}
+                                              <span className="font-medium text-foreground min-w-[22px]">
+                                                {member?.initials || '??'}
+                                              </span>
+                                              {/* Shift type badge */}
+                                              {entry.shift_type && (
+                                                <Badge 
+                                                  variant="outline"
+                                                  className={`px-0.5 h-3 min-w-[10px] text-[7px] ${getShiftColor(entry.shift_type)}`}
+                                                >
+                                                  {entry.shift_type.charAt(0).toUpperCase()}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                        
+                                        {/* Show count if more entries */}
+                                        {entries.length > 3 && (
+                                          <div className="text-[7px] text-muted-foreground pl-1">
+                                            +{entries.length - 3}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  {/* Shift counts at bottom of cell */}
+                                  {Object.keys(shiftCounts).length > 0 && (
+                                    <div className="flex flex-wrap gap-0.5 mt-auto pt-0.5 border-t border-border/50">
+                                      {Object.entries(shiftCounts).map(([shiftType, count]) => (
+                                        <Badge
+                                          key={shiftType}
+                                          variant="outline"
+                                          className={`px-1 h-3 text-[7px] ${getShiftColor(shiftType)}`}
+                                        >
+                                          {shiftType.charAt(0).toUpperCase()}: {count}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
+                        </ShiftDistributionPopover>
                       );
                     })}
                   </div>
