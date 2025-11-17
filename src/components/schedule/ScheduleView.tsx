@@ -22,6 +22,7 @@ import { VacationRequestModal } from './VacationRequestModal';
 import { MyRequestsDialog } from './MyRequestsDialog';
 import { TeamAvailabilityView } from './TeamAvailabilityView';
 import { MonthlyScheduleView } from './MonthlyScheduleView';
+import { PersonalMonthlyCalendar } from './PersonalMonthlyCalendar';
 import { TeamFavoritesManager } from './TeamFavoritesManager';
 import { TeamFavoritesQuickAccess } from './TeamFavoritesQuickAccess';
 import { BulkEditShiftsModal } from './BulkEditShiftsModal';
@@ -1969,13 +1970,9 @@ const getActivityColor = (entry: ScheduleEntry) => {
       {/* Monthly Schedule View */}
       {timeView === "monthly" && (
         <>
-          {/* For team members, use their first team */}
-          {isTeamMember() && !isManager() && !isPlanner() && userTeams.length > 0 && userTeams[0]?.id && (
-            <MonthlyScheduleView 
-              currentMonth={currentMonth}
-              teamId={userTeams[0]!.id}
-              userId={user!.id}
-            />
+          {/* For team members, show personal calendar */}
+          {isTeamMember() && !isManager() && !isPlanner() && (
+            <PersonalMonthlyCalendar />
           )}
           
           {/* For managers/planners, require team selection */}
