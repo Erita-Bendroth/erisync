@@ -19,7 +19,7 @@ import { EditScheduleModal } from './EditScheduleModal';
 import { TimeBlockDisplay } from './TimeBlockDisplay';
 import { TeamHierarchyInfo } from './TeamHierarchyInfo';
 import { VacationRequestModal } from './VacationRequestModal';
-import { VacationRequestsList } from './VacationRequestsList';
+import { MyRequestsDialog } from './MyRequestsDialog';
 import { TeamAvailabilityView } from './TeamAvailabilityView';
 import { MonthlyScheduleView } from './MonthlyScheduleView';
 import { TeamFavoritesManager } from './TeamFavoritesManager';
@@ -121,6 +121,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   const [vacationModalOpen, setVacationModalOpen] = useState(false);
   const [showVacationRequests, setShowVacationRequests] = useState(false);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [pendingSwapRequestsCount, setPendingSwapRequestsCount] = useState(0);
   const [editingVacationRequest, setEditingVacationRequest] = useState<any>(null);
   const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
 
@@ -269,6 +270,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchHolidays();
       fetchShiftTimeDefinitions();
       fetchPendingRequestsCount();
+      fetchPendingSwapRequestsCount();
     }, 150); // Debounce 150ms
     
     return () => clearTimeout(timer);
@@ -332,24 +334,24 @@ const fetchPendingRequestsCount = async () => {
 
     let query = supabase
       .from('vacation_requests')
-      .select('id, request_group_id')
-      .eq('status', 'pending');
-    
-    // If not a planner/manager, only count own requests
-    if (!isPlanner() && !isManager()) {
-      query = query.eq('user_id', user.id);
+      .select('id, request_group_id, status, user_id');
+
+    // For managers/planners, fetch all pending requests
+    if (isManager() || isPlanner()) {
+      query = query.eq('status', 'pending');
+    } else {
+      // For regular users, fetch only their pending requests
+      query = query.eq('user_id', user.id).eq('status', 'pending');
     }
 
-    const { data, error } = await query;
+    const { data: requests } = await query;
     
-    if (error) throw error;
-    
-    // Count unique request groups (multi-day requests) + individual requests
-    if (data) {
+    if (requests) {
+      // Group by request_group_id to count multi-day requests as one
       const groupIds = new Set<string>();
       let individualCount = 0;
       
-      data.forEach(request => {
+      requests.forEach(request => {
         if (request.request_group_id) {
           groupIds.add(request.request_group_id);
         } else {
@@ -364,6 +366,35 @@ const fetchPendingRequestsCount = async () => {
     }
   } catch (error) {
     console.error('Error fetching pending requests count:', error);
+  }
+};
+
+// Fetch pending shift swap requests count for notification badge
+const fetchPendingSwapRequestsCount = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // For managers/planners, count all pending swap requests
+    if (isManager() || isPlanner()) {
+      const { count } = await supabase
+        .from('shift_swap_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      setPendingSwapRequestsCount(count || 0);
+    } else {
+      // For regular users, count their pending swap requests (as requester or target)
+      const { data: requests } = await supabase
+        .from('shift_swap_requests')
+        .select('id')
+        .eq('status', 'pending')
+        .or(`requesting_user_id.eq.${user.id},target_user_id.eq.${user.id}`);
+      
+      setPendingSwapRequestsCount(requests?.length || 0);
+    }
+  } catch (error) {
+    console.error('Error fetching pending swap requests count:', error);
   }
 };
 
@@ -382,6 +413,7 @@ useEffect(() => {
       },
       () => {
         fetchPendingRequestsCount();
+        fetchPendingSwapRequestsCount();
       }
     )
     .subscribe();
@@ -1274,6 +1306,7 @@ useEffect(() => {
 
   const isPlanner = () => userRoles.some(role => role.role === "planner");
   const isManager = () => userRoles.some(role => role.role === "manager");
+  const isAdmin = () => userRoles.some(role => role.role === "admin");
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
   
   // Shift counts for managers (last 6 months) - must be after isManager/isPlanner definitions
@@ -1596,18 +1629,18 @@ const getActivityColor = (entry: ScheduleEntry) => {
           {/* Vacation Requests Toggle - For all authenticated users */}
           <Button
             onClick={() => setShowVacationRequests(true)}
-            variant={pendingRequestsCount > 0 ? "destructive" : "outline"}
+            variant={(pendingRequestsCount + pendingSwapRequestsCount) > 0 ? "destructive" : "outline"}
             size="default"
             className="gap-2 relative"
           >
             <FileText className="h-4 w-4" />
             {(isManager() || isPlanner()) ? 'Show Requests' : 'My Requests'}
-            {pendingRequestsCount > 0 && (
+            {(pendingRequestsCount + pendingSwapRequestsCount) > 0 && (
               <Badge 
                 variant="secondary" 
                 className="ml-2 bg-white text-destructive font-bold px-2"
               >
-                {pendingRequestsCount}
+                {pendingRequestsCount + pendingSwapRequestsCount}
               </Badge>
             )}
           </Button>
@@ -2272,26 +2305,29 @@ const getActivityColor = (entry: ScheduleEntry) => {
         </CardContent>
       </Card>
 
-      {/* Vacation Requests Sheet */}
+      {/* My Requests Sheet */}
       <Sheet open={showVacationRequests} onOpenChange={setShowVacationRequests}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
-              {(isManager() || isPlanner()) ? 'Vacation Requests' : 'My Vacation Requests'}
+              {(isManager() || isPlanner()) ? 'All Requests' : 'My Requests'}
             </SheetTitle>
             <SheetDescription>
               {(isManager() || isPlanner()) 
-                ? 'Review and manage vacation requests from your team members.'
-                : 'View and manage your vacation requests.'}
+                ? 'Review and manage vacation requests and shift swap requests from your team members.'
+                : 'View and manage your vacation requests and shift swap requests.'}
             </SheetDescription>
           </SheetHeader>
           <div className="mt-6">
-            <VacationRequestsList
+            <MyRequestsDialog
               isPlanner={isPlanner()}
+              isManager={isManager()}
+              isAdmin={isAdmin()}
               onRequestProcessed={() => {
                 // Silent refresh to preserve view - don't show loading screen
                 fetchScheduleEntries(true);
                 fetchPendingRequestsCount();
+                fetchPendingSwapRequestsCount();
               }}
               onEditRequest={(request) => {
                 setEditingVacationRequest(request);
