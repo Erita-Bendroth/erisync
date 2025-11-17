@@ -29,6 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { ApplyTemplateDialog } from '../ApplyTemplateDialog';
+import { EditScheduleModal } from '../EditScheduleModal';
 import { CoverageOverview } from '../CoverageOverview';
 import { CoverageHeatmap } from '../CoverageHeatmap';
 import { CoverageAlerts } from '../CoverageAlerts';
@@ -37,6 +38,7 @@ import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
 import { WeeklyGridView } from './WeeklyGridView';
 import { MonthlyGridView } from './MonthlyGridView';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 
 interface TeamMember {
@@ -81,6 +83,9 @@ export const UnifiedTeamScheduler: React.FC = () => {
   } | null>(null);
   const [partnershipName, setPartnershipName] = useState<string>('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<any>(null);
+  const queryClient = useQueryClient();
 
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
@@ -246,6 +251,53 @@ export const UnifiedTeamScheduler: React.FC = () => {
       selectRange(state.dragStart, state.hoveredCell, userIds);
     }
   }, [state.isDragging, state.dragStart, state.hoveredCell, state.selectedUsers, selectRange]);
+
+  // Open edit dialog when a cell is set to editing mode
+  useEffect(() => {
+    if (state.editingCell) {
+      const [userId, date] = state.editingCell.split(':');
+      
+      // Find existing entry or create new one
+      const existingEntry = scheduleEntries.find(
+        e => e.user_id === userId && e.date === date
+      );
+      
+      if (existingEntry) {
+        setEditingEntry(existingEntry);
+      } else {
+        // Create new entry template
+        const member = teamSections
+          .flatMap(s => s.members)
+          .find(m => m.user_id === userId);
+        
+        const teamId = teamSections.find(s => 
+          s.members.some(m => m.user_id === userId)
+        )?.teamId;
+        
+        if (member && teamId) {
+          setEditingEntry({
+            user_id: userId,
+            team_id: teamId,
+            date: date,
+            shift_type: null,
+            activity_type: 'work',
+            availability_status: 'available',
+            notes: '',
+            profiles: {
+              first_name: member.first_name,
+              last_name: member.last_name,
+              initials: member.initials,
+            },
+            teams: {
+              name: teamSections.find(s => s.teamId === teamId)?.teamName || '',
+            },
+          });
+        }
+      }
+      
+      setEditDialogOpen(true);
+    }
+  }, [state.editingCell, scheduleEntries, teamSections]);
 
   useEffect(() => {
     if (user) {
@@ -442,6 +494,17 @@ export const UnifiedTeamScheduler: React.FC = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setEditingEntry(null);
+    setEditingCell(null);
+  };
+
+  const handleSaveEditDialog = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['schedule-entries'] });
+    handleCloseEditDialog();
   };
 
   const navigateDate = (direction: 'prev' | 'next') => {
@@ -992,6 +1055,14 @@ export const UnifiedTeamScheduler: React.FC = () => {
           onApply={handleApplyTemplate}
         />
       )}
+
+      {/* Edit Schedule Modal */}
+      <EditScheduleModal
+        entry={editingEntry}
+        isOpen={editDialogOpen}
+        onClose={handleCloseEditDialog}
+        onSave={handleSaveEditDialog}
+      />
     </>
   );
 };
