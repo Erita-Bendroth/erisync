@@ -148,12 +148,14 @@ const ShiftDistributionPopoverComponent: React.FC<ShiftDistributionPopoverProps>
                 <div className="pl-2 space-y-0.5">
                   {detail.users.map((user) => (
                     <div key={user.userId} className="text-xs text-foreground flex items-center gap-1.5">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium">
+                      <div 
+                        className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium"
+                        title={user.name}
+                      >
                         {user.initials}
                       </div>
-                      <span>{user.name}</span>
                       {showTeamBreakdown && user.teamName && (
-                        <span className="text-muted-foreground">• {user.teamName}</span>
+                        <span className="text-muted-foreground">{user.teamName}</span>
                       )}
                     </div>
                   ))}

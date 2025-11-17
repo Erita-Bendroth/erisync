@@ -28,7 +28,7 @@ interface SchedulerCellProps {
 const SHIFT_TYPE_LABELS: Record<string, string> = {
   early: 'E',
   late: 'L',
-  normal: 'D',
+  normal: 'N',
   weekend: 'W',
 };
 
