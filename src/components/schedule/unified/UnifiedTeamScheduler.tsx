@@ -345,7 +345,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const totalMembers = teamSections.reduce((sum, section) => sum + section.members.length, 0);
 
   return (
-    <Card className="w-full">
+    <>
+      <Card className="w-full">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -493,26 +494,26 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
 
-    {selectedTemplate && (
-      <ApplyTemplateDialog
-        open={applyTemplateDialogOpen}
-        onOpenChange={setApplyTemplateDialogOpen}
-        template={selectedTemplate}
-        selectedUsers={teamSections
-          .flatMap(s => s.members)
-          .filter(m => state.selectedUsers.has(m.user_id))
-          .map(m => ({ user_id: m.user_id, name: `${m.first_name} ${m.last_name}` }))}
-        selectedDates={dates.filter(d => 
-          Array.from(state.selectedCells).some(cellId => cellId.endsWith(`-${d}`))
-        )}
-        teamId={teamSections[0]?.teamId || ''}
-        onApply={handleApplyTemplate}
-      />
-    )}
-  </div>
-);
+      {selectedTemplate && (
+        <ApplyTemplateDialog
+          open={applyTemplateDialogOpen}
+          onOpenChange={setApplyTemplateDialogOpen}
+          template={selectedTemplate}
+          selectedUsers={teamSections
+            .flatMap(s => s.members)
+            .filter(m => state.selectedUsers.has(m.user_id))
+            .map(m => ({ user_id: m.user_id, name: `${m.first_name} ${m.last_name}` }))}
+          selectedDates={dates.filter(d => 
+            Array.from(state.selectedCells).some(cellId => cellId.endsWith(`-${d}`))
+          )}
+          teamId={teamSections[0]?.teamId || ''}
+          onApply={handleApplyTemplate}
+        />
+      )}
+    </>
+  );
 };
 
 function getMonday(date: Date): Date {
