@@ -40,7 +40,7 @@ import { TeamCoverageGrid } from '../TeamCoverageGrid';
 import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
 import { WeeklyGridView } from './WeeklyGridView';
 import { MonthlyGridView } from './MonthlyGridView';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 
@@ -917,6 +917,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
           <TabsContent value="schedule" className="mt-0">
             <ScrollArea ref={scrollAreaRef} className="h-[calc(100vh-400px)]">
+              <div className="min-w-max">
               {loading ? (
                 <div className="flex items-center justify-center p-12">
                   <div className="text-muted-foreground">Loading teams...</div>
@@ -1049,6 +1050,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
                   </div>
                 </div>
               )}
+              </div>
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </TabsContent>
 
