@@ -15,6 +15,7 @@ import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { formatUserName } from "@/lib/utils";
+import { PendingRequestsCard } from "@/components/dashboard/PendingRequestsCard";
 
 interface UserRole {
   role: string;
@@ -335,6 +336,8 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          <PendingRequestsCard />
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
