@@ -69,6 +69,8 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [loading, setLoading] = useState(false);
+  type DateRangeType = '1M' | '3M' | '6M' | '1Y';
+  const [dateRangeType, setDateRangeType] = useState<DateRangeType>('1M');
   const [showPlanning, setShowPlanning] = useState(false);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [quickScheduleOpen, setQuickScheduleOpen] = useState(false);
@@ -82,6 +84,15 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
 
   const { isAdmin, isPlanner, isManager, editableTeams, canViewActivityDetails } = useScheduleAccessControl({ viewMode: 'multi-team' });
 
+  const getDaysCount = (range: DateRangeType): number => {
+    switch (range) {
+      case '1M': return 30;
+      case '3M': return 90;
+      case '6M': return 180;
+      case '1Y': return 365;
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchPartnerships();
@@ -92,7 +103,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
     if (selectedPartnershipId) {
       fetchPartnershipData();
     }
-  }, [selectedPartnershipId, currentWeekStart]);
+  }, [selectedPartnershipId, currentWeekStart, dateRangeType]);
 
   // Real-time subscription
   useEffect(() => {
@@ -182,13 +193,14 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
       }
 
       // Fetch schedule entries
-      const weekEnd = addDays(currentWeekStart, 6);
+      const daysCount = getDaysCount(dateRangeType);
+      const rangeEnd = addDays(currentWeekStart, daysCount - 1);
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('schedule_entries')
         .select('id, date, user_id, team_id, availability_status, activity_type, shift_type, notes')
         .in('team_id', partnership.team_ids)
         .gte('date', format(currentWeekStart, 'yyyy-MM-dd'))
-        .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+        .lte('date', format(rangeEnd, 'yyyy-MM-dd'));
 
       if (scheduleError) throw scheduleError;
 
@@ -296,14 +308,17 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
   };
 
   const previousWeek = () => {
-    setCurrentWeekStart(prev => addDays(prev, -7));
+    const daysCount = getDaysCount(dateRangeType);
+    setCurrentWeekStart(prev => addDays(prev, -daysCount));
   };
 
   const nextWeek = () => {
-    setCurrentWeekStart(prev => addDays(prev, 7));
+    const daysCount = getDaysCount(dateRangeType);
+    setCurrentWeekStart(prev => addDays(prev, daysCount));
   };
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+  const daysCount = getDaysCount(dateRangeType);
+  const displayDays = Array.from({ length: daysCount }, (_, i) => addDays(currentWeekStart, i));
 
   // Group members by team
   const teamGroups = useMemo(() => {
@@ -317,7 +332,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
 
   // Calculate daily coverage for summary
   const dailyCoverage = useMemo(() => {
-    return weekDays.slice(0, 5).map(date => {
+    return displayDays.slice(0, 5).map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
       const dayEntries = scheduleEntries.filter(e => e.date === dateStr);
       const available = dayEntries.filter(e => e.availability_status === 'available').length;
@@ -329,7 +344,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
         total: teamMembers.length
       };
     });
-  }, [weekDays, scheduleEntries, teamMembers]);
+  }, [displayDays, scheduleEntries, teamMembers]);
 
   // Team colors for visual distinction
   const teamColors = useMemo(() => {
@@ -415,7 +430,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
         
         {showPlanning && (
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <Select value={selectedPartnershipId} onValueChange={setSelectedPartnershipId}>
                 <SelectTrigger className="w-[300px]">
                   <SelectValue placeholder="Select partnership..." />
@@ -428,15 +443,33 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                   ))}
                 </SelectContent>
               </Select>
+            </div>
 
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium">Timeframe:</span>
+                <div className="flex rounded-lg border bg-muted p-1">
+                  {(['1M', '3M', '6M', '1Y'] as DateRangeType[]).map(range => (
+                    <Button
+                      key={range}
+                      variant={dateRangeType === range ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setDateRangeType(range)}
+                    >
+                      {range}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={previousWeek}>
+                <Button variant="outline" size="icon" onClick={previousWeek}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium min-w-[200px] text-center">
-                  {format(currentWeekStart, 'MMM d')} - {format(addDays(currentWeekStart, 6), 'MMM d, yyyy')}
-                </span>
-                <Button variant="outline" size="sm" onClick={nextWeek}>
+                <div className="text-sm font-medium min-w-[200px] text-center">
+                  {format(currentWeekStart, 'MMM d, yyyy')} - {format(displayDays[displayDays.length - 1], 'MMM d, yyyy')}
+                </div>
+                <Button variant="outline" size="icon" onClick={nextWeek}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -464,11 +497,11 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                 {/* Week Headers - Sticky */}
                 <div className="sticky top-0 z-20 bg-background border-b pb-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-[200px] font-medium text-sm text-muted-foreground">
+                    <div className="w-[200px] font-medium text-sm text-muted-foreground sticky left-0 bg-background">
                       Team / Member
                     </div>
-                    <div className="flex-1 grid grid-cols-7 gap-2">
-                      {weekDays.map((day, index) => {
+                    <div className="flex gap-2 overflow-x-auto">
+                      {displayDays.map((day, index) => {
                         const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                         return (
                           <div
@@ -503,7 +536,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                         teamColor={teamColors.get(teamId) || 'hsl(var(--muted))'}
                         members={members}
                         scheduleEntries={scheduleEntries}
-                        weekDates={weekDays}
+                        weekDates={displayDays}
                         onCellClick={handleCellClick}
                         canScheduleUser={canScheduleUser}
                         canViewActivityDetails={isAdmin || isPlanner || isManager}
