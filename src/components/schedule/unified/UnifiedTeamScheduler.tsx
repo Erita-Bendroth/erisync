@@ -69,7 +69,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
     pastePattern,
     bulkAssignShift,
     clearCells,
-  } = useSchedulerActions(scheduleEntries, setScheduleEntries, user?.id || '');
+  } = useSchedulerActions(scheduleEntries, setScheduleEntries, user?.id || '', teamSections);
 
   const { shiftTypes } = useShiftTypes(teamIds);
   const { templates } = useRotationTemplates(teamIds);
@@ -222,11 +222,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
       toast({ title: "No destination", description: "Please select target cells" });
       return;
     }
-    const firstTeamId = teamIds[0];
-    if (firstTeamId) {
-      pastePattern(state.clipboardPattern, Array.from(state.selectedCells), firstTeamId);
-      toast({ title: "Pasted", description: "Schedule pattern applied" });
-    }
+    pastePattern(state.clipboardPattern, Array.from(state.selectedCells));
+    toast({ title: "Pasted", description: "Schedule pattern applied" });
   };
 
   const handleQuickAssign = (shiftType: string) => {
@@ -234,11 +231,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
       toast({ title: "No cells selected", description: "Please select cells to assign" });
       return;
     }
-    const firstTeamId = teamIds[0];
-    if (firstTeamId) {
-      bulkAssignShift(Array.from(state.selectedCells), shiftType as any, firstTeamId);
-      toast({ title: "Assigned", description: `${shiftType} shift assigned` });
-    }
+    bulkAssignShift(Array.from(state.selectedCells), shiftType as any);
+    toast({ title: "Assigned", description: `${shiftType} shift assigned` });
   };
 
   const handleClear = () => {
@@ -246,7 +240,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
       toast({ title: "No cells selected", description: "Please select cells to clear" });
       return;
     }
-    clearCells(Array.from(state.selectedCells), teamIds[0]);
+    clearCells(Array.from(state.selectedCells));
     toast({ title: "Cleared", description: "Selected cells cleared" });
   };
 
