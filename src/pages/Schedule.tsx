@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download } from "lucide-react";
+import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download, ArrowLeftRight } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import ScheduleView from "@/components/schedule/ScheduleView";
@@ -31,6 +31,8 @@ import { VacationPlanningDashboard } from "@/components/schedule/vacation-planni
 import { PlanningPartnershipManager } from "@/components/schedule/planning-partners/PlanningPartnershipManager";
 import { IntegratedPlanningCalendar } from "@/components/schedule/planning-partners/IntegratedPlanningCalendar";
 import { UnifiedTeamScheduler } from "@/components/schedule/unified/UnifiedTeamScheduler";
+import { ShiftSwapRequestsList } from "@/components/schedule/swap/ShiftSwapRequestsList";
+import { ManagerSwapApprovals } from "@/components/schedule/swap/ManagerSwapApprovals";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -370,7 +372,7 @@ const Schedule = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="admin" className="flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Admin Setup
@@ -382,6 +384,10 @@ const Schedule = () => {
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Schedule
+            </TabsTrigger>
+            <TabsTrigger value="shift-swaps" className="flex items-center">
+              <ArrowLeftRight className="w-4 h-4 mr-2" />
+              Shift Swaps
             </TabsTrigger>
             <TabsTrigger value="vacation-planning" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
@@ -614,6 +620,31 @@ const Schedule = () => {
               onScheduleUpdate={() => setScheduleRefreshKey(prev => prev + 1)}
               onCreatePartnership={() => setPartnershipDialogOpen(true)}
             />
+          </TabsContent>
+
+          <TabsContent value="shift-swaps" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Shift Swap Requests</CardTitle>
+                <CardDescription>
+                  Request to swap shifts with your team members or {isManager || isPlanner || isAdmin ? 'review pending swap requests' : 'view your swap request history'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(isManager || isPlanner || isAdmin) && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-4">Pending Approvals</h3>
+                    <ManagerSwapApprovals />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">
+                    {(isManager || isPlanner || isAdmin) ? 'All Swap Requests' : 'Your Swap Requests'}
+                  </h3>
+                  <ShiftSwapRequestsList />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="vacation-planning" className="space-y-6">

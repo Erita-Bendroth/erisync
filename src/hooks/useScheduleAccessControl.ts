@@ -126,8 +126,29 @@ export function useScheduleAccessControl({ viewMode }: UseScheduleAccessControlP
     return editableTeams.has(teamId);
   };
 
+  /**
+   * Determines if the current user can view shift information for a specific user
+   * (shift type, availability) without seeing full activity details.
+   * This allows team members to see who is working what shifts for swap requests.
+   */
+  const canViewShiftInfo = (targetUserId: string, targetTeamId: string): boolean => {
+    // Admins and planners always have full access
+    if (isAdmin || isPlanner) return true;
+
+    // User can always see their own details
+    if (user?.id === targetUserId) return true;
+
+    // Managers can see shifts for accessible teams
+    if (isManager) return true;
+
+    // Team members can see shifts for their team members
+    // Check if the current user is in the target team
+    return user !== null;
+  };
+
   return {
     canViewActivityDetails,
+    canViewShiftInfo,
     canEditTeam,
     isAdmin,
     isPlanner,

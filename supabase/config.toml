@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.vacation-recommendations]
 verify_jwt = true
+
+[functions.send-swap-notification]
+verify_jwt = true
