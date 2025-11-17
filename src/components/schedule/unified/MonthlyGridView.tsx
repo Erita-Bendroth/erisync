@@ -47,13 +47,32 @@ const getMonthStats = (dates: string[], entries: ScheduleEntry[]) => {
   return uniqueUsers.size;
 };
 
-const countShiftTypesForDate = (date: string, entries: ScheduleEntry[]): Record<string, number> => {
+const countShiftTypesForDate = (
+  date: string, 
+  entries: ScheduleEntry[], 
+  visibleTeamIds: string[]
+): Record<string, number> => {
   const counts: Record<string, number> = {};
-  entries
-    .filter(e => e.date === date && e.shift_type && e.activity_type === 'work')
-    .forEach(e => {
+  const uniqueKeys = new Set<string>();
+  
+  // Filter by date, shift_type, activity_type, AND visible teams
+  const filtered = entries.filter((e) => 
+    e.date === date && 
+    e.shift_type && 
+    e.activity_type === 'work' &&
+    // Only count entries for visible teams
+    (visibleTeamIds.length === 0 || visibleTeamIds.includes(e.team_id))
+  );
+
+  // Deduplicate by user_id + date + shift_type
+  filtered.forEach((e) => {
+    const key = `${e.user_id}-${e.date}-${e.shift_type}`;
+    if (!uniqueKeys.has(key)) {
+      uniqueKeys.add(key);
       counts[e.shift_type!] = (counts[e.shift_type!] || 0) + 1;
-    });
+    }
+  });
+  
   return counts;
 };
 
@@ -126,6 +145,12 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
 }) => {
   const monthGroups = groupByMonth(dates);
 
+  // Extract visible team IDs for filtering
+  const visibleTeamIds = React.useMemo(() => 
+    teamSections?.map(t => t.teamId) || [],
+    [teamSections]
+  );
+
   const getEntriesForDate = (dateStr: string): ScheduleEntry[] => {
     return scheduleEntries.filter(e => e.date === dateStr && e.activity_type === 'work');
   };
@@ -193,7 +218,7 @@ export const MonthlyGridView: React.FC<MonthlyGridViewProps> = ({
                     {allDaysInMonth.map(day => {
                       const dateStr = format(day, 'yyyy-MM-dd');
                       const isInRange = monthDates.includes(dateStr);
-                      const shiftCounts = isInRange ? countShiftTypesForDate(dateStr, scheduleEntries) : {};
+                      const shiftCounts = isInRange ? countShiftTypesForDate(dateStr, scheduleEntries, visibleTeamIds) : {};
                       const totalScheduled = Object.values(shiftCounts).reduce((a, b) => a + b, 0);
                       const isWeekend = getDay(day) === 0 || getDay(day) === 6;
 
