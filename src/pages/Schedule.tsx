@@ -377,7 +377,7 @@ const Schedule = () => {
             </TabsTrigger>
             <TabsTrigger value="unified-scheduler" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
-              Quick Scheduler
+              Team Scheduler
             </TabsTrigger>
             <TabsTrigger value="schedule" className="flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
