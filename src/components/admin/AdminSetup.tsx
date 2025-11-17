@@ -396,11 +396,12 @@ const AdminSetup = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
           <TabsTrigger value="shifts">Shift Times</TabsTrigger>
           <TabsTrigger value="groups">Team Groups</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users" className="space-y-6">
@@ -567,6 +568,10 @@ const AdminSetup = () => {
         
         <TabsContent value="groups" className="space-y-6">
           <TeamGroupManager />
+        </TabsContent>
+        
+        <TabsContent value="templates" className="space-y-6">
+          <ShiftRotationTemplateManager teams={teams} />
         </TabsContent>
       </Tabs>
     </div>
