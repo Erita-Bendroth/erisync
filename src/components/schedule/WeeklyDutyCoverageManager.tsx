@@ -1271,10 +1271,16 @@ export function WeeklyDutyCoverageManager({ open, onOpenChange }: WeeklyDutyCove
                       </SelectTrigger>
                       <SelectContent>
                         {availableCustomLayouts.map((layout) => (
-                          <SelectItem key={layout.id} value={layout.id}>
-                            {layout.template_name} - Week {layout.week_number}, {layout.year}
-                            {layout.week_number === currentWeek && layout.year === currentYear && " (Current)"}
-                          </SelectItem>
+                  <SelectItem key={layout.id} value={layout.id}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>{layout.template_name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {layout.week_number === currentWeek && layout.year === currentYear 
+                          ? "Current Week" 
+                          : `W${layout.week_number} ${layout.year}`}
+                      </span>
+                    </div>
+                  </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
