@@ -130,7 +130,7 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
                   shiftTypes.map((shift) =>
                     counts[shift.type] > 0 ? (
                       <Badge
-                        key={`${date}-${shift.type}`}
+                        key={`${date}-${shift.id}`}
                         variant="outline"
                         className={`text-xs px-1.5 py-0.5 ${getShiftColor(shift.type)}`}
                       >
