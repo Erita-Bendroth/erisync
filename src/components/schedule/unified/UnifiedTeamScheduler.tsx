@@ -30,6 +30,8 @@ import { CoverageOverview } from '../CoverageOverview';
 import { CoverageHeatmap } from '../CoverageHeatmap';
 import { CoverageAlerts } from '../CoverageAlerts';
 import { TeamCoverageGrid } from '../TeamCoverageGrid';
+import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
 
 interface TeamMember {
@@ -552,17 +554,19 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
       <CardContent className="p-0">
         {!screenshotMode && (
-          <QuickActionsToolbar
-            hasSelection={state.selectedCells.size > 0}
-            hasClipboard={state.clipboardPattern.length > 0}
-            shiftTypes={shiftTypes}
-            onSelectAll={handleSelectAll}
-            onCopy={handleCopy}
-            onPaste={handlePaste}
-            onClear={handleClear}
-            onQuickAssign={handleQuickAssign}
-            onApplyTemplate={handleApplyTemplateClick}
-          />
+          <div className="sticky top-0 z-20 bg-background border-b border-border">
+            <QuickActionsToolbar
+              hasSelection={state.selectedCells.size > 0}
+              hasClipboard={state.clipboardPattern.length > 0}
+              shiftTypes={shiftTypes}
+              onSelectAll={handleSelectAll}
+              onCopy={handleCopy}
+              onPaste={handlePaste}
+              onClear={handleClear}
+              onQuickAssign={handleQuickAssign}
+              onApplyTemplate={handleApplyTemplateClick}
+            />
+          </div>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -579,20 +583,21 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="mt-0">
-            {loading ? (
-              <div className="flex items-center justify-center p-12">
-                <div className="text-muted-foreground">Loading teams...</div>
-              </div>
-            ) : teamSections.length === 0 ? (
-              <div className="flex items-center justify-center p-12">
-                <div className="text-muted-foreground">
-                  {selectionMode === 'partnership' 
-                    ? 'Select a partnership to view teams' 
-                    : 'Select teams to view schedule'}
+            <ScrollArea className="h-[calc(100vh-400px)]">
+              {loading ? (
+                <div className="flex items-center justify-center p-12">
+                  <div className="text-muted-foreground">Loading teams...</div>
                 </div>
-              </div>
-            ) : (
-              <>
+              ) : teamSections.length === 0 ? (
+                <div className="flex items-center justify-center p-12">
+                  <div className="text-muted-foreground">
+                    {selectionMode === 'partnership' 
+                      ? 'Select a partnership to view teams' 
+                      : 'Select teams to view schedule'}
+                  </div>
+                </div>
+              ) : (
+                <>
             {/* Header Row with Dates */}
             <div className="grid grid-cols-[200px_1fr] border-b border-border bg-muted/30 sticky top-0 z-10">
               <div className="px-4 py-2 font-semibold text-sm border-r border-border">
@@ -642,6 +647,13 @@ export const UnifiedTeamScheduler: React.FC = () => {
               />
             ))}
 
+            {/* Shift Type Counter Row */}
+            <ShiftTypeCounterRow
+              dates={dates}
+              scheduleEntries={scheduleEntries}
+              shiftTypes={shiftTypes}
+            />
+
             {/* Coverage Row */}
             <CoverageRow
               dates={dates}
@@ -660,6 +672,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                 </div>
               </div>
             )}
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="coverage" className="mt-0">
