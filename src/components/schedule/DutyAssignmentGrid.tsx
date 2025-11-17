@@ -107,7 +107,7 @@ export function DutyAssignmentGrid({
   const fetchTeamMembers = async () => {
     const { data, error } = await supabase
       .from('team_members')
-      .select('user_id, profiles!inner(first_name, last_name, initials)')
+      .select('user_id, profiles!team_members_user_id_fkey(first_name, last_name, initials)')
       .in('team_id', teamIds);
 
     if (!error && data) {
@@ -162,15 +162,7 @@ export function DutyAssignmentGrid({
     
     const { data, error } = await supabase
       .from('schedule_entries')
-      .select(`
-        date, 
-        user_id, 
-        shift_type, 
-        availability_status, 
-        activity_type,
-        team_id,
-        profiles!inner(first_name, last_name, initials)
-      `)
+      .select('date, user_id, shift_type, availability_status, activity_type, team_id')
       .in('team_id', teamIds)
       .gte('date', startDate)
       .lte('date', endDate);
@@ -181,20 +173,47 @@ export function DutyAssignmentGrid({
     console.log('  - raw data:', data);
       
     if (!error && data) {
+      // Fetch profiles separately since there's no direct FK between schedule_entries and profiles
+      const uniqueUserIds = Array.from(new Set(data.map((entry: any) => entry.user_id)));
+      console.log('[DutyAssignmentGrid] Fetching profiles for', uniqueUserIds.length, 'unique users');
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, initials')
+        .in('user_id', uniqueUserIds);
+      
+      if (profilesError) {
+        console.error('[DutyAssignmentGrid] Error fetching profiles:', profilesError);
+        return;
+      }
+      
+      // Create a lookup map for profiles
+      const profilesMap = new Map(
+        profilesData?.map((p: any) => [p.user_id, p]) || []
+      );
+      console.log('[DutyAssignmentGrid] Profiles fetched:', profilesMap.size);
+      
+      // Merge profile data with schedule entries
+      const enrichedData = data.map((entry: any) => ({
+        ...entry,
+        profiles: profilesMap.get(entry.user_id)
+      })).filter((entry: any) => entry.profiles); // Only keep entries with valid profiles
+      
+      console.log('[DutyAssignmentGrid] Enriched data length:', enrichedData.length);
       // Log data breakdown
-      const byTeam = data.reduce((acc: any, entry: any) => {
+      const byTeam = enrichedData.reduce((acc: any, entry: any) => {
         acc[entry.team_id] = (acc[entry.team_id] || 0) + 1;
         return acc;
       }, {});
       console.log('[DutyAssignmentGrid] Entries by team:', byTeam);
       
-      const byAvailability = data.reduce((acc: any, entry: any) => {
+      const byAvailability = enrichedData.reduce((acc: any, entry: any) => {
         acc[entry.availability_status] = (acc[entry.availability_status] || 0) + 1;
         return acc;
       }, {});
       console.log('[DutyAssignmentGrid] Entries by availability:', byAvailability);
       
-      const byActivity = data.reduce((acc: any, entry: any) => {
+      const byActivity = enrichedData.reduce((acc: any, entry: any) => {
         acc[entry.activity_type] = (acc[entry.activity_type] || 0) + 1;
         return acc;
       }, {});
@@ -203,7 +222,7 @@ export function DutyAssignmentGrid({
       // Merge scheduled users into teamMembers
       const scheduledUserProfiles = Array.from(
         new Map(
-          data.map((entry: any) => [
+          enrichedData.map((entry: any) => [
             entry.user_id,
             {
               user_id: entry.user_id,
@@ -231,7 +250,7 @@ export function DutyAssignmentGrid({
       
       // Apply filter
       console.log('[DutyAssignmentGrid] Applying filter: availability_status === "available" && activity_type === "work"');
-      const workEntries = data.filter(entry => 
+      const workEntries = enrichedData.filter(entry => 
         entry.availability_status === 'available' && 
         entry.activity_type === 'work'
       );
