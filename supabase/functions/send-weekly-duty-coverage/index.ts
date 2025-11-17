@@ -31,8 +31,8 @@ interface DutyCoverageRequest {
 interface Assignment {
   user_id: string;
   substitute_user_id?: string;
-  user?: { first_name: string; last_name: string; initials: string; country_code?: string };
-  substitute?: { first_name: string; last_name: string; initials: string; country_code?: string };
+  user?: { first_name: string; last_name: string; initials: string; country_code?: string; email?: string };
+  substitute?: { first_name: string; last_name: string; initials: string; country_code?: string; email?: string };
   team_id: string;
   date?: string;
   duty_type?: string;
@@ -168,7 +168,7 @@ serve(async (req) => {
     if (manualUserIds.size > 0) {
       const { data: profilesData } = await supabaseServiceRole
         .from('profiles')
-        .select('user_id, first_name, last_name, initials, country_code')
+        .select('user_id, first_name, last_name, initials, country_code, email')
         .in('user_id', Array.from(manualUserIds));
       
       if (profilesData) {
@@ -209,7 +209,7 @@ serve(async (req) => {
     if (scheduleUserIds.size > 0) {
       const { data: profilesData } = await supabaseServiceRole
         .from('profiles')
-        .select('user_id, first_name, last_name, initials, country_code')
+        .select('user_id, first_name, last_name, initials, country_code, email')
         .in('user_id', Array.from(scheduleUserIds));
       
       if (profilesData) {
@@ -495,6 +495,16 @@ const formatNameForEmail = (profile: any): string => {
   return name.replace(/\s*\([A-Z]{2}\)\s*/g, '').trim();
 };
 
+// Helper function to create Microsoft Teams chat link
+const createTeamsLink = (email: string | undefined, name: string): string => {
+  if (!email) {
+    return name; // Return plain name if no email
+  }
+  
+  const teamsUrl = `https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(email)}`;
+  return `<a href="${teamsUrl}" style="color: #0078d4; text-decoration: none; font-weight: 500;" target="_blank">${name}</a>`;
+};
+
 // Consolidate teams by category (e.g., all "Central" teams into one)
 function consolidateTeams(teams: TeamData[]): ConsolidatedTeam[] {
   const consolidated: ConsolidatedTeam[] = [];
@@ -618,9 +628,15 @@ function buildDutyCoverageEmail(
         
         // Separate names and regions into individual columns
         const nameRows = dedupedAssignments.map(assignment => {
-          const name = assignment.user ? formatNameForEmail(assignment.user) : 'TBD';
+          if (!assignment.user) {
+            return 'TBD';
+          }
+          
+          const name = formatNameForEmail(assignment.user);
+          const nameWithLink = createTeamsLink(assignment.user.email, name);
           const sourceIndicator = assignment.source === 'schedule' ? '📅 ' : '';
-          return `${sourceIndicator}${name}`;
+          
+          return `${sourceIndicator}${nameWithLink}`;
         }).join('<br/>');
 
         const regionRows = dedupedAssignments.map(assignment => {
