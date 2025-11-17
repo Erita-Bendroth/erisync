@@ -88,16 +88,16 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
   const getShiftLabel = (shiftType: string): string => {
     switch (shiftType) {
       case 'early':
-        return 'Early';
+        return 'E';
       case 'late':
-        return 'Late';
+        return 'L';
       case 'normal':
-        return 'Normal';
+        return 'N';
       case 'weekend':
-        return 'Weekend';
+        return 'W';
       default:
         const shift = shiftTypes.find((s) => s.type === shiftType);
-        return shift ? shift.label.split(' ')[0] : shiftType;
+        return shift ? shift.label.charAt(0).toUpperCase() : shiftType.charAt(0).toUpperCase();
     }
   };
 
@@ -123,23 +123,23 @@ export const ShiftTypeCounterRow: React.FC<ShiftTypeCounterRowProps> = ({
               teamSections={teamSections}
               showTeamBreakdown={!!teamSections}
             >
-              <div
-                className="px-2 py-2 border-r border-border flex flex-wrap gap-1 justify-center items-center min-h-[48px] cursor-help hover:bg-accent/50 transition-colors"
-              >
+              <div className="px-1 py-2 border-r border-border min-h-[3rem] hover:bg-muted/50 cursor-pointer transition-colors">
                 {hasShifts ? (
-                  shiftTypes.map((shift) =>
-                    counts[shift.type] > 0 ? (
-                      <Badge
-                        key={`${date}-${shift.id}`}
-                        variant="outline"
-                        className={`text-xs px-1.5 py-0.5 ${getShiftColor(shift.type)}`}
-                      >
-                        {getShiftLabel(shift.type)}: {counts[shift.type]}
-                      </Badge>
-                    ) : null
-                  )
+                  <div className="flex flex-wrap gap-1 justify-center items-center">
+                    {shiftTypes.map((shift) =>
+                      counts[shift.type] > 0 ? (
+                        <Badge
+                          key={`${date}-${shift.id}`}
+                          variant="outline"
+                          className={`text-xs px-1.5 py-0 h-5 ${getShiftColor(shift.type)}`}
+                        >
+                          {getShiftLabel(shift.type)}:{counts[shift.type]}
+                        </Badge>
+                      ) : null
+                    )}
+                  </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">-</span>
+                  <div className="text-center text-muted-foreground text-xs">-</div>
                 )}
               </div>
             </ShiftDistributionPopover>
