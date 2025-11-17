@@ -12,6 +12,7 @@ import {
   Clock,
   Sunrise,
   Sunset,
+  Wand2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ interface QuickActionsToolbarProps {
   onPaste: () => void;
   onClear: () => void;
   onQuickAssign: (shiftType: string) => void;
+  onApplyTemplate?: () => void;
 }
 
 export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
@@ -41,6 +43,7 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
   onPaste,
   onClear,
   onQuickAssign,
+  onApplyTemplate,
 }) => {
   return (
     <div className="flex items-center gap-2 p-2 border-b border-border bg-card">
@@ -118,6 +121,21 @@ export const QuickActionsToolbar: React.FC<QuickActionsToolbarProps> = ({
         <Trash2 className="h-4 w-4 mr-2" />
         Clear
       </Button>
+
+      {onApplyTemplate && (
+        <>
+          <Separator orientation="vertical" className="h-6" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onApplyTemplate}
+            disabled={!hasSelection}
+          >
+            <Wand2 className="h-4 w-4 mr-2" />
+            Apply Template
+          </Button>
+        </>
+      )}
     </div>
   );
 };
