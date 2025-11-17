@@ -62,7 +62,7 @@ export const ManualVacationEntry = ({
         .from('team_members')
         .select(`
           user_id,
-          profiles(first_name, last_name)
+          profiles!user_id(first_name, last_name)
         `)
         .eq('team_id', teamId);
 
