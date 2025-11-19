@@ -153,7 +153,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
       const scheduleData = {
         user_id: formData.user_id,
         team_id: formData.team_id,
-        date: formData.date,
+        date: formData.date || (selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''),
         shift_type: formData.shift_type as "early" | "late" | "normal",
         activity_type: formData.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home",
         availability_status: (["work", "working_from_home", "hotline_support"].includes(formData.activity_type) ? "available" : "unavailable") as "available" | "unavailable",
@@ -288,7 +288,12 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    if (date) {
+                      setFormData({ ...formData, date: format(date, 'yyyy-MM-dd') });
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
@@ -312,14 +317,14 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                         : "Select shift type"
                   } />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px] overflow-y-auto">
                   {shiftTypes.map((shift) => (
                     <SelectItem key={shift.id} value={shift.type}>
-                      <div className="flex flex-col items-start">
-                        <span>{shift.label}</span>
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        <span className="font-medium">{shift.label}</span>
                         {shift.startTime && shift.endTime && (
-                          <span className="text-xs text-muted-foreground">
-                            {shift.startTime} - {shift.endTime}
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {shift.startTime}-{shift.endTime}
                           </span>
                         )}
                       </div>
