@@ -317,7 +317,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                         : "Select shift type"
                   } />
                 </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
+                <SelectContent className="bg-popover border border-border shadow-md z-50 max-h-60 overflow-y-auto">
                   {shiftTypes.map((shift) => (
                     <SelectItem key={shift.id} value={shift.type}>
                       <div className="flex items-center justify-between gap-2 w-full">
