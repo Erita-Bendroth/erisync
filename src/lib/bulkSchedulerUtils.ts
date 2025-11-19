@@ -17,13 +17,30 @@ export interface ScheduleEntryDraft {
   notes?: string;
 }
 
-export const calculateBulkEntries = (
+export const calculateBulkEntries = async (
   config: BulkSchedulerConfig,
   allTeamMembers: Array<{ user_id: string }>,
-  userId: string
-): ScheduleEntryDraft[] => {
+  userId: string,
+  supabase: any
+): Promise<ScheduleEntryDraft[]> => {
   if (!config.dateRange.start || !config.dateRange.end || !config.teamId) {
     return [];
+  }
+
+  // Resolve shift definition if not custom
+  let resolvedShiftType: ShiftType = 'normal';
+  if (config.shiftType && config.shiftType !== 'custom') {
+    const { data: shiftDef } = await supabase
+      .from('shift_time_definitions')
+      .select('shift_type')
+      .eq('id', config.shiftType)
+      .single();
+    
+    if (shiftDef) {
+      resolvedShiftType = shiftDef.shift_type;
+    }
+  } else if (config.shiftType === 'custom') {
+    resolvedShiftType = 'normal';
   }
 
   const entries: ScheduleEntryDraft[] = [];
@@ -59,7 +76,7 @@ export const calculateBulkEntries = (
         user_id: rotationUserId,
         team_id: config.teamId,
         date: dateStr,
-        shift_type: config.shiftType as ShiftType,
+        shift_type: resolvedShiftType,
         activity_type: 'work' as ActivityType,
         availability_status: 'available' as AvailabilityStatus,
         created_by: userId,
@@ -72,7 +89,7 @@ export const calculateBulkEntries = (
           user_id: targetUserId,
           team_id: config.teamId,
           date: dateStr,
-          shift_type: config.shiftType as ShiftType,
+          shift_type: resolvedShiftType,
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
           created_by: userId,
