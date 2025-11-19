@@ -137,7 +137,8 @@ export function ShiftTimeDefinitions() {
   };
 
   const deleteDefinition = async (def: ShiftTimeDefinition, index: number) => {
-    if (def.id) {
+    // Only attempt database deletion if this is a saved definition (not a temp ID)
+    if (def.id && !def.id.startsWith('temp-')) {
       const { error } = await supabase
         .from("shift_time_definitions")
         .delete()
