@@ -79,7 +79,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
       }
 
       // Calculate entries
-      const entries = calculateBulkEntries(config, members, userId);
+      const entries = await calculateBulkEntries(config, members, userId, supabase);
 
       if (entries.length === 0) {
         toast({

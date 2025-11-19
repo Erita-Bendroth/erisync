@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SchedulerCell } from './SchedulerCell';
+import { SchedulerCellWithTooltip } from './SchedulerCellWithTooltip';
 import { cn } from '@/lib/utils';
 import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
@@ -129,10 +129,11 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                   const cellId = `${member.user_id}:${date}`;
                   
                   return (
-                    <SchedulerCell
+                    <SchedulerCellWithTooltip
                       key={cellId}
                       userId={member.user_id}
                       date={date}
+                      teamId={teamId}
                       shiftType={entry?.shift_type || null}
                       availabilityStatus={entry?.availability_status || 'available'}
                       activityType={entry?.activity_type}

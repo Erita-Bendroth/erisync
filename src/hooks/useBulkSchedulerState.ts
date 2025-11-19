@@ -10,7 +10,7 @@ export interface BulkSchedulerConfig {
     start: Date | null;
     end: Date | null;
   };
-  shiftType: string | null;
+  shiftType: string | null; // Now stores shift definition ID
   customTimes: {
     start: string;
     end: string;
@@ -38,7 +38,7 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
       start: null,
       end: null,
     },
-    shiftType: 'normal',
+    shiftType: null, // Will store shift definition ID
     customTimes: {
       start: '08:00',
       end: '16:30',

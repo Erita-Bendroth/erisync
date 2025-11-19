@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SchedulerCell } from './SchedulerCell';
+import { SchedulerCellWithTooltip } from './SchedulerCellWithTooltip';
 import { InlineEditPopover } from './InlineEditPopover';
 import { QuickScheduleDialog } from './QuickScheduleDialog';
 import { CoverageRow } from './CoverageRow';
@@ -263,12 +263,14 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
               const cellId = `${member.user_id}:${date}`;
               
               return (
-                <SchedulerCell
+                <SchedulerCellWithTooltip
                   key={cellId}
                   userId={member.user_id}
                   date={date}
+                  teamId={teamId}
                   shiftType={entry?.shift_type || null}
                   availabilityStatus={entry?.availability_status || 'available'}
+                  activityType={entry?.activity_type}
                   isSelected={selectedCells.has(cellId)}
                   isHovered={hoveredCell === cellId}
                   isEditing={editingCell === cellId}
