@@ -66,7 +66,8 @@ export function ShiftTimeDefinitions() {
   };
 
   const addDefinition = () => {
-    const newDef: Partial<ShiftTimeDefinition> = {
+    const newDef: ShiftTimeDefinition = {
+      id: `temp-${crypto.randomUUID()}`,
       team_id: null,
       team_ids: null,
       region_code: null,
@@ -76,7 +77,7 @@ export function ShiftTimeDefinitions() {
       end_time: "16:30",
       description: "",
     };
-    setDefinitions([...definitions, newDef as ShiftTimeDefinition]);
+    setDefinitions([...definitions, newDef]);
   };
 
   const updateDefinition = (index: number, field: string, value: any) => {
