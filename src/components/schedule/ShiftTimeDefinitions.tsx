@@ -301,12 +301,18 @@ export function ShiftTimeDefinitions() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <MultiSelectDays
-                      value={def.day_of_week as number[] | null}
-                      onValueChange={(value) =>
-                        updateDefinition(index, "day_of_week", value)
-                      }
-                    />
+                    {def.shift_type === 'weekend' ? (
+                      <div className="text-sm text-muted-foreground italic px-2">
+                        Auto: Sat, Sun & holidays
+                      </div>
+                    ) : (
+                      <MultiSelectDays
+                        value={def.day_of_week as number[] | null}
+                        onValueChange={(value) =>
+                          updateDefinition(index, "day_of_week", value)
+                        }
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <TimeSelect
