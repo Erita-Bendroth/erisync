@@ -25,18 +25,36 @@ export interface ApplicableShiftTime {
  * 3. Team only
  * 4. Region only
  * 5. Global default (lowest priority)
+ * 
+ * For "weekend" shift type, automatically applies to Saturdays, Sundays, and public holidays.
  */
 export async function getApplicableShiftTimes({
   teamId,
   regionCode,
   shiftType,
   dayOfWeek,
+  date,
 }: {
   teamId?: string;
   regionCode?: string;
   shiftType: "normal" | "early" | "late" | "weekend";
   dayOfWeek?: number;
+  date?: string;
 }): Promise<ApplicableShiftTime> {
+  // For weekend shift type, check if date is a public holiday
+  let isPublicHoliday = false;
+  if (shiftType === 'weekend' && date) {
+    const { data: holidayData } = await supabase
+      .from('holidays')
+      .select('id')
+      .eq('date', date)
+      .eq('is_public', true)
+      .is('user_id', null)
+      .limit(1);
+    
+    isPublicHoliday = !!holidayData && holidayData.length > 0;
+  }
+
   const { data, error } = await supabase
     .from("shift_time_definitions")
     .select("*")
@@ -52,15 +70,24 @@ export async function getApplicableShiftTimes({
     return getDefaultShiftTime(shiftType);
   }
 
+  // For weekend shift type, automatically match if it's Sat/Sun or a public holiday
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const shouldApplyWeekendShift = shiftType === 'weekend' && (isWeekend || isPublicHoliday);
+
   // Priority 1: Team + region + day(s)
-  if (dayOfWeek !== undefined) {
+  if (dayOfWeek !== undefined || shouldApplyWeekendShift) {
     const teamRegionDay = data.find(
-      (def) =>
-        ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId) &&
-        def.region_code === regionCode &&
-        def.day_of_week !== null &&
-        Array.isArray(def.day_of_week) &&
-        def.day_of_week.includes(dayOfWeek)
+      (def) => {
+        const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+        const matchesRegion = def.region_code === regionCode;
+        
+        // For weekend shift type, ignore day_of_week check
+        const matchesDay = shiftType === 'weekend' 
+          ? shouldApplyWeekendShift
+          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek!));
+        
+        return matchesTeam && matchesRegion && matchesDay;
+      }
     );
     if (teamRegionDay) {
       return {
@@ -73,10 +100,18 @@ export async function getApplicableShiftTimes({
 
   // Priority 2: Team + region (no specific days)
   const teamRegion = data.find(
-    (def) =>
-      ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId) &&
-      def.region_code === regionCode &&
-      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
+    (def) => {
+      const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+      const matchesRegion = def.region_code === regionCode;
+      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+      
+      // For weekend shift type, still apply if it's weekend/holiday
+      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
+        return false;
+      }
+      
+      return matchesTeam && matchesRegion && noSpecificDays;
+    }
   );
   if (teamRegion) {
     return {
@@ -88,10 +123,18 @@ export async function getApplicableShiftTimes({
 
   // Priority 3: Team only
   const teamOnly = data.find(
-    (def) =>
-      ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId) &&
-      def.region_code === null &&
-      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
+    (def) => {
+      const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+      const noRegion = def.region_code === null;
+      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+      
+      // For weekend shift type, still apply if it's weekend/holiday
+      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
+        return false;
+      }
+      
+      return matchesTeam && noRegion && noSpecificDays;
+    }
   );
   if (teamOnly) {
     return {
@@ -103,10 +146,18 @@ export async function getApplicableShiftTimes({
 
   // Priority 4: Region only
   const regionOnly = data.find(
-    (def) =>
-      def.team_id === null &&
-      def.region_code === regionCode &&
-      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
+    (def) => {
+      const noTeam = def.team_id === null;
+      const matchesRegion = def.region_code === regionCode;
+      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+      
+      // For weekend shift type, still apply if it's weekend/holiday
+      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
+        return false;
+      }
+      
+      return noTeam && matchesRegion && noSpecificDays;
+    }
   );
   if (regionOnly) {
     return {
@@ -118,10 +169,18 @@ export async function getApplicableShiftTimes({
 
   // Priority 5: Global default
   const globalDefault = data.find(
-    (def) =>
-      def.team_id === null &&
-      def.region_code === null &&
-      (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0))
+    (def) => {
+      const noTeam = def.team_id === null;
+      const noRegion = def.region_code === null;
+      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+      
+      // For weekend shift type, still apply if it's weekend/holiday
+      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
+        return false;
+      }
+      
+      return noTeam && noRegion && noSpecificDays;
+    }
   );
   if (globalDefault) {
     return {

@@ -44,6 +44,7 @@ export const SchedulerCellWithTooltip: React.FC<SchedulerCellWithTooltipProps> =
         regionCode,
         shiftType,
         dayOfWeek,
+        date, // Pass date for holiday checking
       }).then(times => setShiftTimes(times));
     }
   }, [shiftType, date, teamId, regionCode]);
