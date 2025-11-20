@@ -230,6 +230,11 @@ const AdminHolidayManager = () => {
     }
   }, [user, hasPermission, fetchHolidays, fetchImportStatuses]);
 
+  // Clear selected regions when country changes
+  useEffect(() => {
+    setSelectedRegions([]);
+  }, [selectedCountry]);
+
   const getImportStatus = useCallback((countryCode: string, year: number, regionCode?: string | null) => {
     return importStatuses.find(
       s => s.country_code === countryCode && 
