@@ -1,7 +1,8 @@
 import { format, eachDayOfInterval, isWeekend as isWeekendDate } from 'date-fns';
 import { BulkSchedulerConfig } from '@/hooks/useBulkSchedulerState';
 import { Database } from '@/integrations/supabase/types';
-import { detectHolidays, findBestShiftForDate, HolidayInfo } from './holidayDetection';
+import { detectHolidays, HolidayInfo } from './holidayDetection';
+import { getApplicableShiftTimes } from './shiftTimeUtils';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -19,9 +20,15 @@ export interface ScheduleEntryDraft {
   notes?: string;
 }
 
+interface TeamMemberWithLocation {
+  user_id: string;
+  country_code?: string;
+  region_code?: string | null;
+}
+
 export const calculateBulkEntries = async (
   config: BulkSchedulerConfig,
-  allTeamMembers: Array<{ user_id: string }>,
+  allTeamMembers: Array<TeamMemberWithLocation>,
   userId: string,
   supabase: any
 ): Promise<ScheduleEntryDraft[]> => {
@@ -43,12 +50,31 @@ export const calculateBulkEntries = async (
     end: config.dateRange.end,
   });
 
-  // Determine which users to include
+  // Determine which users to include and build country code map
   let targetUsers: string[] = [];
+  const userCountryMap = new Map<string, string>();
+  const userRegionMap = new Map<string, string | null>();
+
   if (config.mode === 'team') {
-    targetUsers = allTeamMembers.map(m => m.user_id);
+    targetUsers = allTeamMembers.map(m => {
+      userCountryMap.set(m.user_id, m.country_code || 'US');
+      userRegionMap.set(m.user_id, m.region_code || null);
+      return m.user_id;
+    });
   } else {
+    // For users/rotation mode, fetch country codes
     targetUsers = config.selectedUserIds;
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, country_code, region_code')
+      .in('user_id', targetUsers);
+    
+    if (profiles) {
+      profiles.forEach((p: any) => {
+        userCountryMap.set(p.user_id, p.country_code || 'US');
+        userRegionMap.set(p.user_id, p.region_code || null);
+      });
+    }
   }
 
   // Detect holidays if enabled
@@ -100,37 +126,42 @@ export const calculateBulkEntries = async (
         (config.autoDetectWeekends && isWeekend) || 
         (config.autoDetectHolidays && userHolidayInfo?.isPublicHoliday);
       
-      const shiftIdToUse = await findBestShiftForDate(
-        day,
-        shouldUseWeekendShift,
-        config.teamId,
-        config.shiftType,
-        config.weekendShiftOverride || null
-      );
+      // Get user's country code
+      const userCountryCode = userCountryMap.get(rotationUserId);
+      const userRegionCode = userRegionMap.get(rotationUserId);
+      console.log(`🌍 User ${rotationUserId} location: ${userCountryCode}/${userRegionCode}`);
       
-      // Resolve shift type
-      let resolvedShiftType: ShiftType = 'normal';
-      if (shiftIdToUse && shiftIdToUse !== 'custom') {
-        const { data: shiftDef } = await supabase
-          .from('shift_time_definitions')
-          .select('shift_type')
-          .eq('id', shiftIdToUse)
-          .maybeSingle();
-        if (shiftDef) resolvedShiftType = shiftDef.shift_type;
+      // Determine which shift type to request
+      let requestedShiftType: ShiftType = config.shiftType as ShiftType || 'normal';
+      if (shouldUseWeekendShift) {
+        requestedShiftType = 'weekend';
       }
+      
+      // Use country-aware shift selection
+      const applicableShift = await getApplicableShiftTimes({
+        teamId: config.teamId,
+        regionCode: userRegionCode || undefined,
+        shiftType: requestedShiftType,
+        dayOfWeek,
+        date: dateStr,
+      });
+      
+      console.log(`✅ Using shift for ${userCountryCode}: ${applicableShift.description || `${applicableShift.startTime}-${applicableShift.endTime}`}`);
+      
+      let resolvedShiftType: ShiftType = requestedShiftType;
 
       const notes = shouldUseWeekendShift 
         ? `Bulk generated (rotation) - ${userHolidayInfo?.holidayName || 'Weekend'}`
         : 'Bulk generated (rotation)';
 
-      console.log(`📝 Creating entry for ${rotationUserId} on ${dateStr}: shift_id=${shiftIdToUse}, shift_type=${resolvedShiftType}`);
+      console.log(`📝 Creating entry for ${rotationUserId} on ${dateStr}: shift_type=${resolvedShiftType}`);
 
       entries.push({
         user_id: rotationUserId,
         team_id: config.teamId,
         date: dateStr,
         shift_type: resolvedShiftType,
-        shift_time_definition_id: shiftIdToUse && shiftIdToUse !== 'custom' ? shiftIdToUse : null,
+        shift_time_definition_id: config.shiftType || null,
         activity_type: 'work' as ActivityType,
         availability_status: 'available' as AvailabilityStatus,
         created_by: userId,
@@ -151,37 +182,42 @@ export const calculateBulkEntries = async (
           (config.autoDetectWeekends && isWeekend) || 
           (config.autoDetectHolidays && userHolidayInfo?.isPublicHoliday);
         
-        const shiftIdToUse = await findBestShiftForDate(
-          day,
-          shouldUseWeekendShift,
-          config.teamId,
-          config.shiftType,
-          config.weekendShiftOverride || null
-        );
+        // Get user's country code
+        const userCountryCode = userCountryMap.get(targetUserId);
+        const userRegionCode = userRegionMap.get(targetUserId);
+        console.log(`🌍 User ${targetUserId} location: ${userCountryCode}/${userRegionCode}`);
         
-        // Resolve shift type
-        let resolvedShiftType: ShiftType = 'normal';
-        if (shiftIdToUse && shiftIdToUse !== 'custom') {
-          const { data: shiftDef } = await supabase
-            .from('shift_time_definitions')
-            .select('shift_type')
-            .eq('id', shiftIdToUse)
-            .maybeSingle();
-          if (shiftDef) resolvedShiftType = shiftDef.shift_type;
+        // Determine which shift type to request
+        let requestedShiftType: ShiftType = config.shiftType as ShiftType || 'normal';
+        if (shouldUseWeekendShift) {
+          requestedShiftType = 'weekend';
         }
-
+        
+        // Use country-aware shift selection
+        const applicableShift = await getApplicableShiftTimes({
+          teamId: config.teamId,
+          regionCode: userRegionCode || undefined,
+          shiftType: requestedShiftType,
+          dayOfWeek,
+          date: dateStr,
+        });
+        
+        console.log(`✅ Using shift for ${userCountryCode}: ${applicableShift.description || `${applicableShift.startTime}-${applicableShift.endTime}`}`);
+        
+        let resolvedShiftType: ShiftType = requestedShiftType;
+        
         const notes = shouldUseWeekendShift 
           ? `Bulk generated - ${userHolidayInfo?.holidayName || 'Weekend'}`
           : 'Bulk generated';
 
-        console.log(`📝 Creating entry for ${targetUserId} on ${dateStr}: shift_id=${shiftIdToUse}, shift_type=${resolvedShiftType}`);
+        console.log(`📝 Creating entry for ${targetUserId} on ${dateStr}: shift_type=${resolvedShiftType}`);
 
         entries.push({
           user_id: targetUserId,
           team_id: config.teamId,
           date: dateStr,
           shift_type: resolvedShiftType,
-          shift_time_definition_id: shiftIdToUse && shiftIdToUse !== 'custom' ? shiftIdToUse : null,
+          shift_time_definition_id: config.shiftType || null,
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
           created_by: userId,
