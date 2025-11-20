@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Settings, LogOut, UserCircle } from 'lucide-react';
+import { User, LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -125,10 +125,6 @@ export const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate('/schedule?tab=settings')}>
           <UserCircle className="mr-2 h-4 w-4" />
           <span>Profile</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate('/schedule?tab=settings')}>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
