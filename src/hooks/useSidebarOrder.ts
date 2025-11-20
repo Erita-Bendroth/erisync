@@ -12,15 +12,12 @@ interface UseSidebarOrderReturn {
   getSortedItems: <T extends { key: string }>(items: T[], section: string) => T[];
   updateOrder: (section: string, itemKeys: string[]) => Promise<void>;
   resetOrder: (section?: string) => Promise<void>;
-  isReorderMode: boolean;
-  setIsReorderMode: (value: boolean) => void;
   isLoading: boolean;
 }
 
 export const useSidebarOrder = (): UseSidebarOrderReturn => {
   const { user } = useAuth();
   const [orderMap, setOrderMap] = useState<Record<string, SidebarOrderItem[]>>({});
-  const [isReorderMode, setIsReorderMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch user's saved order from database
@@ -182,8 +179,6 @@ export const useSidebarOrder = (): UseSidebarOrderReturn => {
     getSortedItems,
     updateOrder,
     resetOrder,
-    isReorderMode,
-    setIsReorderMode,
     isLoading,
   };
 };

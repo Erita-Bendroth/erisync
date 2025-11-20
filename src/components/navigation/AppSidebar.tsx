@@ -10,7 +10,6 @@ import {
   BookOpen,
   UserCircle,
   Star,
-  ArrowDownUp,
   RotateCcw
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -43,7 +42,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { user } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
-  const { getSortedItems, updateOrder, resetOrder, isReorderMode, setIsReorderMode } = useSidebarOrder();
+  const { getSortedItems, updateOrder, resetOrder } = useSidebarOrder();
 
   // State for temporarily reordered items during drag
   const [overviewItems, setOverviewItems] = useState<any[]>([]);
@@ -198,7 +197,6 @@ export function AppSidebar() {
                     <DraggableSidebarMenuItem
                       key={item.key}
                       id={item.key}
-                      isReorderMode={isReorderMode}
                       onClick={() => navigate(item.path)}
                       isActive={isActive(item.path)}
                       tooltip={item.title}
@@ -232,7 +230,6 @@ export function AppSidebar() {
                     <DraggableSidebarMenuItem
                       key={item.key}
                       id={item.key}
-                      isReorderMode={isReorderMode}
                       onClick={() => navigate(item.path)}
                       isActive={location.pathname + location.search === item.path}
                       tooltip={item.title}
@@ -267,7 +264,6 @@ export function AppSidebar() {
                         <DraggableSidebarMenuItem
                           key={item.key}
                           id={item.key}
-                          isReorderMode={isReorderMode}
                           onClick={() => navigate(item.path)}
                           tooltip={item.title}
                           icon={<item.icon className="h-4 w-4" />}
@@ -303,7 +299,6 @@ export function AppSidebar() {
                         <DraggableSidebarMenuItem
                           key={item.key}
                           id={item.key}
-                          isReorderMode={isReorderMode}
                           onClick={() => navigate(item.path)}
                           isActive={location.pathname + location.search === item.path}
                           tooltip={item.title}
@@ -338,7 +333,6 @@ export function AppSidebar() {
                     <DraggableSidebarMenuItem
                       key={item.key}
                       id={item.key}
-                      isReorderMode={isReorderMode}
                       onClick={() => navigate(item.path)}
                       isActive={location.pathname + location.search === item.path}
                       tooltip={item.title}
@@ -357,25 +351,14 @@ export function AppSidebar() {
         {!isCollapsed && (
           <div className="p-2 space-y-2">
             <Button
-              variant={isReorderMode ? "default" : "outline"}
+              variant="ghost"
               size="sm"
-              className="w-full justify-start"
-              onClick={() => setIsReorderMode(!isReorderMode)}
+              className="w-full justify-start text-muted-foreground hover:text-foreground"
+              onClick={() => resetOrder()}
             >
-              <ArrowDownUp className="h-4 w-4 mr-2" />
-              {isReorderMode ? 'Done Reordering' : 'Reorder Sidebar'}
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset Sidebar Order
             </Button>
-            {isReorderMode && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => resetOrder()}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset to Default
-              </Button>
-            )}
             <p className="text-xs text-muted-foreground text-center">
               Employee Scheduler
             </p>
