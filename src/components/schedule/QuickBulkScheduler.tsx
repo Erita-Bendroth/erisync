@@ -24,7 +24,11 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
   const { config, setConfig, validation, preview } = useBulkSchedulerState(userId);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [teamMembers, setTeamMembers] = useState<Array<{ user_id: string }>>([]);
+  const [teamMembers, setTeamMembers] = useState<Array<{ 
+    user_id: string; 
+    country_code?: string; 
+    region_code?: string | null 
+  }>>([]);
   const { toast } = useToast();
 
   const handleApplyPreset = (presetConfig: any) => {
@@ -64,17 +68,21 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
     setLoading(true);
 
     try {
-      // Fetch team members if needed
+      // Fetch team members if needed (with country codes)
       let members = teamMembers;
       if (config.mode === 'team' && config.teamId) {
         const { data } = await supabase
           .from('team_members')
-          .select('user_id')
+          .select('user_id, profiles!inner(country_code, region_code)')
           .eq('team_id', config.teamId);
         
         if (data) {
-          members = data;
-          setTeamMembers(data);
+          members = data.map(tm => ({
+            user_id: tm.user_id,
+            country_code: (tm.profiles as any)?.country_code || 'US',
+            region_code: (tm.profiles as any)?.region_code
+          }));
+          setTeamMembers(members);
         }
       }
 
