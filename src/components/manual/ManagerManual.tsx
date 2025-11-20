@@ -288,6 +288,61 @@ export const ManagerManual = () => {
 
       <Separator />
 
+      <section id="vacation-requests">
+        <h2 className="text-2xl font-bold mb-4">6. Vacation Request Management</h2>
+        
+        <Alert className="bg-primary/5 border-primary/20 mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Manager Approval Authority</AlertTitle>
+          <AlertDescription>
+            As a manager, you can approve or reject vacation requests for your team members. After you approve a request, parent team planners are notified for capacity planning purposes.
+          </AlertDescription>
+        </Alert>
+        
+        <h3 className="text-xl font-semibold mb-3">Approving Vacation Requests</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to the <strong>Schedule</strong> page</li>
+          <li>Click <strong>"My Requests"</strong> to view pending vacation requests</li>
+          <li>Review each request including dates, duration, and notes</li>
+          <li>Check team capacity for the requested dates</li>
+          <li>Click <strong>"Approve"</strong> to grant the vacation</li>
+          <li>The requester will receive an email notification</li>
+          <li>Parent team planners are automatically notified for oversight</li>
+        </ol>
+        
+        <h3 className="text-xl font-semibold mb-3">Rejecting Vacation Requests</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Review the request carefully</li>
+          <li>Click <strong>"Reject"</strong> on the request</li>
+          <li>Provide a clear reason for rejection</li>
+          <li>The requester will receive an email with your reason</li>
+          <li>Consider discussing with the team member if needed</li>
+        </ol>
+        
+        <h3 className="text-xl font-semibold mb-3">What Happens After Approval</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Approved vacation automatically replaces existing schedule entries</li>
+          <li>The vacation appears on the schedule for all team members</li>
+          <li>Parent team planners receive a notification for capacity planning</li>
+          <li>The approval is logged in the system audit trail</li>
+        </ul>
+        
+        <h3 className="text-xl font-semibold mb-3">Relationship with Planners</h3>
+        <p className="mb-2">
+          While you approve requests for your direct team, planners in your parent team receive notifications after approval. This allows them to:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Monitor overall capacity across multiple teams</li>
+          <li>Plan for cross-team coverage if needed</li>
+          <li>Coordinate with other managers on staffing</li>
+        </ul>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Planners and admins also have the ability to approve/reject requests if needed for oversight purposes.
+        </p>
+      </section>
+
+      <Separator />
+
       <section id="planning-partnerships">
         <h2 className="text-2xl font-bold mb-4">4.5 Planning Partnerships</h2>
         

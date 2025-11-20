@@ -204,6 +204,58 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log(`Request notification sent to manager: ${manager.email}`);
     } else if (type === "approval") {
+      // Notify requester and parent team planners
+      // First, get parent team planners if manager approved
+      let parentTeamPlanners: any[] = [];
+      
+      if (request.approver_id) {
+        const { data: approverRoles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', request.approver_id);
+        
+        const isManagerApproval = approverRoles?.some(r => r.role === 'manager');
+        
+        if (isManagerApproval) {
+          // Get the team's parent team
+          const { data: team } = await supabase
+            .from('teams')
+            .select('parent_team_id')
+            .eq('id', request.team_id)
+            .single();
+          
+          if (team?.parent_team_id) {
+            // Get planners from parent team
+            const { data: parentPlanners } = await supabase
+              .from('user_roles')
+              .select(`
+                user_id,
+                profiles!user_roles_user_id_fkey(
+                  user_id,
+                  first_name,
+                  last_name,
+                  email
+                )
+              `)
+              .eq('role', 'planner');
+            
+            if (parentPlanners) {
+              // Filter planners who have access to parent team
+              const { data: parentTeamMembers } = await supabase
+                .from('team_members')
+                .select('user_id')
+                .eq('team_id', team.parent_team_id);
+              
+              const parentTeamUserIds = new Set(parentTeamMembers?.map(m => m.user_id) || []);
+              
+              parentTeamPlanners = parentPlanners
+                .filter(p => p.profiles && (parentTeamUserIds.has(p.user_id) || parentPlanners.length === 0))
+                .map(p => p.profiles);
+            }
+          }
+        }
+      }
+      
       const dateStr = isMultiDay
         ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} - ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
         : startDate.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -241,6 +293,38 @@ const handler = async (req: Request): Promise<Response> => {
       });
 
       console.log(`Approval notification sent to requester: ${request.requester.email}`);
+      
+      // Send notification to parent team planners if manager approved
+      if (parentTeamPlanners.length > 0) {
+        for (const planner of parentTeamPlanners) {
+          await resend.emails.send({
+            from: "EriSync <noreply@erisync.xyz>",
+            to: [planner.email],
+            subject: `Vacation Approved - ${request.requester.first_name} ${request.requester.last_name} (${request.team.name})`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #22c55e;">Vacation Request Approved (FYI)</h2>
+                <p>Hello ${planner.first_name},</p>
+                <p>This is a notification that a vacation request has been approved by a team manager:</p>
+                
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <p><strong>Employee:</strong> ${request.requester.first_name} ${request.requester.last_name}</p>
+                  <p><strong>Team:</strong> ${request.team.name}</p>
+                  <p><strong>Date${isMultiDay ? 's' : ''}:</strong> ${dateStr}${durationStr}</p>
+                  <p><strong>Time:</strong> ${timeStr}</p>
+                  ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ""}
+                  <p><strong>Approved by:</strong> ${request.approver?.first_name} ${request.approver?.last_name}</p>
+                </div>
+                
+                <p style="color: #666; font-size: 14px;">
+                  This notification is sent to parent team planners for oversight and capacity planning purposes.
+                </p>
+              </div>
+            `,
+          });
+        }
+        console.log(`Approval notification sent to ${parentTeamPlanners.length} parent team planner(s)`);
+      }
 
       // Get the manager for the employee's team and send notification
       const { data: teamMember, error: tmError } = await supabase
