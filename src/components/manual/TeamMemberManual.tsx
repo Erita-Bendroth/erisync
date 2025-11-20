@@ -81,12 +81,12 @@ export const TeamMemberManual = () => {
           <li><strong>Other:</strong> Other scheduled activities (usually shown in gray)</li>
         </ul>
 
-        <h3 className="text-xl font-semibold mb-3">Bookmarking Schedule Dates</h3>
+        
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Click on any date in the calendar</li>
-          <li>Click the bookmark icon</li>
-          <li>Access your bookmarked dates from the <strong>Bookmarks</strong> menu</li>
-          <li>Quickly jump to important dates</li>
+          
+          
+          
+          
         </ol>
 
         <Alert>
