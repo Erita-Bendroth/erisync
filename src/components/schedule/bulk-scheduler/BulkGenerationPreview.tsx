@@ -113,13 +113,30 @@ export const BulkGenerationPreview = ({
           }
           
           if (!applicableShift && shiftType) {
-            // Find country-specific shift
-            const countryShifts = allShifts.filter(s => 
-              s.shift_type === shiftType &&
-              (!s.day_of_week || s.day_of_week.includes(dayOfWeek)) &&
-              (!s.country_codes || s.country_codes.includes(userCountry))
-            );
-            applicableShift = countryShifts[0] || allShifts.find(s => s.id === shiftType);
+            // First find the selected shift to get its shift_type enum value
+            const selectedShiftDef = allShifts.find(s => s.id === shiftType);
+            
+            if (selectedShiftDef) {
+              // Now find country-specific shifts with the same shift_type enum
+              const countryShifts = allShifts.filter(s => 
+                s.shift_type === selectedShiftDef.shift_type &&
+                (!s.day_of_week || s.day_of_week.includes(dayOfWeek)) &&
+                (!s.country_codes || s.country_codes.includes(userCountry))
+              );
+              
+              // Prefer country-specific shift, fallback to selected shift
+              applicableShift = countryShifts[0] || selectedShiftDef;
+              
+              console.log(`🔍 [PREVIEW] User ${profile.first_name} (${userCountry}) on ${format(day, 'EEE MMM d')}:`, {
+                selectedShift: selectedShiftDef.description,
+                countrySpecificFound: countryShifts.length > 0,
+                usingShift: applicableShift.description,
+                times: `${applicableShift.start_time.slice(0, 5)}-${applicableShift.end_time.slice(0, 5)}`
+              });
+            } else {
+              // Fallback if selected shift ID not found
+              applicableShift = allShifts.find(s => s.id === shiftType);
+            }
           }
 
           if (applicableShift) {
