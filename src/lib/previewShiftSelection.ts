@@ -77,12 +77,31 @@ export function getShiftForDate(
     console.log('   🔍 Looking for weekend shift...');
     const weekendShifts = allShifts.filter(s => s.shift_type === 'weekend');
     console.log(`   Found ${weekendShifts.length} weekend shifts:`, 
-      weekendShifts.map(s => `${s.description} (${s.start_time}-${s.end_time})`));
+      weekendShifts.map(s => ({
+        desc: s.description,
+        times: `${s.start_time}-${s.end_time}`,
+        hasTeamId: !!s.team_id,
+        hasTeamIds: !!(s.team_ids && s.team_ids.length > 0)
+      })));
     
-    const weekendShift = weekendShifts[0];
+    // Sort weekend shifts: prefer team-specific over global
+    // Team-specific shifts have team_id or team_ids populated
+    const sortedWeekendShifts = [...weekendShifts].sort((a, b) => {
+      const aIsTeamSpecific = !!(a.team_id || (a.team_ids && a.team_ids.length > 0));
+      const bIsTeamSpecific = !!(b.team_id || (b.team_ids && b.team_ids.length > 0));
+      
+      // Team-specific shifts come first
+      if (aIsTeamSpecific && !bIsTeamSpecific) return -1;
+      if (!aIsTeamSpecific && bIsTeamSpecific) return 1;
+      return 0;
+    });
+    
+    const weekendShift = sortedWeekendShifts[0];
     
     if (weekendShift) {
-      console.log(`   ✅ Selected weekend shift: ${weekendShift.description} (${weekendShift.start_time}-${weekendShift.end_time})`);
+      const isTeamSpecific = !!(weekendShift.team_id || (weekendShift.team_ids && weekendShift.team_ids.length > 0));
+      console.log(`   ✅ Selected weekend shift: ${weekendShift.description} (${weekendShift.start_time}-${weekendShift.end_time})`,
+        isTeamSpecific ? '[TEAM-SPECIFIC]' : '[GLOBAL]');
       return {
         date,
         shiftId: weekendShift.id,
@@ -135,18 +154,39 @@ export function getShiftForDate(
     validShiftsForDay.map(s => ({
       desc: s.description,
       times: `${s.start_time}-${s.end_time}`,
-      days: s.day_of_week
+      days: s.day_of_week,
+      hasTeamId: !!s.team_id,
+      hasTeamIds: !!(s.team_ids && s.team_ids.length > 0)
     })));
 
   if (validShiftsForDay.length > 0) {
-    // Use the first valid shift (prefer team-specific, then day-specific)
-    const bestShift = validShiftsForDay[0];
+    // Sort to prefer team-specific shifts, then day-specific shifts
+    const sortedShifts = [...validShiftsForDay].sort((a, b) => {
+      const aIsTeamSpecific = !!(a.team_id || (a.team_ids && a.team_ids.length > 0));
+      const bIsTeamSpecific = !!(b.team_id || (b.team_ids && b.team_ids.length > 0));
+      
+      // Team-specific shifts come first
+      if (aIsTeamSpecific && !bIsTeamSpecific) return -1;
+      if (!aIsTeamSpecific && bIsTeamSpecific) return 1;
+      
+      // Then prefer day-specific shifts
+      const aHasDays = a.day_of_week && a.day_of_week.length > 0;
+      const bHasDays = b.day_of_week && b.day_of_week.length > 0;
+      if (aHasDays && !bHasDays) return -1;
+      if (!aHasDays && bHasDays) return 1;
+      
+      return 0;
+    });
+    
+    const bestShift = sortedShifts[0];
     
     // Check if this is an alternative (day-specific) shift
     const isAlternative = bestShift.day_of_week && bestShift.day_of_week.length > 0;
+    const isTeamSpecific = !!(bestShift.team_id || (bestShift.team_ids && bestShift.team_ids.length > 0));
     
     console.log(`   ✅ Selected: ${bestShift.description} (${bestShift.start_time}-${bestShift.end_time})`, 
-      isAlternative ? '[ALTERNATIVE]' : '[DEFAULT]');
+      isAlternative ? '[ALTERNATIVE]' : '[DEFAULT]',
+      isTeamSpecific ? '[TEAM-SPECIFIC]' : '[GLOBAL]');
     
     return {
       date,
