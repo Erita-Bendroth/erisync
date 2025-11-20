@@ -117,23 +117,52 @@ async function findWeekendShiftForDay(
   dayOfWeek: number,
   teamId: string
 ): Promise<string | null> {
-  const { data: weekendShifts } = await supabase
+  const { data: allWeekendShifts, error } = await supabase
     .from('shift_time_definitions')
     .select('id, day_of_week, team_id, team_ids')
-    .eq('shift_type', 'weekend')
-    .or(`team_ids.cs.{${teamId}},team_id.eq.${teamId},and(team_id.is.null,team_ids.is.null)`)
-    .order('team_id', { ascending: false, nullsFirst: false }); // Prefer team-specific
+    .eq('shift_type', 'weekend');
   
-  if (!weekendShifts || weekendShifts.length === 0) return null;
+  if (error) {
+    console.error('Error finding weekend shifts:', error);
+    return null;
+  }
+  
+  if (!allWeekendShifts || allWeekendShifts.length === 0) {
+    console.log(`No weekend shifts found in database`);
+    return null;
+  }
+  
+  // Filter in JavaScript to properly check team_ids array
+  const weekendShifts = allWeekendShifts.filter(s => 
+    s.team_id === teamId || 
+    s.team_ids?.includes(teamId) ||
+    (s.team_id === null && (s.team_ids === null || s.team_ids.length === 0))
+  ).sort((a, b) => {
+    // Prefer team-specific shifts
+    if (a.team_id && !b.team_id) return -1;
+    if (!a.team_id && b.team_id) return 1;
+    return 0;
+  });
+  
+  if (weekendShifts.length === 0) {
+    console.log(`No weekend shifts found for team ${teamId}`);
+    return null;
+  }
+  
+  console.log(`Found ${weekendShifts.length} weekend shifts for team ${teamId}`);
   
   // Find shift that matches this day of week
   const matchingShift = weekendShifts.find(s => 
     !s.day_of_week || s.day_of_week.length === 0 || s.day_of_week.includes(dayOfWeek)
   );
   
-  if (matchingShift) return matchingShift.id;
+  if (matchingShift) {
+    console.log(`Using weekend shift ${matchingShift.id} for day ${dayOfWeek}`);
+    return matchingShift.id;
+  }
   
   // Fallback: any weekend shift
+  console.log(`No day-specific weekend shift, using fallback ${weekendShifts[0].id}`);
   return weekendShifts[0].id;
 }
 
@@ -146,28 +175,61 @@ async function findAlternativeShift(
   teamId: string
 ): Promise<string | null> {
   // Get the original shift's type
-  const { data: originalShift } = await supabase
+  const { data: originalShift, error: originalError } = await supabase
     .from('shift_time_definitions')
     .select('shift_type, team_id, team_ids')
     .eq('id', originalShiftId)
     .single();
   
-  if (!originalShift) return null;
+  if (originalError || !originalShift) {
+    console.error('Error fetching original shift:', originalError);
+    return null;
+  }
+  
+  console.log(`Looking for alternative to shift type "${originalShift.shift_type}" for day ${dayOfWeek}`);
   
   // Find shifts with the same type and valid for this day
-  const { data: alternatives } = await supabase
+  const { data: allAlternatives, error } = await supabase
     .from('shift_time_definitions')
     .select('id, day_of_week, team_id, team_ids')
-    .eq('shift_type', originalShift.shift_type)
-    .or(`team_ids.cs.{${teamId}},team_id.eq.${teamId},and(team_id.is.null,team_ids.is.null)`)
-    .order('team_id', { ascending: false, nullsFirst: false });
+    .eq('shift_type', originalShift.shift_type);
   
-  if (!alternatives || alternatives.length === 0) return null;
+  if (error) {
+    console.error('Error finding alternative shifts:', error);
+    return null;
+  }
+  
+  if (!allAlternatives || allAlternatives.length === 0) return null;
+  
+  // Filter in JavaScript to properly check team_ids array
+  const alternatives = allAlternatives.filter(s => 
+    s.team_id === teamId || 
+    s.team_ids?.includes(teamId) ||
+    (s.team_id === null && (s.team_ids === null || s.team_ids.length === 0))
+  ).sort((a, b) => {
+    // Prefer team-specific shifts
+    if (a.team_id && !b.team_id) return -1;
+    if (!a.team_id && b.team_id) return 1;
+    return 0;
+  });
+  
+  if (alternatives.length === 0) {
+    console.log(`No alternative shifts found for team ${teamId}`);
+    return null;
+  }
+  
+  console.log(`Found ${alternatives.length} alternative shifts of type "${originalShift.shift_type}"`);
   
   // Find shift that matches this day of week
   const matchingShift = alternatives.find(s => 
     !s.day_of_week || s.day_of_week.length === 0 || s.day_of_week.includes(dayOfWeek)
   );
+  
+  if (matchingShift) {
+    console.log(`✓ Found alternative shift ${matchingShift.id} for day ${dayOfWeek}`);
+  } else {
+    console.log(`✗ No alternative shift matches day ${dayOfWeek}`);
+  }
   
   return matchingShift?.id || null;
 }
@@ -183,32 +245,51 @@ export async function findBestShiftForDate(
   weekendOverrideShiftId: string | null
 ): Promise<string | null> {
   const dayOfWeek = date.getDay();
+  const dateStr = format(date, 'yyyy-MM-dd (EEE)');
+  
+  console.log(`\n🔍 Finding shift for ${dateStr}, day ${dayOfWeek}, weekend/holiday=${isWeekendOrHoliday}`);
   
   // 1. If weekend/holiday and override specified, validate and use it
   if (isWeekendOrHoliday && weekendOverrideShiftId) {
+    console.log(`Checking weekend override shift: ${weekendOverrideShiftId}`);
     const isValid = await isShiftValidForDay(weekendOverrideShiftId, dayOfWeek);
-    if (isValid) return weekendOverrideShiftId;
+    if (isValid) {
+      console.log(`✅ Using weekend override shift: ${weekendOverrideShiftId}`);
+      return weekendOverrideShiftId;
+    }
   }
   
   // 2. If weekend/holiday, look for weekend shifts
   if (isWeekendOrHoliday) {
+    console.log(`Looking for weekend shift...`);
     const weekendShift = await findWeekendShiftForDay(dayOfWeek, teamId);
-    if (weekendShift) return weekendShift;
+    if (weekendShift) {
+      console.log(`✅ Using weekend shift: ${weekendShift}`);
+      return weekendShift;
+    }
   }
   
   // 3. Check if selected shift is valid for this day
   if (selectedShiftId) {
+    console.log(`Checking if selected shift ${selectedShiftId} is valid for day ${dayOfWeek}...`);
     const isValid = await isShiftValidForDay(selectedShiftId, dayOfWeek);
-    if (isValid) return selectedShiftId;
+    if (isValid) {
+      console.log(`✅ Using selected shift: ${selectedShiftId}`);
+      return selectedShiftId;
+    }
     
     // 4. Selected shift not valid, find alternative with same type
+    console.log(`⚠️ Selected shift not valid for day ${dayOfWeek}, looking for alternative...`);
     const alternative = await findAlternativeShift(selectedShiftId, dayOfWeek, teamId);
     if (alternative) {
-      console.log(`Day ${dayOfWeek}: Selected shift not valid, using alternative ${alternative}`);
+      console.log(`✅ Using alternative shift: ${alternative}`);
       return alternative;
     }
+    
+    console.log(`⚠️ No alternative found, falling back to selected shift`);
   }
   
   // 5. Fallback to selected shift even if not ideal
+  console.log(`✅ Final result: ${selectedShiftId}`);
   return selectedShiftId;
 }
