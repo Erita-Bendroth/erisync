@@ -277,8 +277,9 @@ Deno.serve(async (req) => {
     });
 
     // Prepare holiday data for database
-    const holidayData = filteredHolidays.map(holiday => {
+    const holidayData = filteredHolidays.flatMap(holiday => {
       let regionalCode: string | null = null;
+      const matchingGermanRegions: string[] = [];
 
       // Generic regional mapping: if API provides counties codes like "DE-BY"
       if (region_code && Array.isArray(holiday.counties) && holiday.counties.length > 0) {
@@ -288,15 +289,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      // German regional holiday mapping - AUTOMATICALLY assign regions
+      // German regional holiday mapping - COLLECT ALL matching regions
       if (!regionalCode && country_code === 'DE') {
         const holidayName = holiday.localName || holiday.name;
         
-        // Check all German regions to find which one this holiday belongs to
+        // Check ALL German regions to find which ones this holiday belongs to
         for (const [deRegion, regionalHolidays] of Object.entries(germanRegionalHolidays)) {
           if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-            regionalCode = deRegion;
-            break; // Assign to first matching region
+            // Remove 'DE-' prefix and collect (e.g., 'DE-BY' -> 'BY')
+            matchingGermanRegions.push(deRegion.replace('DE-', ''));
           }
         }
       }
@@ -329,8 +330,21 @@ Deno.serve(async (req) => {
         }
       }
 
+      // For German holidays with multiple regions, create ONE ROW PER REGION
+      if (country_code === 'DE' && matchingGermanRegions.length > 0) {
+        return matchingGermanRegions.map(region => ({
+          name: holiday.localName || holiday.name,
+          date: holiday.date,
+          country_code: holiday.countryCode,
+          year: parseInt(year),
+          is_public: true,
+          user_id: null,
+          region_code: region // Each region gets its own row
+        }));
+      }
       
-      return {
+      // For all other holidays (national or UK regional), return single row
+      return [{
         name: holiday.localName || holiday.name,
         date: holiday.date,
         country_code: holiday.countryCode,
@@ -338,7 +352,7 @@ Deno.serve(async (req) => {
         is_public: true,
         user_id: null, // Always null for centrally managed holidays
         region_code: regionalCode
-      };
+      }];
     })
 
     console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
