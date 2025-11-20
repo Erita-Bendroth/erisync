@@ -90,17 +90,22 @@ export function ShiftTimeDefinitions() {
     const { data: user } = await supabase.auth.getUser();
     if (!user.user) return;
 
-    const saveData = {
-      ...def,
+    // Prepare base data
+    const baseData = {
       created_by: user.user.id,
       team_id: null,
       team_ids: def.team_ids && def.team_ids.length > 0 ? def.team_ids : null,
       region_code: def.region_code || null,
       day_of_week: def.day_of_week,
+      shift_type: def.shift_type,
+      start_time: def.start_time,
+      end_time: def.end_time,
+      description: def.description,
     };
 
     // Only UPDATE if this is a saved definition (not a temp ID)
     if (def.id && !def.id.startsWith('temp-')) {
+      const saveData = { ...baseData, id: def.id };
       const { error } = await supabase
         .from("shift_time_definitions")
         .update(saveData)
@@ -116,9 +121,10 @@ export function ShiftTimeDefinitions() {
         toast({ title: "Success", description: "Shift time updated" });
       }
     } else {
+      // For new definitions, don't include the temp ID - let database generate UUID
       const { data, error } = await supabase
         .from("shift_time_definitions")
-        .insert(saveData)
+        .insert(baseData)
         .select()
         .single();
 
