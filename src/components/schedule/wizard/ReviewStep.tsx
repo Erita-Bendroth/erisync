@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SharedPlanningCalendar } from "./SharedPlanningCalendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getShiftForDate, fetchTeamShiftDefinitions } from "@/lib/previewShiftSelection";
 
 interface ReviewStepProps {
   wizardData: WizardData;
@@ -25,12 +26,22 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
   const [userCount, setUserCount] = useState(0);
   const [previewDays, setPreviewDays] = useState<Date[]>([]);
   const [previewUsers, setPreviewUsers] = useState<Array<{ initials: string; name: string }>>([]);
+  const [shiftDefinitions, setShiftDefinitions] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTeamName();
     calculatePreview();
     fetchPreviewUsers();
+    if (wizardData.selectedTeam) {
+      fetchShiftDefinitions();
+    }
   }, [wizardData]);
+
+  const fetchShiftDefinitions = async () => {
+    if (!wizardData.selectedTeam) return;
+    const definitions = await fetchTeamShiftDefinitions(wizardData.selectedTeam);
+    setShiftDefinitions(definitions);
+  };
 
   const fetchTeamName = async () => {
     if (!wizardData.selectedTeam) return;
@@ -275,18 +286,39 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           // Check if the SCHEDULED date is a holiday for ANY of the users
           // We'll check per-user in the loop below
           
-          // Use shift pattern info if available, otherwise fallback to wizard data
-          const finalShiftInfo = shiftInfo ? {
-            shiftType: mapShiftTypeToEnum(shiftInfo.shiftType),
-            shiftName: shiftInfo.shiftName,
-            startTime: shiftInfo.startTime,
-            endTime: shiftInfo.endTime,
-          } : {
-            shiftType: mapShiftTypeToEnum(wizardData.shiftType),
-            shiftName: wizardData.shiftName || "Day Shift",
-            startTime: wizardData.startTime || "08:00",
-            endTime: wizardData.endTime || "16:30",
-          };
+          // Use shift pattern info if available, otherwise use smart shift selection
+          let finalShiftInfo;
+          if (shiftInfo) {
+            finalShiftInfo = {
+              shiftType: mapShiftTypeToEnum(shiftInfo.shiftType),
+              shiftName: shiftInfo.shiftName,
+              startTime: shiftInfo.startTime,
+              endTime: shiftInfo.endTime,
+            };
+          } else if (shiftDefinitions.length > 0 && wizardData.shiftType) {
+            // Use smart selection based on day of week
+            const smartShift = getShiftForDate(
+              scheduledDate,
+              wizardData.shiftType,
+              false, // autoDetectWeekends - false since we're using explicit shiftType
+              null, // weekendOverrideShiftId
+              shiftDefinitions
+            );
+            finalShiftInfo = {
+              shiftType: mapShiftTypeToEnum(smartShift.shiftType),
+              shiftName: smartShift.description || wizardData.shiftName || "Day Shift",
+              startTime: smartShift.startTime,
+              endTime: smartShift.endTime,
+            };
+          } else {
+            // Final fallback to wizard data
+            finalShiftInfo = {
+              shiftType: mapShiftTypeToEnum(wizardData.shiftType),
+              shiftName: wizardData.shiftName || "Day Shift",
+              startTime: wizardData.startTime || "08:00",
+              endTime: wizardData.endTime || "16:30",
+            };
+          }
           
           for (const userProfile of usersToSchedule) {
             // Validate user ID
