@@ -108,10 +108,32 @@ export const BulkGenerationPreview = ({
           // Find applicable shift
           let applicableShift = null;
           
-          if (shouldUseWeekend && weekendShiftOverride) {
-            applicableShift = allShifts.find(s => s.id === weekendShiftOverride);
+          if (shouldUseWeekend) {
+            // When weekend detection is ON, look for weekend shifts
+            if (weekendShiftOverride) {
+              // Use the specified weekend shift override
+              applicableShift = allShifts.find(s => s.id === weekendShiftOverride);
+            } else {
+              // Auto-find a weekend shift for this user's country
+              const weekendShifts = allShifts.filter(s => 
+                s.shift_type === 'weekend' &&
+                (!s.day_of_week || s.day_of_week.includes(dayOfWeek)) &&
+                (!s.country_codes || s.country_codes.includes(userCountry))
+              );
+              
+              // Prefer country-specific weekend shift, fallback to any weekend shift
+              applicableShift = weekendShifts[0] || allShifts.find(s => s.shift_type === 'weekend');
+              
+              console.log(`🎉 [PREVIEW WEEKEND] User ${profile.first_name} (${userCountry}) on ${format(day, 'EEE MMM d')}:`, {
+                isWeekend: true,
+                weekendShiftsFound: weekendShifts.length,
+                usingShift: applicableShift?.description || 'none',
+                times: applicableShift ? `${applicableShift.start_time.slice(0, 5)}-${applicableShift.end_time.slice(0, 5)}` : 'N/A'
+              });
+            }
           }
           
+          // If no weekend shift found (or not weekend), use the selected shift
           if (!applicableShift && shiftType) {
             // First find the selected shift to get its shift_type enum value
             const selectedShiftDef = allShifts.find(s => s.id === shiftType);
