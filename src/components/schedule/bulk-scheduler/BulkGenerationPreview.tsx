@@ -17,6 +17,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 
 interface BulkGenerationPreviewProps {
   totalShifts: number;
@@ -79,6 +81,22 @@ export const BulkGenerationPreview = ({
       allShifts
     );
     setDayPreviews(previews);
+    
+    // Debug logging
+    console.log('🎯 [PREVIEW COMPONENT] Preview generated:', {
+      totalDays: previews.length,
+      shiftType,
+      autoDetectWeekends,
+      shiftsAvailable: allShifts.length,
+      weekendShifts: allShifts.filter(s => s.shift_type === 'weekend').length,
+      firstFewPreviews: previews.slice(0, 3).map(p => ({
+        date: format(p.date, 'EEE MMM d'),
+        shift: p.description,
+        times: `${p.startTime}-${p.endTime}`,
+        isWeekend: p.isWeekend,
+        isAlt: p.isAlternative
+      }))
+    });
   }, [startDate, endDate, shiftType, autoDetectWeekends, weekendShiftOverride, allShifts]);
   
   if (!startDate || !endDate || !shiftType) {
@@ -115,7 +133,45 @@ export const BulkGenerationPreview = ({
 
   return (
     <Card className="p-4 space-y-3">
-      <div className="font-semibold">Preview</div>
+      <div className="flex items-center justify-between">
+        <div className="font-semibold">Preview</div>
+        
+        {/* Debug Panel */}
+        <Collapsible>
+          <CollapsibleTrigger className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+            Debug Info <ChevronDown className="h-3 w-3" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="absolute right-4 top-12 z-50 bg-popover border rounded-md p-3 shadow-lg text-xs space-y-2 max-w-md">
+            <div><strong>Shifts fetched:</strong> {allShifts.length}</div>
+            <div><strong>Auto-detect weekends:</strong> {autoDetectWeekends ? 'Yes' : 'No'}</div>
+            <div><strong>Selected shift type:</strong> {shiftType}</div>
+            <div><strong>Weekend shifts available:</strong> {allShifts.filter(s => s.shift_type === 'weekend').length}</div>
+            <div className="border-t pt-2">
+              <strong>All shift definitions:</strong>
+              <pre className="mt-1 text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+                {JSON.stringify(allShifts.map(s => ({
+                  type: s.shift_type,
+                  desc: s.description,
+                  times: `${s.start_time}-${s.end_time}`,
+                  days: s.day_of_week
+                })), null, 2)}
+              </pre>
+            </div>
+            <div className="border-t pt-2">
+              <strong>First 5 day previews:</strong>
+              <pre className="mt-1 text-xs bg-muted p-2 rounded overflow-auto max-h-40">
+                {JSON.stringify(dayPreviews.slice(0, 5).map(p => ({
+                  date: format(p.date, 'EEE MMM d'),
+                  shift: p.description,
+                  times: `${p.startTime}-${p.endTime}`,
+                  isWeekend: p.isWeekend,
+                  isAlt: p.isAlternative
+                })), null, 2)}
+              </pre>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
       
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
