@@ -10,7 +10,7 @@ export const DateHeaderRow: React.FC<DateHeaderRowProps> = ({ dates }) => {
   const isLongRange = dates.length > 14;
   
   return (
-    <div className="grid grid-cols-[200px_auto] border-t border-border bg-muted/50 sticky top-0 z-10">
+    <div className="grid grid-cols-[200px_auto] border-t border-border bg-muted/50 sticky top-0 z-50 shadow-sm">
       <div className="px-4 py-3 border-r border-border font-semibold text-sm">
         Team Member
       </div>
