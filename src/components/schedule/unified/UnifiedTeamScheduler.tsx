@@ -918,143 +918,39 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="mt-0">
-            <ScrollArea ref={scrollAreaRef} className="h-[calc(100vh-350px)] scroll-area">
+            <ScrollArea ref={scrollAreaRef} className="h-auto max-h-[calc(100vh-400px)] scroll-area">
               <div className="min-w-max">
               {loading ? (
                 <div className="flex items-center justify-center p-12">
-                  <div className="text-muted-foreground">Loading teams...</div>
-                </div>
-              ) : teamSections.length === 0 ? (
-                <div className="flex items-center justify-center p-12">
-                  <div className="text-muted-foreground">
-                    {selectionMode === 'partnership' 
-                      ? 'Select a partnership to view teams' 
-                      : 'Select teams to view schedule'}
-                  </div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <>
-                  {/* Conditional rendering based on view mode */}
-                  {viewMode === 'grid' && (
-                    <>
-                      {/* Header Row with Dates */}
-                      <div className="grid grid-cols-[200px_auto] border-b border-border bg-muted/30 sticky top-0 z-10">
-                        <div className="px-4 py-2 font-semibold text-sm border-r border-border">
-                          Team Members
-                        </div>
-                        <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '60px' : 'minmax(60px, 1fr)'})` }}>
-                          {dates.map((date) => {
-                            const dateObj = new Date(date);
-                            return (
-                              <div
-                                key={date}
-                                className="px-2 py-2 text-center border-r border-border text-xs font-medium"
-                              >
-                                <div>{dateObj.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                                <div className="text-muted-foreground">
-                                  {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Shift Type Counter Row */}
-                      <ShiftTypeCounterRow
-                        dates={dates}
-                        scheduleEntries={scheduleEntries.filter(e => dates.includes(e.date))}
-                        shiftTypes={shiftTypes}
-                        teamSections={teamSections}
-                      />
-
-                      {/* Team Sections */}
-                      {teamSections.map((section) => (
-                        <TeamSection
-                          key={section.teamId}
-                          teamId={section.teamId}
-                          teamName={section.teamName}
-                          teamColor={section.color}
-                          members={section.members}
-                          dates={dates}
-                          scheduleEntries={scheduleEntries}
-                          selectedUsers={state.selectedUsers}
-                          selectedCells={state.selectedCells}
-                          hoveredCell={state.hoveredCell}
-                          editingCell={state.editingCell}
-                          cellsBeingEdited={cellsBeingEdited}
-                          onUserToggle={toggleUserSelection}
-                          onCellClick={toggleCellSelection}
-                          onCellDoubleClick={setEditingCell}
-                          onCellHover={setHoveredCell}
-                          onCellDragStart={startDrag}
-                          onCellDragEnd={endDrag}
-                          onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
-                          showHolidays={showHolidays}
-                          isPartnershipView={selectionMode === 'partnership'}
-                          canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner || accessControl.isManager}
-                        />
-                      ))}
-
-                      {/* Coverage Row */}
-                      <CoverageRow
-                        dates={dates}
-                        teamSize={totalMembers}
-                        scheduledCounts={scheduledCounts}
-                        teamBreakdowns={teamBreakdowns}
-                        partnershipMode={selectionMode === 'partnership'}
-                        partnershipConfig={partnershipConfig ?? undefined}
-                      />
-                    </>
-                  )}
-                  
-                  {viewMode === 'weekly' && (
-                    <WeeklyGridView
-                      teamSections={teamSections}
-                      dates={dates}
-                      scheduleEntries={scheduleEntries}
-                      state={state}
-                      cellsBeingEdited={cellsBeingEdited}
-                      handlers={{
-                        toggleUserSelection,
-                        toggleCellSelection,
-                        setEditingCell,
-                        setHoveredCell,
-                        startDrag,
-                        endDrag,
-                      }}
-                      showHolidays={showHolidays}
-                      shiftTypes={shiftTypes}
-                      partnershipMode={selectionMode === 'partnership'}
-                      partnershipConfig={partnershipConfig ?? undefined}
-                      isPartnershipView={selectionMode === 'partnership'}
-                      canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner || accessControl.isManager}
-                    />
-                  )}
-                  
-                  {viewMode === 'monthly' && (
-                    <MonthlyGridView
-                      teamSections={teamSections}
-                      dates={dates}
-                      scheduleEntries={scheduleEntries}
-                      shiftTypes={shiftTypes}
-                      showHolidays={showHolidays}
-                    />
-                  )}
-                </>
-              )}
-
-              {/* Keyboard Shortcuts Info */}
-              {!screenshotMode && (
-                <div className="p-4 border-t border-border bg-muted/30">
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-semibold">Shortcuts:</span> Click to select • Double-click to edit • Drag to select range
-                  </div>
+                <div className="relative">
+                  <SchedulerGrid
+                    schedule={schedule}
+                    onScheduleChange={handleScheduleChange}
+                    availableUsers={availableUsers}
+                    teamColors={teamColors}
+                    isEditingRef={isEditingRef}
+                    quickModeRef={quickModeRef}
+                    localUpdatesRef={localUpdatesRef}
+                    onOpenDialog={handleOpenDialog}
+                    onDeleteShift={handleDeleteShift}
+                    onCellClick={handleCellClick}
+                    multiSelectMode={multiSelectMode}
+                    selectedCells={selectedCells}
+                    onToggleCellSelection={handleToggleCellSelection}
+                    holidays={holidays}
+                    dateRange={dateRange}
+                    partnershipId={selectedPartnershipId}
+                    onOpenVacationDialog={handleOpenVacationDialog}
+                    directlyManagedUsers={directlyManagedUsers}
+                    canViewActivityDetails={canViewActivityDetails}
+                  />
                 </div>
               )}
               </div>
               <ScrollBar orientation="horizontal" className="h-3" />
-              <ScrollBar orientation="vertical" className="w-3" />
             </ScrollArea>
           </TabsContent>
 

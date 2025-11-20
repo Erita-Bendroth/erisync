@@ -165,6 +165,18 @@ All colors MUST be HSL.
   .dark .scroll-area [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary) / 0.8);
   }
+
+  /* Mobile scrollbar improvements for better touch targets */
+  @media (max-width: 768px) {
+    .scroll-area [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .scroll-area [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+      background: hsl(var(--primary) / 0.6);
+    }
+  }
   
   /* Hide Lovable branding */
   [href*="lovable"],
