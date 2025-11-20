@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { matchesCountryCode } from "@/lib/countryCodeUtils";
 
 interface BulkGenerationPreviewProps {
   totalShifts: number;
@@ -118,7 +119,7 @@ export const BulkGenerationPreview = ({
               const weekendShifts = allShifts.filter(s => 
                 s.shift_type === 'weekend' &&
                 (!s.day_of_week || s.day_of_week.includes(dayOfWeek)) &&
-                (!s.country_codes || s.country_codes.includes(userCountry))
+                (!s.country_codes || s.country_codes.length === 0 || matchesCountryCode(userCountry, s.country_codes))
               );
               
               // Prefer country-specific weekend shift, fallback to any weekend shift
@@ -143,7 +144,7 @@ export const BulkGenerationPreview = ({
               const countryShifts = allShifts.filter(s => 
                 s.shift_type === selectedShiftDef.shift_type &&
                 (!s.day_of_week || s.day_of_week.includes(dayOfWeek)) &&
-                (!s.country_codes || s.country_codes.includes(userCountry))
+                (!s.country_codes || s.country_codes.length === 0 || matchesCountryCode(userCountry, s.country_codes))
               );
               
               // Prefer country-specific shift, fallback to selected shift
