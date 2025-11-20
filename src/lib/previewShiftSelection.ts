@@ -46,7 +46,7 @@ export async function fetchTeamShiftDefinitions(teamId: string): Promise<ShiftTi
  */
 export function getShiftForDate(
   date: Date,
-  selectedShiftId: string,
+  selectedShiftType: string,
   autoDetectWeekends: boolean,
   weekendOverrideShiftId: string | null,
   allShifts: ShiftTimeDefinition[]
@@ -56,8 +56,7 @@ export function getShiftForDate(
 
   // If weekend detection is on and it's a weekend, use weekend shift
   if (autoDetectWeekends && isWeekend) {
-    const weekendShiftId = weekendOverrideShiftId || selectedShiftId;
-    const weekendShift = allShifts.find(s => s.id === weekendShiftId && s.shift_type === 'weekend');
+    const weekendShift = allShifts.find(s => s.shift_type === 'weekend');
     
     if (weekendShift) {
       return {
@@ -73,69 +72,59 @@ export function getShiftForDate(
     }
   }
 
-  // Try to find the selected shift first
-  const selectedShift = allShifts.find(s => s.id === selectedShiftId);
+  // Find all shifts matching the selected shift type
+  const matchingShifts = allShifts.filter(s => s.shift_type === selectedShiftType);
 
-  if (selectedShift) {
-    // Check if this shift has day_of_week constraints
-    if (selectedShift.day_of_week && selectedShift.day_of_week.length > 0) {
-      // If the shift is valid for this day, use it
-      if (selectedShift.day_of_week.includes(dayOfWeek)) {
-        return {
-          date,
-          shiftId: selectedShift.id,
-          shiftType: selectedShift.shift_type,
-          startTime: selectedShift.start_time,
-          endTime: selectedShift.end_time,
-          description: selectedShift.description || selectedShift.shift_type,
-          isWeekend: false,
-          isAlternative: false,
-        };
-      }
-
-      // If not valid for this day, find an alternative shift with same shift_type
-      const alternativeShift = allShifts.find(s => 
-        s.shift_type === selectedShift.shift_type &&
-        s.id !== selectedShift.id &&
-        (!s.day_of_week || s.day_of_week.length === 0 || s.day_of_week.includes(dayOfWeek))
-      );
-
-      if (alternativeShift) {
-        return {
-          date,
-          shiftId: alternativeShift.id,
-          shiftType: alternativeShift.shift_type,
-          startTime: alternativeShift.start_time,
-          endTime: alternativeShift.end_time,
-          description: alternativeShift.description || alternativeShift.shift_type,
-          isWeekend: false,
-          isAlternative: true,
-        };
-      }
-    } else {
-      // No day constraints, use selected shift
-      return {
-        date,
-        shiftId: selectedShift.id,
-        shiftType: selectedShift.shift_type,
-        startTime: selectedShift.start_time,
-        endTime: selectedShift.end_time,
-        description: selectedShift.description || selectedShift.shift_type,
-        isWeekend: false,
-        isAlternative: false,
-      };
-    }
+  if (matchingShifts.length === 0) {
+    // Fallback if no shifts match the type
+    const fallbackShift = allShifts[0];
+    return {
+      date,
+      shiftId: fallbackShift?.id || 'unknown',
+      shiftType: fallbackShift?.shift_type || 'normal',
+      startTime: fallbackShift?.start_time || '08:00',
+      endTime: fallbackShift?.end_time || '16:00',
+      description: fallbackShift?.description || 'Default shift',
+      isWeekend: false,
+      isAlternative: true,
+    };
   }
 
-  // Fallback: use first available shift
-  const fallbackShift = allShifts[0];
+  // Filter shifts that are valid for this day of week
+  const validShiftsForDay = matchingShifts.filter(s => 
+    !s.day_of_week || 
+    s.day_of_week.length === 0 || 
+    s.day_of_week.includes(dayOfWeek)
+  );
+
+  if (validShiftsForDay.length > 0) {
+    // Use the first valid shift (prefer team-specific, then day-specific)
+    const bestShift = validShiftsForDay[0];
+    
+    // Check if this is an alternative (day-specific) shift
+    const isAlternative = bestShift.day_of_week && bestShift.day_of_week.length > 0;
+    
+    return {
+      date,
+      shiftId: bestShift.id,
+      shiftType: bestShift.shift_type,
+      startTime: bestShift.start_time,
+      endTime: bestShift.end_time,
+      description: bestShift.description || bestShift.shift_type,
+      isWeekend: false,
+      isAlternative,
+    };
+  }
+
+  // No valid shifts for this day, use the first matching shift type anyway
+  const fallbackShift = matchingShifts[0];
   return {
     date,
-    shiftId: fallbackShift?.id || 'unknown',
-    shiftType: fallbackShift?.shift_type || 'normal',
-    startTime: fallbackShift?.start_time || '08:00',
-    endTime: fallbackShift?.end_time || '16:00',
-    description: fallbackShift?.description || 'Default shift',
+    shiftId: fallbackShift.id,
+    shiftType: fallbackShift.shift_type,
+    startTime: fallbackShift.start_time,
+    endTime: fallbackShift.end_time,
+    description: fallbackShift.description || fallbackShift.shift_type,
     isWeekend: false,
     isAlternative: true,
   };
@@ -146,12 +135,12 @@ export function getShiftForDate(
  */
 export function generateDayPreviews(
   days: Date[],
-  selectedShiftId: string,
+  selectedShiftType: string,
   autoDetectWeekends: boolean,
   weekendOverrideShiftId: string | null,
   allShifts: ShiftTimeDefinition[]
 ): DayShiftPreview[] {
   return days.map(day => 
-    getShiftForDate(day, selectedShiftId, autoDetectWeekends, weekendOverrideShiftId, allShifts)
+    getShiftForDate(day, selectedShiftType, autoDetectWeekends, weekendOverrideShiftId, allShifts)
   );
 }
