@@ -14,3 +14,12 @@ verify_jwt = true
 
 [functions.send-swap-notification]
 verify_jwt = true
+
+[functions.send-schedule-notification]
+verify_jwt = true
+
+[functions.send-push-notification]
+verify_jwt = true
+
+[functions.vacation-request-notification]
+verify_jwt = true

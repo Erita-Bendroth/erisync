@@ -61,6 +61,31 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Get JWT from authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
+    // Create authenticated Supabase client
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -96,6 +121,23 @@ const handler = async (req: Request): Promise<Response> => {
     // Use the first request for common data
     const request = requests[0];
     const isMultiDay = requests.length > 1;
+
+    // Verify caller has permission (requester, approver, or privileged role)
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const hasPrivilegedRole = roles?.some(r => ['admin', 'planner'].includes(r.role));
+    const isRequester = request.user_id === user.id;
+    const isApprover = request.selected_planner_id === user.id || request.approver_id === user.id;
+
+    if (!hasPrivilegedRole && !isRequester && !isApprover) {
+      return new Response(
+        JSON.stringify({ error: 'Insufficient permissions to send this notification' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // Get date range info
     const dates = requests.map(r => new Date(r.requested_date)).sort((a, b) => a.getTime() - b.getTime());
