@@ -2070,10 +2070,14 @@ const getActivityColor = (entry: ScheduleEntry) => {
 
                   {/* Schedule Entries */}
                   {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
                     const employeeEntries = employees.flatMap((employee) => {
                       const entries = scheduleEntries.filter(
                         e => e.user_id === employee.user_id && 
-                        workDays.some(day => isSameDay(new Date(e.date), day))
+                        workDays.some(day => isSameDay(new Date(e.date), day)) &&
+                        new Date(e.date) >= today
                       );
                       
                       return entries.map((entry) => (
@@ -2086,12 +2090,19 @@ const getActivityColor = (entry: ScheduleEntry) => {
                       ));
                     });
                     
+                    const todayEntries = employeeEntries.filter(e => 
+                      isSameDay(new Date(e.props.entry.date), today)
+                    );
+                    
                     if (employeeEntries.length === 0) {
                       return (
                         <Card className="p-6 text-center">
                           <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            No schedule entries for this week
+                          <p className="text-sm font-semibold mb-1">
+                            {todayEntries.length === 0 ? 'No schedule for today' : 'No schedule entries for this week'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(today, 'EEEE, MMMM d')}
                           </p>
                         </Card>
                       );
