@@ -153,9 +153,33 @@ export function getShiftForDate(
   }
 
   // Find all shifts matching the selected shift type
-  console.log(`   🔍 Looking for shifts of type "${selectedShiftType}"...`);
-  let matchingShifts = allShifts.filter(s => s.shift_type === selectedShiftType);
-  
+  console.log(`   🔍 Looking for shift with ID "${selectedShiftType}"...`);
+
+  // First find the selected shift by ID to get its shift_type enum
+  const selectedShiftDef = allShifts.find(s => s.id === selectedShiftType);
+
+  if (!selectedShiftDef) {
+    console.log('   ⚠️ Selected shift ID not found, using fallback');
+    // Fallback if no shifts match the ID
+    const fallbackShift = allShifts[0];
+    return {
+      date,
+      shiftId: fallbackShift?.id || 'unknown',
+      shiftType: fallbackShift?.shift_type || 'normal',
+      startTime: fallbackShift?.start_time || '08:00',
+      endTime: fallbackShift?.end_time || '16:00',
+      description: fallbackShift?.description || 'Default shift',
+      isWeekend: false,
+      isAlternative: true,
+    };
+  }
+
+  console.log(`   ✅ Found selected shift: ${selectedShiftDef.description} (type: ${selectedShiftDef.shift_type})`);
+
+  // Now find all shifts with the same shift_type enum
+  let matchingShifts = allShifts.filter(s => s.shift_type === selectedShiftDef.shift_type);
+  console.log(`   Found ${matchingShifts.length} shifts with shift_type="${selectedShiftDef.shift_type}"`);
+
   // Filter by country if user country code is provided
   if (userCountryCode) {
     console.log(`   🌍 Filtering by country code: ${userCountryCode}`);
@@ -171,29 +195,13 @@ export function getShiftForDate(
     console.log(`   Found ${countrySpecificShifts.length} country-specific shifts and ${globalShifts.length} global shifts`);
     console.log(`   Using ${matchingShifts.length} shifts after country filtering`);
   }
-  
+
   console.log(`   Found ${matchingShifts.length} shifts:`, 
     matchingShifts.map(s => ({
       desc: s.description,
       times: `${s.start_time}-${s.end_time}`,
       days: s.day_of_week
     })));
-
-  if (matchingShifts.length === 0) {
-    console.log('   ⚠️ No matching shifts, using fallback');
-    // Fallback if no shifts match the type
-    const fallbackShift = allShifts[0];
-    return {
-      date,
-      shiftId: fallbackShift?.id || 'unknown',
-      shiftType: fallbackShift?.shift_type || 'normal',
-      startTime: fallbackShift?.start_time || '08:00',
-      endTime: fallbackShift?.end_time || '16:00',
-      description: fallbackShift?.description || 'Default shift',
-      isWeekend: false,
-      isAlternative: true,
-    };
-  }
 
   // Filter shifts that are valid for this day of week
   console.log(`   🔍 Filtering by day_of_week (${dayOfWeek})...`);
@@ -202,14 +210,23 @@ export function getShiftForDate(
     s.day_of_week.length === 0 || 
     s.day_of_week.includes(dayOfWeek)
   );
-  console.log(`   Found ${validShiftsForDay.length} valid shifts for this day:`,
-    validShiftsForDay.map(s => ({
-      desc: s.description,
-      times: `${s.start_time}-${s.end_time}`,
-      days: s.day_of_week,
-      hasTeamId: !!s.team_id,
-      hasTeamIds: !!(s.team_ids && s.team_ids.length > 0)
-    })));
+  console.log(`   Found ${validShiftsForDay.length} valid shifts for this day`);
+
+  // If no valid shifts found, use the selected shift as fallback
+  if (validShiftsForDay.length === 0) {
+    console.log(`   ⚠️ No valid shifts for day ${dayOfWeek}, using selected shift as fallback`);
+    return {
+      date,
+      shiftId: selectedShiftDef.id,
+      shiftType: selectedShiftDef.shift_type,
+      startTime: selectedShiftDef.start_time,
+      endTime: selectedShiftDef.end_time,
+      description: selectedShiftDef.description || 'Fallback shift',
+      isWeekend: false,
+      isAlternative: false,
+    };
+  }
+
 
   if (validShiftsForDay.length > 0) {
     console.log(`   📋 Before sorting, ${validShiftsForDay.length} candidate shifts:`,
