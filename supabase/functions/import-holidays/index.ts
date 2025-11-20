@@ -325,33 +325,47 @@ Deno.serve(async (req) => {
         }
       }
 
-      // UK regional holiday mapping - COLLECT ALL matching regions
-      if (country_code === 'GB') {
+      // UK regional holiday mapping - check if holiday applies to requested region
+      if (country_code === 'GB' && region_code) {
         const holidayName = holiday.localName || holiday.name;
+        const requestedRegion = region_code.replace('GB-', '');
+        let holidayApplies = false;
         
         // Check the explicit mapping first
         for (const [holidayPattern, regions] of Object.entries(ukHolidayRegions)) {
           if (holidayName.includes(holidayPattern)) {
-            matchingUKRegions.push(...regions);
+            // Only include this holiday if the requested region is in the list
+            if (regions.includes(requestedRegion)) {
+              holidayApplies = true;
+            }
             break;
           }
         }
         
         // If no explicit match found, check old regional mapping
-        if (matchingUKRegions.length === 0) {
+        if (!holidayApplies) {
           for (const [ukRegion, regionalHolidays] of Object.entries(ukRegionalHolidays)) {
             if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-              const region = ukRegion.replace('GB-', '');
-              if (!matchingUKRegions.includes(region)) {
-                matchingUKRegions.push(region);
+              const mappedRegion = ukRegion.replace('GB-', '');
+              if (mappedRegion === requestedRegion) {
+                holidayApplies = true;
+                break;
               }
             }
           }
         }
         
-        // If still no match, assume it's for all regions (fallback for unmapped holidays)
-        if (matchingUKRegions.length === 0) {
-          matchingUKRegions.push('ENG', 'SCT', 'NIR');
+        // If still no explicit match, assume it's a shared holiday (applies to all regions)
+        if (!holidayApplies) {
+          // Check if excluded from this specific region
+          const exclusions = ukRegionalExclusions[`GB-${requestedRegion}`] || [];
+          const isExcluded = exclusions.some(excluded => holidayName.includes(excluded));
+          holidayApplies = !isExcluded;
+        }
+        
+        // Only add this region if the holiday applies to it
+        if (holidayApplies) {
+          matchingUKRegions.push(requestedRegion);
         }
       }
 
