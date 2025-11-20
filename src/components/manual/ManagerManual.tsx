@@ -211,36 +211,61 @@ export const ManagerManual = () => {
       <section id="shift-swaps">
         <h2 className="text-2xl font-bold mb-4">5. Shift Swap Requests</h2>
         
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Managers Cannot Approve Shift Swaps</AlertTitle>
+        <p className="text-muted-foreground mb-4">
+          Team members can request to swap shifts with their colleagues. As a Manager, you can 
+          approve or reject swap requests for your teams to ensure proper coverage and coordination.
+        </p>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Manager Approval Authority</AlertTitle>
           <AlertDescription>
-            Only Planners and Admins can approve or reject shift swap requests. As a Manager, 
-            you can view swap requests from your team but must contact a Planner for approval.
+            Managers can approve or reject shift swap requests for their assigned teams. Planners 
+            and Admins can approve swaps across all teams.
           </AlertDescription>
         </Alert>
 
-        <h3 className="text-xl font-semibold mb-3">What Team Members Can Do</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-4">How Team Members Request Swaps</h3>
         <p className="mb-4">
-          Team members can request to swap shifts with their colleagues by clicking the "Swap" 
-          button on any schedule entry (except their own and past shifts).
+          Team members can request to swap shifts by clicking the "Swap" button on a colleague's 
+          schedule entry (future dates only, not their own shifts).
         </p>
 
         <h3 className="text-xl font-semibold mb-3">Viewing Swap Requests</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Schedule → Shift Swaps</strong></li>
           <li>See pending swap requests from your team members</li>
-          <li>Review details: who wants to swap with whom, which shift, date</li>
+          <li>Review details: requesting user, target user, shift, date, and reason</li>
           <li>Monitor status: pending, approved, or rejected</li>
         </ol>
 
-        <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
+        <h3 className="text-xl font-semibold mb-3">Approving or Rejecting Swaps</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Click on a pending swap request to review</li>
+          <li>Verify both team members can work the swapped shifts</li>
+          <li>Check that team coverage won't be negatively impacted</li>
+          <li>Click <strong>"Approve"</strong> or <strong>"Reject"</strong></li>
+          <li>Add optional notes explaining your decision (recommended for rejections)</li>
+          <li>Submit your decision</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">What Happens When Approved</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
-          <li><strong>Monitor:</strong> Track swap requests from your team</li>
-          <li><strong>Coordinate:</strong> Help team members find swap partners</li>
-          <li><strong>Advise:</strong> Provide input on whether swaps would work for team coverage</li>
-          <li><strong>Escalate:</strong> Contact Planners to expedite important swap requests</li>
+          <li>Schedule entries are automatically swapped between the two users</li>
+          <li>Both users receive notification of approval</li>
+          <li>Calendar updates immediately to reflect the swap</li>
+          <li>Swap is logged for audit purposes</li>
         </ul>
+
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Before Approving Swaps</AlertTitle>
+          <AlertDescription>
+            Always verify that both team members are qualified for the swapped shifts and that 
+            team coverage requirements are maintained. Consider training, certification, and 
+            seniority requirements.
+          </AlertDescription>
+        </Alert>
 
         
         
@@ -257,6 +282,48 @@ export const ManagerManual = () => {
           <AlertTitle>Proactive Management</AlertTitle>
           <AlertDescription>
             Review swap requests regularly and provide timely feedback to your team members.   
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="planning-partnerships">
+        <h2 className="text-2xl font-bold mb-4">4.5 Planning Partnerships</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Planning Partnerships enable coordinated scheduling across multiple teams, providing 
+          visibility and ensuring adequate combined coverage.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Understanding Partnerships</h3>
+        <p className="mb-4">
+          Partnerships are created by Planners to connect teams that need to coordinate coverage, 
+          such as cross-functional teams, backup teams, or teams sharing responsibilities.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Viewing Partner Team Schedules</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Multi-Team View</strong></li>
+          <li>Select a partnership from the dropdown</li>
+          <li>View schedules for all teams in the partnership</li>
+          <li>See combined coverage across teams</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Using the Shared Planning Calendar</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Access partner team availability when planning your team's schedule</li>
+          <li>Coordinate vacation and time-off to maintain coverage</li>
+          <li>View capacity warnings across the partnership</li>
+          <li>Create schedules considering partner team availability</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Cross-Team Coordination</AlertTitle>
+          <AlertDescription>
+            Partnerships help prevent situations where multiple teams have low coverage simultaneously, 
+            ensuring business continuity across functional areas.
           </AlertDescription>
         </Alert>
       </section>
@@ -383,6 +450,112 @@ export const ManagerManual = () => {
           <li>Choose which events trigger notifications</li>
           <li>Save settings</li>
         </ol>
+      </section>
+
+      <Separator />
+
+      <section id="vacation-planning">
+        <h2 className="text-2xl font-bold mb-4">6.5 Vacation Planning Tools</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          The Vacation Planning Dashboard helps you make informed decisions about vacation requests 
+          by providing visibility into team coverage and capacity.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Accessing Vacation Planning</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Vacation Planning</strong></li>
+          <li>Select your team</li>
+          <li>View the multi-month vacation calendar</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Coverage Heatmap</h3>
+        <p className="mb-4">The heatmap shows team availability at a glance:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Green:</strong> Full team coverage</li>
+          <li><strong>Yellow:</strong> Moderate coverage - some team members away</li>
+          <li><strong>Orange:</strong> Low coverage - approaching minimums</li>
+          <li><strong>Red:</strong> Critical - below minimum staffing</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Planning Features</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Capacity Overview:</strong> See pending requests and critical coverage days</li>
+          <li><strong>Fairness Analysis:</strong> Monitor vacation day distribution across team</li>
+          <li><strong>Conflict Detection:</strong> Identify overlapping requests and coverage gaps</li>
+          <li><strong>Calendar View:</strong> See all approved and pending vacation in one place</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Using Insights for Decisions</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Check the heatmap before approving new requests</li>
+          <li>Review fairness analysis to ensure equitable vacation distribution</li>
+          <li>Use conflict detection to identify potential coverage issues</li>
+          <li>Consider suggesting alternative dates if coverage is critical</li>
+        </ol>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Strategic Planning</AlertTitle>
+          <AlertDescription>
+            Regular review of the vacation planning dashboard helps you balance team member 
+            time-off needs with business coverage requirements.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="coverage-monitoring">
+        <h2 className="text-2xl font-bold mb-4">7. Coverage Monitoring</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Coverage monitoring tools help you identify and address staffing gaps to maintain 
+          adequate team coverage.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Coverage Alerts</h3>
+        <p className="mb-4">The system automatically highlights coverage concerns:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Critical Gaps:</strong> Days below minimum staffing requirements (red)</li>
+          <li><strong>Warning Gaps:</strong> Days approaching minimum thresholds (yellow)</li>
+          <li>Alerts appear on schedule views and dashboards</li>
+          <li>Partnership coverage alerts for multi-team coordination</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Coverage Heatmap</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Coverage Analysis</strong></li>
+          <li>Select team(s) and date range</li>
+          <li>View color-coded coverage levels by day</li>
+          <li>Identify patterns and recurring coverage issues</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Capacity Configuration</h3>
+        <p className="mb-4">Set coverage requirements for your teams:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Minimum Staff Required:</strong> Minimum people needed per day</li>
+          <li><strong>Maximum Staff Allowed:</strong> Optional cap to prevent over-scheduling</li>
+          <li><strong>Weekend Settings:</strong> Different rules for weekends if needed</li>
+          <li><strong>Partnership Settings:</strong> Combined minimums across partnership teams</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Using Coverage Insights</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Check coverage before approving vacation requests</li>
+          <li>Identify periods needing additional scheduling</li>
+          <li>Proactively address recurring coverage gaps</li>
+          <li>Coordinate with partner teams to fill gaps</li>
+        </ul>
+
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Proactive Monitoring</AlertTitle>
+          <AlertDescription>
+            Review coverage alerts weekly to identify and address gaps before they become critical. 
+            Early intervention prevents last-minute scrambling for coverage.
+          </AlertDescription>
+        </Alert>
       </section>
 
       <Separator />
