@@ -12,6 +12,7 @@ export interface ScheduleEntryDraft {
   team_id: string;
   date: string;
   shift_type: ShiftType;
+  shift_time_definition_id?: string | null;
   activity_type: ActivityType;
   availability_status: AvailabilityStatus;
   created_by: string;
@@ -27,6 +28,14 @@ export const calculateBulkEntries = async (
   if (!config.dateRange.start || !config.dateRange.end || !config.teamId) {
     return [];
   }
+
+  console.log('🔍 BULK SCHEDULER START:', {
+    dateRange: `${format(config.dateRange.start, 'yyyy-MM-dd')} - ${format(config.dateRange.end, 'yyyy-MM-dd')}`,
+    selectedShiftId: config.shiftType,
+    autoDetectWeekends: config.autoDetectWeekends,
+    teamId: config.teamId,
+    mode: config.mode
+  });
 
   const entries: ScheduleEntryDraft[] = [];
   const days = eachDayOfInterval({
@@ -114,11 +123,14 @@ export const calculateBulkEntries = async (
         ? `Bulk generated (rotation) - ${userHolidayInfo?.holidayName || 'Weekend'}`
         : 'Bulk generated (rotation)';
 
+      console.log(`📝 Creating entry for ${rotationUserId} on ${dateStr}: shift_id=${shiftIdToUse}, shift_type=${resolvedShiftType}`);
+
       entries.push({
         user_id: rotationUserId,
         team_id: config.teamId,
         date: dateStr,
         shift_type: resolvedShiftType,
+        shift_time_definition_id: shiftIdToUse && shiftIdToUse !== 'custom' ? shiftIdToUse : null,
         activity_type: 'work' as ActivityType,
         availability_status: 'available' as AvailabilityStatus,
         created_by: userId,
@@ -162,11 +174,14 @@ export const calculateBulkEntries = async (
           ? `Bulk generated - ${userHolidayInfo?.holidayName || 'Weekend'}`
           : 'Bulk generated';
 
+        console.log(`📝 Creating entry for ${targetUserId} on ${dateStr}: shift_id=${shiftIdToUse}, shift_type=${resolvedShiftType}`);
+
         entries.push({
           user_id: targetUserId,
           team_id: config.teamId,
           date: dateStr,
           shift_type: resolvedShiftType,
+          shift_time_definition_id: shiftIdToUse && shiftIdToUse !== 'custom' ? shiftIdToUse : null,
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
           created_by: userId,

@@ -596,6 +596,7 @@ export type Database = {
           date: string
           id: string
           notes: string | null
+          shift_time_definition_id: string | null
           shift_type: Database["public"]["Enums"]["shift_type"] | null
           team_id: string
           updated_at: string
@@ -609,6 +610,7 @@ export type Database = {
           date: string
           id?: string
           notes?: string | null
+          shift_time_definition_id?: string | null
           shift_type?: Database["public"]["Enums"]["shift_type"] | null
           team_id: string
           updated_at?: string
@@ -622,12 +624,20 @@ export type Database = {
           date?: string
           id?: string
           notes?: string | null
+          shift_time_definition_id?: string | null
           shift_type?: Database["public"]["Enums"]["shift_type"] | null
           team_id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "schedule_entries_shift_time_definition_id_fkey"
+            columns: ["shift_time_definition_id"]
+            isOneToOne: false
+            referencedRelation: "shift_time_definitions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "schedule_entries_team_id_fkey"
             columns: ["team_id"]

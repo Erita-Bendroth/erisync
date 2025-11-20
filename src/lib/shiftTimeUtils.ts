@@ -20,11 +20,12 @@ export interface ApplicableShiftTime {
 
 /**
  * Get applicable shift times with priority resolution:
- * 1. Team + region + day(s) (highest priority)
- * 2. Team + region
- * 3. Team only
- * 4. Region only
- * 5. Global default (lowest priority)
+ * 1. Specific shift_time_definition_id if provided (highest priority)
+ * 2. Team + region + day(s)
+ * 3. Team + region
+ * 4. Team only
+ * 5. Region only
+ * 6. Global default (lowest priority)
  * 
  * For "weekend" shift type, automatically applies to Saturdays, Sundays, and public holidays.
  */
@@ -34,13 +35,32 @@ export async function getApplicableShiftTimes({
   shiftType,
   dayOfWeek,
   date,
+  shiftTimeDefinitionId,
 }: {
   teamId?: string;
   regionCode?: string;
   shiftType: "normal" | "early" | "late" | "weekend";
   dayOfWeek?: number;
   date?: string;
+  shiftTimeDefinitionId?: string;
 }): Promise<ApplicableShiftTime> {
+  // Priority 0: If specific shift definition ID is provided, use it directly
+  if (shiftTimeDefinitionId) {
+    const { data: specificShift, error } = await supabase
+      .from("shift_time_definitions")
+      .select("*")
+      .eq("id", shiftTimeDefinitionId)
+      .maybeSingle();
+    
+    if (specificShift && !error) {
+      return {
+        startTime: specificShift.start_time,
+        endTime: specificShift.end_time,
+        description: specificShift.description || "",
+      };
+    }
+  }
+
   // For weekend shift type, check if date is a public holiday
   let isPublicHoliday = false;
   if (shiftType === 'weekend' && date) {
