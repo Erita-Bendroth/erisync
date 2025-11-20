@@ -269,6 +269,7 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
                   date={date}
                   teamId={teamId}
                   shiftType={entry?.shift_type || null}
+                  shiftTimeDefinitionId={entry?.shift_time_definition_id || null}
                   availabilityStatus={entry?.availability_status || 'available'}
                   activityType={entry?.activity_type}
                   isSelected={selectedCells.has(cellId)}

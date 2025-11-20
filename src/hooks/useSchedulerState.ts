@@ -11,6 +11,7 @@ export interface ScheduleEntry {
   team_id: string;
   date: string;
   shift_type: ShiftType | null;
+  shift_time_definition_id?: string | null;
   activity_type: ActivityType;
   availability_status: AvailabilityStatus;
   notes?: string;
