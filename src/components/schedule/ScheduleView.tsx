@@ -33,6 +33,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useShiftCounts } from '@/hooks/useShiftCounts';
 import { ShiftCountsDisplay } from './ShiftCountsDisplay';
 import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileScheduleCard } from '@/components/mobile/MobileScheduleCard';
+import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
 
 interface ScheduleEntry {
   id: string;
@@ -92,6 +95,7 @@ const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { toast } = useToast();
   const { favorites } = useTeamFavorites('schedule');
   const holidayRefetchTrigger = useHolidayRefetch();
+  const isMobile = useIsMobile();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
@@ -2010,220 +2014,247 @@ const getActivityColor = (entry: ScheduleEntry) => {
         </>
       )}
 
-      {/* Table-based Schedule View - Only show in weekly view */}
+      {/* Mobile Card View or Desktop Table View */}
       {timeView === "weekly" && !(isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability") && (
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="p-0">
-              <Table className="table-fixed w-full">
-               <TableHeader>
-                <TableRow>
-                  {multiSelectMode && <TableHead className="w-12"></TableHead>}
-                  <TableHead className="w-48 font-semibold">
-                    <div className="flex items-center justify-between gap-2">
-                      <span>Employee</span>
-                      {!userRoles.some(r => r.role === 'admin') && 
-                       !userRoles.some(r => r.role === 'planner') && 
-                       userRoles.some(r => r.role === 'manager') && 
-                       selectedTeams.length > 0 && 
-                       !selectedTeams.includes("all") && (
-                        <Badge variant="outline" className="text-xs">
-                          {managedUsersSet.size > 0 ? 'Mixed View' : 'Availability Only'}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableHead>
-                  {workDays.map((day, index) => (
-                    <TableHead key={index} className="text-center font-semibold">
-                      <div className="flex flex-col">
-                        <span>{format(day, "EEE")}</span>
-                        <span className="text-xs font-normal text-muted-foreground">
-                          {format(day, "MMM d")}
-                        </span>
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-               <TableBody>
-                {employees.map((employee) => (
-                  <TableRow key={employee.user_id}>
-                    {multiSelectMode && (
-                      <TableCell className="w-12">
-                        {/* Checkbox column - empty for employee row */}
-                      </TableCell>
-                    )}
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
-                          {formatUserName(employee.first_name, employee.last_name, employee.initials)}
-                        </div>
-                        <div className="flex-1">
-                          {/* Show full name or initials based on management rights */}
-                          {renderEmployeeName(employee)}
-                          {/* Show shift counters for managers/planners */}
-                          {(isManager() || isPlanner()) && shiftCounts.length > 0 && (
-                            <ShiftCountsDisplay
-                              shiftCounts={shiftCounts.find(c => c.user_id === employee.user_id) || {
-                                user_id: employee.user_id,
-                                weekend_shifts_count: 0,
-                                night_shifts_count: 0,
-                                holiday_shifts_count: 0,
-                                total_shifts_count: 0,
-                              }}
-                              variant="inline"
-                              className="mt-1"
-                            />
+        isMobile ? (
+          <div className="space-y-3 pb-20">
+            {employees.flatMap((employee) => {
+              const employeeEntries = scheduleEntries.filter(
+                e => e.user_id === employee.user_id && 
+                workDays.some(day => isSameDay(new Date(e.date), day))
+              );
+              
+              return employeeEntries.map((entry) => (
+                <MobileScheduleCard
+                  key={entry.id}
+                  entry={entry}
+                  onEdit={() => handleEditShift(entry)}
+                  canEdit={(isManager() || isPlanner()) && canEditTeam(entry.team_id)}
+                />
+              ));
+            })}
+            {employees.length === 0 && (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  No employees found for the selected team
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="p-0">
+                <Table className="table-fixed w-full">
+                  <TableHeader>
+                    <TableRow>
+                      {multiSelectMode && <TableHead className="w-12"></TableHead>}
+                      <TableHead className="w-48 font-semibold">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>Employee</span>
+                          {!userRoles.some(r => r.role === 'admin') && 
+                           !userRoles.some(r => r.role === 'planner') && 
+                           userRoles.some(r => r.role === 'manager') && 
+                           selectedTeams.length > 0 && 
+                           !selectedTeams.includes("all") && (
+                            <Badge variant="outline" className="text-xs">
+                              {managedUsersSet.size > 0 ? 'Mixed View' : 'Availability Only'}
+                            </Badge>
                           )}
                         </div>
-                      </div>
-                    </TableCell>
-                    {workDays.map((day, dayIndex) => {
-                      const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
-                      const continuationEntries = getContinuationEntriesForDay(employee.user_id, day);
-                      const dayHolidays = getHolidaysForEmployeeAndDay(employee.user_id, day);
-                      const isToday = isSameDay(day, new Date());
-                      
-                      return (
-                        <TableCell
-                          key={dayIndex} 
-                          className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[150px]`}
-                          onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
-                          title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : ""}
-                        >
-                          <div className="space-y-1 min-h-16 flex flex-col justify-center">
-                            {/* Show continuation from previous day first */}
-                            {continuationEntries.map((entry) => {
-                              const times = getShiftTimesFromEntry(entry);
-                              const canView = canViewActivityDetails(entry.user_id);
-                              
-                              return (
-                                <div key={`continuation-${entry.id}`} className="space-y-1">
-                                   {canView ? (
-                                    <TimeBlockDisplay
-                                      entry={entry}
-                                      userRole={userRoles.length > 0 ? userRoles[0].role : ""}
-                                      showNotes={false}
-                                      isContinuation={true}
-                                      originalStartTime={times.start}
-                                      shiftDescription={getShiftDescription(entry, employee)}
-                                      onClick={(e) => {
-                                        e?.stopPropagation();
-                                        if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
-                                          handleEditShift(entry);
-                                        }
-                                      }}
-                                    />
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                            
-                            {/* Show holidays */}
-                            <TooltipProvider>
-                              {dayHolidays.map((holiday) => (
-                                <Tooltip key={holiday.id} delayDuration={200}>
-                                  <TooltipTrigger asChild>
-                                    <div className="w-full cursor-help">
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 max-w-full block pointer-events-auto"
-                                      >
-                                        <span className="truncate block">
-                                          🎉 {holiday.name}
-                                        </span>
-                                      </Badge>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="z-[100]" side="top">
-                                    <p className="max-w-xs">🎉 {holiday.name}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ))}
-                            </TooltipProvider>
-                            
-                            {/* Show work entries */}
-                              {dayEntries.length === 0 && continuationEntries.length === 0 ? (
-                                <span className="text-xs text-muted-foreground">
-                                  {(isManager() || isPlanner()) && !multiSelectMode ? "+" : "-"}
-                                </span>
-                              ) : (
-                              dayEntries.map((entry) => {
-                                const canView = canViewActivityDetails(entry.user_id);
-                                
-                                return (
-                                  <div key={entry.id} className="space-y-1">
-                                    {multiSelectMode && canView && (
-                                      <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
-                                        <Checkbox
-                                          checked={selectedShiftIds.includes(entry.id)}
-                                          onCheckedChange={() => toggleShiftSelection(entry.id)}
-                                        />
-                                      </div>
-                                    )}
-                                    {canView ? (
-                                      <TimeBlockDisplay
-                                        entry={entry}
-                                        userRole={userRoles.length > 0 ? userRoles[0].role : ""}
-                                        showNotes={isTeamMember() && !isManager() && !isPlanner()}
-                                        shiftDescription={getShiftDescription(entry, employee)}
-                                        onClick={(e) => {
-                                          e?.stopPropagation();
-                                          if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
-                                            // Check if manager can edit this team before opening edit modal
-                                            if (canEditTeam(entry.team_id)) {
-                                              handleEditShift(entry);
-                                            } else {
-                                              toast({ 
-                                                title: "View Only", 
-                                                description: "You can view this schedule but cannot edit it", 
-                                                variant: "default" 
-                                              });
-                                            }
-                                          }
-                                        }}
-                                      />
-                                    ) : (
-                                      <Badge
-                                        variant="secondary"
-                                        className={`${getActivityColor(entry)} block text-xs pointer-events-none`}
-                                      >
-                                        <div className="flex flex-col items-center py-1">
-                                          <span className="font-medium">{getActivityDisplay(entry)}</span>
-                                        </div>
-                                      </Badge>
-                                    )}
-
-                                    {(() => {
-                                      const cleanNotes = getCleanNotesForDisplay(entry.notes);
-                                      return canView && cleanNotes && (
-                                        <p className="text-xs text-muted-foreground truncate" title={cleanNotes}>
-                                          {cleanNotes.length > 20 ? `${cleanNotes.substring(0, 20)}...` : cleanNotes}
-                                        </p>
-                                      );
-                                    })()}
-                                  </div>
-                                );
-                              })
-                            )}
+                      </TableHead>
+                      {workDays.map((day, index) => (
+                        <TableHead key={index} className="text-center font-semibold">
+                          <div className="flex flex-col">
+                            <span>{format(day, "EEE")}</span>
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {format(day, "MMM d")}
+                            </span>
+                          </div>
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {employees.map((employee) => (
+                      <TableRow key={employee.user_id}>
+                        {multiSelectMode && (
+                          <TableCell className="w-12">
+                            {/* Checkbox column - empty for employee row */}
+                          </TableCell>
+                        )}
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
+                              {formatUserName(employee.first_name, employee.last_name, employee.initials)}
+                            </div>
+                            <div className="flex-1">
+                              {/* Show full name or initials based on management rights */}
+                              {renderEmployeeName(employee)}
+                              {/* Show shift counters for managers/planners */}
+                              {(isManager() || isPlanner()) && shiftCounts.length > 0 && (
+                                <ShiftCountsDisplay
+                                  shiftCounts={shiftCounts.find(c => c.user_id === employee.user_id) || {
+                                    user_id: employee.user_id,
+                                    weekend_shifts_count: 0,
+                                    night_shifts_count: 0,
+                                    holiday_shifts_count: 0,
+                                    total_shifts_count: 0,
+                                  }}
+                                  variant="inline"
+                                  className="mt-1"
+                                />
+                              )}
+                            </div>
                           </div>
                         </TableCell>
-                      );
-                     })}
-                  </TableRow>
-                ))}
-                {employees.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No employees found for the selected team
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+                        {workDays.map((day, dayIndex) => {
+                          const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
+                          const continuationEntries = getContinuationEntriesForDay(employee.user_id, day);
+                          const dayHolidays = getHolidaysForEmployeeAndDay(employee.user_id, day);
+                          const isToday = isSameDay(day, new Date());
+                          
+                          return (
+                            <TableCell
+                              key={dayIndex} 
+                              className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[150px]`}
+                              onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
+                              title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : ""}
+                            >
+                              <div className="space-y-1 min-h-16 flex flex-col justify-center">
+                                {/* Show continuation from previous day first */}
+                                {continuationEntries.map((entry) => {
+                                  const times = getShiftTimesFromEntry(entry);
+                                  const canView = canViewActivityDetails(entry.user_id);
+                                  
+                                  return (
+                                    <div key={`continuation-${entry.id}`} className="space-y-1">
+                                       {canView ? (
+                                        <TimeBlockDisplay
+                                          entry={entry}
+                                          userRole={userRoles.length > 0 ? userRoles[0].role : ""}
+                                          showNotes={false}
+                                          isContinuation={true}
+                                          originalStartTime={times.start}
+                                          shiftDescription={getShiftDescription(entry, employee)}
+                                          onClick={(e) => {
+                                            e?.stopPropagation();
+                                            if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
+                                              handleEditShift(entry);
+                                            }
+                                          }}
+                                        />
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                                
+                                {/* Show holidays */}
+                                <TooltipProvider>
+                                  {dayHolidays.map((holiday) => (
+                                    <Tooltip key={holiday.id} delayDuration={200}>
+                                      <TooltipTrigger asChild>
+                                        <div className="w-full cursor-help">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 max-w-full block pointer-events-auto"
+                                          >
+                                            <span className="truncate block">
+                                              🎉 {holiday.name}
+                                            </span>
+                                          </Badge>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="z-[100]" side="top">
+                                        <p className="max-w-xs">🎉 {holiday.name}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ))}
+                                </TooltipProvider>
+                                
+                                {/* Show work entries */}
+                                  {dayEntries.length === 0 && continuationEntries.length === 0 ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {(isManager() || isPlanner()) && !multiSelectMode ? "+" : "-"}
+                                    </span>
+                                  ) : (
+                                  dayEntries.map((entry) => {
+                                    const canView = canViewActivityDetails(entry.user_id);
+                                    
+                                    return (
+                                      <div key={entry.id} className="space-y-1">
+                                        {multiSelectMode && canView && (
+                                          <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox
+                                              checked={selectedShiftIds.includes(entry.id)}
+                                              onCheckedChange={() => toggleShiftSelection(entry.id)}
+                                            />
+                                          </div>
+                                        )}
+                                        {canView ? (
+                                          <TimeBlockDisplay
+                                            entry={entry}
+                                            userRole={userRoles.length > 0 ? userRoles[0].role : ""}
+                                            showNotes={isTeamMember() && !isManager() && !isPlanner()}
+                                            shiftDescription={getShiftDescription(entry, employee)}
+                                            onClick={(e) => {
+                                              e?.stopPropagation();
+                                              if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
+                                                // Check if manager can edit this team before opening edit modal
+                                                if (canEditTeam(entry.team_id)) {
+                                                  handleEditShift(entry);
+                                                } else {
+                                                  toast({ 
+                                                    title: "View Only", 
+                                                    description: "You can view this schedule but cannot edit it", 
+                                                    variant: "default" 
+                                                  });
+                                                }
+                                              }
+                                            }}
+                                          />
+                                        ) : (
+                                          <Badge
+                                            variant="secondary"
+                                            className={`${getActivityColor(entry)} block text-xs pointer-events-none`}
+                                          >
+                                            <div className="flex flex-col items-center py-1">
+                                              <span className="font-medium">{getActivityDisplay(entry)}</span>
+                                            </div>
+                                          </Badge>
+                                        )}
+
+                                        {(() => {
+                                          const cleanNotes = getCleanNotesForDisplay(entry.notes);
+                                          return canView && cleanNotes && (
+                                            <p className="text-xs text-muted-foreground truncate" title={cleanNotes}>
+                                              {cleanNotes.length > 20 ? `${cleanNotes.substring(0, 20)}...` : cleanNotes}
+                                            </p>
+                                          );
+                                        })()}
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </TableCell>
+                          );
+                         })}
+                      </TableRow>
+                    ))}
+                    {employees.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No employees found for the selected team
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )
       )}
 
       <Card>

@@ -101,6 +101,7 @@ const countries = [
 const AdminHolidayManager = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState('DE');
@@ -108,7 +109,6 @@ const AdminHolidayManager = () => {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [importStatuses, setImportStatuses] = useState<ImportStatus[]>([]);
-  const [wizardOpen, setWizardOpen] = useState(false);
 
   const fetchUserRoles = useCallback(async () => {
     if (!user) return;
@@ -689,7 +689,7 @@ const AdminHolidayManager = () => {
                       );
                     })()}
                   >
-                    <Download className="w-4 h-4 mr-2" />
+                  <Download className="w-4 h-4 mr-2" />
                     {loading ? "Importing..." : "Import Holidays"}
                   </Button>
                 </TooltipTrigger>
@@ -707,6 +707,15 @@ const AdminHolidayManager = () => {
                   );
                 })()}
               </Tooltip>
+              
+              <Button 
+                onClick={() => setWizardOpen(true)}
+                variant="secondary"
+                className="gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                Import with Wizard
+              </Button>
             </TooltipProvider>
           </div>
         </CardContent>
@@ -907,6 +916,16 @@ const AdminHolidayManager = () => {
           </div>
         </CardContent>
       </Card>
+
+      <HolidayImportWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onComplete={() => {
+          fetchHolidays();
+          fetchImportStatuses();
+          setWizardOpen(false);
+        }}
+      />
     </div>
   );
 };

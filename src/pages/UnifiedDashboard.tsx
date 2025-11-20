@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
+import Layout from '@/components/Layout';
+
 export default function UnifiedDashboard() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -196,7 +198,8 @@ export default function UnifiedDashboard() {
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <Layout>
+      <div className="space-y-6 pb-20 md:pb-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Unified Scheduling Dashboard</h1>
@@ -459,6 +462,7 @@ export default function UnifiedDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </Layout>
   );
 }
