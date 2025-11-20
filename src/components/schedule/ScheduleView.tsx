@@ -2018,28 +2018,60 @@ const getActivityColor = (entry: ScheduleEntry) => {
       {timeView === "weekly" && !(isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability") && (
         isMobile ? (
           <div className="space-y-3 pb-20">
-            {employees.flatMap((employee) => {
-              const employeeEntries = scheduleEntries.filter(
-                e => e.user_id === employee.user_id && 
-                workDays.some(day => isSameDay(new Date(e.date), day))
+            {(() => {
+              // Filter to show only current week's entries on mobile
+              const now = new Date();
+              const isCurrentWeek = workDays.some(day => 
+                isSameDay(day, now)
               );
               
-              return employeeEntries.map((entry) => (
-                <MobileScheduleCard
-                  key={entry.id}
-                  entry={entry}
-                  onEdit={() => handleEditShift(entry)}
-                  canEdit={(isManager() || isPlanner()) && canEditTeam(entry.team_id)}
-                />
-              ));
-            })}
-            {employees.length === 0 && (
-              <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">
-                  No employees found for the selected team
-                </CardContent>
-              </Card>
-            )}
+              // If not viewing current week, show a notice
+              if (!isCurrentWeek) {
+                return (
+                  <Card className="p-6 text-center">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      You're viewing week of {format(weekStart, 'MMM d, yyyy')}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setCurrentWeek(new Date())}
+                    >
+                      Go to Current Week
+                    </Button>
+                  </Card>
+                );
+              }
+              
+              const employeeEntries = employees.flatMap((employee) => {
+                const entries = scheduleEntries.filter(
+                  e => e.user_id === employee.user_id && 
+                  workDays.some(day => isSameDay(new Date(e.date), day))
+                );
+                
+                return entries.map((entry) => (
+                  <MobileScheduleCard
+                    key={entry.id}
+                    entry={entry}
+                    onEdit={() => handleEditShift(entry)}
+                    canEdit={(isManager() || isPlanner()) && canEditTeam(entry.team_id)}
+                  />
+                ));
+              });
+              
+              if (employeeEntries.length === 0) {
+                return (
+                  <Card className="p-6 text-center">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      No schedule entries for this week
+                    </p>
+                  </Card>
+                );
+              }
+              
+              return employeeEntries;
+            })()}
           </div>
         ) : (
           <div className="space-y-4">
@@ -2358,18 +2390,20 @@ const getActivityColor = (entry: ScheduleEntry) => {
 
       {/* My Requests Sheet */}
       <Sheet open={showVacationRequests} onOpenChange={setShowVacationRequests}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              {(isManager() || isPlanner()) ? 'All Requests' : 'My Requests'}
-            </SheetTitle>
-            <SheetDescription>
-              {(isManager() || isPlanner()) 
-                ? 'Review and manage vacation requests and shift swap requests from your team members.'
-                : 'View and manage your vacation requests and shift swap requests.'}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="mt-6">
+        <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+          <div className="p-6 border-b">
+            <SheetHeader>
+              <SheetTitle>
+                {(isManager() || isPlanner()) ? 'All Requests' : 'My Requests'}
+              </SheetTitle>
+              <SheetDescription>
+                {(isManager() || isPlanner()) 
+                  ? 'Review and manage vacation requests and shift swap requests from your team members.'
+                  : 'View and manage your vacation requests and shift swap requests.'}
+              </SheetDescription>
+            </SheetHeader>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6">
             <MyRequestsDialog
               isPlanner={isPlanner()}
               isManager={isManager()}

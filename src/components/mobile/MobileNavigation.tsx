@@ -16,9 +16,21 @@ export const MobileNavigation = () => {
 
   const isActive = (path: string) => {
     if (path.includes('?')) {
-      return location.pathname + location.search === path;
+      const currentFullPath = location.pathname + location.search;
+      return currentFullPath === path || currentFullPath.includes(path.split('?')[1]);
     }
     return location.pathname === path;
+  };
+
+  const handleNavigation = (path: string, e: React.MouseEvent) => {
+    try {
+      e.stopPropagation();
+      e.preventDefault();
+      console.log('Mobile navigation to:', path);
+      navigate(path);
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
   };
 
   return (
@@ -31,13 +43,14 @@ export const MobileNavigation = () => {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={(e) => handleNavigation(item.path, e)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors",
+                "flex flex-col items-center justify-center gap-1 flex-1 h-full transition-colors touch-manipulation",
                 active 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
               )}
+              aria-label={item.label}
             >
               <Icon className="h-5 w-5" />
               <span className="text-xs font-medium">{item.label}</span>

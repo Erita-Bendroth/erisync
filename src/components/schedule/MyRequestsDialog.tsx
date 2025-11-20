@@ -21,19 +21,21 @@ export const MyRequestsDialog: React.FC<MyRequestsDialogProps> = ({
   onEditRequest,
 }) => {
   return (
-    <Tabs defaultValue="vacation" className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-6">
+    <Tabs defaultValue="vacation" className="w-full h-full flex flex-col">
+      <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0">
         <TabsTrigger value="vacation" className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          Vacation Requests
+          <span className="hidden sm:inline">Vacation Requests</span>
+          <span className="sm:hidden">Vacation</span>
         </TabsTrigger>
         <TabsTrigger value="shift-swaps" className="flex items-center gap-2">
           <ArrowLeftRight className="h-4 w-4" />
-          Shift Swap Requests
+          <span className="hidden sm:inline">Shift Swap Requests</span>
+          <span className="sm:hidden">Swaps</span>
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="vacation" className="space-y-4 mt-0">
+      <TabsContent value="vacation" className="space-y-4 mt-0 overflow-y-auto flex-1">
         <VacationRequestsList
           isPlanner={isPlanner}
           onRequestProcessed={onRequestProcessed}
@@ -41,7 +43,7 @@ export const MyRequestsDialog: React.FC<MyRequestsDialogProps> = ({
         />
       </TabsContent>
 
-      <TabsContent value="shift-swaps" className="space-y-4 mt-0">
+      <TabsContent value="shift-swaps" className="space-y-4 mt-0 overflow-y-auto flex-1">
         {(isManager || isPlanner || isAdmin) && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Pending Approvals</h3>
