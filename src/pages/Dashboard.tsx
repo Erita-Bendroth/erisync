@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { formatUserName } from "@/lib/utils";
 import { PendingRequestsCard } from "@/components/dashboard/PendingRequestsCard";
+import { LocationSetupModal } from "@/components/profile/LocationSetupModal";
 
 interface UserRole {
   role: string;
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
   const [weeklySchedule, setWeeklySchedule] = useState<any[]>([]);
+  const [showLocationSetup, setShowLocationSetup] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -96,12 +98,17 @@ const Dashboard = () => {
       // Fetch user profile
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("first_name, last_name, email, initials")
+        .select("first_name, last_name, email, initials, country_code")
         .eq("user_id", user!.id)
         .single() as any;
 
       if (profileData) {
         setProfile(profileData);
+        
+        // Check if user needs to set location (new users or default location)
+        if (!profileData.country_code || profileData.country_code === 'US') {
+          setShowLocationSetup(true);
+        }
       }
 
       // Fetch user roles
@@ -560,6 +567,14 @@ const Dashboard = () => {
           </Card>
         </div>
       </main>
+
+      <LocationSetupModal 
+        open={showLocationSetup}
+        onComplete={() => {
+          setShowLocationSetup(false);
+          fetchUserData(); // Refresh to update country in profile state
+        }}
+      />
     </div>
   );
 };
