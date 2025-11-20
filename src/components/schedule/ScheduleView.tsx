@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { DatePicker } from '@/components/ui/date-picker';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths } from 'date-fns';
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -90,6 +91,7 @@ const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { favorites } = useTeamFavorites('schedule');
+  const holidayRefetchTrigger = useHolidayRefetch();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
@@ -293,7 +295,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     }, 150); // Debounce 150ms
     
     return () => clearTimeout(timer);
-  }, [user, currentWeek, userRoles, selectedTeams, viewMode, refreshTrigger]);
+  }, [user, currentWeek, userRoles, selectedTeams, viewMode, refreshTrigger, holidayRefetchTrigger]);
 
 // Pre-populate managed users set for performance and deterministic rendering
 useEffect(() => {

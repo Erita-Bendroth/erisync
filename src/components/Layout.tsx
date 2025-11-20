@@ -4,6 +4,7 @@ import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3, Grid3x3 } f
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { useHolidaySync } from "@/hooks/useHolidaySync";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,9 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const { user, signOut } = useAuth();
   const location = useLocation();
+  
+  // Enable realtime holiday synchronization
+  useHolidaySync();
 
   const isActiveRoute = (path: string) => {
     return location.pathname === path;
