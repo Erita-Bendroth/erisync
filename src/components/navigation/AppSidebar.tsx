@@ -148,16 +148,6 @@ export function AppSidebar() {
   };
 
 
-  const getSectionLabel = (section: string) => {
-    switch (section) {
-      case 'overview': return 'Overview';
-      case 'schedule': return 'Schedule';
-      case 'favorites': return 'Quick Access';
-      case 'management': return 'Management';
-      case 'settings': return 'Settings';
-      default: return section;
-    }
-  };
 
   return (
     <Sidebar collapsible="icon">
@@ -172,36 +162,21 @@ export function AppSidebar() {
             strategy={verticalListSortingStrategy}
           >
             <SidebarMenu>
-              {allItems.map((item, index) => {
-                const showSectionLabel = 
-                  index === 0 || allItems[index - 1].section !== item.section;
-                
-                return (
-                  <div key={item.key}>
-                    {showSectionLabel && (
-                      <>
-                        {index > 0 && <Separator className="my-2" />}
-                        <SidebarGroupLabel className="px-2 py-1.5">
-                          {getSectionLabel(item.section)}
-                        </SidebarGroupLabel>
-                      </>
-                    )}
-                    
-                    <DraggableSidebarMenuItem
-                      id={item.key}
-                      onClick={() => navigate(item.path)}
-                      isActive={
-                        item.path.includes('?') 
-                          ? location.pathname + location.search === item.path
-                          : isActive(item.path)
-                      }
-                      tooltip={item.title}
-                      icon={<item.icon className="h-4 w-4" />}
-                      label={item.title}
-                    />
-                  </div>
-                );
-              })}
+              {allItems.map((item) => (
+                <DraggableSidebarMenuItem
+                  key={item.key}
+                  id={item.key}
+                  onClick={() => navigate(item.path)}
+                  isActive={
+                    item.path.includes('?') 
+                      ? location.pathname + location.search === item.path
+                      : isActive(item.path)
+                  }
+                  tooltip={item.title}
+                  icon={<item.icon className="h-4 w-4" />}
+                  label={item.title}
+                />
+              ))}
             </SidebarMenu>
           </SortableContext>
         </DndContext>
