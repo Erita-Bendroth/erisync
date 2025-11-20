@@ -93,8 +93,8 @@ export const ShiftConfigStep = ({ wizardData, updateWizardData }: ShiftConfigSte
     updateWizardData({
       startTime: def.start_time,
       endTime: def.end_time,
-      shiftName: def.shift_type,
-      shiftType: def.id,
+      shiftName: def.description || def.shift_type,
+      shiftType: def.shift_type,
     });
     setSelectedPreset("definition-" + def.id);
   };
