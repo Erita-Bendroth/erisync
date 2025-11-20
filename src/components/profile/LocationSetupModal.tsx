@@ -97,6 +97,12 @@ const ukRegions = [
   { code: 'GB-NIR', name: 'Northern Ireland' },
 ];
 
+const belgiumRegions = [
+  { code: 'BE-VLG', name: 'Flanders (Vlaanderen)' },
+  { code: 'BE-WAL', name: 'Wallonia (Wallonie)' },
+  { code: 'BE-BRU', name: 'Brussels (Bruxelles)' },
+];
+
 interface LocationSetupModalProps {
   open: boolean;
   onComplete: () => void;
@@ -119,7 +125,7 @@ export function LocationSetupModal({ open, onComplete }: LocationSetupModalProps
           country_code: countryCode,
           year: year,
           user_id: user?.id,
-          region_code: countryCode === 'DE' ? regionCode : null
+          region_code: (countryCode === 'DE' || countryCode === 'BE') ? regionCode : null
         }
       })
     );
@@ -137,8 +143,8 @@ export function LocationSetupModal({ open, onComplete }: LocationSetupModalProps
       return;
     }
 
-    // Validate region for DE and UK
-    if ((selectedCountry === 'DE' || selectedCountry === 'GB') && !selectedRegion) {
+    // Validate region for DE, GB, and BE
+    if ((selectedCountry === 'DE' || selectedCountry === 'GB' || selectedCountry === 'BE') && !selectedRegion) {
       toast({
         title: "Region required",
         description: `Please select your ${selectedCountry === 'DE' ? 'state' : 'region'}`,
@@ -162,7 +168,7 @@ export function LocationSetupModal({ open, onComplete }: LocationSetupModalProps
 
       // Import holidays
       try {
-        const regionToImport = (selectedCountry === 'DE' || selectedCountry === 'GB') ? selectedRegion : null;
+        const regionToImport = (selectedCountry === 'DE' || selectedCountry === 'GB' || selectedCountry === 'BE') ? selectedRegion : null;
         await importHolidaysForYears(selectedCountry, regionToImport);
       } catch (importError) {
         console.error('Error importing holidays:', importError);
@@ -249,6 +255,24 @@ export function LocationSetupModal({ open, onComplete }: LocationSetupModalProps
                 </SelectTrigger>
                 <SelectContent>
                   {ukRegions.map((region) => (
+                    <SelectItem key={region.code} value={region.code}>
+                      {region.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {selectedCountry === 'BE' && (
+            <div className="space-y-2">
+              <Label htmlFor="region">Region *</Label>
+              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                <SelectTrigger id="region">
+                  <SelectValue placeholder="Select your region" />
+                </SelectTrigger>
+                <SelectContent>
+                  {belgiumRegions.map((region) => (
                     <SelectItem key={region.code} value={region.code}>
                       {region.name}
                     </SelectItem>

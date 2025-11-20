@@ -40,7 +40,11 @@ const countries = [
     { code: "TH", name: "Thuringia (Thüringen)" }
   ]},
   { code: "AT", name: "Austria" },
-  { code: "BE", name: "Belgium" },
+  { code: "BE", name: "Belgium", regions: [
+    { code: "BE-VLG", name: "Flanders (Vlaanderen)" },
+    { code: "BE-WAL", name: "Wallonia (Wallonie)" },
+    { code: "BE-BRU", name: "Brussels (Bruxelles)" }
+  ]},
   { code: "BG", name: "Bulgaria" },
   { code: "HR", name: "Croatia" },
   { code: "CY", name: "Cyprus" },
@@ -148,11 +152,11 @@ const HolidayManager = () => {
         if (userCountry) {
           query = query
             .eq('country_code', userCountry)
-            .eq('is_public', true)
+          .eq('is_public', true)
             .is('user_id', null); // Public holidays have null user_id
           
-          // For Germany, also filter by region for regional holidays
-          if (userCountry === 'DE' && userRegion) {
+          // For Germany and Belgium, also filter by region for regional holidays
+          if ((userCountry === 'DE' || userCountry === 'BE') && userRegion) {
             // Show both national holidays (no region) and regional holidays for user's region
             query = query.or(`region_code.is.null,region_code.eq.${userRegion}`);
           }
@@ -208,7 +212,7 @@ const HolidayManager = () => {
           country_code: selectedCountry,
           year: selectedYear,
           user_id: user.id,
-          region_code: selectedCountry === 'DE' ? userRegion : null
+          region_code: (selectedCountry === 'DE' || selectedCountry === 'BE') ? userRegion : null
         }
       });
 
@@ -405,7 +409,7 @@ const HolidayManager = () => {
                             <p className="font-medium text-sm">{holiday.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(holiday.date), 'MMM dd, yyyy')}
-                              {holiday.region_code && countryCode === 'DE' && (
+                              {holiday.region_code && (countryCode === 'DE' || countryCode === 'BE') && (
                                 <span className="ml-2 text-xs text-blue-600">
                                   ({holiday.region_code})
                                 </span>

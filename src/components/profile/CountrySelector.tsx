@@ -90,6 +90,12 @@ const ukRegions = [
   { code: 'GB-NIR', name: 'Northern Ireland' },
 ];
 
+const belgiumRegions = [
+  { code: 'BE-VLG', name: 'Flanders (Vlaanderen)' },
+  { code: 'BE-WAL', name: 'Wallonia (Wallonie)' },
+  { code: 'BE-BRU', name: 'Brussels (Bruxelles)' },
+];
+
 const CountrySelector = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -138,7 +144,7 @@ const CountrySelector = () => {
           country_code: countryCode,
           year: year,
           user_id: user?.id,
-          region_code: countryCode === 'DE' ? regionCode : null
+          region_code: (countryCode === 'DE' || countryCode === 'BE') ? regionCode : null
         }
       })
     );
@@ -173,12 +179,12 @@ const CountrySelector = () => {
         country_code: currentCountry
       };
       
-      // Only include region for Germany, clear for other countries
-      if (currentCountry === 'DE') {
+      // Only include region for Germany, UK, and Belgium - clear for other countries
+      if (currentCountry === 'DE' || currentCountry === 'GB' || currentCountry === 'BE') {
         updateData.region_code = currentRegion || null;
       } else {
         updateData.region_code = null;
-        setCurrentRegion(''); // Clear region when switching away from Germany
+        setCurrentRegion(''); // Clear region when switching away from regional countries
       }
 
       const { error } = await supabase
@@ -190,14 +196,14 @@ const CountrySelector = () => {
 
       toast({
         title: "Success",
-        description: currentCountry === 'DE' && currentRegion 
+        description: (currentCountry === 'DE' || currentCountry === 'GB' || currentCountry === 'BE') && currentRegion 
           ? "Country and region preferences updated successfully" 
           : "Country preference updated successfully",
       });
 
       // Automatically import holidays for current and next year
       try {
-        const regionToImport = (currentCountry === 'DE' || currentCountry === 'GB') ? currentRegion : null;
+        const regionToImport = (currentCountry === 'DE' || currentCountry === 'GB' || currentCountry === 'BE') ? currentRegion : null;
         await importHolidaysForYears(currentCountry, regionToImport);
       } catch (importError) {
         console.error('Error importing holidays:', importError);
@@ -225,6 +231,9 @@ const CountrySelector = () => {
     
     const ukRegion = ukRegions.find(r => r.code === code);
     if (ukRegion) return ukRegion.name;
+
+    const belgiumRegion = belgiumRegions.find(r => r.code === code);
+    if (belgiumRegion) return belgiumRegion.name;
     
     return code;
   };
@@ -304,11 +313,35 @@ const CountrySelector = () => {
             </p>
           </div>
         )}
+
+        {currentCountry === 'BE' && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center">
+              <MapPin className="w-4 h-4 mr-1" />
+              Belgium Region
+            </label>
+            <Select value={currentRegion} onValueChange={setCurrentRegion}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select your region..." />
+              </SelectTrigger>
+              <SelectContent>
+                {belgiumRegions.map((region) => (
+                  <SelectItem key={region.code} value={region.code}>
+                    {region.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              This ensures region-specific holidays like Flemish Community Day (Flanders) or French Community Day (Wallonia) are correctly applied.
+            </p>
+          </div>
+        )}
         
         <div className="flex items-center justify-between pt-2">
           <div className="text-sm text-muted-foreground">
             <p>Country: {getCountryName(currentCountry)}</p>
-            {(currentCountry === 'DE' || currentCountry === 'GB') && currentRegion && (
+            {(currentCountry === 'DE' || currentCountry === 'GB' || currentCountry === 'BE') && currentRegion && (
               <p>Region: {getRegionName(currentRegion)}</p>
             )}
           </div>

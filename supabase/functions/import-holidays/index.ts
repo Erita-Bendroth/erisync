@@ -62,6 +62,13 @@ const ukRegionalHolidays: Record<string, string[]> = {
   'GB-ENG': [], // England & Wales use standard UK holidays
 };
 
+// Belgium regional holiday mapping
+const belgiumRegionalHolidays: Record<string, string[]> = {
+  'BE-VLG': ['Flemish Community Day'], // Flanders
+  'BE-WAL': ['French Community Day'], // Wallonia
+  'BE-BRU': ['Iris Day'], // Brussels
+};
+
 // Countries to exclude non-official holidays/observances
 const holidayFilters: Record<string, string[]> = {
   'SE': ['Julafton'], // Exclude Christmas Eve (not official)
@@ -284,6 +291,15 @@ Deno.serve(async (req) => {
       if (!regionalCode && country_code === 'GB' && region_code) {
         const holidayName = holiday.localName || holiday.name;
         const regionalHolidays = ukRegionalHolidays[region_code] || [];
+        if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+          regionalCode = region_code;
+        }
+      }
+
+      // Belgium regional holiday mapping by name
+      if (!regionalCode && country_code === 'BE' && region_code) {
+        const holidayName = holiday.localName || holiday.name;
+        const regionalHolidays = belgiumRegionalHolidays[region_code] || [];
         if (regionalHolidays.some(regional => holidayName.includes(regional))) {
           regionalCode = region_code;
         }
