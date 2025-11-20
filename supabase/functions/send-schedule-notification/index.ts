@@ -29,6 +29,16 @@ const getCorsHeaders = (origin: string | null) => {
   };
 };
 
+// HTML escaping function to prevent XSS
+const escapeHtml = (unsafe: string): string => {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 interface ScheduleNotificationRequest {
   userId?: string;
   userEmail: string;
@@ -48,23 +58,69 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Get JWT from authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
+    // Create authenticated Supabase client
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
     const { userId, userEmail, userName, scheduleDate, changeDetails, changedBy }: ScheduleNotificationRequest = await req.json();
+
+    // Verify caller has permission (admin, planner, manager, or notifying themselves)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const hasPrivilegedRole = roles?.some(r => ['admin', 'planner', 'manager'].includes(r.role));
+    const isNotifyingSelf = userId === user.id;
+
+    if (!hasPrivilegedRole && !isNotifyingSelf) {
+      return new Response(
+        JSON.stringify({ error: 'Insufficient permissions' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     console.log("Sending schedule notification to:", userEmail);
 
-    // Send email notification
+    // Send email notification with sanitized HTML
     const emailResponse = await resend.emails.send({
       from: "EriSync <noreply@erisync.xyz>",
       to: [userEmail],
       subject: "Schedule Change Notification",
       html: `
         <h1>Schedule Update</h1>
-        <p>Hello ${userName},</p>
-        <p>Your schedule has been updated by ${changedBy}.</p>
+        <p>Hello ${escapeHtml(userName)},</p>
+        <p>Your schedule has been updated by ${escapeHtml(changedBy)}.</p>
         
         <h2>Change Details:</h2>
-        <p><strong>Date:</strong> ${scheduleDate}</p>
-        <p><strong>Changes:</strong> ${changeDetails}</p>
+        <p><strong>Date:</strong> ${escapeHtml(scheduleDate)}</p>
+        <p><strong>Changes:</strong> ${escapeHtml(changeDetails)}</p>
         
         <p>Please log into EriSync to view your updated schedule.</p>
         
@@ -77,11 +133,6 @@ const handler = async (req: Request): Promise<Response> => {
     // Store in-app notification if userId is provided
     if (userId) {
       try {
-        const supabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-
         await supabase.from('notifications').insert({
           user_id: userId,
           title: 'Schedule Updated',
