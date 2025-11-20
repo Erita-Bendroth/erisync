@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { matchesCountryCode } from './countryCodeUtils';
 
 export interface ShiftTimeDefinition {
   id: string;
@@ -138,7 +139,7 @@ export function getShiftForDate(
   if (userCountryCode) {
     console.log(`   🌍 Filtering by country code: ${userCountryCode}`);
     const countrySpecificShifts = matchingShifts.filter(
-      (shift) => shift.country_codes && shift.country_codes.includes(userCountryCode)
+      (shift) => matchesCountryCode(userCountryCode, shift.country_codes)
     );
     const globalShifts = matchingShifts.filter(
       (shift) => !shift.country_codes || shift.country_codes.length === 0
