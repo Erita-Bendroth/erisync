@@ -70,6 +70,31 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
     }
   };
 
+  const parseTimeBlocks = (notes: string | undefined) => {
+    if (!notes) return null;
+    
+    // Check if notes contains time block JSON
+    if (notes.trim().startsWith('[{') && notes.includes('start_time')) {
+      try {
+        const blocks = JSON.parse(notes);
+        return Array.isArray(blocks) ? blocks : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    return null;
+  };
+
+  const formatTimeBlocks = (blocks: any[]) => {
+    return blocks.map((block) => {
+      const activity = block.activity_type || 'work';
+      const start = block.start_time || '';
+      const end = block.end_time || '';
+      return `${activity}: ${start} - ${end}`;
+    }).join(', ');
+  };
+
   return (
     <Card className="relative overflow-hidden">
       <CardContent className="p-4 space-y-3">
@@ -126,14 +151,29 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
           Team: <span className="font-medium">{entry.teams.name}</span>
         </p>
 
-        {/* Notes */}
-        {entry.notes && (
-          <div className="pt-2 border-t">
-            <p className="text-xs text-muted-foreground line-clamp-2">
-              {entry.notes}
-            </p>
-          </div>
-        )}
+        {/* Time Blocks or Notes */}
+        {entry.notes && (() => {
+          const timeBlocks = parseTimeBlocks(entry.notes);
+          
+          if (timeBlocks) {
+            return (
+              <div className="pt-2 border-t">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Times:</p>
+                <p className="text-xs text-foreground">
+                  {formatTimeBlocks(timeBlocks)}
+                </p>
+              </div>
+            );
+          } else {
+            return (
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {entry.notes}
+                </p>
+              </div>
+            );
+          }
+        })()}
       </CardContent>
     </Card>
   );
