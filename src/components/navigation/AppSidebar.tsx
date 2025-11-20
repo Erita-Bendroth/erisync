@@ -147,20 +147,21 @@ export function AppSidebar() {
     }
   };
 
-  // Helper to get items by section for rendering
-  const getItemsBySection = (section: string) => 
-    allItems.filter(item => item.section === section);
 
-  const overviewItems = getItemsBySection('overview');
-  const scheduleItems = getItemsBySection('schedule');
-  const favoriteItems = getItemsBySection('favorites');
-  const managementItems = getItemsBySection('management');
-  const settingsItems = getItemsBySection('settings');
+  const getSectionLabel = (section: string) => {
+    switch (section) {
+      case 'overview': return 'Overview';
+      case 'schedule': return 'Schedule';
+      case 'favorites': return 'Quick Access';
+      case 'management': return 'Management';
+      case 'settings': return 'Settings';
+      default: return section;
+    }
+  };
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        {/* Single DndContext wrapping all sections */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -170,117 +171,38 @@ export function AppSidebar() {
             items={allItems.map(item => item.key)}
             strategy={verticalListSortingStrategy}
           >
-            {/* Overview Section */}
-            <SidebarGroup>
-              <SidebarGroupLabel>Overview</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {overviewItems.map((item) => (
+            <SidebarMenu>
+              {allItems.map((item, index) => {
+                const showSectionLabel = 
+                  index === 0 || allItems[index - 1].section !== item.section;
+                
+                return (
+                  <div key={item.key}>
+                    {showSectionLabel && (
+                      <>
+                        {index > 0 && <Separator className="my-2" />}
+                        <SidebarGroupLabel className="px-2 py-1.5">
+                          {getSectionLabel(item.section)}
+                        </SidebarGroupLabel>
+                      </>
+                    )}
+                    
                     <DraggableSidebarMenuItem
-                      key={item.key}
                       id={item.key}
                       onClick={() => navigate(item.path)}
-                      isActive={isActive(item.path)}
+                      isActive={
+                        item.path.includes('?') 
+                          ? location.pathname + location.search === item.path
+                          : isActive(item.path)
+                      }
                       tooltip={item.title}
                       icon={<item.icon className="h-4 w-4" />}
                       label={item.title}
                     />
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            <Separator />
-
-            {/* Schedule Section */}
-            <SidebarGroup>
-              <SidebarGroupLabel>Schedule</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {scheduleItems.map((item) => (
-                    <DraggableSidebarMenuItem
-                      key={item.key}
-                      id={item.key}
-                      onClick={() => navigate(item.path)}
-                      isActive={location.pathname + location.search === item.path}
-                      tooltip={item.title}
-                      icon={<item.icon className="h-4 w-4" />}
-                      label={item.title}
-                    />
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            {/* Quick Access / Favorites Section */}
-            {favoriteItems.length > 0 && (
-              <>
-                <Separator />
-                <SidebarGroup>
-                  <SidebarGroupLabel>Quick Access</SidebarGroupLabel>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {favoriteItems.map((item) => (
-                        <DraggableSidebarMenuItem
-                          key={item.key}
-                          id={item.key}
-                          onClick={() => navigate(item.path)}
-                          tooltip={item.title}
-                          icon={<item.icon className="h-4 w-4" />}
-                          label={item.title}
-                        />
-                      ))}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              </>
-            )}
-
-            {/* Management Section (for managers/planners only) */}
-            {isManagerOrPlanner && managementItems.length > 0 && (
-              <>
-                <Separator />
-                <SidebarGroup>
-                  <SidebarGroupLabel>Management</SidebarGroupLabel>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {managementItems.map((item) => (
-                        <DraggableSidebarMenuItem
-                          key={item.key}
-                          id={item.key}
-                          onClick={() => navigate(item.path)}
-                          isActive={location.pathname + location.search === item.path}
-                          tooltip={item.title}
-                          icon={<item.icon className="h-4 w-4" />}
-                          label={item.title}
-                        />
-                      ))}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              </>
-            )}
-
-            {/* Settings Section */}
-            <Separator />
-            <SidebarGroup>
-              <SidebarGroupLabel>Settings</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {settingsItems.map((item) => (
-                    <DraggableSidebarMenuItem
-                      key={item.key}
-                      id={item.key}
-                      onClick={() => navigate(item.path)}
-                      isActive={location.pathname + location.search === item.path}
-                      tooltip={item.title}
-                      icon={<item.icon className="h-4 w-4" />}
-                      label={item.title}
-                    />
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+                  </div>
+                );
+              })}
+            </SidebarMenu>
           </SortableContext>
         </DndContext>
       </SidebarContent>
