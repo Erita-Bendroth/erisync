@@ -9,15 +9,15 @@ interface SidebarOrderItem {
 }
 
 interface UseSidebarOrderReturn {
-  getSortedItems: <T extends { key: string }>(items: T[], section: string) => T[];
-  updateOrder: (section: string, itemKeys: string[]) => Promise<void>;
-  resetOrder: (section?: string) => Promise<void>;
+  getSortedItems: <T extends { key: string }>(items: T[]) => T[];
+  updateOrder: (itemKeys: string[]) => Promise<void>;
+  resetOrder: () => Promise<void>;
   isLoading: boolean;
 }
 
 export const useSidebarOrder = (): UseSidebarOrderReturn => {
   const { user } = useAuth();
-  const [orderMap, setOrderMap] = useState<Record<string, SidebarOrderItem[]>>({});
+  const [orderMap, setOrderMap] = useState<SidebarOrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch user's saved order from database
@@ -30,25 +30,13 @@ export const useSidebarOrder = (): UseSidebarOrderReturn => {
     try {
       const { data, error } = await supabase
         .from('sidebar_item_order')
-        .select('section, item_key, order_index')
+        .select('item_key, order_index')
         .eq('user_id', user.id)
         .order('order_index', { ascending: true });
 
       if (error) throw error;
 
-      // Group by section
-      const grouped: Record<string, SidebarOrderItem[]> = {};
-      data?.forEach((item) => {
-        if (!grouped[item.section]) {
-          grouped[item.section] = [];
-        }
-        grouped[item.section].push({
-          item_key: item.item_key,
-          order_index: item.order_index,
-        });
-      });
-
-      setOrderMap(grouped);
+      setOrderMap(data || []);
     } catch (error) {
       console.error('Error fetching sidebar order:', error);
     } finally {
@@ -83,15 +71,14 @@ export const useSidebarOrder = (): UseSidebarOrderReturn => {
 
   // Sort items based on saved order
   const getSortedItems = useCallback(
-    <T extends { key: string }>(items: T[], section: string): T[] => {
-      const savedOrder = orderMap[section];
-      if (!savedOrder || savedOrder.length === 0) {
+    <T extends { key: string }>(items: T[]): T[] => {
+      if (!orderMap || orderMap.length === 0) {
         return items; // Return default order
       }
 
       // Create a map of item_key to order_index
       const orderIndexMap = new Map(
-        savedOrder.map((item) => [item.item_key, item.order_index])
+        orderMap.map((item) => [item.item_key, item.order_index])
       );
 
       // Sort items, placing items not in saved order at the end
@@ -106,21 +93,19 @@ export const useSidebarOrder = (): UseSidebarOrderReturn => {
 
   // Update order in database
   const updateOrder = useCallback(
-    async (section: string, itemKeys: string[]) => {
+    async (itemKeys: string[]) => {
       if (!user) return;
 
       try {
-        // Delete existing order for this section
+        // Delete all existing order
         await supabase
           .from('sidebar_item_order')
           .delete()
-          .eq('user_id', user.id)
-          .eq('section', section);
+          .eq('user_id', user.id);
 
         // Insert new order
         const orderData = itemKeys.map((key, index) => ({
           user_id: user.id,
-          section,
           item_key: key,
           order_index: index,
         }));
@@ -142,28 +127,18 @@ export const useSidebarOrder = (): UseSidebarOrderReturn => {
 
   // Reset order (delete saved preferences)
   const resetOrder = useCallback(
-    async (section?: string) => {
+    async () => {
       if (!user) return;
 
       try {
-        let query = supabase
+        const { error } = await supabase
           .from('sidebar_item_order')
           .delete()
           .eq('user_id', user.id);
 
-        if (section) {
-          query = query.eq('section', section);
-        }
-
-        const { error } = await query;
-
         if (error) throw error;
 
-        toast.success(
-          section
-            ? `${section} section reset to default`
-            : 'Sidebar reset to default'
-        );
+        toast.success('Sidebar reset to default');
 
         // Refresh order
         fetchOrder();

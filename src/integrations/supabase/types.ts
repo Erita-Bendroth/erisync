@@ -911,7 +911,7 @@ export type Database = {
           id: string
           item_key: string
           order_index: number
-          section: string
+          section: string | null
           updated_at: string
           user_id: string
         }
@@ -920,7 +920,7 @@ export type Database = {
           id?: string
           item_key: string
           order_index: number
-          section: string
+          section?: string | null
           updated_at?: string
           user_id: string
         }
@@ -929,7 +929,7 @@ export type Database = {
           id?: string
           item_key?: string
           order_index?: number
-          section?: string
+          section?: string | null
           updated_at?: string
           user_id?: string
         }
