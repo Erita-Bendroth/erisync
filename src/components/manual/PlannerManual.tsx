@@ -580,7 +580,7 @@ export const PlannerManual = () => {
       <section id="integrations">
         <h2 className="text-2xl font-bold mb-4">10. Integrations</h2>
         
-        <h3 className="text-xl font-semibold mb-3">Microsoft Outlook Integration</h3>
+        <h3 className="text-xl font-semibold mb-3">Microsoft Outlook Integration (Not in operational mode yet)     </h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Settings → Integrations</strong></li>
           <li>Click <strong>"Connect Outlook"</strong></li>
