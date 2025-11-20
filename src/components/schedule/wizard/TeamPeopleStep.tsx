@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { WizardData } from "./BulkScheduleWizard";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,13 +29,21 @@ interface TeamPeopleStepProps {
 }
 
 export const TeamPeopleStep = ({ wizardData, updateWizardData }: TeamPeopleStepProps) => {
+  const { user } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchTeams();
-  }, []);
+    fetchUserRoles();
+  }, [user]);
+
+  useEffect(() => {
+    if (userRoles.length > 0) {
+      fetchTeams();
+    }
+  }, [userRoles]);
 
   useEffect(() => {
     if (wizardData.selectedTeam) {
@@ -42,16 +51,48 @@ export const TeamPeopleStep = ({ wizardData, updateWizardData }: TeamPeopleStepP
     }
   }, [wizardData.selectedTeam]);
 
+  const fetchUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      setUserRoles(data?.map(r => r.role) || []);
+    } catch (error) {
+      console.error("Error fetching user roles:", error);
+    }
+  };
+
   const fetchTeams = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, name")
-        .order("name");
+      const isOnlyManager = userRoles.includes('manager') && 
+                           !userRoles.includes('planner') && 
+                           !userRoles.includes('admin');
+      
+      if (isOnlyManager && user) {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select('teams(id, name)')
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+          
+        if (error) throw error;
+        const managerTeams = data?.map((item: any) => item.teams).filter(Boolean) || [];
+        setTeams(managerTeams);
+      } else {
+        const { data, error } = await supabase
+          .from("teams")
+          .select("id, name")
+          .order("name");
 
-      if (error) throw error;
-      setTeams(data || []);
+        if (error) throw error;
+        setTeams(data || []);
+      }
     } catch (error) {
       console.error("Error fetching teams:", error);
     } finally {
