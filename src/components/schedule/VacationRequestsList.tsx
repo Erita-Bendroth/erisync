@@ -540,84 +540,16 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     }
 
     const requestsToReject = groupedRequests.filter(r => selectedRequestIds.has(r.id) && r.status === 'pending');
-    setProcessingId('bulk');
-    let successCount = 0;
-
-    for (const request of requestsToReject) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { error: updateError } = await supabase
-          .from('vacation_requests')
-          .update({ 
-            status: 'approved',
-            approver_id: currentUserId 
-          })
-          .in('id', request.requestIds);
-
-        if (updateError) throw updateError;
-
-        // Create schedule entries for each date
-        const scheduleEntries = request.dates.map(date => ({
-          user_id: request.user_id,
-          team_id: request.team_id,
-          date: date,
-          shift_type: 'normal' as const,
-          activity_type: 'vacation' as const,
-          availability_status: 'unavailable' as const,
-          notes: request.notes || 'Approved vacation',
-          created_by: currentUserId,
-        }));
-
-        const { error: scheduleError } = await supabase
-          .from('schedule_entries')
-          .upsert(scheduleEntries, {
-            onConflict: 'user_id,date,team_id',
-            ignoreDuplicates: false
-          });
-
-        if (scheduleError) throw scheduleError;
-
-        // Send notification
-        await supabase.functions.invoke('vacation-request-notification', {
-          body: {
-            requestId: request.id,
-            userId: request.user_id,
-            status: 'approved',
-            dates: request.dates,
-          },
-        });
-
-        successCount++;
-      } catch (error: any) {
-        console.error('Error approving request:', error);
-        errorCount++;
-      }
-    }
-
-    if (successCount > 0) {
+    if (requestsToReject.length === 0) {
       toast({
-        title: "Requests approved",
-        description: `${successCount} request(s) approved successfully.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`,
-      });
-    }
-
-    if (errorCount > 0 && successCount === 0) {
-      toast({
-        title: "Error",
-        description: "Failed to approve requests",
+        title: "No pending requests",
+        description: "Please select pending requests to reject.",
         variant: "destructive",
       });
+      return;
     }
 
-    setSelectedRequestIds(new Set());
-    await fetchRequests();
-    onRequestProcessed?.();
-  };
-
-  const handleBulkReject = async () => {
-    if (selectedRequestIds.size === 0 || !bulkRejectionReason.trim()) return;
-
-    const requestsToReject = groupedRequests.filter(r => selectedRequestIds.has(r.id));
+    setProcessingId('bulk');
     let successCount = 0;
     let errorCount = 0;
 
@@ -638,9 +570,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
         await supabase.functions.invoke('vacation-request-notification', {
           body: {
             requestId: request.id,
-            userId: request.user_id,
-            status: 'rejected',
-            rejectionReason: bulkRejectionReason,
+            type: 'rejection',
+            groupId: request.groupId,
           },
         });
 
@@ -651,24 +582,17 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       }
     }
 
-    if (successCount > 0) {
-      toast({
-        title: "Requests rejected",
-        description: `${successCount} request(s) rejected.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`,
-      });
-    }
-
-    if (errorCount > 0 && successCount === 0) {
-      toast({
-        title: "Error",
-        description: "Failed to reject requests",
-        variant: "destructive",
-      });
-    }
-
+    setProcessingId(null);
     setBulkRejectDialogOpen(false);
     setBulkRejectionReason('');
     setSelectedRequestIds(new Set());
+
+    toast({
+      title: successCount > 0 ? "Bulk rejection complete" : "Bulk rejection failed",
+      description: `${successCount} rejected, ${errorCount} failed`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+
     await fetchRequests();
     onRequestProcessed?.();
   };
@@ -1127,7 +1051,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             </Button>
             <Button
               variant="destructive"
-              onClick={handleBulkReject}
+              onClick={confirmBulkReject}
               disabled={processingId !== null || !bulkRejectionReason.trim()}
             >
               {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
