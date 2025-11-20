@@ -252,6 +252,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
                   teamId={config.teamId}
                   autoDetectWeekends={config.autoDetectWeekends}
                   autoDetectHolidays={config.autoDetectHolidays}
+                  weekendShiftOverride={config.weekendShiftOverride}
                 />
         </div>
       </div>

@@ -1,9 +1,22 @@
 import { format, isWeekend, eachDayOfInterval } from "date-fns";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useShiftTypes } from "@/hooks/useShiftTypes";
 import { cn } from "@/lib/utils";
+import { 
+  fetchTeamShiftDefinitions, 
+  generateDayPreviews, 
+  type DayShiftPreview,
+  type ShiftTimeDefinition 
+} from "@/lib/previewShiftSelection";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface BulkGenerationPreviewProps {
   totalShifts: number;
@@ -15,6 +28,7 @@ interface BulkGenerationPreviewProps {
   teamId: string | null;
   autoDetectWeekends: boolean;
   autoDetectHolidays: boolean;
+  weekendShiftOverride?: string | null;
 }
 
 export const BulkGenerationPreview = ({
@@ -27,9 +41,45 @@ export const BulkGenerationPreview = ({
   teamId,
   autoDetectWeekends,
   autoDetectHolidays,
+  weekendShiftOverride,
 }: BulkGenerationPreviewProps) => {
   const { shiftTypes } = useShiftTypes(teamId ? [teamId] : []);
   const selectedShift = shiftTypes.find(s => s.type === shiftType);
+  const [allShifts, setAllShifts] = useState<ShiftTimeDefinition[]>([]);
+  const [dayPreviews, setDayPreviews] = useState<DayShiftPreview[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch shift definitions when team changes
+  useEffect(() => {
+    if (!teamId) return;
+    
+    const loadShifts = async () => {
+      setLoading(true);
+      const shifts = await fetchTeamShiftDefinitions(teamId);
+      setAllShifts(shifts);
+      setLoading(false);
+    };
+    
+    loadShifts();
+  }, [teamId]);
+
+  // Generate day previews when configuration changes
+  useEffect(() => {
+    if (!startDate || !endDate || !shiftType || allShifts.length === 0) {
+      setDayPreviews([]);
+      return;
+    }
+
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const previews = generateDayPreviews(
+      days,
+      shiftType,
+      autoDetectWeekends,
+      weekendShiftOverride || null,
+      allShifts
+    );
+    setDayPreviews(previews);
+  }, [startDate, endDate, shiftType, autoDetectWeekends, weekendShiftOverride, allShifts]);
   
   if (!startDate || !endDate || !shiftType) {
     return (
@@ -42,11 +92,26 @@ export const BulkGenerationPreview = ({
   }
 
   // Calculate weekend count
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  const days = startDate && endDate ? eachDayOfInterval({ start: startDate, end: endDate }) : [];
   const weekendCount = days.filter(d => isWeekend(d)).length;
   
   // Show preview days for visual indication
-  const previewDays = days.slice(0, 14); // Show first 14 days max
+  const previewDays = dayPreviews.slice(0, 14); // Show first 14 days max
+  
+  // Calculate unique shifts being used
+  const uniqueShifts = new Map<string, { description: string; count: number; times: string }>();
+  dayPreviews.forEach(preview => {
+    const key = preview.shiftId;
+    if (uniqueShifts.has(key)) {
+      uniqueShifts.get(key)!.count++;
+    } else {
+      uniqueShifts.set(key, {
+        description: preview.description,
+        count: 1,
+        times: `${preview.startTime}-${preview.endTime}`
+      });
+    }
+  });
 
   return (
     <Card className="p-4 space-y-3">
@@ -137,48 +202,73 @@ export const BulkGenerationPreview = ({
       {previewDays.length > 0 && (
         <div className="pt-3 mt-3 border-t">
           <p className="text-xs font-medium mb-2 text-muted-foreground">Date Range Preview:</p>
-          <div className="grid grid-cols-7 gap-2">
-            {previewDays.map((day) => {
-              const dayIsWeekend = isWeekend(day);
-              const dayLabel = format(day, 'EEE');
-              const dayOfWeek = day.getDay();
-              const isHighlighted = autoDetectWeekends && dayIsWeekend;
-              
-              // Check if selected shift has day_of_week constraint
-              const shiftDayConstraint = selectedShift?.dayOfWeek;
-              const isShiftValidForDay = !shiftDayConstraint || shiftDayConstraint.length === 0 || shiftDayConstraint.includes(dayOfWeek);
-              const willUseDifferentShift = !dayIsWeekend && !isShiftValidForDay;
-              
-              return (
-                <div 
-                  key={day.toISOString()}
-                  className={cn(
-                    "p-2 border rounded-md text-center transition-colors relative",
-                    isHighlighted && "bg-blue-50 border-blue-300 dark:bg-blue-950/30 dark:border-blue-800",
-                    willUseDifferentShift && "bg-yellow-50 border-yellow-300 dark:bg-yellow-950/30 dark:border-yellow-800"
-                  )}
-                >
-                  <div className="text-xs font-medium text-muted-foreground">{dayLabel}</div>
-                  <div className="text-sm font-semibold mt-1">{format(day, 'd')}</div>
-                  {isHighlighted && (
-                    <Badge variant="secondary" className="text-[9px] px-1 py-0 mt-1 h-4">
-                      Weekend
-                    </Badge>
-                  )}
-                  {willUseDifferentShift && (
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 mt-1 h-4">
-                      Alt
-                    </Badge>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {previewDays.length < days.length && (
+          <TooltipProvider>
+            <div className="grid grid-cols-7 gap-2">
+              {previewDays.map((preview) => {
+                const dayLabel = format(preview.date, 'EEE');
+                
+                return (
+                  <Tooltip key={preview.date.toISOString()}>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className={cn(
+                          "p-2 border rounded-md text-center transition-colors relative cursor-help",
+                          preview.isWeekend && "bg-blue-50 border-blue-300 dark:bg-blue-950/30 dark:border-blue-800",
+                          preview.isAlternative && !preview.isWeekend && "bg-yellow-50 border-yellow-300 dark:bg-yellow-950/30 dark:border-yellow-800"
+                        )}
+                      >
+                        <div className="text-xs font-medium text-muted-foreground">{dayLabel}</div>
+                        <div className="text-sm font-semibold mt-1">{format(preview.date, 'd')}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          {preview.startTime.substring(0, 5)}-{preview.endTime.substring(0, 5)}
+                        </div>
+                        {preview.isWeekend && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0 mt-1 h-4">
+                            Weekend
+                          </Badge>
+                        )}
+                        {preview.isAlternative && !preview.isWeekend && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 mt-1 h-4">
+                            Alt
+                          </Badge>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs space-y-1">
+                        <div className="font-semibold">{preview.description}</div>
+                        <div>{preview.startTime} - {preview.endTime}</div>
+                        {preview.isAlternative && <div className="text-muted-foreground">Alternative shift</div>}
+                        {preview.isWeekend && <div className="text-muted-foreground">Weekend shift</div>}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+          {previewDays.length < dayPreviews.length && (
             <p className="text-xs text-muted-foreground mt-2">
-              ... and {days.length - previewDays.length} more days
+              ... and {dayPreviews.length - previewDays.length} more days
             </p>
           )}
+        </div>
+      )}
+      
+      {/* Shift summary */}
+      {uniqueShifts.size > 1 && dayPreviews.length > 0 && (
+        <div className="pt-3 mt-3 border-t">
+          <p className="text-xs font-medium mb-2 text-muted-foreground">Shifts in this schedule:</p>
+          <div className="space-y-1">
+            {Array.from(uniqueShifts.entries()).map(([shiftId, info]) => (
+              <div key={shiftId} className="text-xs flex items-center justify-between">
+                <span className="text-muted-foreground">{info.description}:</span>
+                <span className="font-medium">
+                  {info.times} <span className="text-muted-foreground">({info.count} {info.count === 1 ? 'day' : 'days'})</span>
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </Card>
