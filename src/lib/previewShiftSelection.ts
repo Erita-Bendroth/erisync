@@ -175,6 +175,12 @@ export function getShiftForDate(
       if (aHasDays && !bHasDays) return -1;
       if (!aHasDays && bHasDays) return 1;
       
+      // If both have days, prefer the one with FEWER days (more specific)
+      if (aHasDays && bHasDays) {
+        if (a.day_of_week!.length < b.day_of_week!.length) return -1;
+        if (a.day_of_week!.length > b.day_of_week!.length) return 1;
+      }
+      
       return 0;
     });
     
