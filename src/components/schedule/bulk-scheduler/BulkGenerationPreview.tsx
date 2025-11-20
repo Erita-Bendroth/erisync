@@ -1,7 +1,8 @@
-import { format } from "date-fns";
+import { format, isWeekend, eachDayOfInterval } from "date-fns";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { useShiftTypes } from "@/hooks/useShiftTypes";
+import { cn } from "@/lib/utils";
 
 interface BulkGenerationPreviewProps {
   totalShifts: number;
@@ -11,6 +12,8 @@ interface BulkGenerationPreviewProps {
   endDate: Date | null;
   shiftType: string | null;
   teamId: string | null;
+  autoDetectWeekends: boolean;
+  autoDetectHolidays: boolean;
 }
 
 export const BulkGenerationPreview = ({
@@ -21,9 +24,12 @@ export const BulkGenerationPreview = ({
   endDate,
   shiftType,
   teamId,
+  autoDetectWeekends,
+  autoDetectHolidays,
 }: BulkGenerationPreviewProps) => {
   const { shiftTypes } = useShiftTypes(teamId ? [teamId] : []);
   const selectedShift = shiftTypes.find(s => s.type === shiftType);
+  
   if (!startDate || !endDate || !shiftType) {
     return (
       <Card className="p-4 bg-muted/30">
@@ -33,6 +39,10 @@ export const BulkGenerationPreview = ({
       </Card>
     );
   }
+
+  // Calculate weekend count
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  const weekendCount = days.filter(d => isWeekend(d)).length;
 
   return (
     <Card className="p-4 space-y-3">
@@ -50,6 +60,16 @@ export const BulkGenerationPreview = ({
           <span className="text-muted-foreground">Working days:</span>
           <span className="font-medium">{workDays} days</span>
         </div>
+        
+        {autoDetectWeekends && weekendCount > 0 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Weekend days:</span>
+            <span className="font-medium flex items-center gap-1">
+              {weekendCount} days
+              <Badge variant="secondary" className="text-[10px]">Auto-detect ON</Badge>
+            </span>
+          </div>
+        )}
 
         <div className="flex justify-between">
           <span className="text-muted-foreground">Team members:</span>
@@ -79,10 +99,25 @@ export const BulkGenerationPreview = ({
       </div>
 
       {totalShifts > 0 && (
-        <div className="pt-3 mt-3 border-t">
+        <div className="pt-3 mt-3 border-t space-y-2">
           <div className="text-xs text-muted-foreground">
             ✨ Ready to generate {totalShifts} schedule entries
           </div>
+          
+          {(autoDetectWeekends || autoDetectHolidays) && (
+            <div className="flex flex-wrap gap-1 pt-2">
+              {autoDetectWeekends && (
+                <Badge variant="outline" className="text-[10px]">
+                  📅 Weekend detection enabled
+                </Badge>
+              )}
+              {autoDetectHolidays && (
+                <Badge variant="outline" className="text-[10px]">
+                  🎉 Holiday detection enabled
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Card>

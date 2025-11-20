@@ -17,6 +17,10 @@ export interface BulkSchedulerConfig {
   };
   excludedDays: number[]; // [0=Sunday, 1=Monday, ..., 6=Saturday]
   skipHolidays: boolean;
+  autoDetectWeekends: boolean;
+  autoDetectHolidays: boolean;
+  skipUsersWithHolidays: boolean;
+  weekendShiftOverride: string | null;
   advanced: {
     fairnessEnabled: boolean;
     fairnessWeight: number;
@@ -45,6 +49,10 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
     },
     excludedDays: [0, 6], // Default: exclude Saturday and Sunday
     skipHolidays: false,
+    autoDetectWeekends: true,
+    autoDetectHolidays: true,
+    skipUsersWithHolidays: true,
+    weekendShiftOverride: null,
     advanced: {
       fairnessEnabled: false,
       fairnessWeight: 50,
