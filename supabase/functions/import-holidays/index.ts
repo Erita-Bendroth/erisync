@@ -57,8 +57,8 @@ const germanRegionalHolidays: Record<string, string[]> = {
 
 // UK regional holiday mapping
 const ukRegionalHolidays: Record<string, string[]> = {
-  'GB-SCT': ['St Andrew\'s Day', '2 January'], // Scotland-specific
-  'GB-NIR': ['St Patrick\'s Day', 'Battle of the Boyne'], // Northern Ireland-specific
+  'GB-SCT': ['Saint Andrew\'s Day', '2 January'], // Scotland-specific
+  'GB-NIR': ['Saint Patrick\'s Day', 'Battle of the Boyne'], // Northern Ireland-specific
   'GB-ENG': [], // England & Wales use standard UK holidays
 };
 
