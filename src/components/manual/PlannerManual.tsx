@@ -100,6 +100,85 @@ export const PlannerManual = () => {
 
       <Separator />
 
+      <section id="planning-partnerships">
+        <h2 className="text-2xl font-bold mb-4">3.5 Planning Partnerships</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Planning Partnerships allow you to create collaborative planning relationships between teams, 
+          enabling coordinated scheduling and visibility across functional boundaries.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">What are Planning Partnerships?</h3>
+        <p className="mb-4">
+          Partnerships enable multiple teams to:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>View each other's schedules for coordination</li>
+          <li>Plan coverage across team boundaries</li>
+          <li>Monitor combined capacity and availability</li>
+          <li>Facilitate cross-functional backup coverage</li>
+          <li>Coordinate vacation planning to maintain overall coverage</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Creating a Planning Partnership</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Planning Partnerships</strong></li>
+          <li>Click <strong>"Create New Partnership"</strong></li>
+          <li>Enter a descriptive partnership name (e.g., "Frontend & Backend Teams")</li>
+          <li>Select 2 or more teams to include in the partnership</li>
+          <li>Configure capacity settings:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li>Minimum staff required across all partnership teams</li>
+              <li>Maximum staff allowed (optional)</li>
+              <li>Whether capacity rules apply to weekends</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Create Partnership"</strong></li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Using the Shared Planning Calendar</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Multi-Team View</strong></li>
+          <li>Select a partnership from the dropdown</li>
+          <li>View all teams in the partnership simultaneously</li>
+          <li>See combined coverage statistics at the top</li>
+          <li>Create and edit schedules for any team in the partnership</li>
+          <li>Monitor coverage alerts across all partnership teams</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Partnership Capacity Configuration</h3>
+        <p className="mb-4">
+          Set capacity requirements to ensure adequate coverage across partnership teams:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Minimum Staff Required:</strong> Total minimum staff needed across ALL teams</li>
+          <li><strong>Maximum Staff Allowed:</strong> Optional cap to prevent over-scheduling</li>
+          <li><strong>Weekend Application:</strong> Whether capacity rules apply on weekends</li>
+          <li><strong>Coverage Alerts:</strong> Automatically highlights days not meeting minimums</li>
+        </ul>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Use Case: Cross-Functional Coverage</AlertTitle>
+          <AlertDescription>
+            Partnerships are ideal for teams that provide backup coverage for each other, such as 
+            support teams across time zones, on-call rotations spanning multiple departments, or 
+            cross-trained teams sharing responsibilities.
+          </AlertDescription>
+        </Alert>
+
+        <Alert className="mt-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Vacation Coordination</AlertTitle>
+          <AlertDescription>
+            The Vacation Planning Dashboard respects partnership capacity settings, helping you 
+            identify safe vacation periods that maintain coverage across all partnership teams.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
       <section id="team-management">
         <h2 className="text-2xl font-bold mb-4">3. Team Management</h2>
         
@@ -363,15 +442,24 @@ export const PlannerManual = () => {
         <h3 className="text-xl font-semibold mb-3 mt-6">Shift Swap Requests</h3>
         <p className="mb-4">
           Team members can request to swap shifts with their colleagues. As a Planner, you can monitor 
-          and manage these swap requests to ensure proper coverage.
+          and manage swap requests across all teams to ensure proper coverage.
         </p>
 
-        <h4 className="font-semibold mb-2">Viewing Swap Requests</h4>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Approval Authority</AlertTitle>
+          <AlertDescription>
+            Planners can approve or reject ALL shift swap requests across the organization. 
+            Managers can approve swaps for their assigned teams only.
+          </AlertDescription>
+        </Alert>
+
+        <h4 className="font-semibold mb-2 mt-4">Viewing Swap Requests</h4>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Schedule → Shift Swaps</strong></li>
-          <li>See all pending, approved, and rejected swap requests</li>
+          <li>See all pending, approved, and rejected swap requests across all teams</li>
           <li>Filter by team, date range, or status</li>
-          <li>Review request details: who's swapping with whom, which shifts, dates</li>
+          <li>Review request details: who's swapping with whom, which shifts, dates, and reasons</li>
         </ol>
 
         <h4 className="font-semibold mb-2">Approving or Rejecting Swaps</h4>
@@ -381,13 +469,14 @@ export const PlannerManual = () => {
             <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
               <li>Requesting user and target user</li>
               <li>Shift date and type being swapped</li>
-              <li>Any notes or reasons provided</li>
+              <li>Any notes or reasons provided by the requesting user</li>
             </ul>
           </li>
           <li>Verify that both users can work the swapped shifts</li>
-          <li>Check team coverage won't be impacted</li>
+          <li>Check team coverage won't be impacted negatively</li>
           <li>Click <strong>"Approve"</strong> or <strong>"Reject"</strong></li>
-          <li>Add optional notes explaining your decision</li>
+          <li>Add optional notes explaining your decision (recommended for rejections)</li>
+          <li>Submit your decision</li>
         </ol>
 
         <h4 className="font-semibold mb-2">What Happens When Approved</h4>
@@ -456,6 +545,339 @@ export const PlannerManual = () => {
           <AlertDescription>
             Multi-day vacation requests automatically exclude weekends when calculating working days.
             Approval creates vacation entries for each working day in the range.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="vacation-planning-dashboard">
+        <h2 className="text-2xl font-bold mb-4">5.5 Vacation Planning Dashboard</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          The Vacation Planning Dashboard is a comprehensive tool for strategic vacation management, 
+          providing multi-month visibility, coverage analysis, and planning insights.
+        </p>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Strategic Planning Tool</AlertTitle>
+          <AlertDescription>
+            This dashboard goes beyond individual request approval, providing team-wide vacation 
+            planning insights to balance time off while maintaining coverage.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-4">Accessing the Dashboard</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Vacation Planning</strong></li>
+          <li>Select your team or partnership</li>
+          <li>Choose the year to analyze</li>
+          <li>View comprehensive vacation planning insights</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Multi-Month Calendar View</h3>
+        <p className="mb-4">The calendar displays vacation requests and approvals across multiple months:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Color-Coded Status:</strong> Pending (yellow), Approved (green), Rejected (red)</li>
+          <li><strong>User Indicators:</strong> See who has vacation on each day</li>
+          <li><strong>Click for Details:</strong> Click any day to see full vacation details</li>
+          <li><strong>Coverage Impact:</strong> Days with coverage concerns highlighted</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Coverage Heatmap</h3>
+        <p className="mb-4">Visual representation of team availability:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Green:</strong> Full coverage - safe for additional vacation</li>
+          <li><strong>Yellow:</strong> Moderate coverage - proceed with caution</li>
+          <li><strong>Orange:</strong> Low coverage - high risk for additional vacation</li>
+          <li><strong>Red:</strong> Critical - minimum coverage not met</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Conflict Detection</h3>
+        <p className="mb-4">Automatically identifies scheduling conflicts:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Overlapping vacation requests from same user</li>
+          <li>Days where too many team members are on vacation</li>
+          <li>Periods falling below minimum staffing requirements</li>
+          <li>Partnership capacity violations</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Fairness Analysis</h3>
+        <p className="mb-4">Monitor vacation day distribution across your team:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>See vacation days used vs. allowance for each team member</li>
+          <li>Identify who has used most/least vacation</li>
+          <li>Ensure equitable vacation distribution</li>
+          <li>Track remaining vacation balances</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Capacity Overview</h3>
+        <p className="mb-4">High-level metrics for quick assessment:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Pending Requests:</strong> Number awaiting your decision</li>
+          <li><strong>Critical Days:</strong> Days below minimum staffing</li>
+          <li><strong>Warning Days:</strong> Days approaching minimum staffing</li>
+          <li><strong>Average Capacity:</strong> Overall team availability percentage</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Recommendation Engine</h3>
+        <p className="mb-4">AI-powered suggestions for optimal vacation dates:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Suggests periods with lowest coverage impact</li>
+          <li>Considers historical vacation patterns</li>
+          <li>Respects team capacity requirements</li>
+          <li>Identifies safe vacation windows</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">What-If Scenarios</h3>
+        <p className="mb-4">Test vacation approval decisions before committing:</p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Select a pending vacation request</li>
+          <li>Click <strong>"Test Scenario"</strong></li>
+          <li>See how approval would impact coverage</li>
+          <li>View updated heatmap and capacity metrics</li>
+          <li>Make informed approval/rejection decisions</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Manual Vacation Entry</h3>
+        <p className="mb-4">Manually add vacation entries for planning purposes:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Useful for pre-approved vacation or known absences</li>
+          <li>Enter directly from the calendar view</li>
+          <li>Automatically updates coverage calculations</li>
+          <li>Can be converted to formal requests later</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Export Tools</h3>
+        <p className="mb-4">Generate reports for management and planning:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Excel Export:</strong> Full vacation data for analysis</li>
+          <li><strong>Coverage Report:</strong> Detailed capacity analysis</li>
+          <li><strong>Fairness Report:</strong> Vacation distribution metrics</li>
+          <li><strong>PDF Summary:</strong> Executive summary for stakeholders</li>
+        </ul>
+
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Best Practice: Regular Review</AlertTitle>
+          <AlertDescription>
+            Review the Vacation Planning Dashboard weekly, especially before approving new requests. 
+            This ensures you maintain adequate coverage and identify potential issues early.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="country-specific-shifts">
+        <h2 className="text-2xl font-bold mb-4">6.5 Country-Specific Shift Configuration</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          The system supports country-specific shift definitions to accommodate regional differences 
+          in work patterns, weekend definitions, and business hours.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Understanding Country Codes</h3>
+        <p className="mb-4">
+          Shift time definitions can be configured for specific countries using standard ISO country codes:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>GB/UK:</strong> United Kingdom (both codes supported)</li>
+          <li><strong>DK:</strong> Denmark</li>
+          <li><strong>NO:</strong> Norway</li>
+          <li><strong>SE:</strong> Sweden</li>
+          <li><strong>BE:</strong> Belgium</li>
+          <li><strong>NL:</strong> Netherlands</li>
+          <li><strong>DE:</strong> Germany</li>
+          <li>And many more standard ISO 3166-1 alpha-2 codes</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Country Code Normalization</AlertTitle>
+          <AlertDescription>
+            The system automatically normalizes GB to UK for consistency. Both codes work 
+            interchangeably throughout the application.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-4">Configuring Country-Specific Shifts</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Shift Time Definitions</strong></li>
+          <li>Click <strong>"Add New Definition"</strong></li>
+          <li>Select the shift type (Early, Late, Normal, Weekend)</li>
+          <li>Set start and end times</li>
+          <li>Select applicable country codes (can select multiple)</li>
+          <li>Optionally specify days of week this shift applies to</li>
+          <li>Select which teams can use this shift definition</li>
+          <li>Save the configuration</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Weekend Shift Differences by Country</h3>
+        <p className="mb-4">
+          Different countries have different weekend definitions and practices:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Most European Countries:</strong> Saturday-Sunday weekend</li>
+          <li><strong>Some Middle Eastern Countries:</strong> Friday-Saturday or Thursday-Friday weekend</li>
+          <li><strong>Weekend Work:</strong> Some countries have different weekend shift patterns</li>
+          <li>System respects country-specific weekend definitions for holiday detection</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Multi-Country Teams</h3>
+        <p className="mb-4">For teams spanning multiple countries:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Create shift definitions applicable to multiple country codes</li>
+          <li>System uses team member's profile country code to determine applicable shifts</li>
+          <li>Holiday detection respects each user's country and region</li>
+          <li>Coverage calculations account for regional differences</li>
+        </ul>
+
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Best Practice</AlertTitle>
+          <AlertDescription>
+            When managing multi-country teams, create separate shift definitions for each country 
+            rather than trying to use one-size-fits-all definitions. This ensures compliance with 
+            local labor laws and cultural norms.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="coverage-analysis">
+        <h2 className="text-2xl font-bold mb-4">7. Coverage Analysis & Monitoring</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Comprehensive coverage analysis tools help you identify gaps, monitor capacity, and 
+          maintain adequate staffing levels across all teams.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Coverage Alerts</h3>
+        <p className="mb-4">The system automatically detects and highlights coverage concerns:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Critical Gaps:</strong> Days below minimum staffing (red alerts)</li>
+          <li><strong>Warning Gaps:</strong> Days approaching minimums (yellow alerts)</li>
+          <li>Alerts appear directly on schedule views</li>
+          <li>Dashboard shows summary of critical and warning days</li>
+          <li>Partnership alerts for cross-team capacity issues</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Coverage Heatmap</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Coverage Analysis</strong></li>
+          <li>Select team(s) or partnership</li>
+          <li>Choose date range to analyze</li>
+          <li>View color-coded heatmap:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li><strong>Green:</strong> Full coverage (100%+ of minimum)</li>
+              <li><strong>Yellow:</strong> Adequate (80-99% of minimum)</li>
+              <li><strong>Orange:</strong> Warning (60-79% of minimum)</li>
+              <li><strong>Red:</strong> Critical (below 60% of minimum)</li>
+            </ul>
+          </li>
+          <li>Click any day for detailed breakdown</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Capacity Configuration</h3>
+        <p className="mb-4">Configure coverage requirements at team and partnership levels:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Team Capacity:</strong> Set min/max staff per team per day</li>
+          <li><strong>Partnership Capacity:</strong> Set combined minimums across partnership teams</li>
+          <li><strong>Weekend Settings:</strong> Different requirements for weekends</li>
+          <li><strong>Holiday Exclusions:</strong> Option to exclude holidays from coverage calculations</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Exporting Coverage Reports</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>From Coverage Analysis view, click <strong>"Export"</strong></li>
+          <li>Choose format: Excel (.xlsx) or PDF</li>
+          <li>Select report type:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li><strong>Gap Report:</strong> Lists all critical and warning days</li>
+              <li><strong>Coverage Summary:</strong> Statistics and trends</li>
+              <li><strong>Detailed Breakdown:</strong> Day-by-day staffing levels</li>
+            </ul>
+          </li>
+          <li>Download for management review or archival</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Using Coverage Insights</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Check coverage before approving vacation requests</li>
+          <li>Identify recurring coverage gaps needing attention</li>
+          <li>Proactively schedule to prevent coverage issues</li>
+          <li>Balance coverage across partnership teams</li>
+          <li>Justify staffing needs with concrete coverage data</li>
+        </ul>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Proactive Management</AlertTitle>
+          <AlertDescription>
+            Regular coverage monitoring (weekly reviews recommended) helps identify and address 
+            gaps before they become critical. Prevention is easier than firefighting.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="quick-access-tools">
+        <h2 className="text-2xl font-bold mb-4">8. Quick Access & Organization Tools</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Organization tools help you quickly access frequently used teams and views, improving 
+          efficiency when managing multiple teams and complex schedules.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Team Favorites</h3>
+        <p className="mb-4">Save frequently accessed team combinations for quick access:</p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to any schedule view</li>
+          <li>Select the teams you frequently work with together</li>
+          <li>Click <strong>"Save as Favorite"</strong> (star icon)</li>
+          <li>Give your favorite a descriptive name (e.g., "My Managed Teams")</li>
+          <li>Access saved favorites from the team dropdown instantly</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Schedule Bookmarks</h3>
+        <p className="mb-4">Bookmark important schedule configurations:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Save specific date ranges, filters, and views</li>
+          <li>Quickly return to important planning periods</li>
+          <li>Bookmark vacation planning views for seasonal peaks</li>
+          <li>Save multi-team configurations for partnerships</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Team Grouping</h3>
+        <p className="mb-4">Create logical team groups for organizational clarity:</p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Team Management → Team Groups</strong></li>
+          <li>Click <strong>"Create Group"</strong></li>
+          <li>Name your group (e.g., "Engineering Teams", "Support Teams")</li>
+          <li>Select teams to include in the group</li>
+          <li>Use groups to filter and organize multi-team views</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Context-Specific Favorites</h3>
+        <p className="mb-4">Favorites are saved per view context:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Schedule View Favorites:</strong> For regular schedule management</li>
+          <li><strong>Multi-Team Favorites:</strong> For partnership and cross-team planning</li>
+          <li>Each context maintains separate favorites for relevance</li>
+          <li>Quickly switch between different planning contexts</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Efficiency Tip</AlertTitle>
+          <AlertDescription>
+            Create favorites for common scenarios like "Weekly Review" (all your teams), 
+            "On-Call Planning" (partnership teams), or "Vacation Approval" (high-demand teams). 
+            This saves time and reduces clicks.
           </AlertDescription>
         </Alert>
       </section>

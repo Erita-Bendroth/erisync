@@ -81,6 +81,61 @@ export const TeamMemberManual = () => {
           <li><strong>Other:</strong> Other scheduled activities (usually shown in gray)</li>
         </ul>
 
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Country-Specific Shifts</AlertTitle>
+          <AlertDescription>
+            Shift definitions may vary by country and region. For example, some countries 
+            consider Saturday a work day while others treat it as weekend. Your team's shift 
+            configuration reflects your location's norms.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
+      <section id="personal-calendar">
+        <h2 className="text-2xl font-bold mb-4">2.5 Personal Monthly Calendar</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Your Personal Calendar provides a focused view of YOUR upcoming shifts, making it easy 
+          to see your schedule at a glance without team distractions.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">Accessing Your Personal Calendar</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Personal Calendar</strong></li>
+          <li>View your personal monthly calendar</li>
+          <li>See only YOUR shifts across all your teams</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">What You'll See</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Your Shifts Only:</strong> Focus on your schedule without team clutter</li>
+          <li><strong>Color-Coded Activities:</strong> Work, vacation, training, etc. clearly distinguished</li>
+          <li><strong>Shift Details:</strong> Click any day to see full shift information</li>
+          <li><strong>Multi-Team View:</strong> If you're on multiple teams, see all your shifts together</li>
+          <li><strong>Monthly Overview:</strong> Plan ahead with full month visibility</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Why Use Personal Calendar?</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Quick personal schedule overview without team information</li>
+          <li>Easy to share your availability with family and friends</li>
+          <li>Plan personal appointments around your work schedule</li>
+          <li>See your shift patterns and rotation at a glance</li>
+          <li>Export your personal schedule for external calendars</li>
+        </ul>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Focus on What Matters</AlertTitle>
+          <AlertDescription>
+            The Personal Calendar filters out all team members except you, giving you a clean, 
+            uncluttered view of YOUR schedule perfect for personal planning.
+          </AlertDescription>
+        </Alert>
+
         
         <ol className="list-decimal list-inside space-y-2 mb-4">
           
@@ -280,13 +335,22 @@ export const TeamMemberManual = () => {
 
         <h3 className="text-xl font-semibold mb-3">After Submitting a Request</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Your request goes to your manager/planner for approval</li>
+          <li>Your request goes to your manager for approval</li>
           <li>You can view your pending requests in <strong>Schedule → My Swap Requests</strong></li>
           <li>You'll receive a notification when the request is approved or rejected</li>
           <li>If approved, the shifts are automatically swapped in the schedule</li>
         </ol>
 
-        <h3 className="text-xl font-semibold mb-3">Tracking Your Swap Requests</h3>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Who Approves Swap Requests?</AlertTitle>
+          <AlertDescription>
+            Shift swap requests are reviewed and approved by your team's Manager. Planners and 
+            Admins can also approve swaps across all teams if needed.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-4">Tracking Your Swap Requests</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
           <li><strong>Pending:</strong> Request submitted, waiting for manager approval</li>
           <li><strong>Approved:</strong> Swap approved, shifts have been exchanged</li>
@@ -307,10 +371,11 @@ export const TeamMemberManual = () => {
           <AlertTitle>Important Rules</AlertTitle>
           <AlertDescription>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Swaps require manager/planner approval - they are not automatic</li>
+              <li>Swaps require manager approval - they are not automatic</li>
               <li>You cannot swap shifts on past dates</li>
               <li>Both you and your colleague must be able to work the swapped shifts</li>
               <li>Team coverage needs may result in rejection even if both parties agree</li>
+              <li>Approval timeline varies - plan ahead for important swaps</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -336,8 +401,29 @@ export const TeamMemberManual = () => {
         <ul className="list-disc list-inside space-y-2 mb-4">
           <li>Use the team availability view to see real-time availability</li>
           <li>Check before requesting vacation to see team coverage</li>
-          <li>Coordinate with teammates for shift swaps (contact your manager)</li>
+          <li>Coordinate with teammates for shift swaps</li>
         </ul>
+
+        <h3 className="text-xl font-semibold mb-3 mt-4">Partner Team Availability</h3>
+        <p className="mb-4">
+          If your team is part of a Planning Partnership with other teams, you may be able to 
+          view partner team schedules for coordination:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Access <strong>Multi-Team View</strong> to see partnership teams</li>
+          <li>View partner team availability for cross-functional coordination</li>
+          <li>Useful when your work depends on other teams' availability</li>
+          <li>Helps coordinate cross-team projects and coverage</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Partnerships</AlertTitle>
+          <AlertDescription>
+            Planning Partnerships are created by your Planner to connect teams that need to 
+            coordinate coverage, such as support teams, cross-functional groups, or backup teams.
+          </AlertDescription>
+        </Alert>
 
         <h3 className="text-xl font-semibold mb-3">Understanding Coverage Needs</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
