@@ -246,6 +246,18 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           countryCode: (tm.profiles as any).country_code || 'US',
           regionCode: (tm.profiles as any).region_code
         })) || [];
+      } else if (wizardData.mode === "users") {
+        // Handle users mode - fetch selected users with their country codes
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, country_code, region_code")
+          .in("user_id", wizardData.selectedUsers || []);
+        
+        usersToSchedule = profiles?.map(p => ({
+          userId: p.user_id,
+          countryCode: p.country_code || 'US',
+          regionCode: p.region_code
+        })) || [];
       } else if (wizardData.mode === "rotation") {
         const { data: profiles } = await supabase
           .from("profiles")
