@@ -503,45 +503,52 @@ export const PlannerManual = () => {
       <section id="vacation-requests">
         <h2 className="text-2xl font-bold mb-4">5. Vacation Request Management</h2>
         
-        <h3 className="text-xl font-semibold mb-3">Viewing Requests</h3>
-        <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Navigate to <strong>Schedule → Vacation Requests</strong></li>
-          <li>View all pending requests across all teams</li>
-          <li>Filter by team, user, or date range</li>
-        </ol>
-
-        <h3 className="text-xl font-semibold mb-3">Approving Requests</h3>
-        <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Review the request details (dates, duration, notes)</li>
-          <li>Check team availability and coverage</li>
-          <li>Click <strong>"Approve"</strong></li>
-          <li>The system automatically creates vacation schedule entries</li>
-          <li>User receives approval notification</li>
-        </ol>
-
-        <div className="my-4">
-          
-        </div>
-
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertTitle>Planner-Only Action</AlertTitle>
+        <Alert className="bg-primary/5 border-primary/20 mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Planner Oversight</AlertTitle>
           <AlertDescription>
-            Only Planners and Admins can approve or reject vacation requests. Managers can 
-            view requests but must contact you to have them processed.
+            As a planner, you have visibility of all vacation requests across teams. Managers are the primary approvers for their teams, but you can approve/reject requests when needed. You receive notifications when managers approve requests in your oversight area.
           </AlertDescription>
         </Alert>
-
-        <h3 className="text-xl font-semibold mb-3">Rejecting Requests</h3>
+        
+        <h3 className="text-xl font-semibold mb-3">Your Role in Vacation Approvals</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Primary Approvers:</strong> Team managers approve vacation requests for their direct reports</li>
+          <li><strong>Notifications:</strong> You receive notifications when managers in your teams approve requests</li>
+          <li><strong>Oversight Access:</strong> You can view all vacation requests across your teams</li>
+          <li><strong>Can Approve:</strong> You can approve or reject requests if needed (e.g., manager unavailable)</li>
+          <li><strong>Capacity Planning:</strong> Use approval notifications to monitor team capacity</li>
+        </ul>
+        
+        <h3 className="text-xl font-semibold mb-3">Viewing Vacation Requests</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Click <strong>"Reject"</strong> on the request</li>
-          <li>Provide a reason for rejection (required)</li>
-          <li>User receives rejection notification with reason</li>
+          <li>Navigate to <strong>Schedule → My Requests</strong></li>
+          <li>See all vacation requests across your teams</li>
+          <li>Filter by status: Pending, Approved, Rejected</li>
+          <li>Review request details including dates and notes</li>
         </ol>
+        
+        <h3 className="text-xl font-semibold mb-3">When to Intervene</h3>
+        <p className="mb-2">You should approve/reject requests directly when:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>A manager is unavailable or on vacation</li>
+          <li>Cross-team capacity concerns require immediate action</li>
+          <li>The request affects multiple teams you oversee</li>
+          <li>There's a dispute or special circumstance</li>
+        </ul>
+        
+        <h3 className="text-xl font-semibold mb-3">Capacity Planning with Notifications</h3>
+        <p className="mb-2">When managers approve vacation requests, you receive email notifications that help you:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Track vacation trends across teams</li>
+          <li>Identify potential coverage gaps</li>
+          <li>Plan for cross-team support if needed</li>
+          <li>Coordinate with other managers on staffing</li>
+        </ul>
 
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertTitle>Multi-Day Requests</AlertTitle>
+        <Alert className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Working Days</AlertTitle>
           <AlertDescription>
             Multi-day vacation requests automatically exclude weekends when calculating working days.
             Approval creates vacation entries for each working day in the range.

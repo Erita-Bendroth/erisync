@@ -268,8 +268,8 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
 
     if (!selectedPlannerId) {
       toast({
-        title: "Planner required",
-        description: "Please select a planner to review your request.",
+        title: "Manager required",
+        description: "Please select a manager to review your request.",
         variant: "destructive",
       });
       return;

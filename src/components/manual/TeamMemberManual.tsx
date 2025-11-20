@@ -184,8 +184,7 @@ export const TeamMemberManual = () => {
           <Info className="h-4 w-4" />
           <AlertTitle>Who Approves Requests?</AlertTitle>
           <AlertDescription>
-            Only Planners and Admins can approve vacation requests. Your manager can view 
-            your request but cannot approve it - a Planner will review and make the decision.
+            Your direct manager approves vacation requests for your team. After approval, planners in your parent team are notified for capacity planning purposes.
           </AlertDescription>
         </Alert>
 
@@ -203,11 +202,11 @@ export const TeamMemberManual = () => {
           <li>Creates vacation entries for each working day in the range</li>
         </ul>
 
-        <h3 className="text-xl font-semibold mb-3">Choosing Which Planner to Send To</h3>
+        <h3 className="text-xl font-semibold mb-3">Selecting Your Manager</h3>
         <ul className="list-disc list-inside space-y-2 mb-4">
-          <li>Select from available planners/admins in the dropdown</li>
-          <li>Choose the planner who typically manages your team's schedule</li>
-          <li>If unsure, ask your manager which planner to select</li>
+          <li>Select your team manager from the dropdown</li>
+          <li>The dropdown shows managers who oversee your team</li>
+          <li>If no managers are listed, contact your administrator</li>
         </ul>
 
         <Alert>
