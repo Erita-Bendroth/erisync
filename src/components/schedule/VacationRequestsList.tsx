@@ -491,12 +491,61 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   const handleBulkApprove = async () => {
     if (selectedRequestIds.size === 0) return;
 
-    const requestsToApprove = groupedRequests.filter(r => selectedRequestIds.has(r.id));
+    const requestsToApprove = groupedRequests.filter(r => selectedRequestIds.has(r.id) && r.status === 'pending');
+    if (requestsToApprove.length === 0) {
+      toast({
+        title: "No pending requests",
+        description: "Please select pending requests to approve.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessingId('bulk');
     let successCount = 0;
     let errorCount = 0;
 
     for (const request of requestsToApprove) {
       try {
+        await handleApprove(request);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+      }
+    }
+
+    setSelectedRequestIds(new Set());
+    setProcessingId(null);
+    
+    toast({
+      title: successCount > 0 ? "Bulk approval complete" : "Bulk approval failed",
+      description: `${successCount} approved, ${errorCount} failed`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+  };
+
+  const handleBulkReject = () => {
+    if (selectedRequestIds.size === 0) return;
+    setBulkRejectDialogOpen(true);
+  };
+
+  const confirmBulkReject = async () => {
+    if (!bulkRejectionReason.trim()) {
+      toast({
+        title: "Reason required",
+        description: "Please provide a reason for rejection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const requestsToReject = groupedRequests.filter(r => selectedRequestIds.has(r.id) && r.status === 'pending');
+    setProcessingId('bulk');
+    let successCount = 0;
+
+    for (const request of requestsToReject) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
         const { error: updateError } = await supabase
           .from('vacation_requests')
           .update({ 
