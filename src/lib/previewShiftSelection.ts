@@ -56,6 +56,7 @@ export async function fetchTeamShiftDefinitions(teamId: string): Promise<ShiftTi
       desc: s.description,
       team_id: s.team_id,
       team_ids: s.team_ids,
+      country_codes: s.country_codes,
       teamIdsType: typeof s.team_ids
     }))
   );

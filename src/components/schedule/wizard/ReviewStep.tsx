@@ -740,12 +740,18 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                               const userTime = userShift 
                                 ? `${userShift.startTime} - ${userShift.endTime}`
                                 : fallbackTime;
+                              const userShiftDesc = userShift?.description || shiftLabel;
                               return (
-                                <div key={idx} className="flex justify-between gap-2">
-                                  <span>• {user.name}</span>
-                                  <span className="text-muted-foreground font-mono text-[10px]">
-                                    {userTime}
-                                  </span>
+                                <div key={idx} className="space-y-0.5">
+                                  <div className="flex justify-between gap-2">
+                                    <span>• {user.name}</span>
+                                    <span className="text-muted-foreground font-mono text-[10px]">
+                                      {userTime}
+                                    </span>
+                                  </div>
+                                  <div className="pl-3 text-[10px] text-muted-foreground italic">
+                                    {userShiftDesc}
+                                  </div>
                                 </div>
                               );
                             })}
