@@ -66,6 +66,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState<'partnership' | 'multi-team'>('partnership');
   const [selectedPartnershipId, setSelectedPartnershipId] = useState<string>('');
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   // Access control for partnership views
   const accessControl = useScheduleAccessControl({ 
@@ -100,6 +101,31 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
   const holidayRefetchTrigger = useHolidayRefetch();
+
+  // Handle favorite from URL parameter
+  useEffect(() => {
+    if (initialLoadDone) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const favoriteId = urlParams.get('favorite');
+    
+    if (favoriteId && favorites.length > 0) {
+      const favorite = favorites.find(f => f.id === favoriteId);
+      if (favorite) {
+        setSelectionMode('multi-team');
+        setTeamIds(favorite.team_ids);
+        toast({
+          title: "Favorite Loaded",
+          description: `Showing teams for "${favorite.name}"`,
+        });
+        setInitialLoadDone(true);
+        
+        // Clean up URL parameter
+        const newUrl = window.location.pathname + '?tab=unified-scheduler';
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [favorites, initialLoadDone, toast]);
 
   // Load partnership capacity config
   useEffect(() => {

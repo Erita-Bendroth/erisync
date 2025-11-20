@@ -27,6 +27,8 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
+import { useTeamFavorites } from '@/hooks/useTeamFavorites';
+import { Star } from 'lucide-react';
 
 export function AppSidebar() {
   const location = useLocation();
@@ -58,6 +60,8 @@ export function AppSidebar() {
     { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { title: 'Analytics', icon: BarChart3, path: '/analytics' },
   ];
+
+  const { favorites } = useTeamFavorites('multi-team');
 
   const scheduleNavItems = [
     { title: 'My Schedule', icon: Calendar, path: '/schedule?tab=schedule' },
@@ -120,13 +124,38 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
 
-        {/* Management Section (for managers/planners only) */}
-        {isManagerOrPlanner && (
-          <>
+      {/* Quick Access / Favorites Section */}
+      {favorites.length > 0 && (
+        <>
+          <Separator />
+          <SidebarGroup>
+            <SidebarGroupLabel>Quick Access</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {favorites.map((favorite) => (
+                  <SidebarMenuItem key={favorite.id}>
+                    <SidebarMenuButton
+                      onClick={() => navigate(`/schedule?tab=unified-scheduler&favorite=${favorite.id}`)}
+                      tooltip={favorite.name}
+                    >
+                      <Star className="h-4 w-4" />
+                      <span>{favorite.name}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </>
+      )}
+
+      {/* Management Section (for managers/planners only) */}
+      {isManagerOrPlanner && (
+        <>
             <Separator />
             <SidebarGroup>
               <SidebarGroupLabel>Management</SidebarGroupLabel>
