@@ -6,7 +6,6 @@ import { ReactNode } from 'react';
 
 interface DraggableSidebarMenuItemProps {
   id: string;
-  isReorderMode: boolean;
   onClick?: () => void;
   isActive?: boolean;
   tooltip?: string;
@@ -16,7 +15,6 @@ interface DraggableSidebarMenuItemProps {
 
 export function DraggableSidebarMenuItem({
   id,
-  isReorderMode,
   onClick,
   isActive,
   tooltip,
@@ -30,7 +28,7 @@ export function DraggableSidebarMenuItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id, disabled: !isReorderMode });
+  } = useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -39,22 +37,20 @@ export function DraggableSidebarMenuItem({
   };
 
   return (
-    <SidebarMenuItem ref={setNodeRef} style={style}>
+    <SidebarMenuItem ref={setNodeRef} style={style} className="group">
       <SidebarMenuButton
-        onClick={isReorderMode ? undefined : onClick}
+        onClick={onClick}
         isActive={isActive}
         tooltip={tooltip}
-        className={isReorderMode ? 'cursor-grab active:cursor-grabbing' : ''}
+        className="cursor-pointer"
       >
-        {isReorderMode && (
-          <div
-            {...attributes}
-            {...listeners}
-            className="flex items-center mr-2 cursor-grab active:cursor-grabbing touch-none"
-          >
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </div>
-        )}
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex items-center mr-2 cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
         {icon}
         <span>{label}</span>
       </SidebarMenuButton>
