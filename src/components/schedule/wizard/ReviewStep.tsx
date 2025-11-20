@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WizardData } from "./BulkScheduleWizard";
 import { format, eachDayOfInterval, isWeekend as isWeekendDate, addDays, getDay } from "date-fns";
-import { Calendar, Users, Clock, CheckCircle2, Loader2, ArrowLeftRight } from "lucide-react";
+import { Calendar, Users, Clock, CheckCircle2, Loader2, ArrowLeftRight, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -286,40 +286,6 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
           // Check if the SCHEDULED date is a holiday for ANY of the users
           // We'll check per-user in the loop below
           
-          // Use shift pattern info if available, otherwise use smart shift selection
-          let finalShiftInfo;
-          if (shiftInfo) {
-            finalShiftInfo = {
-              shiftType: mapShiftTypeToEnum(shiftInfo.shiftType),
-              shiftName: shiftInfo.shiftName,
-              startTime: shiftInfo.startTime,
-              endTime: shiftInfo.endTime,
-            };
-          } else if (shiftDefinitions.length > 0 && wizardData.shiftType) {
-            // Use smart selection based on day of week
-            const smartShift = getShiftForDate(
-              scheduledDate,
-              wizardData.shiftType,
-              true, // autoDetectWeekends
-              null, // weekendOverrideShiftId
-              shiftDefinitions
-            );
-            finalShiftInfo = {
-              shiftType: mapShiftTypeToEnum(smartShift.shiftType),
-              shiftName: smartShift.description || wizardData.shiftName || "Day Shift",
-              startTime: smartShift.startTime,
-              endTime: smartShift.endTime,
-            };
-          } else {
-            // Final fallback to wizard data
-            finalShiftInfo = {
-              shiftType: mapShiftTypeToEnum(wizardData.shiftType),
-              shiftName: wizardData.shiftName || "Day Shift",
-              startTime: wizardData.startTime || "08:00",
-              endTime: wizardData.endTime || "16:30",
-            };
-          }
-          
           for (const userProfile of usersToSchedule) {
             // Validate user ID
             if (!userProfile.userId) {
@@ -342,6 +308,41 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             if (skipDueToHoliday) {
               console.log(`Skipping ${scheduledDateStr} for user ${userProfile.userId} - holiday in their location`);
               continue;
+            }
+
+            // Calculate shift info for THIS specific user with THEIR country code
+            let finalShiftInfo;
+            if (shiftInfo) {
+              finalShiftInfo = {
+                shiftType: mapShiftTypeToEnum(shiftInfo.shiftType),
+                shiftName: shiftInfo.shiftName,
+                startTime: shiftInfo.startTime,
+                endTime: shiftInfo.endTime,
+              };
+            } else if (shiftDefinitions.length > 0 && wizardData.shiftType) {
+              // Use smart selection based on day of week AND USER'S COUNTRY
+              const smartShift = getShiftForDate(
+                scheduledDate,
+                wizardData.shiftType,
+                true, // autoDetectWeekends
+                null, // weekendOverrideShiftId
+                shiftDefinitions,
+                userProfile.countryCode  // Pass user's country code
+              );
+              finalShiftInfo = {
+                shiftType: mapShiftTypeToEnum(smartShift.shiftType),
+                shiftName: smartShift.description || wizardData.shiftName || "Day Shift",
+                startTime: smartShift.startTime,
+                endTime: smartShift.endTime,
+              };
+            } else {
+              // Final fallback to wizard data
+              finalShiftInfo = {
+                shiftType: mapShiftTypeToEnum(wizardData.shiftType),
+                shiftName: wizardData.shiftName || "Day Shift",
+                startTime: wizardData.startTime || "08:00",
+                endTime: wizardData.endTime || "16:30",
+              };
             }
 
             // Format time information as JSON in notes
@@ -545,6 +546,15 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             <span className="text-muted-foreground">Skip Holidays:</span>
             <span className="font-medium">{wizardData.skipHolidays ? "Yes" : "No"}</span>
           </div>
+          {shiftDefinitions.some(def => def.country_codes && def.country_codes.length > 0) && (
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <Globe className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                Location-specific shift times configured
+              </span>
+              <Badge variant="outline" className="text-xs">Auto-assigned</Badge>
+            </div>
+          )}
           {wizardData.fairnessMode && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Fairness Mode:</span>
@@ -613,7 +623,8 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                       wizardData.shiftType,
                       true, // autoDetectWeekends
                       null, // weekendOverrideShiftId
-                      shiftDefinitions
+                      shiftDefinitions,
+                      undefined  // Preview: show generic/global shift
                     )
                   : null;
 
