@@ -1216,6 +1216,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_time_allowances: {
+        Row: {
+          created_at: string
+          flextime_hours_allowance: number
+          id: string
+          is_override: boolean
+          set_by: string | null
+          updated_at: string
+          user_id: string
+          vacation_days_allowance: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          flextime_hours_allowance?: number
+          id?: string
+          is_override?: boolean
+          set_by?: string | null
+          updated_at?: string
+          user_id: string
+          vacation_days_allowance?: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          flextime_hours_allowance?: number
+          id?: string
+          is_override?: boolean
+          set_by?: string | null
+          updated_at?: string
+          user_id?: string
+          vacation_days_allowance?: number
+          year?: number
+        }
+        Relationships: []
+      }
       vacation_requests: {
         Row: {
           approved_at: string | null
@@ -1605,6 +1641,10 @@ export type Database = {
         }[]
       }
       get_user_teams: { Args: { _user_id: string }; Returns: string[] }
+      get_user_time_stats: {
+        Args: { _team_ids: string[]; _user_id: string; _year: number }
+        Returns: Json
+      }
       global_search: {
         Args: {
           _current_user_id: string
@@ -1670,6 +1710,8 @@ export type Database = {
         }[]
       }
       mask_email: { Args: { email: string }; Returns: string }
+      parse_hours_from_notes: { Args: { notes: string }; Returns: number }
+      reset_annual_allowances: { Args: never; Returns: undefined }
       revoke_manager_delegation: {
         Args: { _delegation_id: string; _revoked_by: string }
         Returns: Json
