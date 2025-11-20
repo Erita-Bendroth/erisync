@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Drawer,
   DrawerClose,
@@ -28,6 +28,15 @@ export const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
   children,
   footer,
 }) => {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top when drawer opens
+  useEffect(() => {
+    if (open && contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [open]);
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
@@ -46,7 +55,10 @@ export const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
             </div>
           </DrawerHeader>
         )}
-        <div className="px-4 pb-4 max-h-[60vh] overflow-y-auto">
+        <div 
+          ref={contentRef}
+          className="px-4 pb-4 pt-2 max-h-[70vh] overflow-y-auto"
+        >
           {children}
         </div>
         {footer && (
