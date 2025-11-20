@@ -247,7 +247,7 @@ export const BulkGenerationPreview = ({
   const uniqueShifts = new Map<string, { description: string; count: number; times: string }>();
   userBreakdown.forEach(user => {
     user.shifts.forEach(shift => {
-      const key = `${shift.type}-${shift.times}`;
+      const key = `${shift.description}-${shift.times}`;
       if (uniqueShifts.has(key)) {
         uniqueShifts.get(key)!.count += shift.count;
       } else {
