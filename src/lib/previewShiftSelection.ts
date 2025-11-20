@@ -11,6 +11,7 @@ export interface ShiftTimeDefinition {
   team_id: string | null;
   team_ids: string[] | null;
   region_code: string | null;
+  country_codes?: string[] | null;
 }
 
 export interface DayShiftPreview {
@@ -70,7 +71,8 @@ export function getShiftForDate(
   selectedShiftType: string,
   autoDetectWeekends: boolean,
   weekendOverrideShiftId: string | null,
-  allShifts: ShiftTimeDefinition[]
+  allShifts: ShiftTimeDefinition[],
+  userCountryCode?: string
 ): DayShiftPreview {
   const dayOfWeek = date.getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -130,7 +132,24 @@ export function getShiftForDate(
 
   // Find all shifts matching the selected shift type
   console.log(`   🔍 Looking for shifts of type "${selectedShiftType}"...`);
-  const matchingShifts = allShifts.filter(s => s.shift_type === selectedShiftType);
+  let matchingShifts = allShifts.filter(s => s.shift_type === selectedShiftType);
+  
+  // Filter by country if user country code is provided
+  if (userCountryCode) {
+    console.log(`   🌍 Filtering by country code: ${userCountryCode}`);
+    const countrySpecificShifts = matchingShifts.filter(
+      (shift) => shift.country_codes && shift.country_codes.includes(userCountryCode)
+    );
+    const globalShifts = matchingShifts.filter(
+      (shift) => !shift.country_codes || shift.country_codes.length === 0
+    );
+    
+    // Prioritize country-specific shifts, fall back to global shifts
+    matchingShifts = countrySpecificShifts.length > 0 ? countrySpecificShifts : globalShifts;
+    console.log(`   Found ${countrySpecificShifts.length} country-specific shifts and ${globalShifts.length} global shifts`);
+    console.log(`   Using ${matchingShifts.length} shifts after country filtering`);
+  }
+  
   console.log(`   Found ${matchingShifts.length} shifts:`, 
     matchingShifts.map(s => ({
       desc: s.description,
@@ -262,9 +281,10 @@ export function generateDayPreviews(
   selectedShiftType: string,
   autoDetectWeekends: boolean,
   weekendOverrideShiftId: string | null,
-  allShifts: ShiftTimeDefinition[]
+  allShifts: ShiftTimeDefinition[],
+  userCountryCode?: string
 ): DayShiftPreview[] {
   return days.map(day => 
-    getShiftForDate(day, selectedShiftType, autoDetectWeekends, weekendOverrideShiftId, allShifts)
+    getShiftForDate(day, selectedShiftType, autoDetectWeekends, weekendOverrideShiftId, allShifts, userCountryCode)
   );
 }
