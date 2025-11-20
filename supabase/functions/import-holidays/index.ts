@@ -313,17 +313,26 @@ Deno.serve(async (req) => {
         }
       }
 
-      // German regional holiday mapping - COLLECT ALL matching regions
-      if (!regionalCode && country_code === 'DE') {
-        const holidayName = holiday.localName || holiday.name;
-        
-        // Check ALL German regions to find which ones this holiday belongs to
-        for (const [deRegion, regionalHolidays] of Object.entries(germanRegionalHolidays)) {
-          if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-            matchingGermanRegions.push(deRegion.replace('DE-', ''));
+        // German regional holiday mapping - use API's counties field for accuracy
+        if (country_code === 'DE' && region_code) {
+          const requestedRegion = `DE-${region_code.replace('DE-', '')}`;
+          
+          // Check if the holiday has a counties field from the API
+          if (holiday.counties && Array.isArray(holiday.counties)) {
+            // Only include this holiday if the requested region is in the counties list
+            if (holiday.counties.includes(requestedRegion)) {
+              console.log(`✅ ${holiday.name} applies to ${requestedRegion} - in counties:`, holiday.counties);
+              matchingGermanRegions.push(region_code.replace('DE-', ''));
+            } else {
+              console.log(`❌ Skipping ${holiday.name} for ${requestedRegion} - not in counties:`, holiday.counties);
+              // Skip this holiday - doesn't apply to this region
+            }
+          } else {
+            // No counties field = national holiday, include it for this region
+            console.log(`ℹ️ ${holiday.name} has no counties field - national holiday, creating for ${requestedRegion}`);
+            matchingGermanRegions.push(region_code.replace('DE-', ''));
           }
         }
-      }
 
       // UK regional holiday mapping - use API's counties field for accuracy
       if (country_code === 'GB' && region_code) {
@@ -346,18 +355,24 @@ Deno.serve(async (req) => {
         }
       }
 
-      // For German holidays with multiple regions, create ONE ROW PER REGION
-      if (country_code === 'DE' && matchingGermanRegions.length > 0) {
-        return matchingGermanRegions.map(region => ({
-          name: holiday.localName || holiday.name,
-          date: holiday.date,
-          country_code: holiday.countryCode,
-          year: parseInt(year),
-          is_public: true,
-          user_id: null,
-          region_code: region
-        }));
-      }
+        // For German holidays - ONLY create entries if they apply to the requested region
+        if (country_code === 'DE' && region_code) {
+          // If we checked for this region and it didn't match, skip it entirely
+          if (matchingGermanRegions.length === 0) {
+            return []; // Skip this holiday - doesn't apply to requested region
+          }
+          
+          // Create entry for the matching region
+          return matchingGermanRegions.map(region => ({
+            name: holiday.localName || holiday.name,
+            date: holiday.date,
+            country_code: holiday.countryCode,
+            year: parseInt(year),
+            is_public: true,
+            user_id: null,
+            region_code: region
+          }));
+        }
       
       // For UK holidays - ONLY create entries if they apply to the requested region
       if (country_code === 'GB' && region_code) {
