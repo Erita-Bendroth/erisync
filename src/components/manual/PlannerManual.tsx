@@ -80,12 +80,12 @@ export const PlannerManual = () => {
           <li>User will receive email with new temporary password</li>
         </ol>
 
-        <p className="mb-2"><strong>Bulk Password Reset:</strong></p>
+        
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Navigate to <strong>Bulk Password Reset</strong></li>
-          <li>Select users from the list</li>
-          <li>Click <strong>"Reset Selected Passwords"</strong></li>
-          <li>All selected users will receive new temporary passwords</li>
+          
+          
+          
+          
         </ol>
 
         <Alert variant="destructive" className="mb-4">
