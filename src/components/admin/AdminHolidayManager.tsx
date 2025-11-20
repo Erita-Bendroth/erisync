@@ -873,7 +873,7 @@ const AdminHolidayManager = () => {
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(holiday.date), 'MMM dd, yyyy')}
                             </p>
-                            {holiday.regions && holiday.regions.length > 0 && countryCode === 'DE' && (
+                            {holiday.regions && holiday.regions.length > 0 && (
                               <p className="text-xs text-blue-600 mt-1">
                                 Regions: {holiday.regions.sort().join(', ')}
                               </p>
