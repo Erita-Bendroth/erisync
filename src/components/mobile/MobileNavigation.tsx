@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, FileCheck, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export const MobileNavigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
+  const isNavigating = useRef(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -23,13 +26,32 @@ export const MobileNavigation = () => {
   };
 
   const handleNavigation = (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Prevent double-click spam
+    if (isNavigating.current) {
+      console.log('Navigation already in progress, ignoring');
+      return;
+    }
+    
+    isNavigating.current = true;
+    
     try {
-      e.stopPropagation();
-      e.preventDefault();
       console.log('Mobile navigation to:', path);
-      navigate(path);
+      navigate(path, { replace: false });
     } catch (error) {
       console.error('Navigation error:', error);
+      toast({
+        title: "Navigation Error",
+        description: "Failed to navigate. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Reset navigation lock after a delay
+      setTimeout(() => {
+        isNavigating.current = false;
+      }, 500);
     }
   };
 

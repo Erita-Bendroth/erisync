@@ -74,16 +74,22 @@ export function AppSidebar() {
   const isCollapsed = state === 'collapsed';
   const isActive = (path: string) => location.pathname === path;
 
+  const isManagerOrPlanner = userRole === 'manager' || userRole === 'planner' || userRole === 'admin';
+
   const mainNavItems = [
     { key: 'nav-dashboard', title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { key: 'nav-analytics', title: 'Analytics', icon: BarChart3, path: '/analytics' },
+    ...(isManagerOrPlanner ? [
+      { key: 'nav-analytics', title: 'Analytics', icon: BarChart3, path: '/analytics' }
+    ] : []),
   ];
 
   const { favorites } = useTeamFavorites();
 
   const scheduleNavItems = [
     { key: 'nav-my-schedule', title: 'My Schedule', icon: Calendar, path: '/schedule?tab=schedule' },
-    { key: 'nav-team-scheduler', title: 'Team Scheduler', icon: CalendarCheck, path: '/schedule?tab=unified-scheduler' },
+    ...(isManagerOrPlanner ? [
+      { key: 'nav-team-scheduler', title: 'Team Scheduler', icon: CalendarCheck, path: '/schedule?tab=unified-scheduler' }
+    ] : []),
   ];
 
   const managementNavItems = [
@@ -96,8 +102,6 @@ export function AppSidebar() {
     { key: 'nav-profile', title: 'Profile', icon: UserCircle, path: '/schedule?tab=settings' },
     { key: 'nav-manual', title: 'Manual', icon: BookOpen, path: '/manual' },
   ];
-
-  const isManagerOrPlanner = userRole === 'manager' || userRole === 'planner' || userRole === 'admin';
 
   // Merge all items into a single array
   useEffect(() => {

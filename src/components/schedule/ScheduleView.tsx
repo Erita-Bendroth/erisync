@@ -143,6 +143,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   } = useScheduleAccessControl({ viewMode: 'standard' });
 
 const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
+const weekEnd = addDays(weekStart, 6); // Sunday end
 // Show Monday through Sunday (full week)
 const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
 
@@ -2019,58 +2020,87 @@ const getActivityColor = (entry: ScheduleEntry) => {
         isMobile ? (
           <div className="space-y-3 pb-20">
             {(() => {
-              // Filter to show only current week's entries on mobile
               const now = new Date();
               const isCurrentWeek = workDays.some(day => 
                 isSameDay(day, now)
               );
               
-              // If not viewing current week, show a notice
-              if (!isCurrentWeek) {
-                return (
-                  <Card className="p-6 text-center">
-                    <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-4">
-                      You're viewing week of {format(weekStart, 'MMM d, yyyy')}
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setCurrentWeek(new Date())}
-                    >
-                      Go to Current Week
-                    </Button>
+              return (
+                <>
+                  {/* Current Date Display */}
+                  <Card className="sticky top-0 z-10 bg-background shadow-md">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-base">
+                            {format(now, 'EEEE, MMMM d, yyyy')}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            Week {format(currentWeek, 'w')} • {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
+                          </p>
+                        </div>
+                        {!isCurrentWeek && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setCurrentWeek(new Date())}
+                          >
+                            Today
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
                   </Card>
-                );
-              }
-              
-              const employeeEntries = employees.flatMap((employee) => {
-                const entries = scheduleEntries.filter(
-                  e => e.user_id === employee.user_id && 
-                  workDays.some(day => isSameDay(new Date(e.date), day))
-                );
-                
-                return entries.map((entry) => (
-                  <MobileScheduleCard
-                    key={entry.id}
-                    entry={entry}
-                    onEdit={() => handleEditShift(entry)}
-                    canEdit={(isManager() || isPlanner()) && canEditTeam(entry.team_id)}
-                  />
-                ));
-              });
-              
-              if (employeeEntries.length === 0) {
-                return (
-                  <Card className="p-6 text-center">
-                    <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      No schedule entries for this week
-                    </p>
-                  </Card>
-                );
-              }
-              
-              return employeeEntries;
+
+                  {/* If not viewing current week, show notice */}
+                  {!isCurrentWeek && (
+                    <Card className="p-6 text-center border-warning">
+                      <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-4">
+                        You're viewing past week of {format(weekStart, 'MMM d')}
+                      </p>
+                      <Button 
+                        variant="default" 
+                        onClick={() => setCurrentWeek(new Date())}
+                      >
+                        Go to Current Week
+                      </Button>
+                    </Card>
+                  )}
+
+                  {/* Schedule Entries */}
+                  {(() => {
+                    const employeeEntries = employees.flatMap((employee) => {
+                      const entries = scheduleEntries.filter(
+                        e => e.user_id === employee.user_id && 
+                        workDays.some(day => isSameDay(new Date(e.date), day))
+                      );
+                      
+                      return entries.map((entry) => (
+                        <MobileScheduleCard
+                          key={entry.id}
+                          entry={entry}
+                          onEdit={() => handleEditShift(entry)}
+                          canEdit={(isManager() || isPlanner()) && canEditTeam(entry.team_id)}
+                        />
+                      ));
+                    });
+                    
+                    if (employeeEntries.length === 0) {
+                      return (
+                        <Card className="p-6 text-center">
+                          <Calendar className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            No schedule entries for this week
+                          </p>
+                        </Card>
+                      );
+                    }
+                    
+                    return employeeEntries;
+                  })()}
+                </>
+              );
             })()}
           </div>
         ) : (

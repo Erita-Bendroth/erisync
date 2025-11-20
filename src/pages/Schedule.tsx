@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download, ArrowLeftRight } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
@@ -343,11 +344,48 @@ const Schedule = () => {
   return (
     <div className="space-y-6 pb-20 md:pb-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-1">
-            <TabsTrigger value="admin" className="flex items-center justify-center px-2">
-              <Shield className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">Admin Setup</span>
-            </TabsTrigger>
+          {/* Mobile: Horizontal scrollable tabs */}
+          <ScrollArea className="w-full md:hidden">
+            <TabsList className="inline-flex w-max gap-1 px-1">
+              {(isAdmin() || isPlanner()) && (
+                <TabsTrigger value="admin" className="flex items-center justify-center px-3">
+                  <Shield className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">Admin</span>
+                </TabsTrigger>
+              )}
+              {(isAdmin() || isPlanner() || isManager()) && (
+                <TabsTrigger value="unified-scheduler" className="flex items-center justify-center px-3">
+                  <Calendar className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs">Team</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="schedule" className="flex items-center justify-center px-3">
+                <Calendar className="w-4 h-4 mr-1.5" />
+                <span className="text-xs">Schedule</span>
+              </TabsTrigger>
+              <TabsTrigger value="vacations" className="flex items-center justify-center px-3">
+                <ArrowLeftRight className="w-4 h-4 mr-1.5" />
+                <span className="text-xs">Requests</span>
+              </TabsTrigger>
+              <TabsTrigger value="teams" className="flex items-center justify-center px-3">
+                <Users className="w-4 h-4 mr-1.5" />
+                <span className="text-xs">Teams</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center justify-center px-3">
+                <Settings className="w-4 h-4 mr-1.5" />
+                <span className="text-xs">Settings</span>
+              </TabsTrigger>
+            </TabsList>
+          </ScrollArea>
+
+          {/* Desktop: Grid layout */}
+          <TabsList className="hidden md:grid w-full md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-1">
+            {(isAdmin() || isPlanner()) && (
+              <TabsTrigger value="admin" className="flex items-center justify-center px-2">
+                <Shield className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Admin Setup</span>
+              </TabsTrigger>
+            )}
             {(isAdmin() || isPlanner() || isManager()) && (
               <TabsTrigger value="unified-scheduler" className="flex items-center justify-center px-2">
                 <Calendar className="w-4 h-4 md:mr-2" />
@@ -625,6 +663,11 @@ const Schedule = () => {
 
           <TabsContent value="settings" className="space-y-6">
             <div className="space-y-6">
+              <UserProfileOverview 
+                userId={user!.id}
+                canView={true}
+                showTeamContext={true}
+              />
               <CountrySelector />
               <NotificationSettings />
               <PasswordSettings />
