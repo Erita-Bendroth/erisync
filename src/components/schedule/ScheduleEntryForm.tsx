@@ -374,14 +374,16 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 onValueChange={(value) => setFormData({ ...formData, shift_type: value })}
                 disabled={!formData.team_id || loadingShiftTypes}
               >
-                <SelectTrigger>
+                <SelectTrigger className="truncate">
                   <SelectValue placeholder={
                     !formData.team_id 
                       ? "Select a team first" 
                       : loadingShiftTypes 
                         ? "Loading shifts..." 
                         : "Select shift type"
-                  } />
+                  }>
+                    {formData.shift_type && shiftTypes.find(s => s.type === formData.shift_type)?.label}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-popover border border-border shadow-md z-50 max-h-60 overflow-y-auto">
                   {shiftTypes.map((shift) => (
