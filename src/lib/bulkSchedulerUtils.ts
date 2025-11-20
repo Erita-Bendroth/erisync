@@ -53,12 +53,23 @@ export const calculateBulkEntries = async (
     const dayOfWeek = day.getDay();
     const dateStr = format(day, 'yyyy-MM-dd');
     
-    // Check if this day is a weekend or holiday
-    const isWeekend = config.autoDetectWeekends && isWeekendDate(day);
+    // Check if this day should use weekend/holiday shift
+    const isWeekend = isWeekendDate(day);
     const dateHolidayInfo = holidayMap?.get(dateStr);
+    const hasAnyHoliday = dateHolidayInfo && Array.from(dateHolidayInfo.values()).some(
+      info => info.isPublicHoliday || info.isWeekend
+    );
     
-    // Skip if day is in excluded list AND we're not overriding with holiday detection
-    if (config.excludedDays.includes(dayOfWeek) && !(isWeekend || dateHolidayInfo)) {
+    // Determine if we should include this day:
+    // - Always include if autoDetectWeekends is ON and it's a weekend
+    // - Always include if autoDetectHolidays is ON and there's a holiday
+    // - Otherwise, respect excludedDays list
+    const shouldIncludeDay = 
+      (config.autoDetectWeekends && isWeekend) ||
+      (config.autoDetectHolidays && hasAnyHoliday) ||
+      !config.excludedDays.includes(dayOfWeek);
+    
+    if (!shouldIncludeDay) {
       continue;
     }
 
@@ -76,13 +87,16 @@ export const calculateBulkEntries = async (
       }
       
       // Determine shift to use
-      const shouldUseWeekendShift = (isWeekend || userHolidayInfo?.isPublicHoliday);
+      const shouldUseWeekendShift = 
+        (config.autoDetectWeekends && isWeekend) || 
+        (config.autoDetectHolidays && userHolidayInfo?.isPublicHoliday);
+      
       const shiftIdToUse = await findBestShiftForDate(
         day,
         shouldUseWeekendShift,
         config.teamId,
         config.shiftType,
-        config.weekendShiftOverride
+        config.weekendShiftOverride || null
       );
       
       // Resolve shift type
@@ -121,13 +135,16 @@ export const calculateBulkEntries = async (
         }
         
         // Determine shift to use
-        const shouldUseWeekendShift = (isWeekend || userHolidayInfo?.isPublicHoliday);
+        const shouldUseWeekendShift = 
+          (config.autoDetectWeekends && isWeekend) || 
+          (config.autoDetectHolidays && userHolidayInfo?.isPublicHoliday);
+        
         const shiftIdToUse = await findBestShiftForDate(
           day,
           shouldUseWeekendShift,
           config.teamId,
           config.shiftType,
-          config.weekendShiftOverride
+          config.weekendShiftOverride || null
         );
         
         // Resolve shift type
