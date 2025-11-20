@@ -409,7 +409,7 @@ const HolidayManager = () => {
                             <p className="font-medium text-sm">{holiday.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(holiday.date), 'MMM dd, yyyy')}
-                              {holiday.region_code && (countryCode === 'DE' || countryCode === 'BE') && (
+                              {holiday.region_code && (countryCode === 'DE' || countryCode === 'BE' || countryCode === 'GB') && (
                                 <span className="ml-2 text-xs text-blue-600">
                                   ({holiday.region_code})
                                 </span>
