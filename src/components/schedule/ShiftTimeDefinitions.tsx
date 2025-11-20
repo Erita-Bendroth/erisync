@@ -24,11 +24,29 @@ import { Label } from "@/components/ui/label";
 import { TimeSelect } from "@/components/ui/time-select";
 import { MultiSelectDays } from "@/components/ui/multi-select-days";
 import { MultiSelectTeams } from "@/components/ui/multi-select-teams";
+import { MultiSelectCountries } from "@/components/ui/multi-select-countries";
 import { Plus, Trash2, Save, Users } from "lucide-react";
 import { ShiftTimeDefinition } from "@/lib/shiftTimeUtils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-const REGIONS = ["DE", "UK", "SE", "FR", "CH", "AT"];
+const COUNTRIES = [
+  { code: "AT", name: "Austria" },
+  { code: "BE", name: "Belgium" },
+  { code: "CH", name: "Switzerland" },
+  { code: "DE", name: "Germany" },
+  { code: "DK", name: "Denmark" },
+  { code: "ES", name: "Spain" },
+  { code: "FI", name: "Finland" },
+  { code: "FR", name: "France" },
+  { code: "IE", name: "Ireland" },
+  { code: "IT", name: "Italy" },
+  { code: "NL", name: "Netherlands" },
+  { code: "NO", name: "Norway" },
+  { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" },
+  { code: "SE", name: "Sweden" },
+  { code: "UK", name: "United Kingdom" },
+];
 
 export function ShiftTimeDefinitions() {
   const [definitions, setDefinitions] = useState<ShiftTimeDefinition[]>([]);
@@ -71,6 +89,7 @@ export function ShiftTimeDefinitions() {
       team_id: null,
       team_ids: null,
       region_code: null,
+      country_codes: null,
       shift_type: "normal",
       day_of_week: null,
       start_time: "08:00",
@@ -96,6 +115,7 @@ export function ShiftTimeDefinitions() {
       team_id: null,
       team_ids: def.team_ids && def.team_ids.length > 0 ? def.team_ids : null,
       region_code: def.region_code || null,
+      country_codes: def.country_codes && def.country_codes.length > 0 ? def.country_codes : null,
       day_of_week: def.day_of_week,
       shift_type: def.shift_type,
       start_time: def.start_time,
@@ -188,7 +208,7 @@ export function ShiftTimeDefinitions() {
               <TableRow>
                 <TableHead className="w-[120px]">Shift Type</TableHead>
                 <TableHead className="w-[100px]">Teams</TableHead>
-                <TableHead className="w-[100px]">Region</TableHead>
+                <TableHead className="w-[150px]">Countries</TableHead>
                 <TableHead className="w-[140px]">Day</TableHead>
                 <TableHead className="w-[110px]">Start</TableHead>
                 <TableHead className="w-[110px]">End</TableHead>
@@ -285,28 +305,60 @@ export function ShiftTimeDefinitions() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={def.region_code || "none"}
-                      onValueChange={(value) =>
-                        updateDefinition(
-                          index,
-                          "region_code",
-                          value === "none" ? null : value
-                        )
-                      }
-                    >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">All</SelectItem>
-                        {REGIONS.map((region) => (
-                          <SelectItem key={region} value={region}>
-                            {region}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {def.country_codes && def.country_codes.length > 0 ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-9 w-full justify-start">
+                            {def.country_codes.length} {def.country_codes.length === 1 ? 'country' : 'countries'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px]" align="start">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Selected Countries</p>
+                            <div className="flex flex-wrap gap-1">
+                              {def.country_codes.map((code) => {
+                                const country = COUNTRIES.find(c => c.code === code);
+                                return (
+                                  <Badge key={code} variant="secondary" className="text-xs">
+                                    {country?.name || code}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                            <MultiSelectCountries
+                              countries={COUNTRIES}
+                              selectedCountryCodes={def.country_codes}
+                              onValueChange={(value) =>
+                                updateDefinition(index, "country_codes", value.length > 0 ? value : null)
+                              }
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-9 w-full justify-start text-muted-foreground">
+                            All Countries
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[300px]" align="start">
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Select Countries</p>
+                            <p className="text-xs text-muted-foreground">
+                              Empty = applies to all countries globally
+                            </p>
+                            <MultiSelectCountries
+                              countries={COUNTRIES}
+                              selectedCountryCodes={[]}
+                              onValueChange={(value) =>
+                                updateDefinition(index, "country_codes", value.length > 0 ? value : null)
+                              }
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </TableCell>
                   <TableCell>
                     {def.shift_type === 'weekend' ? (

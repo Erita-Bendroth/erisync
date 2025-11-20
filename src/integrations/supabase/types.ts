@@ -812,6 +812,7 @@ export type Database = {
       }
       shift_time_definitions: {
         Row: {
+          country_codes: string[] | null
           created_at: string
           created_by: string
           day_of_week: number[] | null
@@ -826,6 +827,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          country_codes?: string[] | null
           created_at?: string
           created_by: string
           day_of_week?: number[] | null
@@ -840,6 +842,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          country_codes?: string[] | null
           created_at?: string
           created_by?: string
           day_of_week?: number[] | null

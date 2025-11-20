@@ -5,6 +5,7 @@ export interface ShiftTimeDefinition {
   team_id: string | null;
   team_ids: string[] | null;
   region_code: string | null;
+  country_codes?: string[] | null;
   shift_type: "normal" | "early" | "late" | "weekend";
   day_of_week: number[] | null;
   start_time: string;
