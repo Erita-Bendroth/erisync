@@ -918,7 +918,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="mt-0">
-            <ScrollArea ref={scrollAreaRef} className="h-auto max-h-[calc(100vh-400px)] scroll-area">
+            <ScrollArea ref={scrollAreaRef} className="scroll-area">
               <div className="min-w-max">
               {loading ? (
                 <div className="flex items-center justify-center p-12">
