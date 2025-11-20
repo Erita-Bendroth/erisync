@@ -337,11 +337,12 @@ Deno.serve(async (req) => {
             matchingUKRegions.push(region_code.replace('GB-', ''));
           } else {
             console.log(`❌ Skipping ${holiday.name} for ${requestedRegion} - not in counties:`, holiday.counties);
+            // Skip this holiday - doesn't apply to this region
           }
         } else {
-          // If no counties specified, it's likely a UK-wide holiday
-          console.log(`ℹ️ ${holiday.name} has no counties field - treating as UK-wide for ${requestedRegion}`);
-          matchingUKRegions.push(region_code.replace('GB-', ''));
+          // No counties field = national holiday, should NOT be imported during regional imports
+          console.log(`⚠️ Skipping ${holiday.name} - no counties field (national holiday, import without region_code)`);
+          // Don't add to matchingUKRegions - skip it entirely for regional imports
         }
       }
 
