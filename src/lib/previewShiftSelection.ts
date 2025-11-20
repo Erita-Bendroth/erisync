@@ -90,17 +90,36 @@ export function getShiftForDate(
   // If weekend detection is on and it's a weekend, use weekend shift
   if (autoDetectWeekends && isWeekend) {
     console.log('   🔍 Looking for weekend shift...');
-    const weekendShifts = allShifts.filter(s => s.shift_type === 'weekend');
-    console.log(`   Found ${weekendShifts.length} weekend shifts:`, 
+    let weekendShifts = allShifts.filter(s => s.shift_type === 'weekend');
+    console.log(`   Found ${weekendShifts.length} weekend shifts (before country filter):`, 
       weekendShifts.map(s => ({
         desc: s.description,
         times: `${s.start_time}-${s.end_time}`,
         hasTeamId: !!s.team_id,
-        hasTeamIds: !!(s.team_ids && s.team_ids.length > 0)
+        hasTeamIds: !!(s.team_ids && s.team_ids.length > 0),
+        country_codes: s.country_codes
       })));
     
+    // Filter by country code
+    if (userCountryCode) {
+      console.log(`   🌍 Filtering weekend shifts by country code: ${userCountryCode}`);
+      const countrySpecificWeekendShifts = weekendShifts.filter(
+        (shift) => matchesCountryCode(userCountryCode, shift.country_codes)
+      );
+      const globalWeekendShifts = weekendShifts.filter(
+        (shift) => !shift.country_codes || shift.country_codes.length === 0
+      );
+      
+      // Prioritize country-specific weekend shifts, fall back to global
+      weekendShifts = countrySpecificWeekendShifts.length > 0 
+        ? countrySpecificWeekendShifts 
+        : globalWeekendShifts;
+      
+      console.log(`   Found ${countrySpecificWeekendShifts.length} country-specific weekend shifts and ${globalWeekendShifts.length} global weekend shifts`);
+      console.log(`   Using ${weekendShifts.length} weekend shifts after country filtering`);
+    }
+    
     // Sort weekend shifts: prefer team-specific over global
-    // Team-specific shifts have team_id or team_ids populated
     const sortedWeekendShifts = [...weekendShifts].sort((a, b) => {
       const aIsTeamSpecific = !!(a.team_id || (a.team_ids && a.team_ids.length > 0));
       const bIsTeamSpecific = !!(b.team_id || (b.team_ids && b.team_ids.length > 0));
@@ -116,7 +135,8 @@ export function getShiftForDate(
     if (weekendShift) {
       const isTeamSpecific = !!(weekendShift.team_id || (weekendShift.team_ids && weekendShift.team_ids.length > 0));
       console.log(`   ✅ Selected weekend shift: ${weekendShift.description} (${weekendShift.start_time}-${weekendShift.end_time})`,
-        isTeamSpecific ? '[TEAM-SPECIFIC]' : '[GLOBAL]');
+        isTeamSpecific ? '[TEAM-SPECIFIC]' : '[GLOBAL]',
+        userCountryCode ? `[FOR ${userCountryCode}]` : '');
       return {
         date,
         shiftId: weekendShift.id,
