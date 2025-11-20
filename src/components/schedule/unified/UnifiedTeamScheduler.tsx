@@ -24,6 +24,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useCoverageAnalysis } from '@/hooks/useCoverageAnalysis';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { useHolidayVisibility } from '@/hooks/useHolidayVisibility';
+import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
 import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { TeamFavoritesQuickAccess } from '../TeamFavoritesQuickAccess';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,6 +98,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
+  const holidayRefetchTrigger = useHolidayRefetch();
 
   // Load partnership capacity config
   useEffect(() => {
@@ -344,7 +346,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
       fetchTeamSections();
       fetchScheduleEntries();
     }
-  }, [teamIds, dateStart, rangeType]);
+  }, [teamIds, dateStart, rangeType, holidayRefetchTrigger]);
 
   const fetchTeamSections = async () => {
     setLoading(true);

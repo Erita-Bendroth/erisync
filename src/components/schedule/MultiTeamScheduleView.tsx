@@ -17,6 +17,7 @@ import { CoverageHeatmap } from "./CoverageHeatmap";
 import { TeamCoverageGrid } from "./TeamCoverageGrid";
 import { useCoverageAnalysis } from "@/hooks/useCoverageAnalysis";
 import { useHolidayVisibility } from "@/hooks/useHolidayVisibility";
+import { useHolidayRefetch } from "@/hooks/useHolidayRefetch";
 import { HolidayBadge } from "./HolidayBadge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -79,6 +80,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const [dateRangeType, setDateRangeType] = useState<'1week' | '2weeks' | '1month' | '3months' | '6months'>('1week');
   const { showHolidays, toggleHolidays } = useHolidayVisibility(user?.id);
   const { favorites } = useTeamFavorites('multi-team');
+  const holidayRefetchTrigger = useHolidayRefetch();
   
   // Access control hook for multi-team view mode
   const {
@@ -242,7 +244,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
       prevDateRef.current = currentDate;
       fetchTeamData();
     }
-  }, [selectedTeams, currentDate, screenshotMode]);
+  }, [selectedTeams, currentDate, screenshotMode, holidayRefetchTrigger]);
 
 
   const fetchTeams = async () => {
