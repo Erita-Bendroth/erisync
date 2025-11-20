@@ -505,7 +505,10 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             <div className="font-medium">Shift Times</div>
           </div>
           <div className="text-sm text-muted-foreground">
-            {wizardData.startTime} - {wizardData.endTime}
+            {shiftDefinitions.length > 1 
+              ? "Varies by day (see preview)" 
+              : `${wizardData.startTime} - ${wizardData.endTime}`
+            }
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             {wizardData.shiftName || wizardData.shiftType}
@@ -603,6 +606,23 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                                   wizardData.shiftType === "late" ? "Late" : 
                                   wizardData.shiftType === "night" ? "Night" : "Custom";
                 
+                // Calculate the smart shift time for this specific day
+                const smartShift = shiftDefinitions.length > 0 
+                  ? getShiftForDate(
+                      day,
+                      wizardData.shiftType,
+                      false, // autoDetectWeekends
+                      null, // weekendOverrideShiftId
+                      shiftDefinitions
+                    )
+                  : null;
+
+                const displayTime = smartShift 
+                  ? `${smartShift.startTime} - ${smartShift.endTime}`
+                  : `${wizardData.startTime || "08:00"} - ${wizardData.endTime || "16:30"}`;
+
+                const displayShiftName = smartShift?.description || shiftLabel;
+                
                 return (
                   <Tooltip key={index}>
                     <TooltipTrigger asChild>
@@ -653,7 +673,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                       <div className="space-y-1">
                         <div className="font-medium">{format(day, "MMMM d, yyyy")}</div>
                         <div className="text-xs text-muted-foreground">
-                          {shiftLabel} Shift: {wizardData.startTime || "08:00"} - {wizardData.endTime || "16:30"}
+                          {displayShiftName} Shift: {displayTime}
                         </div>
                         {wizardData.mode === "users" && previewUsers.length > 0 && (
                           <div className="text-xs pt-1 border-t">
