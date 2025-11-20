@@ -256,8 +256,7 @@ export const ManagerManual = () => {
           <Info className="h-4 w-4" />
           <AlertTitle>Proactive Management</AlertTitle>
           <AlertDescription>
-            Review swap requests regularly and provide timely feedback to Planners. This helps 
-            ensure your team's swaps are processed quickly and coverage is maintained.
+            Review swap requests regularly and provide timely feedback to your team members.   
           </AlertDescription>
         </Alert>
       </section>
