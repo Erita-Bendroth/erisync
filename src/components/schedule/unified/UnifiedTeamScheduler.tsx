@@ -919,7 +919,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="mt-0">
-            <div ref={scrollAreaRef} className="min-w-max overflow-x-auto">
+            <div ref={scrollAreaRef} className="relative">
               {loading ? (
                 <div className="flex items-center justify-center p-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -955,10 +955,10 @@ export const UnifiedTeamScheduler: React.FC = () => {
                   showHolidays={showHolidays}
                 />
               ) : (
-                <div>
+                <div className="relative">
                   <DateHeaderRow dates={dates} />
                   
-                  <div className="space-y-8 mt-0">
+                  <div className="space-y-8 mt-0 overflow-x-auto min-w-max">
                     <ShiftTypeCounterRow
                     dates={dates}
                     scheduleEntries={scheduleEntries}
