@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { format, isWeekend as isWeekendDate } from 'date-fns';
+import { normalizeCountryCode } from './countryCodeUtils';
 
 export interface HolidayInfo {
   date: string;
@@ -59,11 +60,11 @@ export async function detectHolidays(
       const location = userLocations.get(userId);
       const isWeekend = isWeekendDate(date);
       
-      // Check public holidays
+      // Check public holidays (with normalized country codes)
       const publicHoliday = holidays?.find(h => 
         h.date === dateStr &&
         h.user_id === null &&
-        h.country_code === location?.country &&
+        normalizeCountryCode(h.country_code) === normalizeCountryCode(location?.country) &&
         (h.region_code === null || h.region_code === location?.region)
       );
       
