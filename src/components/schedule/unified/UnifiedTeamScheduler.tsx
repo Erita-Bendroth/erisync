@@ -924,29 +924,80 @@ export const UnifiedTeamScheduler: React.FC = () => {
                 <div className="flex items-center justify-center p-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
+              ) : viewMode === 'weekly' ? (
+                <WeeklyGridView
+                  teamSections={teamSections}
+                  dates={dates}
+                  scheduleEntries={scheduleEntries}
+                  state={state}
+                  cellsBeingEdited={cellsBeingEdited}
+                  handlers={{
+                    toggleUserSelection,
+                    toggleCellSelection,
+                    setEditingCell,
+                    setHoveredCell,
+                    startDrag,
+                    endDrag,
+                  }}
+                  showHolidays={showHolidays}
+                  shiftTypes={shiftTypes}
+                  partnershipMode={selectionMode === 'partnership'}
+                  partnershipConfig={partnershipConfig ?? undefined}
+                  isPartnershipView={selectionMode === 'partnership'}
+                  canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner}
+                />
+              ) : viewMode === 'monthly' ? (
+                <MonthlyGridView
+                  teamSections={teamSections}
+                  dates={dates}
+                  scheduleEntries={scheduleEntries}
+                  shiftTypes={shiftTypes}
+                  showHolidays={showHolidays}
+                />
               ) : (
-                <div className="relative">
-                  <SchedulerGrid
-                    schedule={schedule}
-                    onScheduleChange={handleScheduleChange}
-                    availableUsers={availableUsers}
-                    teamColors={teamColors}
-                    isEditingRef={isEditingRef}
-                    quickModeRef={quickModeRef}
-                    localUpdatesRef={localUpdatesRef}
-                    onOpenDialog={handleOpenDialog}
-                    onDeleteShift={handleDeleteShift}
-                    onCellClick={handleCellClick}
-                    multiSelectMode={multiSelectMode}
-                    selectedCells={selectedCells}
-                    onToggleCellSelection={handleToggleCellSelection}
-                    holidays={holidays}
-                    dateRange={dateRange}
-                    partnershipId={selectedPartnershipId}
-                    onOpenVacationDialog={handleOpenVacationDialog}
-                    directlyManagedUsers={directlyManagedUsers}
-                    canViewActivityDetails={canViewActivityDetails}
+                <div className="space-y-8">
+                  <ShiftTypeCounterRow
+                    dates={dates}
+                    scheduleEntries={scheduleEntries}
+                    shiftTypes={shiftTypes}
+                    teamSections={teamSections}
                   />
+                  {selectionMode === 'partnership' && partnershipConfig && (
+                    <CoverageRow
+                      dates={dates}
+                      teamSize={totalMembers}
+                      scheduledCounts={scheduledCounts}
+                      teamBreakdowns={teamBreakdowns}
+                      partnershipMode={true}
+                      partnershipConfig={partnershipConfig}
+                    />
+                  )}
+                  {teamSections.map((section) => (
+                    <TeamSection
+                      key={section.teamId}
+                      teamId={section.teamId}
+                      teamName={section.teamName}
+                      teamColor={section.color}
+                      members={section.members}
+                      dates={dates}
+                      scheduleEntries={scheduleEntries}
+                      selectedUsers={state.selectedUsers}
+                      selectedCells={state.selectedCells}
+                      hoveredCell={state.hoveredCell}
+                      editingCell={state.editingCell}
+                      cellsBeingEdited={cellsBeingEdited}
+                      onUserToggle={toggleUserSelection}
+                      onCellClick={toggleCellSelection}
+                      onCellDoubleClick={setEditingCell}
+                      onCellHover={setHoveredCell}
+                      onCellDragStart={startDrag}
+                      onCellDragEnd={endDrag}
+                      onSelectAllTeam={() => handleSelectAllTeam(section.teamId)}
+                      showHolidays={showHolidays}
+                      isPartnershipView={selectionMode === 'partnership'}
+                      canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner}
+                    />
+                  ))}
                 </div>
               )}
               </div>
