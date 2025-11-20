@@ -99,7 +99,8 @@ export function ShiftTimeDefinitions() {
       day_of_week: def.day_of_week,
     };
 
-    if (def.id) {
+    // Only UPDATE if this is a saved definition (not a temp ID)
+    if (def.id && !def.id.startsWith('temp-')) {
       const { error } = await supabase
         .from("shift_time_definitions")
         .update(saveData)
