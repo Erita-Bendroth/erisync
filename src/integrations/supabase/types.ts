@@ -905,6 +905,36 @@ export type Database = {
           },
         ]
       }
+      sidebar_item_order: {
+        Row: {
+          created_at: string
+          id: string
+          item_key: string
+          order_index: number
+          section: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_key: string
+          order_index: number
+          section: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_key?: string
+          order_index?: number
+          section?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       team_audit_log: {
         Row: {
           action: string
