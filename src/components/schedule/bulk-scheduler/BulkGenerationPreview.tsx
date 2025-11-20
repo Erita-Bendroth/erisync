@@ -3,8 +3,11 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { Calendar, Users } from "lucide-react";
 import { useShiftTypes } from "@/hooks/useShiftTypes";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   fetchTeamShiftDefinitions, 
   generateDayPreviews, 
@@ -31,6 +34,8 @@ interface BulkGenerationPreviewProps {
   autoDetectWeekends: boolean;
   autoDetectHolidays: boolean;
   weekendShiftOverride?: string | null;
+  selectedUserIds?: string[];
+  mode?: 'users' | 'team' | 'rotation';
 }
 
 export const BulkGenerationPreview = ({
@@ -44,12 +49,20 @@ export const BulkGenerationPreview = ({
   autoDetectWeekends,
   autoDetectHolidays,
   weekendShiftOverride,
+  selectedUserIds = [],
+  mode = 'users',
 }: BulkGenerationPreviewProps) => {
   const { shiftTypes } = useShiftTypes(teamId ? [teamId] : []);
   const selectedShift = shiftTypes.find(s => s.type === shiftType);
   const [allShifts, setAllShifts] = useState<ShiftTimeDefinition[]>([]);
   const [dayPreviews, setDayPreviews] = useState<DayShiftPreview[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userBreakdown, setUserBreakdown] = useState<Array<{
+    userId: string;
+    userName: string;
+    countryCode: string;
+    shifts: Array<{ type: string; description: string; count: number; times: string }>;
+  }>>([]);
 
   // Fetch shift definitions when team changes
   useEffect(() => {
@@ -64,6 +77,80 @@ export const BulkGenerationPreview = ({
     
     loadShifts();
   }, [teamId]);
+
+  // Fetch user information and generate breakdown
+  useEffect(() => {
+    if (!selectedUserIds || selectedUserIds.length === 0 || !startDate || !endDate || !teamId) {
+      setUserBreakdown([]);
+      return;
+    }
+
+    const generateUserBreakdown = async () => {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, country_code')
+        .in('user_id', selectedUserIds);
+
+      if (!profiles || allShifts.length === 0) return;
+
+      const days = eachDayOfInterval({ start: startDate, end: endDate });
+      const breakdown: typeof userBreakdown = [];
+
+      for (const profile of profiles) {
+        const userCountry = profile.country_code || 'US';
+        const shiftCounts = new Map<string, { type: string; description: string; count: number; times: string }>();
+
+        for (const day of days) {
+          const isWeekendDay = isWeekend(day);
+          const dayOfWeek = day.getDay();
+          const shouldUseWeekend = autoDetectWeekends && isWeekendDay;
+
+          // Find applicable shift
+          let applicableShift = null;
+          
+          if (shouldUseWeekend && weekendShiftOverride) {
+            applicableShift = allShifts.find(s => s.id === weekendShiftOverride);
+          }
+          
+          if (!applicableShift && shiftType) {
+            // Find country-specific shift
+            const countryShifts = allShifts.filter(s => 
+              s.shift_type === shiftType &&
+              (!s.day_of_week || s.day_of_week.includes(dayOfWeek)) &&
+              (!s.country_codes || s.country_codes.includes(userCountry))
+            );
+            applicableShift = countryShifts[0] || allShifts.find(s => s.id === shiftType);
+          }
+
+          if (applicableShift) {
+            const key = `${applicableShift.shift_type}-${applicableShift.id}`;
+            const existing = shiftCounts.get(key);
+            if (existing) {
+              existing.count++;
+            } else {
+              shiftCounts.set(key, {
+                type: applicableShift.shift_type,
+                description: applicableShift.description || applicableShift.shift_type,
+                count: 1,
+                times: `${applicableShift.start_time.slice(0, 5)}-${applicableShift.end_time.slice(0, 5)}`,
+              });
+            }
+          }
+        }
+
+        breakdown.push({
+          userId: profile.user_id,
+          userName: `${profile.first_name} ${profile.last_name}`,
+          countryCode: userCountry,
+          shifts: Array.from(shiftCounts.values()),
+        });
+      }
+
+      setUserBreakdown(breakdown);
+    };
+
+    generateUserBreakdown();
+  }, [selectedUserIds, startDate, endDate, allShifts, shiftType, autoDetectWeekends, weekendShiftOverride, teamId]);
 
   // Generate day previews when configuration changes
   useEffect(() => {
@@ -173,6 +260,32 @@ export const BulkGenerationPreview = ({
         </Collapsible>
       </div>
       
+      {/* User-specific breakdown */}
+      {userBreakdown.length > 0 && (
+        <div className="space-y-3 pt-3 border-t">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Shifts in this schedule:
+          </h3>
+          {userBreakdown.map((user) => (
+            <div key={user.userId} className="space-y-1 pl-6">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-medium">{user.userName}</span>
+                <Badge variant="outline" className="text-xs">
+                  {user.countryCode}
+                </Badge>
+              </div>
+              {user.shifts.map((shift, idx) => (
+                <div key={idx} className="text-sm text-muted-foreground pl-4">
+                  • {shift.description} <span className="font-mono text-xs">{shift.times}</span>{' '}
+                  <span className="text-xs">({shift.count} days)</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Period:</span>

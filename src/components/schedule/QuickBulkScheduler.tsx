@@ -250,18 +250,20 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
             }
           />
 
-                <BulkGenerationPreview
-                  totalShifts={preview.totalShifts}
-                  workDays={preview.workDays}
-                  userCount={preview.userCount}
-                  startDate={config.dateRange.start}
-                  endDate={config.dateRange.end}
-                  shiftType={config.shiftType}
-                  teamId={config.teamId}
-                  autoDetectWeekends={config.autoDetectWeekends}
-                  autoDetectHolidays={config.autoDetectHolidays}
-                  weekendShiftOverride={config.weekendShiftOverride}
-                />
+              <BulkGenerationPreview
+                totalShifts={preview.totalShifts}
+                workDays={preview.workDays}
+                userCount={preview.userCount}
+                startDate={config.dateRange.start}
+                endDate={config.dateRange.end}
+                shiftType={config.shiftType}
+                teamId={config.teamId}
+                autoDetectWeekends={config.autoDetectWeekends}
+                autoDetectHolidays={config.autoDetectHolidays}
+                weekendShiftOverride={config.weekendShiftOverride}
+                selectedUserIds={config.selectedUserIds}
+                mode={config.mode}
+              />
         </div>
       </div>
 
