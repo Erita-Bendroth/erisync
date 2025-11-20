@@ -22,6 +22,8 @@ import { DelegateAccessModal } from "./DelegateAccessModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format as formatDate, startOfYear, endOfYear } from "date-fns";
+import { useUserTimeStats } from "@/hooks/useUserTimeStats";
+import { UserTimeStatsDisplay } from "./UserTimeStatsDisplay";
 
 interface Team {
   id: string;
@@ -83,6 +85,16 @@ const EnhancedTeamManagement = () => {
   const [downloadStartDate, setDownloadStartDate] = useState<Date>(startOfYear(new Date()));
   const [downloadEndDate, setDownloadEndDate] = useState<Date>(endOfYear(new Date()));
   const [downloadPreset, setDownloadPreset] = useState<"current-year" | "past-year" | "next-year" | "custom">("current-year");
+
+  // Get all user IDs from all teams for time stats
+  const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
+  
+  // Fetch time stats for all team members
+  const { stats: timeStats, loading: statsLoading, updateAllowance } = useUserTimeStats({
+    userIds: allUserIds,
+    year: new Date().getFullYear(),
+    enabled: allUserIds.length > 0,
+  });
 
   useEffect(() => {
     fetchUserRoles();
@@ -958,15 +970,28 @@ const EnhancedTeamManagement = () => {
                               Team Member Overview
                             </h4>
                             <div className="grid gap-4">
-                              {members.map((member) => (
-                                <UserProfileOverview
-                                  key={member.user_id}
-                                  userId={member.user_id}
-                                  teamId={team.id}
-                                  canView={true}
-                                  showTeamContext={false}
-                                />
-                              ))}
+                              {members.map((member) => {
+                                const memberStats = timeStats.get(member.user_id);
+                                return (
+                                  <div key={member.user_id} className="space-y-3">
+                                    <UserProfileOverview
+                                      userId={member.user_id}
+                                      teamId={team.id}
+                                      canView={true}
+                                      showTeamContext={false}
+                                    />
+                                    {memberStats && !statsLoading && (
+                                      <UserTimeStatsDisplay
+                                        stats={memberStats}
+                                        canEdit={canEditTeams()}
+                                        onUpdate={async (vacationDays, flextimeHours) => {
+                                          await updateAllowance(member.user_id, vacationDays, flextimeHours);
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
