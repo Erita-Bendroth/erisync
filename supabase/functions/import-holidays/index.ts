@@ -57,7 +57,7 @@ const germanRegionalHolidays: Record<string, string[]> = {
 
 // UK regional holiday mapping
 const ukRegionalHolidays: Record<string, string[]> = {
-  'GB-SCT': ['St Andrew\'s Day'], // Scotland-specific
+  'GB-SCT': ['St Andrew\'s Day', '2 January'], // Scotland-specific
   'GB-NIR': ['St Patrick\'s Day', 'Battle of the Boyne'], // Northern Ireland-specific
   'GB-ENG': [], // England & Wales use standard UK holidays
 };
@@ -278,30 +278,42 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Additional German safety net by name mapping
-      if (!regionalCode && country_code === 'DE' && region_code) {
+      // German regional holiday mapping - AUTOMATICALLY assign regions
+      if (!regionalCode && country_code === 'DE') {
         const holidayName = holiday.localName || holiday.name;
-        const regionalHolidays = germanRegionalHolidays[region_code] || [];
-        if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-          regionalCode = region_code;
+        
+        // Check all German regions to find which one this holiday belongs to
+        for (const [deRegion, regionalHolidays] of Object.entries(germanRegionalHolidays)) {
+          if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+            regionalCode = deRegion;
+            break; // Assign to first matching region
+          }
         }
       }
 
-      // UK regional holiday mapping by name
-      if (!regionalCode && country_code === 'GB' && region_code) {
+      // UK regional holiday mapping - AUTOMATICALLY assign regions
+      if (!regionalCode && country_code === 'GB') {
         const holidayName = holiday.localName || holiday.name;
-        const regionalHolidays = ukRegionalHolidays[region_code] || [];
-        if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-          regionalCode = region_code;
+        
+        // Check all UK regions to find which one this holiday belongs to
+        for (const [ukRegion, regionalHolidays] of Object.entries(ukRegionalHolidays)) {
+          if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+            regionalCode = ukRegion;
+            break;
+          }
         }
       }
 
-      // Belgium regional holiday mapping by name
-      if (!regionalCode && country_code === 'BE' && region_code) {
+      // Belgium regional holiday mapping - AUTOMATICALLY assign regions
+      if (!regionalCode && country_code === 'BE') {
         const holidayName = holiday.localName || holiday.name;
-        const regionalHolidays = belgiumRegionalHolidays[region_code] || [];
-        if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-          regionalCode = region_code;
+        
+        // Check all Belgian regions to find which one this holiday belongs to
+        for (const [beRegion, regionalHolidays] of Object.entries(belgiumRegionalHolidays)) {
+          if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+            regionalCode = beRegion;
+            break;
+          }
         }
       }
       
