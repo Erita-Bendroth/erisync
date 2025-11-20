@@ -2,12 +2,12 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
-interface Step {
+export interface Step {
   id: number;
   label: string;
 }
 
-interface WizardProgressProps {
+export interface WizardProgressProps {
   steps: Step[];
   currentStep: number;
 }

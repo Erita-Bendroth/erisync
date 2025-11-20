@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Calendar, Download, Trash2, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Calendar, Download, Trash2, AlertCircle, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { HolidayImportWizard } from "./holiday-wizard/HolidayImportWizard";
 
 interface Holiday {
   id: string;
@@ -107,6 +108,7 @@ const AdminHolidayManager = () => {
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [importStatuses, setImportStatuses] = useState<ImportStatus[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const fetchUserRoles = useCallback(async () => {
     if (!user) return;

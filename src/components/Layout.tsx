@@ -1,100 +1,60 @@
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { LogOut, Calendar, Users, Settings, CalendarDays, BarChart3, Grid3x3 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { useAuth } from "./auth/AuthProvider";
+import { Calendar } from "lucide-react";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/navigation/AppSidebar";
+import { UserMenu } from "@/components/navigation/UserMenu";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { GlobalSearch } from "./search/GlobalSearch";
+import { ThemeToggle } from "./theme/ThemeToggle";
 import { useHolidaySync } from "@/hooks/useHolidaySync";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileNavigation } from "@/components/mobile/MobileNavigation";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const { user, signOut } = useAuth();
-  const location = useLocation();
-  
-  // Enable realtime holiday synchronization
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
   useHolidaySync();
 
-  const isActiveRoute = (path: string) => {
-    return location.pathname === path;
-  };
+  if (!user) {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <Link to="/dashboard" className="flex items-center space-x-2">
-              <Calendar className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold">Employee Scheduler</h1>
-            </Link>
-            
-            <nav className="flex items-center space-x-4">
-              <Link 
-                to="/dashboard" 
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActiveRoute('/dashboard') 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span>Dashboard</span>
-              </Link>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar />
+        
+        <div className="flex-1 flex flex-col w-full">
+          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+            <div className="flex h-16 items-center px-4 gap-4">
+              <SidebarTrigger />
               
-              <Link 
-                to="/unified-dashboard" 
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActiveRoute('/unified-dashboard') 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                <Grid3x3 className="h-4 w-4" />
-                <span>Unified View</span>
-              </Link>
-              
-              <Link 
-                to="/schedule" 
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActiveRoute('/schedule') 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                <Calendar className="h-4 w-4" />
-                <span>Schedule</span>
-              </Link>
-            </nav>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <GlobalSearch />
-            <div className="bg-primary/10 px-3 py-1 rounded-md border">
-              <span className="text-sm font-medium">
-                Logged in as: <strong className="text-primary">{user?.email || 'Not logged in'}</strong>
-              </span>
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5" />
+                <span className="font-semibold hidden sm:inline">Employee Scheduler</span>
+              </div>
+
+              <div className="ml-auto flex items-center gap-2">
+                <GlobalSearch />
+                <NotificationBell />
+                <ThemeToggle />
+                <UserMenu />
+              </div>
             </div>
-            <ThemeToggle />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={signOut}
-              className="flex items-center space-x-2"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Sign Out</span>
-            </Button>
-          </div>
+          </header>
+
+          <main className="flex-1 container mx-auto py-6 px-4 pb-20 md:pb-6">
+            {children}
+          </main>
+
+          {isMobile && <MobileNavigation />}
         </div>
-      </header>
-      
-      <main className="container mx-auto px-4 py-6">
-        {children}
-      </main>
-    </div>
+      </div>
+    </SidebarProvider>
   );
 };
 
