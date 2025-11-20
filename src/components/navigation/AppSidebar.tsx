@@ -61,7 +61,7 @@ export function AppSidebar() {
     { title: 'Analytics', icon: BarChart3, path: '/analytics' },
   ];
 
-  const { favorites } = useTeamFavorites('multi-team');
+  const { favorites } = useTeamFavorites(); // Fetch all favorites regardless of context
 
   const scheduleNavItems = [
     { title: 'My Schedule', icon: Calendar, path: '/schedule?tab=schedule' },
