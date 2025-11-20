@@ -1,6 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
 import { SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { ReactNode } from 'react';
 
@@ -37,20 +36,15 @@ export function DraggableSidebarMenuItem({
   };
 
   return (
-    <SidebarMenuItem ref={setNodeRef} style={style} className="group">
+    <SidebarMenuItem ref={setNodeRef} style={style}>
       <SidebarMenuButton
         onClick={onClick}
         isActive={isActive}
         tooltip={tooltip}
-        className="cursor-pointer"
+        className="cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
       >
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex items-center mr-2 cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </div>
         {icon}
         <span>{label}</span>
       </SidebarMenuButton>
