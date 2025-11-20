@@ -242,16 +242,14 @@ export const ManagerManual = () => {
           <li><strong>Escalate:</strong> Contact Planners to expedite important swap requests</li>
         </ul>
 
-        <h3 className="text-xl font-semibold mb-3">Communicating with Planners</h3>
-        <p className="mb-4">
-          If you need a swap approved or have concerns about a request:
-        </p>
+        
+        
         <ol className="list-decimal list-inside space-y-2 mb-4">
-          <li>Review the swap request details</li>
-          <li>Check if both users can cover the swapped shifts</li>
-          <li>Verify team coverage won't be impacted</li>
-          <li>Contact your Planner or Admin with recommendation</li>
-          <li>Provide context: coverage status, user qualifications, urgency</li>
+          
+          
+          
+          
+          
         </ol>
 
         <Alert className="mb-4">
