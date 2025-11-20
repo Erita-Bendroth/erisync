@@ -3,19 +3,99 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { BulkSchedulerConfig } from "@/hooks/useBulkSchedulerState";
+import { ShiftTypeSelector } from "./ShiftTypeSelector";
 
 interface AdvancedOptionsPanelProps {
-  advanced: BulkSchedulerConfig['advanced'];
-  onAdvancedChange: (advanced: BulkSchedulerConfig['advanced']) => void;
+  config: BulkSchedulerConfig;
+  onConfigChange: (config: BulkSchedulerConfig) => void;
 }
 
 export const AdvancedOptionsPanel = ({
-  advanced,
-  onAdvancedChange,
+  config,
+  onConfigChange,
 }: AdvancedOptionsPanelProps) => {
+  const { advanced } = config;
+  
+  const onAdvancedChange = (newAdvanced: BulkSchedulerConfig['advanced']) => {
+    onConfigChange({ ...config, advanced: newAdvanced });
+  };
+  
   return (
     <div className="space-y-6 p-4 border rounded-lg bg-muted/20">
+      {/* Weekend/Holiday Detection */}
+      <div className="space-y-4 pb-4 border-b">
+        <h4 className="font-semibold text-sm">Weekend & Holiday Detection</h4>
+        
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Auto-detect Weekends</Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically use weekend shift for Saturdays and Sundays
+            </p>
+          </div>
+          <Switch
+            checked={config.autoDetectWeekends}
+            onCheckedChange={(checked) =>
+              onConfigChange({ ...config, autoDetectWeekends: checked })
+            }
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Auto-detect Public Holidays</Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically use weekend shift for public holidays
+            </p>
+          </div>
+          <Switch
+            checked={config.autoDetectHolidays}
+            onCheckedChange={(checked) =>
+              onConfigChange({ ...config, autoDetectHolidays: checked })
+            }
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Skip Users with Personal Holidays</Label>
+            <p className="text-xs text-muted-foreground">
+              Don't schedule users on their personal holidays
+            </p>
+          </div>
+          <Switch
+            checked={config.skipUsersWithHolidays}
+            onCheckedChange={(checked) =>
+              onConfigChange({ ...config, skipUsersWithHolidays: checked })
+            }
+          />
+        </div>
+
+        {(config.autoDetectWeekends || config.autoDetectHolidays) && (
+          <div className="space-y-2 pt-2 border-t">
+            <Label className="text-sm font-medium">Weekend/Holiday Shift Override (Optional)</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Choose a specific shift for weekends and holidays
+            </p>
+            <ShiftTypeSelector
+              teamId={config.teamId}
+              shiftType={config.weekendShiftOverride}
+              customTimes={config.customTimes}
+              onShiftTypeChange={(type) =>
+                onConfigChange({ ...config, weekendShiftOverride: type })
+              }
+              onCustomTimesChange={(times) =>
+                onConfigChange({ ...config, customTimes: times })
+              }
+              filterToWeekendShifts={true}
+              label="Weekend Shift"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Fairness Mode */}
       <div className="space-y-3">
         <div className="flex items-center space-x-2">

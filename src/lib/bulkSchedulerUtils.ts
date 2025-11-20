@@ -1,6 +1,7 @@
-import { format, eachDayOfInterval, isWeekend } from 'date-fns';
+import { format, eachDayOfInterval, isWeekend as isWeekendDate } from 'date-fns';
 import { BulkSchedulerConfig } from '@/hooks/useBulkSchedulerState';
 import { Database } from '@/integrations/supabase/types';
+import { detectHolidays, findBestShiftForDate, HolidayInfo } from './holidayDetection';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -27,22 +28,6 @@ export const calculateBulkEntries = async (
     return [];
   }
 
-  // Resolve shift definition if not custom
-  let resolvedShiftType: ShiftType = 'normal';
-  if (config.shiftType && config.shiftType !== 'custom') {
-    const { data: shiftDef } = await supabase
-      .from('shift_time_definitions')
-      .select('shift_type')
-      .eq('id', config.shiftType)
-      .single();
-    
-    if (shiftDef) {
-      resolvedShiftType = shiftDef.shift_type;
-    }
-  } else if (config.shiftType === 'custom') {
-    resolvedShiftType = 'normal';
-  }
-
   const entries: ScheduleEntryDraft[] = [];
   const days = eachDayOfInterval({
     start: config.dateRange.start,
@@ -57,20 +42,63 @@ export const calculateBulkEntries = async (
     targetUsers = config.selectedUserIds;
   }
 
+  // Detect holidays if enabled
+  let holidayMap: Map<string, Map<string, HolidayInfo>> | null = null;
+  if (config.autoDetectWeekends || config.autoDetectHolidays) {
+    holidayMap = await detectHolidays(days, targetUsers, config.teamId);
+  }
+
   // Generate entries
   for (const day of days) {
-    // Skip any days in the excluded list
-    if (config.excludedDays.includes(day.getDay())) {
+    const dayOfWeek = day.getDay();
+    const dateStr = format(day, 'yyyy-MM-dd');
+    
+    // Check if this day is a weekend or holiday
+    const isWeekend = config.autoDetectWeekends && isWeekendDate(day);
+    const dateHolidayInfo = holidayMap?.get(dateStr);
+    
+    // Skip if day is in excluded list AND we're not overriding with holiday detection
+    if (config.excludedDays.includes(dayOfWeek) && !(isWeekend || dateHolidayInfo)) {
       continue;
     }
-
-    const dateStr = format(day, 'yyyy-MM-dd');
 
     if (config.mode === 'rotation' && config.advanced.rotationEnabled) {
       // Rotation mode: assign one user per day in sequence
       const dayIndex = days.indexOf(day);
       const userIndex = dayIndex % targetUsers.length;
       const rotationUserId = targetUsers[userIndex];
+      
+      // Check if this user has a holiday
+      const userHolidayInfo = dateHolidayInfo?.get(rotationUserId);
+      if (config.skipUsersWithHolidays && userHolidayInfo?.userHasHoliday) {
+        console.log(`Skipping ${rotationUserId} on ${dateStr} - user has personal holiday`);
+        continue;
+      }
+      
+      // Determine shift to use
+      const shouldUseWeekendShift = (isWeekend || userHolidayInfo?.isPublicHoliday);
+      const shiftIdToUse = await findBestShiftForDate(
+        day,
+        shouldUseWeekendShift,
+        config.teamId,
+        config.shiftType,
+        config.weekendShiftOverride
+      );
+      
+      // Resolve shift type
+      let resolvedShiftType: ShiftType = 'normal';
+      if (shiftIdToUse && shiftIdToUse !== 'custom') {
+        const { data: shiftDef } = await supabase
+          .from('shift_time_definitions')
+          .select('shift_type')
+          .eq('id', shiftIdToUse)
+          .maybeSingle();
+        if (shiftDef) resolvedShiftType = shiftDef.shift_type;
+      }
+
+      const notes = shouldUseWeekendShift 
+        ? `Bulk generated (rotation) - ${userHolidayInfo?.holidayName || 'Weekend'}`
+        : 'Bulk generated (rotation)';
 
       entries.push({
         user_id: rotationUserId,
@@ -80,11 +108,43 @@ export const calculateBulkEntries = async (
         activity_type: 'work' as ActivityType,
         availability_status: 'available' as AvailabilityStatus,
         created_by: userId,
-        notes: 'Bulk generated (rotation)',
+        notes,
       });
     } else {
       // Regular mode: assign to all selected users
       for (const targetUserId of targetUsers) {
+        // Check if this user has a holiday
+        const userHolidayInfo = dateHolidayInfo?.get(targetUserId);
+        if (config.skipUsersWithHolidays && userHolidayInfo?.userHasHoliday) {
+          console.log(`Skipping ${targetUserId} on ${dateStr} - user has personal holiday`);
+          continue;
+        }
+        
+        // Determine shift to use
+        const shouldUseWeekendShift = (isWeekend || userHolidayInfo?.isPublicHoliday);
+        const shiftIdToUse = await findBestShiftForDate(
+          day,
+          shouldUseWeekendShift,
+          config.teamId,
+          config.shiftType,
+          config.weekendShiftOverride
+        );
+        
+        // Resolve shift type
+        let resolvedShiftType: ShiftType = 'normal';
+        if (shiftIdToUse && shiftIdToUse !== 'custom') {
+          const { data: shiftDef } = await supabase
+            .from('shift_time_definitions')
+            .select('shift_type')
+            .eq('id', shiftIdToUse)
+            .maybeSingle();
+          if (shiftDef) resolvedShiftType = shiftDef.shift_type;
+        }
+
+        const notes = shouldUseWeekendShift 
+          ? `Bulk generated - ${userHolidayInfo?.holidayName || 'Weekend'}`
+          : 'Bulk generated';
+
         entries.push({
           user_id: targetUserId,
           team_id: config.teamId,
@@ -93,7 +153,7 @@ export const calculateBulkEntries = async (
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
           created_by: userId,
-          notes: 'Bulk generated',
+          notes,
         });
       }
     }

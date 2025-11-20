@@ -250,6 +250,8 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
                   endDate={config.dateRange.end}
                   shiftType={config.shiftType}
                   teamId={config.teamId}
+                  autoDetectWeekends={config.autoDetectWeekends}
+                  autoDetectHolidays={config.autoDetectHolidays}
                 />
         </div>
       </div>
@@ -263,8 +265,8 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-4">
           <AdvancedOptionsPanel
-            advanced={config.advanced}
-            onAdvancedChange={(advanced) => setConfig({ ...config, advanced })}
+            config={config}
+            onConfigChange={setConfig}
           />
         </CollapsibleContent>
       </Collapsible>

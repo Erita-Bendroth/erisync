@@ -13,6 +13,8 @@ interface ShiftTypeSelectorProps {
   };
   onShiftTypeChange: (type: string) => void;
   onCustomTimesChange: (times: { start: string; end: string }) => void;
+  filterToWeekendShifts?: boolean;
+  label?: string;
 }
 
 export const ShiftTypeSelector = ({
@@ -21,12 +23,18 @@ export const ShiftTypeSelector = ({
   customTimes,
   onShiftTypeChange,
   onCustomTimesChange,
+  filterToWeekendShifts = false,
+  label = "Shift Type",
 }: ShiftTypeSelectorProps) => {
   const { shiftTypes, loading } = useShiftTypes(teamId ? [teamId] : []);
+  
+  const filteredShifts = filterToWeekendShifts 
+    ? shiftTypes.filter(s => s.type === 'weekend')
+    : shiftTypes;
 
   return (
     <div className="space-y-4">
-      <Label>Shift Type</Label>
+      <Label>{label}</Label>
       
       {loading ? (
         <div className="space-y-3">
@@ -37,7 +45,12 @@ export const ShiftTypeSelector = ({
       ) : (
         <RadioGroup value={shiftType || ''} onValueChange={onShiftTypeChange}>
           <div className="space-y-3">
-            {shiftTypes.map((shift) => (
+            {filteredShifts.length === 0 && filterToWeekendShifts && (
+              <div className="text-sm text-muted-foreground py-2">
+                No weekend shifts configured. Using regular shift selection.
+              </div>
+            )}
+            {filteredShifts.map((shift) => (
               <div key={shift.id} className="flex items-center space-x-2">
                 <RadioGroupItem value={shift.id} id={shift.id} />
                 <Label htmlFor={shift.id} className="cursor-pointer font-normal flex-1">
