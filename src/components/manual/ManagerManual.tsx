@@ -1,10 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
-
 export const ManagerManual = () => {
-  return (
-    <div className="space-y-8">
+  return <div className="space-y-8">
       <section id="getting-started">
         <h2 className="text-2xl font-bold mb-4">1. Getting Started</h2>
         <p className="text-muted-foreground mb-4">
@@ -136,7 +134,7 @@ export const ManagerManual = () => {
         <ul className="list-disc list-inside space-y-2 mb-4">
           <li><strong>Working:</strong> Regular work shift</li>
           <li><strong>Vacation:</strong> Approved time off</li>
-          <li><strong>Sick:</strong> Sick leave</li>
+          
           <li><strong>Training:</strong> Training or development activities</li>
           <li><strong>Other:</strong> Other scheduled activities</li>
         </ul>
@@ -290,11 +288,7 @@ export const ManagerManual = () => {
         </ol>
 
         <div className="my-4">
-          <img 
-            src="/images/manual/manager-vacation-view.png" 
-            alt="Vacation Requests section showing team member requests with status badges but no approve/reject buttons for managers"
-            className="w-full rounded-lg border border-border shadow-sm"
-          />
+          <img src="/images/manual/manager-vacation-view.png" alt="Vacation Requests section showing team member requests with status badges but no approve/reject buttons for managers" className="w-full rounded-lg border border-border shadow-sm" />
         </div>
 
         <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
@@ -509,6 +503,5 @@ export const ManagerManual = () => {
           </AlertDescription>
         </Alert>
       </section>
-    </div>
-  );
+    </div>;
 };
