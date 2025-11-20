@@ -358,8 +358,14 @@ Deno.serve(async (req) => {
         }));
       }
       
-      // For UK holidays with multiple regions, create ONE ROW PER REGION
-      if (country_code === 'GB' && matchingUKRegions.length > 0) {
+      // For UK holidays - ONLY create entries if they apply to the requested region
+      if (country_code === 'GB' && region_code) {
+        // If we checked for this region and it didn't match, skip it entirely
+        if (matchingUKRegions.length === 0) {
+          return []; // Skip this holiday - doesn't apply to requested region
+        }
+        
+        // Create entry for the matching region
         return matchingUKRegions.map(region => ({
           name: holiday.localName || holiday.name,
           date: holiday.date,
