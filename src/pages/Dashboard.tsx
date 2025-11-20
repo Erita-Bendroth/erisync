@@ -14,7 +14,7 @@ import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { formatUserName } from "@/lib/utils";
+import { formatUserName, cn } from "@/lib/utils";
 import { PendingRequestsCard } from "@/components/dashboard/PendingRequestsCard";
 import { LocationSetupModal } from "@/components/profile/LocationSetupModal";
 
@@ -416,17 +416,28 @@ const Dashboard = () => {
                 <div className="space-y-2">
                   {(() => {
                     const now = new Date();
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
                     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
                     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
                     
-                    return days.map((day) => {
+                    // Filter to only show today and future dates on mobile
+                    const isMobile = window.innerWidth < 768;
+                    const filteredDays = isMobile ? days.filter(day => day >= today) : days;
+                    
+                    return filteredDays.map((day) => {
                       const daySchedule = weeklySchedule.filter(
                         entry => entry.date === format(day, 'yyyy-MM-dd')
                       );
                       const isToday = format(day, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+                      const isPast = day < today;
                       
                       return (
-                        <div key={format(day, 'yyyy-MM-dd')} className={`flex items-center justify-between p-2 rounded ${isToday ? 'bg-primary/10 border border-primary/20' : ''}`}>
+                        <div key={format(day, 'yyyy-MM-dd')} className={cn(
+                          "flex items-center justify-between p-2 rounded",
+                          isToday && 'bg-primary/10 border border-primary/20',
+                          isPast && 'opacity-60'
+                        )}>
                           <div className="flex items-center space-x-3">
                             <span className={`text-sm font-medium min-w-[50px] ${isToday ? 'text-primary' : ''}`}>
                               {format(day, 'EEE')}

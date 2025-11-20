@@ -29,17 +29,24 @@ export const MobileNavigation = () => {
     e.stopPropagation();
     e.preventDefault();
     
+    console.log('Mobile nav clicked:', { 
+      path, 
+      currentPath: location.pathname + location.search, 
+      isNavigating: isNavigating.current 
+    });
+    
     // Prevent double-click spam
     if (isNavigating.current) {
-      console.log('Navigation already in progress, ignoring');
+      console.warn('Navigation blocked - already in progress');
       return;
     }
     
     isNavigating.current = true;
     
     try {
-      console.log('Mobile navigation to:', path);
+      console.log('Navigating to:', path);
       navigate(path, { replace: false });
+      console.log('Navigation called successfully');
     } catch (error) {
       console.error('Navigation error:', error);
       toast({
@@ -51,7 +58,8 @@ export const MobileNavigation = () => {
       // Reset navigation lock after a delay
       setTimeout(() => {
         isNavigating.current = false;
-      }, 500);
+        console.log('Navigation lock released');
+      }, 1000);
     }
   };
 

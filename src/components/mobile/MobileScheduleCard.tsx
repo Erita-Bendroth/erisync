@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Edit, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
-import { formatUserName } from '@/lib/utils';
+import { formatUserName, cn } from '@/lib/utils';
 
 interface MobileScheduleCardProps {
   entry: {
@@ -33,6 +33,10 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
   onEdit,
   canEdit = false,
 }) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isPast = new Date(entry.date) < today;
+  
   const getShiftBadgeVariant = (shiftType: string) => {
     switch (shiftType) {
       case 'early':
@@ -126,7 +130,7 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
   };
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card className={cn("relative overflow-hidden", isPast && "opacity-60")}>
       <CardContent className="p-4 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
@@ -141,11 +145,18 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                {format(new Date(entry.date), 'EEE, MMM d, yyyy')}
-              </p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <p className={cn("text-xs", isPast ? "text-muted-foreground" : "text-muted-foreground")}>
+                  {format(new Date(entry.date), 'EEE, MMM d, yyyy')}
+                </p>
+              </div>
+              {isPast && (
+                <Badge variant="outline" className="text-xs">
+                  Past
+                </Badge>
+              )}
             </div>
           </div>
           {canEdit && onEdit && (
