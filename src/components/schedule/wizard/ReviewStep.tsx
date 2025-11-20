@@ -25,7 +25,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
   const [teamName, setTeamName] = useState("");
   const [userCount, setUserCount] = useState(0);
   const [previewDays, setPreviewDays] = useState<Date[]>([]);
-  const [previewUsers, setPreviewUsers] = useState<Array<{ initials: string; name: string }>>([]);
+  const [previewUsers, setPreviewUsers] = useState<Array<{ userId: string; initials: string; name: string; countryCode?: string }>>([]);
   const [shiftDefinitions, setShiftDefinitions] = useState<any[]>([]);
 
   useEffect(() => {
@@ -97,8 +97,10 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
       
       if (data) {
         setPreviewUsers(data.map((u: any) => ({
+          userId: u.user_id,
           initials: u.initials || `${u.first_name[0]}${u.last_name[0]}`,
-          name: `${u.first_name} ${u.last_name}`
+          name: `${u.first_name} ${u.last_name}`,
+          countryCode: u.country_code
         })));
       }
     } else if (wizardData.mode === "team" && wizardData.selectedTeam) {
@@ -115,8 +117,10 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
         
         if (data) {
           setPreviewUsers(data.map((u: any) => ({
+            userId: u.user_id,
             initials: u.initials || `${u.first_name[0]}${u.last_name[0]}`,
-            name: `${u.first_name} ${u.last_name}`
+            name: `${u.first_name} ${u.last_name}`,
+            countryCode: u.country_code
           })));
         }
       }
@@ -608,31 +612,73 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             ))}
             
             <TooltipProvider>
-              {previewDays.map((day, index) => {
-                const dayOfWeek = getDay(day);
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                const shiftLabel = wizardData.shiftType === "normal" ? "Day" : 
-                                  wizardData.shiftType === "early" ? "Early" :
-                                  wizardData.shiftType === "late" ? "Late" : 
-                                  wizardData.shiftType === "night" ? "Night" : "Custom";
-                
-                // Calculate the smart shift time for this specific day
-                const smartShift = shiftDefinitions.length > 0 
-                  ? getShiftForDate(
+              {(() => {
+                // Check if we have country-specific shifts configured
+                const hasCountrySpecificShifts = shiftDefinitions.some(
+                  def => def.country_codes && def.country_codes.length > 0
+                );
+
+                // Helper to calculate shift for a user on a specific day
+                const getUserShiftForDay = (day: Date, userCountryCode?: string) => {
+                  if (shiftDefinitions.length > 0) {
+                    return getShiftForDate(
                       day,
                       wizardData.shiftType,
-                      true, // autoDetectWeekends
-                      null, // weekendOverrideShiftId
+                      true,
+                      null,
                       shiftDefinitions,
-                      undefined  // Preview: show generic/global shift
-                    )
-                  : null;
+                      userCountryCode
+                    );
+                  }
+                  return null;
+                };
 
-                const displayTime = smartShift 
-                  ? `${smartShift.startTime} - ${smartShift.endTime}`
-                  : `${wizardData.startTime || "08:00"} - ${wizardData.endTime || "16:30"}`;
+                return previewDays.map((day, index) => {
+                  const dayOfWeek = getDay(day);
+                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                  const shiftLabel = wizardData.shiftType === "normal" ? "Day" : 
+                                    wizardData.shiftType === "early" ? "Early" :
+                                    wizardData.shiftType === "late" ? "Late" : 
+                                    wizardData.shiftType === "night" ? "Night" : "Custom";
+                  
+                  const fallbackTime = `${wizardData.startTime || "08:00"} - ${wizardData.endTime || "16:30"}`;
+                  
+                  // Calculate shift info based on mode and country-specific configuration
+                  let displayInfo: { time: string; shiftName: string; note?: string };
 
-                const displayShiftName = smartShift?.description || shiftLabel;
+                  if (wizardData.mode === "users" && hasCountrySpecificShifts && previewUsers.length > 0) {
+                    // Calculate unique shift times for the selected users
+                    const userShifts = previewUsers.map(user => 
+                      getUserShiftForDay(day, user.countryCode)
+                    );
+                    const uniqueTimes = new Set(userShifts.map(s => 
+                      s ? `${s.startTime} - ${s.endTime}` : null
+                    ));
+                    
+                    if (uniqueTimes.size > 1) {
+                      displayInfo = {
+                        time: "Varies by location",
+                        shiftName: shiftLabel,
+                        note: "Different shift times per user"
+                      };
+                    } else {
+                      const firstShift = userShifts[0];
+                      displayInfo = {
+                        time: firstShift ? `${firstShift.startTime} - ${firstShift.endTime}` : fallbackTime,
+                        shiftName: firstShift?.description || shiftLabel
+                      };
+                    }
+                  } else {
+                    // Original logic for team mode or non-country-specific shifts
+                    const smartShift = getUserShiftForDay(day, undefined);
+                    displayInfo = {
+                      time: smartShift ? `${smartShift.startTime} - ${smartShift.endTime}` : fallbackTime,
+                      shiftName: smartShift?.description || shiftLabel
+                    };
+                  }
+
+                  const displayTime = displayInfo.time;
+                  const displayShiftName = displayInfo.shiftName;
                 
                 return (
                   <Tooltip key={index}>
@@ -688,10 +734,21 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                         </div>
                         {wizardData.mode === "users" && previewUsers.length > 0 && (
                           <div className="text-xs pt-1 border-t">
-                            <div className="font-medium">People scheduled:</div>
-                            {previewUsers.map((user, idx) => (
-                              <div key={idx}>• {user.name}</div>
-                            ))}
+                            <div className="font-medium mb-1">People scheduled:</div>
+                            {previewUsers.map((user, idx) => {
+                              const userShift = getUserShiftForDay(day, user.countryCode);
+                              const userTime = userShift 
+                                ? `${userShift.startTime} - ${userShift.endTime}`
+                                : fallbackTime;
+                              return (
+                                <div key={idx} className="flex justify-between gap-2">
+                                  <span>• {user.name}</span>
+                                  <span className="text-muted-foreground font-mono text-[10px]">
+                                    {userTime}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         {wizardData.mode === "team" && (
@@ -702,8 +759,9 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                       </div>
                     </TooltipContent>
                   </Tooltip>
-                );
-              })}
+                  );
+                });
+              })()}
             </TooltipProvider>
           </div>
         </div>
