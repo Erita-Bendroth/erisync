@@ -160,7 +160,19 @@ export function getShiftForDate(
     })));
 
   if (validShiftsForDay.length > 0) {
-    // Sort to prefer team-specific shifts, then day-specific shifts
+    console.log(`   📋 Before sorting, ${validShiftsForDay.length} candidate shifts:`,
+      validShiftsForDay.map(s => ({
+        id: s.id.substring(0, 8),
+        desc: s.description,
+        days: s.day_of_week,
+        dayCount: s.day_of_week?.length || 0,
+        times: `${s.start_time}-${s.end_time}`,
+        hasTeamId: !!s.team_id,
+        hasTeamIds: !!(s.team_ids && s.team_ids.length > 0),
+        teamIdsCount: s.team_ids?.length || 0
+      })));
+    
+    // Sort to prefer team-specific shifts, then day-specific shifts, then more specific days
     const sortedShifts = [...validShiftsForDay].sort((a, b) => {
       const aIsTeamSpecific = !!(a.team_id || (a.team_ids && a.team_ids.length > 0));
       const bIsTeamSpecific = !!(b.team_id || (b.team_ids && b.team_ids.length > 0));
@@ -177,12 +189,22 @@ export function getShiftForDate(
       
       // If both have days, prefer the one with FEWER days (more specific)
       if (aHasDays && bHasDays) {
-        if (a.day_of_week!.length < b.day_of_week!.length) return -1;
-        if (a.day_of_week!.length > b.day_of_week!.length) return 1;
+        const lengthDiff = a.day_of_week!.length - b.day_of_week!.length;
+        console.log(`      🔢 Comparing day counts: "${a.description}" (${a.day_of_week!.length} days) vs "${b.description}" (${b.day_of_week!.length} days) = ${lengthDiff}`);
+        if (lengthDiff !== 0) return lengthDiff; // Negative means a < b (a comes first)
       }
       
       return 0;
     });
+    
+    console.log(`   🏆 After sorting, winner is first:`,
+      sortedShifts.map((s, i) => ({
+        rank: i + 1,
+        id: s.id.substring(0, 8),
+        desc: s.description,
+        days: s.day_of_week,
+        dayCount: s.day_of_week?.length || 0
+      })));
     
     const bestShift = sortedShifts[0];
     
