@@ -308,8 +308,23 @@ Deno.serve(async (req) => {
         // Check all UK regions to find which one this holiday belongs to
         for (const [ukRegion, regionalHolidays] of Object.entries(ukRegionalHolidays)) {
           if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-            regionalCode = ukRegion;
+            regionalCode = ukRegion.replace('GB-', ''); // Store as 'SCT', 'NIR', 'ENG'
             break;
+          }
+        }
+        
+        // Mark England-only holidays (excluded from BOTH Scotland AND Northern Ireland)
+        if (!regionalCode) {
+          const excludedFromScotland = ukRegionalExclusions['GB-SCT']?.some(excluded => 
+            holidayName.includes(excluded)
+          );
+          const excludedFromNI = ukRegionalExclusions['GB-NIR']?.some(excluded => 
+            holidayName.includes(excluded)
+          );
+          
+          // If excluded from BOTH Scotland and NI, it's England/Wales only
+          if (excludedFromScotland && excludedFromNI) {
+            regionalCode = 'ENG';
           }
         }
       }
