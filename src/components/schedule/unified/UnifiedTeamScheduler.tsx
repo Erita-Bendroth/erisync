@@ -39,6 +39,7 @@ import { CoverageHeatmap } from '../CoverageHeatmap';
 import { CoverageAlerts } from '../CoverageAlerts';
 import { TeamCoverageGrid } from '../TeamCoverageGrid';
 import { ShiftTypeCounterRow } from './ShiftTypeCounterRow';
+import { DateHeaderRow } from './DateHeaderRow';
 import { WeeklyGridView } from './WeeklyGridView';
 import { MonthlyGridView } from './MonthlyGridView';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -954,8 +955,11 @@ export const UnifiedTeamScheduler: React.FC = () => {
                   showHolidays={showHolidays}
                 />
               ) : (
-                <div className="space-y-8">
-                  <ShiftTypeCounterRow
+                <div>
+                  <DateHeaderRow dates={dates} />
+                  
+                  <div className="space-y-8 mt-0">
+                    <ShiftTypeCounterRow
                     dates={dates}
                     scheduleEntries={scheduleEntries}
                     shiftTypes={shiftTypes}
@@ -997,6 +1001,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                       canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner}
                     />
                   ))}
+                  </div>
                 </div>
               )}
             </div>
