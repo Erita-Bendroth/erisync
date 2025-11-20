@@ -61,7 +61,7 @@ export function AppSidebar() {
 
   const scheduleNavItems = [
     { title: 'My Schedule', icon: Calendar, path: '/schedule?tab=schedule' },
-    { title: 'Team Scheduler', icon: CalendarCheck, path: '/unified-dashboard' },
+    { title: 'Team Scheduler', icon: CalendarCheck, path: '/schedule?tab=unified-scheduler' },
   ];
 
   const managementNavItems = [
