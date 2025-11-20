@@ -300,7 +300,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
             const smartShift = getShiftForDate(
               scheduledDate,
               wizardData.shiftType,
-              false, // autoDetectWeekends - false since we're using explicit shiftType
+              true, // autoDetectWeekends
               null, // weekendOverrideShiftId
               shiftDefinitions
             );
@@ -611,7 +611,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
                   ? getShiftForDate(
                       day,
                       wizardData.shiftType,
-                      false, // autoDetectWeekends
+                      true, // autoDetectWeekends
                       null, // weekendOverrideShiftId
                       shiftDefinitions
                     )
