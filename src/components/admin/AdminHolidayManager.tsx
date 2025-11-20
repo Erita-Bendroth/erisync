@@ -650,34 +650,6 @@ const AdminHolidayManager = () => {
               </div>
             )}
             
-            {selectedCountry === 'BE' && (
-              <div className="flex-1">
-                <label className="text-sm font-medium">
-                  Regions (Optional) - {selectedRegions.length > 0 ? `${selectedRegions.length} selected` : 'Select regions'}
-                </label>
-                <div className="border rounded-md p-3 max-h-40 overflow-y-auto bg-background">
-                  <div className="space-y-2">
-                    {getRegions().map((region) => (
-                      <label key={region.code} className="flex items-center space-x-2 cursor-pointer hover:bg-accent/50 p-1 rounded">
-                        <input
-                          type="checkbox"
-                          checked={selectedRegions.includes(region.code)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRegions([...selectedRegions, region.code]);
-                            } else {
-                              setSelectedRegions(selectedRegions.filter(r => r !== region.code));
-                            }
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm">{region.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
             
             <div className="flex-1">
               <label className="text-sm font-medium">Year</label>
@@ -701,7 +673,7 @@ const AdminHolidayManager = () => {
                   <Button 
                     onClick={importHolidays} 
                     disabled={loading || (() => {
-                      const regionsToCheck = (selectedCountry === 'DE' || selectedCountry === 'GB' || selectedCountry === 'BE') && selectedRegions.length > 0 
+                      const regionsToCheck = (selectedCountry === 'DE' || selectedCountry === 'GB') && selectedRegions.length > 0 
                         ? selectedRegions 
                         : [null];
                       return regionsToCheck.some(region => 
@@ -714,7 +686,7 @@ const AdminHolidayManager = () => {
                   </Button>
                 </TooltipTrigger>
                 {(() => {
-                  const regionsToCheck = (selectedCountry === 'DE' || selectedCountry === 'GB' || selectedCountry === 'BE') && selectedRegions.length > 0 
+                  const regionsToCheck = (selectedCountry === 'DE' || selectedCountry === 'GB') && selectedRegions.length > 0 
                     ? selectedRegions 
                     : [null];
                   const pendingImport = regionsToCheck.find(region => 
