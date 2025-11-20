@@ -44,12 +44,8 @@ export function AppSidebar() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const { getSortedItems, updateOrder, resetOrder } = useSidebarOrder();
 
-  // State for temporarily reordered items during drag
-  const [overviewItems, setOverviewItems] = useState<any[]>([]);
-  const [scheduleItems, setScheduleItems] = useState<any[]>([]);
-  const [favoriteItems, setFavoriteItems] = useState<any[]>([]);
-  const [managementItems, setManagementItems] = useState<any[]>([]);
-  const [settingsItems, setSettingsItems] = useState<any[]>([]);
+  // Single state for all items (allows dragging between sections)
+  const [allItems, setAllItems] = useState<any[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -103,95 +99,81 @@ export function AppSidebar() {
 
   const isManagerOrPlanner = userRole === 'manager' || userRole === 'planner' || userRole === 'admin';
 
-  // Update items when favorites change or sorting changes
+  // Merge all items into a single array
   useEffect(() => {
-    setOverviewItems(getSortedItems(mainNavItems, 'overview'));
-    setScheduleItems(getSortedItems(scheduleNavItems, 'schedule'));
-    
     const favItems = favorites.map(fav => ({
       key: `favorite-${fav.id}`,
       title: fav.name,
       icon: Star,
       path: `/schedule?tab=unified-scheduler&favorite=${fav.id}`,
       favoriteId: fav.id,
+      section: 'favorites',
     }));
-    setFavoriteItems(getSortedItems(favItems, 'favorites'));
 
-    if (isManagerOrPlanner) {
-      const mgmtItems = [
-        ...managementNavItems,
-        ...(userRole === 'planner' || userRole === 'admin' ? [{
-          key: 'nav-admin',
-          title: 'Admin Settings',
-          icon: Shield,
-          path: '/schedule?tab=admin',
-        }] : [])
-      ];
-      setManagementItems(getSortedItems(mgmtItems, 'management'));
-    }
+    const mgmtItems = isManagerOrPlanner ? [
+      ...managementNavItems.map(item => ({ ...item, section: 'management' })),
+      ...(userRole === 'planner' || userRole === 'admin' ? [{
+        key: 'nav-admin',
+        title: 'Admin Settings',
+        icon: Shield,
+        path: '/schedule?tab=admin',
+        section: 'management',
+      }] : [])
+    ] : [];
 
-    setSettingsItems(getSortedItems(settingsNavItems, 'settings'));
+    const combinedItems = [
+      ...mainNavItems.map(item => ({ ...item, section: 'overview' })),
+      ...scheduleNavItems.map(item => ({ ...item, section: 'schedule' })),
+      ...favItems,
+      ...mgmtItems,
+      ...settingsNavItems.map(item => ({ ...item, section: 'settings' })),
+    ];
+
+    setAllItems(getSortedItems(combinedItems));
   }, [favorites, getSortedItems, isManagerOrPlanner, userRole]);
 
-  const handleDragEnd = (event: DragEndEvent, section: string) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over || active.id === over.id) return;
 
-    let items: any[];
-    let setItems: (items: any[]) => void;
-
-    switch (section) {
-      case 'overview':
-        items = overviewItems;
-        setItems = setOverviewItems;
-        break;
-      case 'schedule':
-        items = scheduleItems;
-        setItems = setScheduleItems;
-        break;
-      case 'favorites':
-        items = favoriteItems;
-        setItems = setFavoriteItems;
-        break;
-      case 'management':
-        items = managementItems;
-        setItems = setManagementItems;
-        break;
-      case 'settings':
-        items = settingsItems;
-        setItems = setSettingsItems;
-        break;
-      default:
-        return;
-    }
-
-    const oldIndex = items.findIndex((item) => item.key === active.id);
-    const newIndex = items.findIndex((item) => item.key === over.id);
+    const oldIndex = allItems.findIndex((item) => item.key === active.id);
+    const newIndex = allItems.findIndex((item) => item.key === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newItems = arrayMove(items, oldIndex, newIndex);
-      setItems(newItems);
-      updateOrder(section, newItems.map(item => item.key));
+      const newItems = arrayMove(allItems, oldIndex, newIndex);
+      setAllItems(newItems);
+      updateOrder(newItems.map(item => item.key));
     }
   };
+
+  // Helper to get items by section for rendering
+  const getItemsBySection = (section: string) => 
+    allItems.filter(item => item.section === section);
+
+  const overviewItems = getItemsBySection('overview');
+  const scheduleItems = getItemsBySection('schedule');
+  const favoriteItems = getItemsBySection('favorites');
+  const managementItems = getItemsBySection('management');
+  const settingsItems = getItemsBySection('settings');
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        {/* Overview Section */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Overview</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event) => handleDragEnd(event, 'overview')}
-            >
-              <SortableContext
-                items={overviewItems.map(item => item.key)}
-                strategy={verticalListSortingStrategy}
-              >
+        {/* Single DndContext wrapping all sections */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={allItems.map(item => item.key)}
+            strategy={verticalListSortingStrategy}
+          >
+            {/* Overview Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel>Overview</SidebarGroupLabel>
+              <SidebarGroupContent>
                 <SidebarMenu>
                   {overviewItems.map((item) => (
                     <DraggableSidebarMenuItem
@@ -205,26 +187,15 @@ export function AppSidebar() {
                     />
                   ))}
                 </SidebarMenu>
-              </SortableContext>
-            </DndContext>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarGroupContent>
+            </SidebarGroup>
 
-        <Separator />
+            <Separator />
 
-        {/* Schedule Section */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Schedule</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event) => handleDragEnd(event, 'schedule')}
-            >
-              <SortableContext
-                items={scheduleItems.map(item => item.key)}
-                strategy={verticalListSortingStrategy}
-              >
+            {/* Schedule Section */}
+            <SidebarGroup>
+              <SidebarGroupLabel>Schedule</SidebarGroupLabel>
+              <SidebarGroupContent>
                 <SidebarMenu>
                   {scheduleItems.map((item) => (
                     <DraggableSidebarMenuItem
@@ -238,27 +209,16 @@ export function AppSidebar() {
                     />
                   ))}
                 </SidebarMenu>
-              </SortableContext>
-            </DndContext>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarGroupContent>
+            </SidebarGroup>
 
-        {/* Quick Access / Favorites Section */}
-        {favoriteItems.length > 0 && (
-          <>
-            <Separator />
-            <SidebarGroup>
-              <SidebarGroupLabel>Quick Access</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={(event) => handleDragEnd(event, 'favorites')}
-                >
-                  <SortableContext
-                    items={favoriteItems.map(item => item.key)}
-                    strategy={verticalListSortingStrategy}
-                  >
+            {/* Quick Access / Favorites Section */}
+            {favoriteItems.length > 0 && (
+              <>
+                <Separator />
+                <SidebarGroup>
+                  <SidebarGroupLabel>Quick Access</SidebarGroupLabel>
+                  <SidebarGroupContent>
                     <SidebarMenu>
                       {favoriteItems.map((item) => (
                         <DraggableSidebarMenuItem
@@ -271,29 +231,18 @@ export function AppSidebar() {
                         />
                       ))}
                     </SidebarMenu>
-                  </SortableContext>
-                </DndContext>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </>
+            )}
 
-        {/* Management Section (for managers/planners only) */}
-        {isManagerOrPlanner && (
-          <>
-            <Separator />
-            <SidebarGroup>
-              <SidebarGroupLabel>Management</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={(event) => handleDragEnd(event, 'management')}
-                >
-                  <SortableContext
-                    items={managementItems.map(item => item.key)}
-                    strategy={verticalListSortingStrategy}
-                  >
+            {/* Management Section (for managers/planners only) */}
+            {isManagerOrPlanner && managementItems.length > 0 && (
+              <>
+                <Separator />
+                <SidebarGroup>
+                  <SidebarGroupLabel>Management</SidebarGroupLabel>
+                  <SidebarGroupContent>
                     <SidebarMenu>
                       {managementItems.map((item) => (
                         <DraggableSidebarMenuItem
@@ -307,27 +256,16 @@ export function AppSidebar() {
                         />
                       ))}
                     </SidebarMenu>
-                  </SortableContext>
-                </DndContext>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </>
+            )}
 
-        {/* Settings Section */}
-        <Separator />
-        <SidebarGroup>
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event) => handleDragEnd(event, 'settings')}
-            >
-              <SortableContext
-                items={settingsItems.map(item => item.key)}
-                strategy={verticalListSortingStrategy}
-              >
+            {/* Settings Section */}
+            <Separator />
+            <SidebarGroup>
+              <SidebarGroupLabel>Settings</SidebarGroupLabel>
+              <SidebarGroupContent>
                 <SidebarMenu>
                   {settingsItems.map((item) => (
                     <DraggableSidebarMenuItem
@@ -341,10 +279,10 @@ export function AppSidebar() {
                     />
                   ))}
                 </SidebarMenu>
-              </SortableContext>
-            </DndContext>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SortableContext>
+        </DndContext>
       </SidebarContent>
 
       <SidebarFooter>
