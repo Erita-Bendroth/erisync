@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 
 export interface ShiftTimeDefinition {
   id: string;
@@ -32,10 +33,15 @@ export async function fetchTeamShiftDefinitions(teamId: string): Promise<ShiftTi
   const { data, error } = await supabase
     .from('shift_time_definitions')
     .select('*')
-    .or(`team_id.eq.${teamId},team_ids.cs.{${teamId}},and(team_id.is.null,team_ids.is.null)`);
+    .or(`team_id.eq.${teamId},team_ids.cs.{"${teamId}"},and(team_id.is.null,team_ids.is.null)`);
 
   if (error) {
     console.error('❌ [PREVIEW DEBUG] Error fetching shift definitions:', error);
+    return [];
+  }
+
+  if (!data || data.length === 0) {
+    console.warn('⚠️ [PREVIEW DEBUG] No shifts found for team:', teamId);
     return [];
   }
 
@@ -45,7 +51,10 @@ export async function fetchTeamShiftDefinitions(teamId: string): Promise<ShiftTi
       type: s.shift_type,
       times: `${s.start_time}-${s.end_time}`,
       days: s.day_of_week,
-      desc: s.description
+      desc: s.description,
+      team_id: s.team_id,
+      team_ids: s.team_ids,
+      teamIdsType: typeof s.team_ids
     }))
   );
 
@@ -65,6 +74,8 @@ export function getShiftForDate(
 ): DayShiftPreview {
   const dayOfWeek = date.getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  
+  console.log(`🔍 [PREVIEW DEBUG] getShiftForDate called for ${format(date, 'EEE MMM d')} (day ${dayOfWeek}), shiftType="${selectedShiftType}", autoWeekends=${autoDetectWeekends}`);
   
   const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   console.log(`\n📅 [PREVIEW DEBUG] ${dateStr}`);
