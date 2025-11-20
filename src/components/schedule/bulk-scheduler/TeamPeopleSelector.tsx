@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -21,11 +22,52 @@ export const TeamPeopleSelector = ({
   onUserSelectionChange,
   mode,
 }: TeamPeopleSelectorProps) => {
+  const { user } = useAuth();
   const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
   const [teamMembers, setTeamMembers] = useState<Array<{ user_id: string; first_name: string; last_name: string; initials: string }>>([]);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchTeams = async () => {
+    fetchUserRoles();
+  }, [user]);
+
+  useEffect(() => {
+    if (userRoles.length > 0) {
+      fetchTeams();
+    }
+  }, [userRoles]);
+
+  const fetchUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      setUserRoles(data?.map(r => r.role) || []);
+    } catch (error) {
+      console.error("Error fetching user roles:", error);
+    }
+  };
+
+  const fetchTeams = async () => {
+    const isOnlyManager = userRoles.includes('manager') && 
+                         !userRoles.includes('planner') && 
+                         !userRoles.includes('admin');
+    
+    if (isOnlyManager && user) {
+      const { data } = await supabase
+        .from('team_members')
+        .select('teams(id, name)')
+        .eq('user_id', user.id)
+        .eq('is_manager', true);
+      
+      const managerTeams = data?.map((item: any) => item.teams).filter(Boolean) || [];
+      setTeams(managerTeams);
+    } else {
       const { data } = await supabase
         .from('teams')
         .select('id, name')
@@ -34,10 +76,8 @@ export const TeamPeopleSelector = ({
       if (data) {
         setTeams(data);
       }
-    };
-
-    fetchTeams();
-  }, []);
+    }
+  };
 
   useEffect(() => {
     const fetchTeamMembers = async () => {

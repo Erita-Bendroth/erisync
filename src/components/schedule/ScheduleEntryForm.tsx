@@ -68,7 +68,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
   }, [user]);
 
   useEffect(() => {
-    if (open && hasPermission) {
+    if (open && hasPermission && userRoles.length > 0) {
       fetchTeams();
       fetchProfiles();
       
@@ -86,7 +86,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
         setSelectedDate(new Date(editEntry.date));
       }
     }
-  }, [open, editEntry, hasPermission]);
+  }, [open, editEntry, hasPermission, userRoles]);
 
   const fetchUserRoles = async () => {
     if (!user) return;
@@ -113,12 +113,29 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
 
   const fetchTeams = async () => {
     try {
-      const { data } = await supabase
-        .from("teams")
-        .select("id, name")
-        .order("name");
+      const isOnlyManager = userRoles.includes('manager') && 
+                           !userRoles.includes('planner') && 
+                           !userRoles.includes('admin');
       
-      setTeams(data || []);
+      if (isOnlyManager && user) {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select('teams(id, name)')
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+          
+        if (error) throw error;
+        const managerTeams = data?.map((item: any) => item.teams).filter(Boolean) || [];
+        setTeams(managerTeams);
+      } else {
+        const { data, error } = await supabase
+          .from("teams")
+          .select("id, name")
+          .order("name");
+        
+        if (error) throw error;
+        setTeams(data || []);
+      }
     } catch (error) {
       console.error("Error fetching teams:", error);
     }

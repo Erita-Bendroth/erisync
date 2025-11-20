@@ -172,14 +172,14 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
   }, [user]);
 
   useEffect(() => {
-    if (hasPermission) {
+    if (hasPermission && userRoles.length > 0) {
       fetchTeams();
       // Set default dates to current month
       const now = new Date();
       setStartDate(startOfMonth(now));
       setEndDate(endOfMonth(addMonths(now, 1)));
     }
-  }, [hasPermission]);
+  }, [hasPermission, userRoles]);
 
   useEffect(() => {
     fetchUsers();
