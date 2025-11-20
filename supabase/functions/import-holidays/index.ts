@@ -430,20 +430,37 @@ Deno.serve(async (req) => {
 
     console.log(`Successfully upserted holidays for ${country_code} ${year}`)
 
-    // Update status to completed immediately
-    const { error: statusUpdateError } = await supabaseClient
-      .from('holiday_import_status')
-      .update({
-        status: 'completed',
-        imported_count: holidayData.length,
-        completed_at: new Date().toISOString()
-      })
-      .eq('country_code', country_code)
-      .eq('year', year)
-      .eq('region_code', region_code || null);
+    // Update status to completed immediately - handle NULL region_code correctly
+    console.log(`📊 Updating import status for ${country_code} ${year} ${region_code || '(no region)'}`);
+    console.log(`   - Imported count: ${holidayData.length}`);
+    
+    const statusUpdate = region_code 
+      ? supabaseClient
+          .from('holiday_import_status')
+          .update({
+            status: 'completed',
+            imported_count: holidayData.length,
+            completed_at: new Date().toISOString()
+          })
+          .eq('country_code', country_code)
+          .eq('year', year)
+          .eq('region_code', region_code)
+      : supabaseClient
+          .from('holiday_import_status')
+          .update({
+            status: 'completed',
+            imported_count: holidayData.length,
+            completed_at: new Date().toISOString()
+          })
+          .eq('country_code', country_code)
+          .eq('year', year)
+          .is('region_code', null);
+    
+    const { error: statusUpdateError } = await statusUpdate;
     
     if (statusUpdateError) {
-      console.error('Failed to update import status:', statusUpdateError);
+      console.error('❌ Failed to update import status:', statusUpdateError);
+      console.error('   Query params:', { country_code, year, region_code });
     } else {
       console.log('✅ Import status updated to completed');
     }
