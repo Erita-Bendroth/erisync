@@ -73,17 +73,44 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
   const parseTimeBlocks = (notes: string | undefined) => {
     if (!notes) return null;
     
-    // Check if notes contains time block JSON
-    if (notes.trim().startsWith('[{') && notes.includes('start_time')) {
+    const trimmed = notes.trim();
+    
+    // Try direct JSON array format: [{"activity_type":"work",...}]
+    if (trimmed.startsWith('[{')) {
       try {
-        const blocks = JSON.parse(notes);
-        return Array.isArray(blocks) ? blocks : null;
+        const blocks = JSON.parse(trimmed);
+        if (Array.isArray(blocks) && blocks.length > 0 && blocks[0].start_time) {
+          return blocks;
+        }
       } catch (e) {
-        return null;
+        console.error('Failed to parse time blocks:', e);
+      }
+    }
+    
+    // Try "Times: [{...}]" format
+    const timesMatch = trimmed.match(/Times:\s*(\[.+\])/);
+    if (timesMatch) {
+      try {
+        const blocks = JSON.parse(timesMatch[1]);
+        if (Array.isArray(blocks) && blocks.length > 0) {
+          return blocks;
+        }
+      } catch (e) {
+        console.error('Failed to parse Times format:', e);
       }
     }
     
     return null;
+  };
+
+  const isUnscheduled = () => {
+    // Check if entry is just "available" with no actual work scheduled
+    const hasTimeBlocks = entry.notes && parseTimeBlocks(entry.notes);
+    const isJustAvailable = entry.activity_type === 'work' && 
+                            entry.availability_status === 'available';
+    const noSpecificShift = !entry.shift_type || entry.shift_type === 'normal';
+    
+    return isJustAvailable && noSpecificShift && !hasTimeBlocks;
   };
 
   const formatTimeBlocks = (blocks: any[]) => {
@@ -91,8 +118,11 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
       const activity = block.activity_type || 'work';
       const start = block.start_time || '';
       const end = block.end_time || '';
-      return `${activity}: ${start} - ${end}`;
-    }).join(', ');
+      
+      // Capitalize activity and format nicely
+      const formattedActivity = activity.charAt(0).toUpperCase() + activity.slice(1);
+      return `${formattedActivity}: ${start} - ${end}`;
+    }).join(' • ');
   };
 
   return (
@@ -132,18 +162,26 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
 
         {/* Badges */}
         <div className="flex flex-wrap gap-2">
-          <Badge variant={getShiftBadgeVariant(entry.shift_type)}>
-            {entry.shift_type || 'normal'}
-          </Badge>
-          <Badge variant={getActivityBadgeVariant(entry.activity_type)}>
-            {entry.activity_type}
-          </Badge>
-          <Badge
-            variant="outline"
-            className={getAvailabilityColor(entry.availability_status)}
-          >
-            {entry.availability_status}
-          </Badge>
+          {isUnscheduled() ? (
+            <Badge variant="outline" className="text-muted-foreground">
+              Unscheduled
+            </Badge>
+          ) : (
+            <>
+              <Badge variant={getShiftBadgeVariant(entry.shift_type)}>
+                {entry.shift_type || 'normal'}
+              </Badge>
+              <Badge variant={getActivityBadgeVariant(entry.activity_type)}>
+                {entry.activity_type}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={getAvailabilityColor(entry.availability_status)}
+              >
+                {entry.availability_status}
+              </Badge>
+            </>
+          )}
         </div>
 
         {/* Team */}
@@ -152,19 +190,20 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
         </p>
 
         {/* Time Blocks or Notes */}
-        {entry.notes && (() => {
+        {entry.notes && !isUnscheduled() && (() => {
           const timeBlocks = parseTimeBlocks(entry.notes);
           
-          if (timeBlocks) {
+          if (timeBlocks && timeBlocks.length > 0) {
             return (
               <div className="pt-2 border-t">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Times:</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Schedule:</p>
                 <p className="text-xs text-foreground">
                   {formatTimeBlocks(timeBlocks)}
                 </p>
               </div>
             );
-          } else {
+          } else if (!entry.notes.trim().startsWith('[{')) {
+            // Only show plain text notes if they're not JSON
             return (
               <div className="pt-2 border-t">
                 <p className="text-xs text-muted-foreground line-clamp-2">
@@ -173,6 +212,7 @@ export const MobileScheduleCard: React.FC<MobileScheduleCardProps> = ({
               </div>
             );
           }
+          return null;
         })()}
       </CardContent>
     </Card>
