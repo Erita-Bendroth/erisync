@@ -55,18 +55,41 @@ const germanRegionalHolidays: Record<string, string[]> = {
   'TH': ['Weltkindertag', 'Reformationstag'], // Thuringia
 };
 
-// UK regional holiday mapping
+// UK regional holiday mapping - which regions observe each holiday
+const ukHolidayRegions: Record<string, string[]> = {
+  // Shared holidays observed by all regions
+  "New Year's Day": ['ENG', 'SCT', 'NIR'],
+  "Good Friday": ['ENG', 'SCT', 'NIR'],
+  "Christmas Day": ['ENG', 'SCT', 'NIR'],
+  "Boxing Day": ['ENG', 'SCT', 'NIR'],
+  "Early May bank holiday": ['ENG', 'SCT', 'NIR'],
+  
+  // Scotland-specific
+  "2 January": ['SCT'],
+  "Saint Andrew's Day": ['SCT'],
+  
+  // Northern Ireland-specific
+  "Saint Patrick's Day": ['NIR'],
+  "Battle of the Boyne": ['NIR'],
+  
+  // England & Wales only
+  "Spring bank holiday": ['ENG'],
+  "Summer bank holiday": ['ENG'],
+  "Easter Monday": ['ENG', 'NIR'], // NOT observed in Scotland
+};
+
+// UK regional holiday mapping (kept for backward compatibility)
 const ukRegionalHolidays: Record<string, string[]> = {
-  'GB-SCT': ['Saint Andrew\'s Day', '2 January'], // Scotland-specific
-  'GB-NIR': ['Saint Patrick\'s Day', 'Battle of the Boyne'], // Northern Ireland-specific
-  'GB-ENG': [], // England & Wales use standard UK holidays
+  'GB-SCT': ['Saint Andrew\'s Day', '2 January'],
+  'GB-NIR': ['Saint Patrick\'s Day', 'Battle of the Boyne'],
+  'GB-ENG': [],
 };
 
 // UK regional holiday EXCLUSIONS - holidays that don't apply to specific regions
 const ukRegionalExclusions: Record<string, string[]> = {
-  'GB-SCT': ['Spring bank holiday'], // Scotland does NOT get Spring bank holiday
-  'GB-NIR': ['Spring bank holiday', 'Summer bank holiday'], // NI does NOT get these
-  'GB-ENG': [], // England & Wales get all standard UK holidays
+  'GB-SCT': ['Spring bank holiday'],
+  'GB-NIR': ['Spring bank holiday', 'Summer bank holiday'],
+  'GB-ENG': [],
 };
 
 
@@ -131,13 +154,13 @@ Deno.serve(async (req) => {
     
     console.log('Request received:', { country_code, year, user_id, region_code })
 
-    // Check if import is already in progress
+    // Check if import is already in progress for ANY region of this country/year
     const { data: existingStatus } = await supabaseClient
       .from('holiday_import_status')
       .select('*')
       .eq('country_code', country_code)
       .eq('year', year)
-      .eq('region_code', region_code || null)
+      .in('status', ['pending', 'in_progress'])
       .maybeSingle();
 
     if (existingStatus && existingStatus.status === 'pending') {
@@ -280,6 +303,7 @@ Deno.serve(async (req) => {
     const holidayData = filteredHolidays.flatMap(holiday => {
       let regionalCode: string | null = null;
       const matchingGermanRegions: string[] = [];
+      const matchingUKRegions: string[] = [];
 
       // Generic regional mapping: if API provides counties codes like "DE-BY"
       if (region_code && Array.isArray(holiday.counties) && holiday.counties.length > 0) {
@@ -296,37 +320,38 @@ Deno.serve(async (req) => {
         // Check ALL German regions to find which ones this holiday belongs to
         for (const [deRegion, regionalHolidays] of Object.entries(germanRegionalHolidays)) {
           if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-            // Remove 'DE-' prefix and collect (e.g., 'DE-BY' -> 'BY')
             matchingGermanRegions.push(deRegion.replace('DE-', ''));
           }
         }
       }
 
-      // UK regional holiday mapping - AUTOMATICALLY assign regions
-      if (!regionalCode && country_code === 'GB') {
+      // UK regional holiday mapping - COLLECT ALL matching regions
+      if (country_code === 'GB') {
         const holidayName = holiday.localName || holiday.name;
         
-        // Check all UK regions to find which one this holiday belongs to
-        for (const [ukRegion, regionalHolidays] of Object.entries(ukRegionalHolidays)) {
-          if (regionalHolidays.some(regional => holidayName.includes(regional))) {
-            regionalCode = ukRegion.replace('GB-', ''); // Store as 'SCT', 'NIR', 'ENG'
+        // Check the explicit mapping first
+        for (const [holidayPattern, regions] of Object.entries(ukHolidayRegions)) {
+          if (holidayName.includes(holidayPattern)) {
+            matchingUKRegions.push(...regions);
             break;
           }
         }
         
-        // Mark England-only holidays (excluded from BOTH Scotland AND Northern Ireland)
-        if (!regionalCode) {
-          const excludedFromScotland = ukRegionalExclusions['GB-SCT']?.some(excluded => 
-            holidayName.includes(excluded)
-          );
-          const excludedFromNI = ukRegionalExclusions['GB-NIR']?.some(excluded => 
-            holidayName.includes(excluded)
-          );
-          
-          // If excluded from BOTH Scotland and NI, it's England/Wales only
-          if (excludedFromScotland && excludedFromNI) {
-            regionalCode = 'ENG';
+        // If no explicit match found, check old regional mapping
+        if (matchingUKRegions.length === 0) {
+          for (const [ukRegion, regionalHolidays] of Object.entries(ukRegionalHolidays)) {
+            if (regionalHolidays.some(regional => holidayName.includes(regional))) {
+              const region = ukRegion.replace('GB-', '');
+              if (!matchingUKRegions.includes(region)) {
+                matchingUKRegions.push(region);
+              }
+            }
           }
+        }
+        
+        // If still no match, assume it's for all regions (fallback for unmapped holidays)
+        if (matchingUKRegions.length === 0) {
+          matchingUKRegions.push('ENG', 'SCT', 'NIR');
         }
       }
 
@@ -339,18 +364,31 @@ Deno.serve(async (req) => {
           year: parseInt(year),
           is_public: true,
           user_id: null,
-          region_code: region // Each region gets its own row
+          region_code: region
         }));
       }
       
-      // For all other holidays (national or UK regional), return single row
+      // For UK holidays with multiple regions, create ONE ROW PER REGION
+      if (country_code === 'GB' && matchingUKRegions.length > 0) {
+        return matchingUKRegions.map(region => ({
+          name: holiday.localName || holiday.name,
+          date: holiday.date,
+          country_code: holiday.countryCode,
+          year: parseInt(year),
+          is_public: true,
+          user_id: null,
+          region_code: region
+        }));
+      }
+      
+      // For all other holidays (national or single region), return single row
       return [{
         name: holiday.localName || holiday.name,
         date: holiday.date,
         country_code: holiday.countryCode,
         year: parseInt(year),
         is_public: true,
-        user_id: null, // Always null for centrally managed holidays
+        user_id: null,
         region_code: regionalCode
       }];
     })
