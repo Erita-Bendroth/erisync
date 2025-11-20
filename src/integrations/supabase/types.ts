@@ -1574,10 +1574,12 @@ export type Database = {
       get_multiple_basic_profile_info: {
         Args: { _user_ids: string[] }
         Returns: {
+          country_code: string
           email: string
           first_name: string
           initials: string
           last_name: string
+          region_code: string
           user_id: string
         }[]
       }
