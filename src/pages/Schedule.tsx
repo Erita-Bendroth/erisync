@@ -34,6 +34,7 @@ import { UnifiedTeamScheduler } from "@/components/schedule/unified/UnifiedTeamS
 import { ShiftSwapRequestsList } from "@/components/schedule/swap/ShiftSwapRequestsList";
 import { ManagerSwapApprovals } from "@/components/schedule/swap/ManagerSwapApprovals";
 import { PersonalMonthlyCalendar } from "@/components/schedule/PersonalMonthlyCalendar";
+import { MyRequestsDialog } from "@/components/schedule/MyRequestsDialog";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -342,28 +343,32 @@ const Schedule = () => {
   return (
     <div className="space-y-6 pb-20 md:pb-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="admin" className="flex items-center">
-              <Shield className="w-4 h-4 mr-2" />
-              Admin Setup
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-1">
+            <TabsTrigger value="admin" className="flex items-center justify-center px-2">
+              <Shield className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Admin Setup</span>
             </TabsTrigger>
             {(isAdmin() || isPlanner() || isManager()) && (
-              <TabsTrigger value="unified-scheduler" className="flex items-center">
-                <Calendar className="w-4 h-4 mr-2" />
-                Team Scheduler
+              <TabsTrigger value="unified-scheduler" className="flex items-center justify-center px-2">
+                <Calendar className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Team Scheduler</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="schedule" className="flex items-center">
-              <Calendar className="w-4 h-4 mr-2" />
-              Schedule
+            <TabsTrigger value="schedule" className="flex items-center justify-center px-2">
+              <Calendar className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Schedule</span>
             </TabsTrigger>
-            <TabsTrigger value="teams" className="flex items-center">
-              <Users className="w-4 h-4 mr-2" />
-              Teams
+            <TabsTrigger value="vacations" className="flex items-center justify-center px-2">
+              <ArrowLeftRight className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Requests</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
+            <TabsTrigger value="teams" className="flex items-center justify-center px-2">
+              <Users className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Teams</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center justify-center px-2">
+              <Settings className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
 
@@ -588,6 +593,30 @@ const Schedule = () => {
               onScheduleUpdate={() => setScheduleRefreshKey(prev => prev + 1)}
               onCreatePartnership={() => setPartnershipDialogOpen(true)}
             />
+          </TabsContent>
+
+          <TabsContent value="vacations" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {(isManager() || isPlanner()) ? 'All Requests' : 'My Requests'}
+                </CardTitle>
+                <CardDescription>
+                  {(isManager() || isPlanner()) 
+                    ? 'Review and manage vacation requests and shift swap requests from your team members.'
+                    : 'View and manage your vacation requests and shift swap requests.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MyRequestsDialog
+                  isPlanner={isPlanner()}
+                  isManager={isManager()}
+                  isAdmin={isAdmin()}
+                  onRequestProcessed={() => setScheduleRefreshKey(prev => prev + 1)}
+                  onEditRequest={undefined}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
