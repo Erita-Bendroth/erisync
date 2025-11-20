@@ -54,7 +54,11 @@ const countries = [
     { code: "TH", name: "Thuringia (Thüringen)" }
   ]},
   { code: "AT", name: "Austria" },
-  { code: "BE", name: "Belgium" },
+  { code: "BE", name: "Belgium", regions: [
+    { code: "BE-VLG", name: "Flanders (Vlaanderen)" },
+    { code: "BE-WAL", name: "Wallonia (Wallonie)" },
+    { code: "BE-BRU", name: "Brussels (Bruxelles)" }
+  ]},
   { code: "BG", name: "Bulgaria" },
   { code: "HR", name: "Croatia" },
   { code: "CY", name: "Cyprus" },
@@ -322,9 +326,9 @@ const AdminHolidayManager = () => {
 
     setLoading(true);
     try {
-      // For Germany, if specific regions are selected, import for each region
+      // For Germany, UK, and Belgium: if specific regions are selected, import for each region
       // Otherwise import national holidays only
-      const regionsToImport = (selectedCountry === 'DE' || selectedCountry === 'GB') && selectedRegions.length > 0 
+      const regionsToImport = (selectedCountry === 'DE' || selectedCountry === 'GB' || selectedCountry === 'BE') && selectedRegions.length > 0 
         ? selectedRegions 
         : [null];
 
