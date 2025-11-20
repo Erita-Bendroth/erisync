@@ -267,15 +267,7 @@ export const ManagerManual = () => {
       <section id="vacation-requests">
         <h2 className="text-2xl font-bold mb-4">6. Vacation Requests</h2>
         
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          
-          <AlertDescription>
-            Only Planners and Admins have the authority to approve or reject vacation requests. 
-            As a Manager, you can view requests from your team members, but you must contact 
-            a Planner to have them approved or rejected.
-          </AlertDescription>
-        </Alert>
+        
 
         <h3 className="text-xl font-semibold mb-3">Viewing Your Team's Requests</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
@@ -286,7 +278,7 @@ export const ManagerManual = () => {
         </ol>
 
         <div className="my-4">
-          <img src="/images/manual/manager-vacation-view.png" alt="Vacation Requests section showing team member requests with status badges but no approve/reject buttons for managers" className="w-full rounded-lg border border-border shadow-sm" />
+          
         </div>
 
         <h3 className="text-xl font-semibold mb-3">What You Can Do</h3>
