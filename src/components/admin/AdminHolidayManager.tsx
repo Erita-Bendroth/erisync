@@ -514,7 +514,8 @@ const AdminHolidayManager = () => {
       if (existing) {
         // Add region to existing holiday
         if (holiday.region_code) {
-          existing.regions = [...(existing.regions || []), holiday.region_code];
+          const regionSet = new Set([...(existing.regions || []), holiday.region_code]);
+          existing.regions = Array.from(regionSet);
         }
       } else {
         // Create new entry
