@@ -831,6 +831,11 @@ const EnhancedTeamManagement = () => {
               const members = teamMembers[team.id] || [];
               const isExpanded = expandedTeams.has(team.id);
               
+              // Check if current user is a manager of this specific team
+              const isCurrentUserManagerOfTeam = members.some(
+                m => m.user_id === user?.id && m.is_manager
+              );
+              
               return (
                 <div key={team.id} className="border rounded-lg">
                   <Collapsible open={isExpanded} onOpenChange={() => toggleTeamExpanded(team.id)}>
@@ -963,7 +968,7 @@ const EnhancedTeamManagement = () => {
                         </div>
                         
                         {/* Team Member Overview - Working and Vacation Days */}
-                        {canEditTeams() && members.length > 0 && (
+                        {(canEditTeams() || isCurrentUserManagerOfTeam) && members.length > 0 && (
                           <div className="space-y-4 pt-4 border-t">
                             <h4 className="text-lg font-medium flex items-center">
                               <BarChart3 className="w-5 h-5 mr-2 text-primary" />
@@ -983,7 +988,7 @@ const EnhancedTeamManagement = () => {
                                     {memberStats && !statsLoading && (
                                       <UserTimeStatsDisplay
                                         stats={memberStats}
-                                        canEdit={canEditTeams()}
+                                        canEdit={canEditTeams() || isCurrentUserManagerOfTeam}
                                         onUpdate={async (vacationDays, flextimeHours) => {
                                           await updateAllowance(member.user_id, vacationDays, flextimeHours);
                                         }}
