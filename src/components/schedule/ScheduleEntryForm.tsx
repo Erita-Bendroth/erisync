@@ -143,12 +143,61 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
 
   const fetchProfiles = async () => {
     try {
-      const { data } = await supabase
-        .rpc('get_all_basic_profiles');
+      // Check if user is ONLY a manager (not also planner/admin)
+      const isOnlyManager = userRoles.includes('manager') && 
+                           !userRoles.includes('planner') && 
+                           !userRoles.includes('admin');
       
-      setProfiles(data || []);
+      if (isOnlyManager && user) {
+        // Step 1: Get teams this manager has access to
+        const { data: managerTeams, error: teamsError } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .eq('is_manager', true);
+        
+        if (teamsError) throw teamsError;
+        
+        const teamIds = managerTeams?.map(tm => tm.team_id) || [];
+        
+        if (teamIds.length === 0) {
+          setProfiles([]);
+          return;
+        }
+        
+        // Step 2: Get all user_ids who are members of those teams
+        const { data: teamMemberData, error: membersError } = await supabase
+          .from('team_members')
+          .select('user_id')
+          .in('team_id', teamIds);
+        
+        if (membersError) throw membersError;
+        
+        const userIds = [...new Set(teamMemberData?.map(tm => tm.user_id) || [])];
+        
+        if (userIds.length === 0) {
+          setProfiles([]);
+          return;
+        }
+        
+        // Step 3: Get profiles for those user_ids
+        const { data: profileData, error: profileError } = await supabase
+          .rpc('get_multiple_basic_profile_info', { _user_ids: userIds });
+        
+        if (profileError) throw profileError;
+        
+        setProfiles(profileData || []);
+        
+      } else {
+        // Planners/Admins: get all profiles (original behavior)
+        const { data } = await supabase
+          .rpc('get_all_basic_profiles');
+        
+        setProfiles(data || []);
+      }
     } catch (error) {
       console.error("Error fetching profiles:", error);
+      setProfiles([]);
     }
   };
 
