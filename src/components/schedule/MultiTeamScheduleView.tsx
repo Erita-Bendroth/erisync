@@ -720,7 +720,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                   </div>
                 ) : (
                   <TooltipProvider>
-                <ScrollArea className="border rounded-lg h-[calc(100vh-450px)] scroll-area">
+                <ScrollArea className="border rounded-lg h-[600px] scroll-area">
                       <div className="px-3 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
                         <strong>Note:</strong> Multi-team overview shows work schedules only. Other activities (vacation, training, etc.) are not displayed here.
                       </div>

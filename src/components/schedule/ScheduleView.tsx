@@ -2045,11 +2045,11 @@ const getActivityColor = (entry: ScheduleEntry) => {
           <div className="space-y-4">
             <Card>
               <CardContent className="p-0">
-                <Table className="table-fixed w-full">
+                <Table className="table-auto w-full">
                   <TableHeader>
                     <TableRow>
                       {multiSelectMode && <TableHead className="w-12"></TableHead>}
-                      <TableHead className="w-48 font-semibold">
+                      <TableHead className="w-40 font-semibold">
                         <div className="flex items-center justify-between gap-2">
                           <span>Employee</span>
                           {!userRoles.some(r => r.role === 'admin') && 
@@ -2117,7 +2117,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                           return (
                             <TableCell
                               key={dayIndex} 
-                              className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[150px]`}
+                              className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[120px]`}
                               onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
                               title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : ""}
                             >
