@@ -220,19 +220,21 @@ export const BulkGenerationPreview = ({
   // Show preview days for visual indication
   const previewDays = dayPreviews.slice(0, 14); // Show first 14 days max
   
-  // Calculate unique shifts being used
+  // Calculate unique shifts from user-specific breakdown
   const uniqueShifts = new Map<string, { description: string; count: number; times: string }>();
-  dayPreviews.forEach(preview => {
-    const key = preview.shiftId;
-    if (uniqueShifts.has(key)) {
-      uniqueShifts.get(key)!.count++;
-    } else {
-      uniqueShifts.set(key, {
-        description: preview.description,
-        count: 1,
-        times: `${preview.startTime}-${preview.endTime}`
-      });
-    }
+  userBreakdown.forEach(user => {
+    user.shifts.forEach(shift => {
+      const key = `${shift.type}-${shift.times}`;
+      if (uniqueShifts.has(key)) {
+        uniqueShifts.get(key)!.count += shift.count;
+      } else {
+        uniqueShifts.set(key, {
+          description: shift.description,
+          count: shift.count,
+          times: shift.times
+        });
+      }
+    });
   });
 
   return (
