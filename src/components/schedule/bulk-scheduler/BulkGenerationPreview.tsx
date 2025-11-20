@@ -1,6 +1,7 @@
 import { format, isWeekend, eachDayOfInterval } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useShiftTypes } from "@/hooks/useShiftTypes";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +95,14 @@ export const BulkGenerationPreview = ({
             <span className="font-medium capitalize">{shiftType}</span>
           )}
         </div>
+        
+        {selectedShift?.dayOfWeek && selectedShift.dayOfWeek.length > 0 && (
+          <Alert className="mt-2">
+            <AlertDescription className="text-xs">
+              ℹ️ This shift is only valid for: <strong>{selectedShift.dayOfWeek.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}</strong>. Alternative shifts will be used automatically for other days.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="pt-2 mt-2 border-t flex justify-between">
           <span className="font-semibold">Total shifts:</span>
@@ -132,20 +141,33 @@ export const BulkGenerationPreview = ({
             {previewDays.map((day) => {
               const dayIsWeekend = isWeekend(day);
               const dayLabel = format(day, 'EEE');
+              const dayOfWeek = day.getDay();
+              const isHighlighted = autoDetectWeekends && dayIsWeekend;
+              
+              // Check if selected shift has day_of_week constraint
+              const shiftDayConstraint = selectedShift?.dayOfWeek;
+              const isShiftValidForDay = !shiftDayConstraint || shiftDayConstraint.length === 0 || shiftDayConstraint.includes(dayOfWeek);
+              const willUseDifferentShift = !dayIsWeekend && !isShiftValidForDay;
               
               return (
-                <div
+                <div 
                   key={day.toISOString()}
                   className={cn(
-                    "p-2 rounded text-center border text-xs",
-                    dayIsWeekend && autoDetectWeekends && "bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
+                    "p-2 border rounded-md text-center transition-colors relative",
+                    isHighlighted && "bg-blue-50 border-blue-300 dark:bg-blue-950/30 dark:border-blue-800",
+                    willUseDifferentShift && "bg-yellow-50 border-yellow-300 dark:bg-yellow-950/30 dark:border-yellow-800"
                   )}
                 >
-                  <div className="font-medium">{dayLabel}</div>
-                  <div className="text-muted-foreground">{format(day, 'd')}</div>
-                  {dayIsWeekend && autoDetectWeekends && (
-                    <Badge variant="secondary" className="text-[10px] mt-1 px-1 py-0">
-                      WE
+                  <div className="text-xs font-medium text-muted-foreground">{dayLabel}</div>
+                  <div className="text-sm font-semibold mt-1">{format(day, 'd')}</div>
+                  {isHighlighted && (
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 mt-1 h-4">
+                      Weekend
+                    </Badge>
+                  )}
+                  {willUseDifferentShift && (
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 mt-1 h-4">
+                      Alt
                     </Badge>
                   )}
                 </div>
