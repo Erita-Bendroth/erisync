@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Calendar, Clock, AlertCircle, Info, UserCheck } from 'lucide-react';
 import { formatUserName } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
 
 interface Planner {
   user_id: string;
@@ -428,9 +430,11 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+  const isMobile = useIsMobile();
+
+  const modalContent = (
+    <>
+      {!isMobile && (
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -444,8 +448,9 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
               : 'Submit your vacation request for manager approval. You\'ll receive an email notification once it\'s reviewed.'}
           </DialogDescription>
         </DialogHeader>
+      )}
 
-        <div className="space-y-5 py-4">
+      <div className="space-y-5 py-4">
           {/* Info Alert */}
           <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -607,6 +612,28 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
             {isSubmitting ? (editRequest ? 'Updating...' : 'Submitting...') : (editRequest ? 'Update Request' : 'Submit Request')}
           </Button>
         </DialogFooter>
+      </>
+    );
+
+  if (isMobile) {
+    return (
+      <MobileBottomSheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title={editRequest ? 'Edit Vacation Request' : 'Request Time Off'}
+        description={editRequest 
+          ? 'Update your vacation request details.'
+          : 'Submit your vacation request for manager approval.'}
+      >
+        {modalContent}
+      </MobileBottomSheet>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        {modalContent}
       </DialogContent>
     </Dialog>
   );

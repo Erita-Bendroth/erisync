@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { validateSwapApproval } from '@/lib/swapValidation';
 import { ArrowLeftRight, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -18,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { BulkActionBar } from '@/components/shared/BulkActionBar';
 
 interface SwapRequest {
   id: string;
@@ -44,6 +46,10 @@ export function ManagerSwapApprovals() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject'>('approve');
   const [processing, setProcessing] = useState(false);
+  const [selectedSwapIds, setSelectedSwapIds] = useState<Set<string>>(new Set());
+  const [bulkApproveDialogOpen, setBulkApproveDialogOpen] = useState(false);
+  const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
+  const [bulkNotes, setBulkNotes] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -196,6 +202,169 @@ export function ManagerSwapApprovals() {
     }
   };
 
+  const handleBulkApprove = async () => {
+    const requestsToApprove = swapRequests.filter(r => selectedSwapIds.has(r.id));
+    if (requestsToApprove.length === 0) return;
+
+    setProcessing(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const request of requestsToApprove) {
+      try {
+        const validation = await validateSwapApproval(request.id);
+        if (!validation.valid) {
+          errorCount++;
+          continue;
+        }
+
+        await supabase
+          .from('shift_swap_requests')
+          .update({
+            status: 'approved',
+            reviewed_by: user?.id,
+            reviewed_at: new Date().toISOString(),
+            review_notes: bulkNotes.trim() || null
+          })
+          .eq('id', request.id);
+
+        const { data: entries } = await supabase
+          .from('schedule_entries')
+          .select('id, shift_type')
+          .in('id', [request.requesting_entry_id, request.target_entry_id]);
+
+        if (entries && entries.length === 2) {
+          const requestingEntry = entries.find(e => e.id === request.requesting_entry_id);
+          const targetEntry = entries.find(e => e.id === request.target_entry_id);
+
+          await supabase
+            .from('schedule_entries')
+            .update({ 
+              shift_type: targetEntry?.shift_type,
+              notes: `Shift swapped via approved request on ${format(new Date(), 'MMM d, yyyy')}`
+            })
+            .eq('id', request.requesting_entry_id);
+
+          await supabase
+            .from('schedule_entries')
+            .update({ 
+              shift_type: requestingEntry?.shift_type,
+              notes: `Shift swapped via approved request on ${format(new Date(), 'MMM d, yyyy')}`
+            })
+            .eq('id', request.target_entry_id);
+        }
+
+        await supabase.functions.invoke('send-swap-notification', {
+          body: {
+            type: 'request_approved',
+            requesting_user_id: request.requesting_user_id,
+            target_user_id: request.target_user_id,
+            swap_date: request.swap_date,
+            team_id: request.team_id,
+            review_notes: bulkNotes.trim() || null
+          }
+        });
+
+        successCount++;
+      } catch (error) {
+        console.error('Error approving swap:', error);
+        errorCount++;
+      }
+    }
+
+    setProcessing(false);
+    setBulkApproveDialogOpen(false);
+    setBulkNotes('');
+    setSelectedSwapIds(new Set());
+
+    toast({
+      title: successCount > 0 ? 'Bulk approval complete' : 'Bulk approval failed',
+      description: `${successCount} approved, ${errorCount} failed`,
+      variant: errorCount > 0 ? 'destructive' : 'default',
+    });
+
+    fetchPendingSwaps();
+  };
+
+  const handleBulkReject = async () => {
+    if (!bulkNotes.trim()) {
+      toast({
+        title: 'Notes required',
+        description: 'Please provide a reason for bulk rejection',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const requestsToReject = swapRequests.filter(r => selectedSwapIds.has(r.id));
+    if (requestsToReject.length === 0) return;
+
+    setProcessing(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const request of requestsToReject) {
+      try {
+        await supabase
+          .from('shift_swap_requests')
+          .update({
+            status: 'rejected',
+            reviewed_by: user?.id,
+            reviewed_at: new Date().toISOString(),
+            review_notes: bulkNotes.trim()
+          })
+          .eq('id', request.id);
+
+        await supabase.functions.invoke('send-swap-notification', {
+          body: {
+            type: 'request_rejected',
+            requesting_user_id: request.requesting_user_id,
+            target_user_id: request.target_user_id,
+            swap_date: request.swap_date,
+            team_id: request.team_id,
+            review_notes: bulkNotes.trim()
+          }
+        });
+
+        successCount++;
+      } catch (error) {
+        console.error('Error rejecting swap:', error);
+        errorCount++;
+      }
+    }
+
+    setProcessing(false);
+    setBulkRejectDialogOpen(false);
+    setBulkNotes('');
+    setSelectedSwapIds(new Set());
+
+    toast({
+      title: successCount > 0 ? 'Bulk rejection complete' : 'Bulk rejection failed',
+      description: `${successCount} rejected, ${errorCount} failed`,
+      variant: errorCount > 0 ? 'destructive' : 'default',
+    });
+
+    fetchPendingSwaps();
+  };
+
+  const toggleSwapSelection = (swapId: string) => {
+    const newSelection = new Set(selectedSwapIds);
+    if (newSelection.has(swapId)) {
+      newSelection.delete(swapId);
+    } else {
+      newSelection.add(swapId);
+    }
+    setSelectedSwapIds(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedSwapIds.size === swapRequests.length) {
+      setSelectedSwapIds(new Set());
+    } else {
+      setSelectedSwapIds(new Set(swapRequests.map(r => r.id)));
+    }
+  };
+
   const getShiftLabel = (shiftType: string | null) => {
     if (!shiftType) return 'Normal';
     const labels: Record<string, string> = {
@@ -226,26 +395,47 @@ export function ManagerSwapApprovals() {
             </CardContent>
           </Card>
         ) : (
-          swapRequests.map(request => {
-            const isCrossTeam = request.requesting_entry.team_id !== request.target_entry.team_id;
-            
-            return (
-            <Card key={request.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-                    <span>{request.requesting_user.first_name} {request.requesting_user.last_name}</span>
-                    <span className="text-xs text-muted-foreground">({request.requesting_entry.teams?.name})</span>
-                    <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-                    <span>{request.target_user.first_name} {request.target_user.last_name}</span>
-                    <span className="text-xs text-muted-foreground">({request.target_entry.teams?.name})</span>
-                    {isCrossTeam && (
-                      <Badge variant="outline" className="text-xs ml-2">
-                        Cross-team Partnership
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </div>
+          <>
+            {/* Select All Header */}
+            {swapRequests.length > 1 && (
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                <Checkbox
+                  checked={selectedSwapIds.size === swapRequests.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm font-medium">
+                  Select All ({selectedSwapIds.size}/{swapRequests.length})
+                </span>
+              </div>
+            )}
+
+            {swapRequests.map(request => {
+              const isCrossTeam = request.requesting_entry.team_id !== request.target_entry.team_id;
+              const isSelected = selectedSwapIds.has(request.id);
+              
+              return (
+              <Card key={request.id} className={isSelected ? 'border-primary' : ''}>
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-3 flex-1">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSwapSelection(request.id)}
+                      />
+                      <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                        <span>{request.requesting_user.first_name} {request.requesting_user.last_name}</span>
+                        <span className="text-xs text-muted-foreground">({request.requesting_entry.teams?.name})</span>
+                        <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                        <span>{request.target_user.first_name} {request.target_user.last_name}</span>
+                        <span className="text-xs text-muted-foreground">({request.target_entry.teams?.name})</span>
+                        {isCrossTeam && (
+                          <Badge variant="outline" className="text-xs ml-2">
+                            Cross-team Partnership
+                          </Badge>
+                        )}
+                      </CardTitle>
+                    </div>
+                  </div>
                 <CardDescription>
                   {format(new Date(request.swap_date), 'EEEE, MMMM d, yyyy')}
                 </CardDescription>
@@ -299,10 +489,98 @@ export function ManagerSwapApprovals() {
                 </p>
               </CardContent>
             </Card>
-          );
-        })
+              );
+            })}
+          </>
         )}
       </div>
+
+      {/* Bulk Action Bar */}
+      {selectedSwapIds.size > 0 && (
+        <BulkActionBar
+          selectedCount={selectedSwapIds.size}
+          onApprove={() => setBulkApproveDialogOpen(true)}
+          onReject={() => setBulkRejectDialogOpen(true)}
+          onClear={() => setSelectedSwapIds(new Set())}
+          approveLabel="Approve Selected"
+          rejectLabel="Reject Selected"
+          isProcessing={processing}
+        />
+      )}
+
+      {/* Bulk Approve Dialog */}
+      <Dialog open={bulkApproveDialogOpen} onOpenChange={setBulkApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve {selectedSwapIds.size} Swap Requests</DialogTitle>
+            <DialogDescription>
+              This will approve all selected swap requests and update the schedules accordingly.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-approve-notes">Notes (Optional)</Label>
+              <Textarea
+                id="bulk-approve-notes"
+                placeholder="Add any notes about these approvals..."
+                value={bulkNotes}
+                onChange={(e) => setBulkNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkApproveDialogOpen(false)} disabled={processing}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkApprove} disabled={processing}>
+              {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Approve {selectedSwapIds.size} Requests
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Reject Dialog */}
+      <Dialog open={bulkRejectDialogOpen} onOpenChange={setBulkRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject {selectedSwapIds.size} Swap Requests</DialogTitle>
+            <DialogDescription>
+              This will reject all selected swap requests. Please provide a reason.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-reject-notes">Rejection Reason (Required)</Label>
+              <Textarea
+                id="bulk-reject-notes"
+                placeholder="Explain why these requests are being rejected..."
+                value={bulkNotes}
+                onChange={(e) => setBulkNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkRejectDialogOpen(false)} disabled={processing}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkReject}
+              disabled={processing || !bulkNotes.trim()}
+            >
+              {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Reject {selectedSwapIds.size} Requests
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
         <DialogContent>
