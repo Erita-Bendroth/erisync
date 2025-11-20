@@ -43,6 +43,9 @@ export const BulkGenerationPreview = ({
   // Calculate weekend count
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekendCount = days.filter(d => isWeekend(d)).length;
+  
+  // Show preview days for visual indication
+  const previewDays = days.slice(0, 14); // Show first 14 days max
 
   return (
     <Card className="p-4 space-y-3">
@@ -117,6 +120,42 @@ export const BulkGenerationPreview = ({
                 </Badge>
               )}
             </div>
+          )}
+        </div>
+      )}
+      
+      {/* Visual day preview */}
+      {previewDays.length > 0 && (
+        <div className="pt-3 mt-3 border-t">
+          <p className="text-xs font-medium mb-2 text-muted-foreground">Date Range Preview:</p>
+          <div className="grid grid-cols-7 gap-2">
+            {previewDays.map((day) => {
+              const dayIsWeekend = isWeekend(day);
+              const dayLabel = format(day, 'EEE');
+              
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={cn(
+                    "p-2 rounded text-center border text-xs",
+                    dayIsWeekend && autoDetectWeekends && "bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
+                  )}
+                >
+                  <div className="font-medium">{dayLabel}</div>
+                  <div className="text-muted-foreground">{format(day, 'd')}</div>
+                  {dayIsWeekend && autoDetectWeekends && (
+                    <Badge variant="secondary" className="text-[10px] mt-1 px-1 py-0">
+                      WE
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {previewDays.length < days.length && (
+            <p className="text-xs text-muted-foreground mt-2">
+              ... and {days.length - previewDays.length} more days
+            </p>
           )}
         </div>
       )}

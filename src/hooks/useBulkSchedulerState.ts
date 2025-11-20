@@ -47,7 +47,7 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
       start: '08:00',
       end: '16:30',
     },
-    excludedDays: [0, 6], // Default: exclude Saturday and Sunday
+    excludedDays: [], // Empty by default - let weekend detection handle it
     skipHolidays: false,
     autoDetectWeekends: true,
     autoDetectHolidays: true,
