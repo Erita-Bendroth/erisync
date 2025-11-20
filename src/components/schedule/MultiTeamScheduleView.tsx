@@ -27,6 +27,7 @@ import { useTeamFavorites } from "@/hooks/useTeamFavorites";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 import { useScheduleAccessControl } from "@/hooks/useScheduleAccessControl";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface TeamMember {
   user_id: string;
@@ -719,7 +720,7 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                   </div>
                 ) : (
                   <TooltipProvider>
-                <div className="overflow-x-auto border rounded-lg">
+                <ScrollArea className="border rounded-lg h-[calc(100vh-450px)] scroll-area">
                       <div className="px-3 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
                         <strong>Note:</strong> Multi-team overview shows work schedules only. Other activities (vacation, training, etc.) are not displayed here.
                       </div>
@@ -860,7 +861,9 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                           })}
                         </tbody>
                       </table>
-                    </div>
+                      <ScrollBar orientation="horizontal" className="h-3" />
+                      <ScrollBar orientation="vertical" className="w-3" />
+                    </ScrollArea>
                   </TooltipProvider>
                 )}
 
