@@ -527,9 +527,8 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                       </div>
                     </div>
 
-                    {/* Team Sections with Vertical Scroll */}
-                    <div className="max-h-[600px] overflow-y-auto">
-                      <div className="space-y-3">
+                    {/* Team Sections */}
+                    <div className="space-y-3">
                         {Array.from(teamGroups.entries()).map(([teamId, members]) => {
                           console.log(`Rendering team ${teamNames.get(teamId)} (${teamId}) with ${members.length} members`);
                           return (
@@ -548,7 +547,6 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                             />
                           );
                         })}
-                      </div>
                     </div>
                   </div>
                 </div>

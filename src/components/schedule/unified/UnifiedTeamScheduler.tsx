@@ -918,8 +918,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="mt-0">
-            <ScrollArea ref={scrollAreaRef} className="scroll-area">
-              <div className="min-w-max">
+            <div ref={scrollAreaRef} className="min-w-max overflow-x-auto">
               {loading ? (
                 <div className="flex items-center justify-center p-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -1000,9 +999,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                   ))}
                 </div>
               )}
-              </div>
-              <ScrollBar orientation="horizontal" className="h-3" />
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           <TabsContent value="coverage" className="mt-0">
