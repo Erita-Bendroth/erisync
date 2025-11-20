@@ -62,12 +62,18 @@ const ukRegionalHolidays: Record<string, string[]> = {
   'GB-ENG': [], // England & Wales use standard UK holidays
 };
 
+// UK regional holiday EXCLUSIONS - holidays that don't apply to specific regions
+const ukRegionalExclusions: Record<string, string[]> = {
+  'GB-SCT': ['Spring bank holiday'], // Scotland does NOT get Spring bank holiday
+  'GB-NIR': ['Spring bank holiday', 'Summer bank holiday'], // NI does NOT get these
+  'GB-ENG': [], // England & Wales get all standard UK holidays
+};
+
 
 // Countries to exclude non-official holidays/observances
 const holidayFilters: Record<string, string[]> = {
   'SE': ['Julafton'], // Exclude Christmas Eve (not official)
   'US': ['Columbus Day'], // Example filter for US
-  'GB': ['Boxing Day'] // Example filter for UK
 };
 
 Deno.serve(async (req) => {
@@ -254,8 +260,18 @@ Deno.serve(async (req) => {
     const countryFilters = holidayFilters[country_code] || [];
     const filteredHolidays = holidays.filter(holiday => {
       const holidayName = holiday.localName || holiday.name;
+      
       // Exclude country-specific unofficial holidays
       if (countryFilters.some(filter => holidayName.includes(filter))) return false;
+      
+      // UK-specific: exclude holidays that don't apply to specified region
+      if (country_code === 'GB' && region_code) {
+        const regionExclusions = ukRegionalExclusions[`GB-${region_code}`] || [];
+        if (regionExclusions.some(excluded => holidayName.includes(excluded))) {
+          return false; // This holiday doesn't apply to this UK region
+        }
+      }
+      
       // Only accept official public holidays
       return holiday.types && holiday.types.includes('Public');
     });
