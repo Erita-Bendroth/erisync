@@ -269,7 +269,7 @@ export const ManagerManual = () => {
         
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Important: Managers Cannot Approve Vacation Requests</AlertTitle>
+          
           <AlertDescription>
             Only Planners and Admins have the authority to approve or reject vacation requests. 
             As a Manager, you can view requests from your team members, but you must contact 
