@@ -84,6 +84,39 @@ serve(async (req) => {
           ...(targetUser?.email ? [targetUser.email] : []),
           ...(managers?.map(m => (m.profiles as any)?.email).filter(Boolean) || [])
         ];
+
+        // Create in-app notifications
+        const notificationsToCreate = [];
+        
+        // Notify target user
+        if (target_user_id) {
+          notificationsToCreate.push({
+            user_id: target_user_id,
+            type: 'swap_request',
+            title: 'New Shift Swap Request',
+            message: `${requestingUser?.first_name} ${requestingUser?.last_name} wants to swap shifts with you on ${new Date(swap_date).toLocaleDateString()}`,
+            link: `/schedule?tab=schedule&showRequests=true`,
+            metadata: { swap_date, team_id, requesting_user_id }
+          });
+        }
+
+        // Notify managers
+        if (managers && managers.length > 0) {
+          managers.forEach(m => {
+            notificationsToCreate.push({
+              user_id: m.user_id,
+              type: 'swap_request',
+              title: 'Shift Swap Request',
+              message: notificationMessage,
+              link: `/schedule?tab=schedule`,
+              metadata: { swap_date, team_id }
+            });
+          });
+        }
+
+        if (notificationsToCreate.length > 0) {
+          await supabase.from('notifications').insert(notificationsToCreate);
+        }
         break;
 
       case 'request_approved':
@@ -93,12 +126,42 @@ serve(async (req) => {
           ...(requestingUser?.email ? [requestingUser.email] : []),
           ...(targetUser?.email ? [targetUser.email] : [])
         ];
+
+        // Create in-app notifications for both users
+        await supabase.from('notifications').insert([
+          {
+            user_id: requesting_user_id,
+            type: 'approval',
+            title: 'Shift Swap Approved',
+            message: `Your shift swap with ${targetUser?.first_name} on ${new Date(swap_date).toLocaleDateString()} has been approved`,
+            link: `/schedule?tab=schedule`,
+            metadata: { swap_date }
+          },
+          {
+            user_id: target_user_id,
+            type: 'approval',
+            title: 'Shift Swap Approved',
+            message: `Your shift swap with ${requestingUser?.first_name} on ${new Date(swap_date).toLocaleDateString()} has been approved`,
+            link: `/schedule?tab=schedule`,
+            metadata: { swap_date }
+          }
+        ]);
         break;
 
       case 'request_rejected':
         notificationMessage = `Your shift swap request with ${targetUser?.first_name} ${targetUser?.last_name} on ${new Date(swap_date).toLocaleDateString()} has been rejected.${review_notes ? `\n\nReason: ${review_notes}` : ''}`;
         // Notify requesting user
         recipients = requestingUser?.email ? [requestingUser.email] : [];
+
+        // Create in-app notification for requesting user
+        await supabase.from('notifications').insert({
+          user_id: requesting_user_id,
+          type: 'rejection',
+          title: 'Shift Swap Rejected',
+          message: `Your shift swap request has been rejected${review_notes ? ': ' + review_notes : ''}`,
+          link: `/schedule?tab=schedule&showRequests=true`,
+          metadata: { swap_date }
+        });
         break;
     }
 
