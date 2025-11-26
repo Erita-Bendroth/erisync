@@ -215,7 +215,7 @@ export const PendingRequestsCard = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => navigate("/schedule?tab=vacation")}
+                  onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}
                 >
                   View
                 </Button>
@@ -236,7 +236,7 @@ export const PendingRequestsCard = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => navigate("/schedule?tab=swaps")}
+                  onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}
                 >
                   View
                 </Button>

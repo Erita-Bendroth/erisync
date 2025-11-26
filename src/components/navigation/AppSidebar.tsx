@@ -93,8 +93,7 @@ export function AppSidebar() {
   ];
 
   const managementNavItems = [
-    { key: 'nav-vacations', title: 'Vacations', icon: FileCheck, path: '/schedule?tab=vacations' },
-    { key: 'nav-swaps', title: 'Swap Requests', icon: Users, path: '/schedule?tab=swaps' },
+    { key: 'nav-requests', title: 'Requests', icon: FileCheck, path: '/schedule?tab=schedule&showRequests=true' },
     { key: 'nav-holidays', title: 'Holidays', icon: Calendar, path: '/schedule?tab=holidays' },
   ];
 

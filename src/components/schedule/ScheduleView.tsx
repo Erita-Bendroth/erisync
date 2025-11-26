@@ -263,6 +263,19 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   };
 
   // Validate initial team exists once teams are loaded
+  // Check for showRequests URL parameter and auto-open sheet
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('showRequests') === 'true') {
+      setShowVacationRequests(true);
+      // Clear the param from URL without navigation
+      params.delete('showRequests');
+      const newSearch = params.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
   useEffect(() => {
     if (initialTeamId && initialTeamId !== '' && teams.length > 0) {
       const teamExists = teams.find(team => team.id === initialTeamId);

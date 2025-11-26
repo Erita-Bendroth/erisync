@@ -13,7 +13,7 @@ export const MobileNavigation = () => {
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: Calendar, label: 'Schedule', path: '/schedule' },
-    { icon: FileCheck, label: 'Requests', path: '/schedule?tab=vacations' },
+    { icon: FileCheck, label: 'Requests', path: '/schedule?tab=schedule&showRequests=true' },
     { icon: User, label: 'Profile', path: '/schedule?tab=settings' },
   ];
 
