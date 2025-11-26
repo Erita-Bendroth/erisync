@@ -35,6 +35,7 @@ import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-ki
 import { DraggableSidebarMenuItem } from './DraggableSidebarMenuItem';
 import { useSidebarOrder } from '@/hooks/useSidebarOrder';
 import { Button } from '@/components/ui/button';
+import { usePendingRequestsCount } from '@/hooks/usePendingRequestsCount';
 
 export function AppSidebar() {
   const location = useLocation();
@@ -43,6 +44,7 @@ export function AppSidebar() {
   const { user } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
   const { getSortedItems, updateOrder, resetOrder } = useSidebarOrder();
+  const { total: pendingRequestsTotal } = usePendingRequestsCount();
 
   // Single state for all items (allows dragging between sections)
   const [allItems, setAllItems] = useState<any[]>([]);
@@ -92,8 +94,12 @@ export function AppSidebar() {
     ] : []),
   ];
 
+  // Items visible to all users
+  const commonNavItems = [
+    { key: 'nav-requests', title: 'Requests', icon: FileCheck, path: '/schedule?tab=schedule&showRequests=true', badge: pendingRequestsTotal },
+  ];
+
   const managementNavItems = [
-    { key: 'nav-requests', title: 'Requests', icon: FileCheck, path: '/schedule?tab=schedule&showRequests=true' },
     { key: 'nav-holidays', title: 'Holidays', icon: Calendar, path: '/schedule?tab=holidays' },
   ];
 
@@ -128,6 +134,7 @@ export function AppSidebar() {
       ...mainNavItems.map(item => ({ ...item, section: 'overview' })),
       ...scheduleNavItems.map(item => ({ ...item, section: 'schedule' })),
       ...favItems,
+      ...commonNavItems.map(item => ({ ...item, section: 'common' })),
       ...mgmtItems,
       ...settingsNavItems.map(item => ({ ...item, section: 'settings' })),
     ];
@@ -178,6 +185,7 @@ export function AppSidebar() {
                   tooltip={item.title}
                   icon={<item.icon className="h-4 w-4" />}
                   label={item.title}
+                  badge={item.badge}
                 />
               ))}
             </SidebarMenu>

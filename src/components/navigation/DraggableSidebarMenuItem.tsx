@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
+import { Badge } from '@/components/ui/badge';
 import { ReactNode } from 'react';
 
 interface DraggableSidebarMenuItemProps {
@@ -10,6 +11,7 @@ interface DraggableSidebarMenuItemProps {
   tooltip?: string;
   icon?: ReactNode;
   label?: string;
+  badge?: number;
 }
 
 export function DraggableSidebarMenuItem({
@@ -19,6 +21,7 @@ export function DraggableSidebarMenuItem({
   tooltip,
   icon,
   label,
+  badge,
 }: DraggableSidebarMenuItemProps) {
   const {
     attributes,
@@ -47,6 +50,11 @@ export function DraggableSidebarMenuItem({
       >
         {icon}
         <span>{label}</span>
+        {badge !== undefined && badge > 0 && (
+          <Badge variant="destructive" className="ml-auto h-5 w-5 flex items-center justify-center p-0 text-xs">
+            {badge > 9 ? '9+' : badge}
+          </Badge>
+        )}
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
