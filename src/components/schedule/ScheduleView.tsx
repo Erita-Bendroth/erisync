@@ -16,6 +16,7 @@ import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, 
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useLocation } from 'react-router-dom';
 import { EditScheduleModal } from './EditScheduleModal';
 import { TimeBlockDisplay } from './TimeBlockDisplay';
 import { TeamHierarchyInfo } from './TeamHierarchyInfo';
@@ -96,6 +97,7 @@ const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { favorites } = useTeamFavorites('schedule');
   const holidayRefetchTrigger = useHolidayRefetch();
   const isMobile = useIsMobile();
+  const location = useLocation();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
@@ -265,7 +267,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   // Validate initial team exists once teams are loaded
   // Check for showRequests URL parameter and auto-open sheet
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     if (params.get('showRequests') === 'true') {
       setShowVacationRequests(true);
       // Clear the param from URL without navigation
@@ -274,7 +276,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}`;
       window.history.replaceState({}, '', newUrl);
     }
-  }, []);
+  }, [location.search]);
 
   useEffect(() => {
     if (initialTeamId && initialTeamId !== '' && teams.length > 0) {
