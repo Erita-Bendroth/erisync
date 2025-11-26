@@ -202,6 +202,16 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
 
+      // Create in-app notification for manager
+      await supabase.from('notifications').insert({
+        user_id: request.selected_planner_id,
+        type: 'vacation_request',
+        title: 'New Vacation Request',
+        message: `${request.requester.first_name} ${request.requester.last_name} has requested vacation for ${dateStr}`,
+        link: `/schedule?tab=schedule&showRequests=true`,
+        metadata: { requestId, groupId, teamId: request.team_id }
+      });
+
       console.log(`Request notification sent to manager: ${manager.email}`);
     } else if (type === "approval") {
       // Notify requester and parent team planners
@@ -290,6 +300,16 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
           </div>
         `,
+      });
+
+      // Create in-app notification for requester
+      await supabase.from('notifications').insert({
+        user_id: request.user_id,
+        type: 'approval',
+        title: 'Vacation Request Approved',
+        message: `Your vacation request for ${dateStr} has been approved`,
+        link: `/schedule?tab=schedule&showRequests=true`,
+        metadata: { requestId, groupId }
       });
 
       console.log(`Approval notification sent to requester: ${request.requester.email}`);
@@ -404,6 +424,16 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
           </div>
         `,
+      });
+
+      // Create in-app notification for requester
+      await supabase.from('notifications').insert({
+        user_id: request.user_id,
+        type: 'rejection',
+        title: 'Vacation Request Rejected',
+        message: `Your vacation request for ${dateStr} has been rejected${request.rejection_reason ? ': ' + request.rejection_reason : ''}`,
+        link: `/schedule?tab=schedule&showRequests=true`,
+        metadata: { requestId, groupId }
       });
 
       console.log(`Rejection notification sent to: ${request.requester.email}`);
