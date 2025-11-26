@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format as formatDate, startOfYear, endOfYear } from "date-fns";
 import { useUserTimeStats } from "@/hooks/useUserTimeStats";
 import { UserTimeStatsDisplay } from "./UserTimeStatsDisplay";
+import EditUserModal from "@/components/admin/EditUserModal";
+import SetTempPasswordModal from "@/components/admin/SetTempPasswordModal";
 
 interface Team {
   id: string;
@@ -85,6 +87,13 @@ const EnhancedTeamManagement = () => {
   const [downloadStartDate, setDownloadStartDate] = useState<Date>(startOfYear(new Date()));
   const [downloadEndDate, setDownloadEndDate] = useState<Date>(endOfYear(new Date()));
   const [downloadPreset, setDownloadPreset] = useState<"current-year" | "past-year" | "next-year" | "custom">("current-year");
+  
+  // User editing modal states
+  const [editingMember, setEditingMember] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
+  const [tempPasswordMember, setTempPasswordMember] = useState<any>(null);
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
 
   // Get all user IDs from all teams for time stats
   const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
@@ -105,6 +114,7 @@ const EnhancedTeamManagement = () => {
     if (userRoles.length > 0) {
       fetchTeamsAndMembers();
       fetchProfiles();
+      fetchAllTeams();
     }
   }, [user, userRoles]);
 
@@ -139,6 +149,20 @@ const EnhancedTeamManagement = () => {
       setProfiles(data || []);
     } catch (error) {
       console.error("Error fetching profiles:", error);
+    }
+  };
+
+  const fetchAllTeams = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name, description')
+        .order('name');
+      
+      if (error) throw error;
+      setAllTeams(data || []);
+    } catch (error) {
+      console.error("Error fetching all teams:", error);
     }
   };
 
@@ -345,6 +369,79 @@ const EnhancedTeamManagement = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const sendRandomPassword = async (userId: string, email: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('send-random-password', {
+        body: { 
+          userId,
+          userEmail: email
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: data?.emailSent 
+          ? `Random password generated and sent to ${email}`
+          : "Random password generated successfully",
+      });
+
+      fetchTeamsAndMembers();
+    } catch (error: any) {
+      console.error('Error sending random password:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send random password",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditMember = (member: TeamMember) => {
+    // Transform TeamMember to User format expected by EditUserModal
+    const userForModal = {
+      user_id: member.user_id,
+      email: member.profiles.email,
+      first_name: member.profiles.first_name,
+      last_name: member.profiles.last_name,
+      initials: member.profiles.initials || '',
+      country_code: 'US', // Will be fetched in modal
+      requires_password_change: false,
+      roles: member.user_roles.map(r => ({ id: '', role: r.role })),
+      teams: [{ id: member.team_id, name: '' }]
+    };
+    setEditingMember(userForModal);
+    setShowEditModal(true);
+  };
+
+  const handleSetTempPassword = (member: TeamMember) => {
+    setTempPasswordMember(member);
+    setShowTempPasswordModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingMember(null);
+  };
+
+  const handleCloseTempPasswordModal = () => {
+    setShowTempPasswordModal(false);
+    setTempPasswordMember(null);
+  };
+
+  const getAvailableRoles = () => {
+    if (isAdmin() || isPlanner()) {
+      return ['admin', 'planner', 'manager', 'teammember'];
+    } else if (isManager()) {
+      return ['manager', 'teammember'];
+    }
+    return ['teammember'];
   };
 
   const openDownloadDialog = (teamId: string) => {
@@ -935,30 +1032,38 @@ const EnhancedTeamManagement = () => {
                                 </TableCell>
                                 <TableCell>
                                   {member.user_id !== user?.id && (
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="outline" size="sm">
-                                          <Trash2 className="w-4 h-4" />
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="w-4 h-4" />
                                         </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Are you sure you want to remove {formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials)} from {team.name}?
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction 
-                                            onClick={() => removeTeamMember(member.id, team.id)}
-                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                          >
-                                            Remove
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditMember(member)}>
+                                          <Edit className="w-4 h-4 mr-2" />
+                                          Edit User
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => sendRandomPassword(member.user_id, member.profiles.email)}>
+                                          <Key className="w-4 h-4 mr-2" />
+                                          Generate Random Password
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleSetTempPassword(member)}>
+                                          <Lock className="w-4 h-4 mr-2" />
+                                          Set Temporary Password
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() => {
+                                            if (confirm(`Are you sure you want to remove ${formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials)} from ${team.name}?`)) {
+                                              removeTeamMember(member.id, team.id);
+                                            }
+                                          }}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Remove from Team
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -1167,6 +1272,34 @@ const EnhancedTeamManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit User Modal */}
+      {editingMember && (
+        <EditUserModal
+          user={editingMember}
+          teams={allTeams}
+          availableRoles={getAvailableRoles()}
+          isOpen={showEditModal}
+          onClose={handleCloseEditModal}
+          onUserUpdated={fetchTeamsAndMembers}
+        />
+      )}
+
+      {/* Set Temporary Password Modal */}
+      {tempPasswordMember && (
+        <SetTempPasswordModal
+          isOpen={showTempPasswordModal}
+          onClose={handleCloseTempPasswordModal}
+          userId={tempPasswordMember.user_id}
+          userName={formatUserName(
+            tempPasswordMember.profiles.first_name,
+            tempPasswordMember.profiles.last_name,
+            tempPasswordMember.profiles.initials
+          )}
+          userEmail={tempPasswordMember.profiles.email}
+          onSuccess={fetchTeamsAndMembers}
+        />
+      )}
     </div>
   );
 };
