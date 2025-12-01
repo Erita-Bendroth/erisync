@@ -75,6 +75,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [allTeams, setAllTeams] = useState<Array<{ id: string; name: string }>>([]);
   const [teamSections, setTeamSections] = useState<TeamSection[]>([]);
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
+  const [dutyAssignments, setDutyAssignments] = useState<any[]>([]);
   const [dateStart, setDateStart] = useState<Date>(getMonday(new Date()));
   const [rangeType, setRangeType] = useState<DateRangeType>('week');
   const [viewMode, setViewMode] = useState<'grid' | 'weekly' | 'monthly'>('grid');
@@ -372,6 +373,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
     if (teamIds.length > 0) {
       fetchTeamSections();
       fetchScheduleEntries();
+      fetchDutyAssignments();
     }
   }, [teamIds, dateStart, rangeType, holidayRefetchTrigger]);
 
@@ -446,6 +448,25 @@ export const UnifiedTeamScheduler: React.FC = () => {
         description: "Failed to load schedule",
         variant: "destructive",
       });
+    }
+  };
+
+  const fetchDutyAssignments = async () => {
+    if (teamIds.length === 0 || dates.length === 0) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('duty_assignments')
+        .select('*')
+        .in('team_id', teamIds)
+        .eq('duty_type', 'hotline')
+        .gte('date', dates[0])
+        .lte('date', dates[dates.length - 1]);
+
+      if (error) throw error;
+      setDutyAssignments(data || []);
+    } catch (error) {
+      console.error('Error fetching duty assignments:', error);
     }
   };
 
@@ -955,6 +976,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                   teamSections={teamSections}
                   dates={dates}
                   scheduleEntries={scheduleEntries}
+                  dutyAssignments={dutyAssignments}
                   state={state}
                   cellsBeingEdited={cellsBeingEdited}
                   handlers={{
@@ -1010,6 +1032,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                       members={section.members}
                       dates={dates}
                       scheduleEntries={scheduleEntries}
+                      dutyAssignments={dutyAssignments}
                       selectedUsers={state.selectedUsers}
                       selectedCells={state.selectedCells}
                       hoveredCell={state.hoveredCell}

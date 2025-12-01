@@ -31,6 +31,11 @@ interface SchedulerCellWithTooltipProps {
   enableQuickDialog?: boolean;
   canViewActivityDetails?: boolean;
   isPartnershipView?: boolean;
+  hotlineAssignment?: {
+    id: string;
+    notes: string | null;
+    responsibility_region: string | null;
+  };
 }
 
 export const SchedulerCellWithTooltip: React.FC<SchedulerCellWithTooltipProps> = (props) => {

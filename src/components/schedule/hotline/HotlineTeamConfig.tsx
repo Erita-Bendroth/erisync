@@ -155,7 +155,7 @@ export const HotlineTeamConfig = ({ open, onOpenChange, teamId, teamName }: Hotl
           friday_start_time: fridayStart,
           friday_end_time: fridayEnd,
           created_by: user.id,
-        });
+        }, { onConflict: 'team_id' });
 
       if (configError) throw configError;
 

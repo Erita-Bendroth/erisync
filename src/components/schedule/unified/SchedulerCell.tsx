@@ -27,6 +27,11 @@ interface SchedulerCellProps {
   enableQuickDialog?: boolean;
   canViewActivityDetails?: boolean;
   isPartnershipView?: boolean;
+  hotlineAssignment?: {
+    id: string;
+    notes: string | null;
+    responsibility_region: string | null;
+  };
 }
 
 const SHIFT_TYPE_LABELS: Record<string, string> = {
@@ -62,6 +67,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   enableQuickDialog = false,
   canViewActivityDetails = true,
   isPartnershipView = false,
+  hotlineAssignment,
 }) => {
   const cellId = `${userId}:${date}`;
   const isBeingEdited = editingBy.length > 0;
@@ -98,7 +104,27 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
       data-cell-id={cellId}
       title={enableQuickDialog ? 'Click to schedule' : undefined}
     >
-      {shiftType && availabilityStatus === 'available' && (
+      {/* Dual block display when both shift and hotline exist */}
+      {shiftType && availabilityStatus === 'available' && hotlineAssignment ? (
+        <div className="flex flex-col gap-0.5 items-center">
+          <Badge
+            variant="secondary"
+            className={cn(
+              'text-[10px] font-semibold px-1.5 py-0',
+              SHIFT_TYPE_COLORS[shiftType] || 'bg-muted'
+            )}
+          >
+            {SHIFT_TYPE_LABELS[shiftType] || shiftType.charAt(0).toUpperCase()}
+          </Badge>
+          <Badge
+            variant="secondary"
+            className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-[10px] font-semibold px-1.5 py-0"
+            title={`Hotline: ${hotlineAssignment.notes || 'No time info'}`}
+          >
+            📞H
+          </Badge>
+        </div>
+      ) : shiftType && availabilityStatus === 'available' ? (
         <Badge
           variant="secondary"
           className={cn(
@@ -108,11 +134,19 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
         >
           {SHIFT_TYPE_LABELS[shiftType] || shiftType.charAt(0).toUpperCase()}
         </Badge>
-      )}
-      {availabilityStatus === 'unavailable' && !shouldHideActivityDetails && (
+      ) : hotlineAssignment ? (
+        <Badge
+          variant="secondary"
+          className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs font-semibold"
+          title={`Hotline: ${hotlineAssignment.notes || 'No time info'}`}
+        >
+          📞H
+        </Badge>
+      ) : null}
+      {availabilityStatus === 'unavailable' && !shouldHideActivityDetails && !hotlineAssignment && (
         <div className="w-2 h-2 rounded-full bg-destructive" />
       )}
-      {shouldHideActivityDetails && (
+      {shouldHideActivityDetails && !hotlineAssignment && (
         <div className="w-2 h-2 rounded-full bg-muted-foreground" title="Unavailable" />
       )}
       

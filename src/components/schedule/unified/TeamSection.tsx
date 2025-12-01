@@ -22,6 +22,7 @@ interface TeamSectionProps {
   members: TeamMember[];
   dates: string[];
   scheduleEntries: ScheduleEntry[];
+  dutyAssignments: any[];
   selectedUsers: Set<string>;
   selectedCells: Set<string>;
   hoveredCell: string | null;
@@ -46,6 +47,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
   members,
   dates,
   scheduleEntries,
+  dutyAssignments,
   selectedUsers,
   selectedCells,
   hoveredCell,
@@ -66,6 +68,10 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
 
   const getEntry = (userId: string, date: string) => {
     return scheduleEntries.find(e => e.user_id === userId && e.date === date);
+  };
+
+  const getHotlineAssignment = (userId: string, date: string) => {
+    return dutyAssignments.find(d => d.user_id === userId && d.date === date);
   };
 
   return (
@@ -126,6 +132,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
               <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${dates.length}, ${dates.length > 14 ? '60px' : 'minmax(60px, 1fr)'})` }}>
                 {dates.map((date) => {
                   const entry = getEntry(member.user_id, date);
+                  const hotlineAssignment = getHotlineAssignment(member.user_id, date);
                   const cellId = `${member.user_id}:${date}`;
                   
                   return (
@@ -150,6 +157,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                       editingBy={cellsBeingEdited[cellId] || []}
                       isPartnershipView={isPartnershipView}
                       canViewActivityDetails={canViewActivityDetails}
+                      hotlineAssignment={hotlineAssignment}
                     />
                   );
                 })}
