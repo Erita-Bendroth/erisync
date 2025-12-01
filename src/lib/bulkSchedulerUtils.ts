@@ -155,6 +155,7 @@ export const calculateBulkEntries = async (
       const applicableShift = await getApplicableShiftTimes({
         teamId: config.teamId,
         regionCode: userRegionCode || undefined,
+        countryCode: userCountryCode,
         shiftType: requestedShiftType,
         dayOfWeek,
         date: dateStr,
@@ -221,6 +222,7 @@ export const calculateBulkEntries = async (
         const applicableShift = await getApplicableShiftTimes({
           teamId: config.teamId,
           regionCode: userRegionCode || undefined,
+          countryCode: userCountryCode,
           shiftType: requestedShiftType,
           dayOfWeek,
           date: dateStr,
