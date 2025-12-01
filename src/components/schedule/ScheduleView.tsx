@@ -1934,12 +1934,6 @@ const getActivityColor = (entry: ScheduleEntry) => {
             
             {/* Week/Month Navigation */}
             <div className="flex items-center gap-1">
-              {(isManager() || isPlanner()) && timeView === "weekly" && (
-                <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Entry
-                </Button>
-              )}
               <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
