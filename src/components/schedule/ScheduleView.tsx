@@ -2375,22 +2375,6 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                         </div>
                                       );
                                     })}
-                                    
-                                    {/* Show hotline assignment badge */}
-                                    {hotlineAssignment && (
-                                      <TooltipProvider>
-                                        <Tooltip delayDuration={200}>
-                                          <TooltipTrigger asChild>
-                                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] cursor-help">
-                                              📞H {hotlineAssignment.notes ? `(${hotlineAssignment.notes.split('-')[0]})` : ''}
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="z-[100]" side="top">
-                                            <p>Hotline Duty: {hotlineAssignment.notes || 'No time specified'}</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
                                   </>
                                   )}
                               </div>

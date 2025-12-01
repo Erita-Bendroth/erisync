@@ -385,10 +385,21 @@ export const useHotlineScheduler = () => {
         return aTime - bTime;
       });
 
-      // Generate assignments for each weekday
+      // Generate date strings for the range
       const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+      const dateStrings = dateRange.map(d => format(d, "yyyy-MM-dd"));
+
+      // Delete existing hotline entries for this team and date range
+      await supabase
+        .from("schedule_entries")
+        .delete()
+        .eq("team_id", teamId)
+        .eq("activity_type", "hotline_support")
+        .in("date", dateStrings);
+
       let memberIndex = 0;
-      const assignments: any[] = [];
+      const scheduleEntries: any[] = [];
+      const assignedDates = new Map<string, number>(); // Track assignments per date
 
       for (const date of dateRange) {
         const dayOfWeek = getDay(date);
@@ -404,7 +415,10 @@ export const useHotlineScheduler = () => {
           ? config.friday_end_time
           : config.weekday_end_time;
 
-        // Assign required number of staff
+        const dateStr = format(date, "yyyy-MM-dd");
+        assignedDates.set(dateStr, 0);
+
+        // Assign exactly min_staff_required per day (no more, no less)
         for (let i = 0; i < config.min_staff_required; i++) {
           let assigned = false;
           let attempts = 0;
@@ -416,40 +430,43 @@ export const useHotlineScheduler = () => {
             const isAvailable = await checkAvailability(member.user_id, date, teamId);
 
             if (isAvailable) {
-              assignments.push({
+              scheduleEntries.push({
                 team_id: teamId,
                 user_id: member.user_id,
-                date: format(date, "yyyy-MM-dd"),
-                duty_type: "hotline" as const,
-                is_substitute: attempts > 0,
-                year: date.getFullYear(),
-                week_number: Math.ceil(
-                  (date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) /
-                    (7 * 24 * 60 * 60 * 1000)
-                ),
+                date: dateStr,
+                activity_type: "hotline_support" as const,
+                availability_status: "available" as const,
+                shift_type: null,
                 notes: `${startTime}-${endTime}`,
                 created_by: userId,
               });
               assigned = true;
+              assignedDates.set(dateStr, (assignedDates.get(dateStr) || 0) + 1);
               memberIndex++;
+              break; // Stop after successful assignment
             } else {
               attempts++;
               memberIndex++;
             }
           }
+
+          if (!assigned) {
+            // Could not find available person for this slot
+            console.warn(`Could not assign hotline for ${dateStr}, slot ${i + 1}`);
+          }
         }
       }
 
-      // Insert directly into duty_assignments
-      if (assignments.length > 0) {
+      // Insert into schedule_entries
+      if (scheduleEntries.length > 0) {
         const { error: insertError } = await supabase
-          .from("duty_assignments")
-          .insert(assignments);
+          .from("schedule_entries")
+          .insert(scheduleEntries);
 
         if (insertError) throw insertError;
       }
 
-      return assignments.length;
+      return scheduleEntries.length;
     } catch (error: any) {
       console.error("Error auto-generating hotline:", error);
       return 0;
