@@ -21,7 +21,6 @@ const SHIFT_TYPES = [
   { value: "late", label: "🌙 Late Shift", description: "Evening and night coverage" },
   { value: "early", label: "☀️ Early Shift", description: "Morning coverage" },
   { value: "weekend", label: "📅 Weekend", description: "Saturday and Sunday" },
-  { value: "normal", label: "💼 Normal Shift", description: "Standard workday hours" },
 ];
 
 export function ShiftRequirements({ partnershipId }: ShiftRequirementsProps) {

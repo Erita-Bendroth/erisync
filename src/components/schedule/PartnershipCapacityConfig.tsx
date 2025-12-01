@@ -164,100 +164,30 @@ export const PartnershipCapacityConfig: React.FC<PartnershipCapacityConfigProps>
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <>
-                {/* Display teams in partnership */}
-                <div className="rounded-md border border-border p-3 bg-muted/30">
-                  <Label className="text-sm font-semibold">Teams in Partnership:</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {teams.map(team => (
-                      <Badge key={team.id} variant="secondary">{team.name}</Badge>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Teams in Partnership</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {teams.map((team) => (
+                      <Badge key={team.id} variant="secondary">
+                        {team.name}
+                      </Badge>
                     ))}
                   </div>
                 </div>
 
-                {/* Configuration Form */}
-                <div className="space-y-4 mt-4">
-                  {/* Min Staff Required */}
-                  <div>
-                    <Label htmlFor="min-staff">Minimum Staff Required (Total across all teams)</Label>
-                    <Input
-                      id="min-staff"
-                      type="number"
-                      min={1}
-                      value={config.min_staff_required}
-                      onChange={(e) => setConfig({ ...config, min_staff_required: parseInt(e.target.value) || 1 })}
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Total minimum number of people needed across all {teams.length} teams
-                    </p>
-                  </div>
-
-                  {/* Max Staff Allowed */}
-                  <div>
-                    <Label htmlFor="max-staff">Maximum Staff Allowed (Optional)</Label>
-                    <Input
-                      id="max-staff"
-                      type="number"
-                      min={config.min_staff_required}
-                      value={config.max_staff_allowed || ''}
-                      onChange={(e) => setConfig({ 
-                        ...config, 
-                        max_staff_allowed: e.target.value ? parseInt(e.target.value) : null 
-                      })}
-                      placeholder="No maximum"
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Leave empty for no maximum limit
-                    </p>
-                  </div>
-
-                  {/* Applies to Weekends */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="weekends"
-                      checked={config.applies_to_weekends}
-                      onCheckedChange={(checked) => setConfig({ ...config, applies_to_weekends: checked })}
-                    />
-                    <Label htmlFor="weekends" className="cursor-pointer">
-                      Apply these requirements to weekends
-                    </Label>
-                  </div>
-
-                  {/* Notes */}
-                  <div>
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Add any notes about capacity requirements..."
-                      value={config.notes}
-                      onChange={(e) => setConfig({ ...config, notes: e.target.value })}
-                      className="mt-1"
-                      rows={3}
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Textarea
+                    id="notes"
+                    value={config.notes || ""}
+                    onChange={(e) => setConfig({ ...config, notes: e.target.value })}
+                    placeholder="Add any additional notes about this partnership..."
+                    className="mt-1"
+                    rows={3}
+                  />
                 </div>
-
-                <DialogFooter className="mt-6">
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSave} disabled={saving || loading}>
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Configuration
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </>
+              </div>
             )}
           </TabsContent>
 
