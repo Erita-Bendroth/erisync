@@ -353,6 +353,15 @@ export const useHotlineScheduler = () => {
     }
   };
 
+  // Helper: Format time as HH:MM (strip seconds if present)
+  const formatTimeWithoutSeconds = (time: string): string => {
+    // If time is in HH:MM:SS format, strip the seconds
+    if (time && time.length > 5) {
+      return time.substring(0, 5);
+    }
+    return time;
+  };
+
   // Helper: Parse time blocks from notes
   const parseTimeBlocksFromNotes = (notes: string | null): Array<{ activity_type: string; start_time: string; end_time: string }> | null => {
     if (!notes) return null;
@@ -481,12 +490,12 @@ export const useHotlineScheduler = () => {
                   timeBlocks = [getDefaultTimeBlock(existingEntry.shift_type)];
                 }
 
-                // Add hotline time block
-                timeBlocks.push({
-                  activity_type: "hotline_support",
-                  start_time: startTime,
-                  end_time: endTime
-                });
+            // Add hotline time block with normalized time format
+            timeBlocks.push({
+              activity_type: "hotline_support",
+              start_time: formatTimeWithoutSeconds(startTime),
+              end_time: formatTimeWithoutSeconds(endTime)
+            });
 
                 // Update entry with new notes containing all time blocks
                 const { error: updateError } = await supabase
