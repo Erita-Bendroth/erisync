@@ -174,7 +174,7 @@ export function getShiftForDate(
     };
   }
 
-  console.log(`   ✅ Found selected shift: ${selectedShiftDef.description} (type: ${selectedShiftDef.shift_type})`);
+  console.log(`   ✅ Found selected shift: ${selectedShiftDef?.description || 'No description'} (type: ${selectedShiftDef?.shift_type})`);
 
   // Now find all shifts with the same shift_type enum
   let matchingShifts = allShifts.filter(s => s.shift_type === selectedShiftDef.shift_type);
