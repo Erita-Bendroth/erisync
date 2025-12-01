@@ -360,6 +360,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
                 weekendShiftOverride={config.weekendShiftOverride}
                 selectedUserIds={config.selectedUserIds}
                 mode={config.mode}
+                excludedDays={config.excludedDays}
               />
             </div>
           </div>

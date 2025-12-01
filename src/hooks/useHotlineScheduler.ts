@@ -88,7 +88,11 @@ export const useHotlineScheduler = () => {
       .eq("date", dateStr)
       .single();
 
-    if (!entry || entry.availability_status !== "available") return false;
+    // No entry = available by default (not on vacation/sick)
+    if (!entry) return true;
+
+    // If entry exists, check availability status
+    if (entry.availability_status !== "available") return false;
 
     // Not available if on vacation, sick, flextime, etc.
     if (["vacation", "flextime", "other", "out_of_office"].includes(entry.activity_type)) {
