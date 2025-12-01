@@ -26,6 +26,7 @@ interface TimeBlockDisplayProps {
   isContinuation?: boolean; // Flag to indicate this is the continuation part of a night shift
   originalStartTime?: string; // Original start time from previous day
   shiftDescription?: string; // Custom shift description from shift_time_definitions
+  shiftDefinitionTimes?: { startTime: string; endTime: string } | null; // Actual times from shift_time_definitions
 }
 
 const getActivityColor = (activityType: string, shiftType?: string) => {
@@ -102,7 +103,8 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   userRole = "",
   isContinuation = false,
   originalStartTime = "",
-  shiftDescription = ""
+  shiftDescription = "",
+  shiftDefinitionTimes = null
 }) => {
   // Check if this is a holiday entry (activity_type = 'other' with "Public holiday:" in notes)
   const isHoliday = entry.activity_type === 'other' && entry.notes?.includes('Public holiday:');
@@ -172,6 +174,12 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
 
   // Default shift times if no time split
   const getDefaultTimes = (shiftType: string) => {
+    // Use shift definition times if provided (from database)
+    if (shiftDefinitionTimes) {
+      return { start: shiftDefinitionTimes.startTime, end: shiftDefinitionTimes.endTime };
+    }
+    
+    // Otherwise fall back to hardcoded defaults
     switch (shiftType) {
       case 'early':
         return { start: '06:00', end: '14:30' };
