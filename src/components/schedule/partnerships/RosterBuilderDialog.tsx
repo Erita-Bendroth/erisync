@@ -101,11 +101,11 @@ export function RosterBuilderDialog({
       const rosterData = {
         partnership_id: partnershipId,
         roster_name: rosterName,
-        shift_type: "mixed", // Placeholder since we now do per-person assignments
+        shift_type: "normal", // Default since we do per-person assignments
         cycle_length_weeks: cycleLength,
         start_date: startDate,
         end_date: null,
-        default_shift_for_non_duty: "normal", // Placeholder
+        default_shift_for_non_duty: "normal",
         status: "draft",
       };
 

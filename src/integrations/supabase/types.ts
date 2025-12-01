@@ -1983,9 +1983,11 @@ export type Database = {
       get_partnership_team_members: {
         Args: { p_partnership_id: string }
         Returns: {
+          country_code: string
           first_name: string
           initials: string
           last_name: string
+          region_code: string
           team_id: string
           team_name: string
           user_id: string

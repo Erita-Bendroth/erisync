@@ -17,6 +17,8 @@ interface TeamMember {
   first_name: string;
   last_name: string;
   initials: string;
+  country_code: string;
+  region_code: string;
 }
 
 interface Assignment {
@@ -160,10 +162,13 @@ export function RosterWeekGrid({
   const getShiftTypeLabel = (shiftType: string | null) => {
     if (!shiftType) return "Not assigned";
     const labels: Record<string, string> = {
-      late: "Late Shift",
-      early: "Early Shift",
-      weekend: "Weekend",
-      normal: "Normal",
+      late: "Late Shift (Mon-Fri)",
+      early: "Early Shift (Mon-Fri)",
+      weekend: "Weekend Only",
+      normal: "Normal Shift (Mon-Fri)",
+      weekend_normal: "Weekend + Normal weekdays",
+      weekend_early: "Weekend + Early weekdays",
+      weekend_late: "Weekend + Late weekdays",
       off: "Off",
     };
     return labels[shiftType] || shiftType;
@@ -175,6 +180,9 @@ export function RosterWeekGrid({
       late: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
       early: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
       weekend: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+      weekend_normal: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+      weekend_early: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+      weekend_late: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
       normal: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
       off: "bg-muted text-muted-foreground",
     };
@@ -263,11 +271,14 @@ export function RosterWeekGrid({
                           <SelectItem value="none">
                             <span className="text-muted-foreground italic">Not assigned</span>
                           </SelectItem>
-                          <SelectItem value="late">🌙 Late Shift</SelectItem>
-                          <SelectItem value="early">☀️ Early Shift</SelectItem>
-                          <SelectItem value="weekend">📅 Weekend</SelectItem>
-                          <SelectItem value="normal">💼 Normal</SelectItem>
-                          <SelectItem value="off">🏖️ Off</SelectItem>
+                          <SelectItem value="late">🌙 Late Shift (Mon-Fri only)</SelectItem>
+                          <SelectItem value="early">☀️ Early Shift (Mon-Fri only)</SelectItem>
+                          <SelectItem value="normal">💼 Normal Shift (Mon-Fri only)</SelectItem>
+                          <SelectItem value="weekend">📅 Weekend Only</SelectItem>
+                          <SelectItem value="weekend_normal">📅 Weekend + Normal weekdays</SelectItem>
+                          <SelectItem value="weekend_early">📅 Weekend + Early weekdays</SelectItem>
+                          <SelectItem value="weekend_late">📅 Weekend + Late weekdays</SelectItem>
+                          <SelectItem value="off">🏖️ Off (entire week)</SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
