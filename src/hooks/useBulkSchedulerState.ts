@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, addWeeks, startOfMonth, endOfMonth, format } from 'date-fns';
 
 export interface BulkSchedulerConfig {
-  mode: 'users' | 'team' | 'rotation';
+  mode: 'users' | 'team' | 'rotation' | 'hotline';
   teamId: string | null;
   selectedUserIds: string[];
   dateRange: {
