@@ -30,8 +30,17 @@ export function formatUserName(firstName: string, lastName?: string | null, init
 /**
  * Extract time from notes or use default shift times
  */
-export function getShiftTimes(notes: string | null | undefined, shiftType: string): { start: string; end: string } {
-  // Try to extract from JSON format first
+export function getShiftTimes(
+  notes: string | null | undefined, 
+  shiftType: string,
+  shiftDefinitionTimes?: { startTime: string; endTime: string } | null
+): { start: string; end: string } {
+  // Priority 1: Use shift definition times if provided
+  if (shiftDefinitionTimes) {
+    return { start: shiftDefinitionTimes.startTime, end: shiftDefinitionTimes.endTime };
+  }
+  
+  // Priority 2: Try to extract from JSON format in notes
   if (notes) {
     const timeSplitPattern = /Times:\s*(.+)/;
     const match = notes.match(timeSplitPattern);
@@ -55,7 +64,7 @@ export function getShiftTimes(notes: string | null | undefined, shiftType: strin
     }
   }
   
-  // Default shift times
+  // Priority 3: Default shift times as fallback
   switch (shiftType) {
     case 'early':
       return { start: '06:00', end: '14:30' };

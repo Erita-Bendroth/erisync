@@ -47,6 +47,7 @@ interface ScheduleEntry {
   activity_type: string;
   availability_status: string;
   notes?: string;
+  shift_time_definition_id?: string | null;
   profiles: {
     first_name: string;
     last_name: string;
@@ -813,6 +814,19 @@ useEffect(() => {
     }
   };
 
+  const getShiftTimesFromDefinition = (entry: ScheduleEntry): { startTime: string; endTime: string } | null => {
+    if (!entry.shift_time_definition_id) return null;
+    
+    const def = shiftTimeDefinitions.find(d => d.id === entry.shift_time_definition_id);
+    if (def) {
+      return {
+        startTime: def.start_time.substring(0, 5),
+        endTime: def.end_time.substring(0, 5)
+      };
+    }
+    return null;
+  };
+
   const getShiftDescription = (entry: ScheduleEntry, employeeData?: Employee): string => {
     if (entry.activity_type !== 'work') return '';
     
@@ -997,6 +1011,7 @@ useEffect(() => {
               activity_type,
               availability_status,
               notes,
+              shift_time_definition_id,
               created_by,
               created_at,
               updated_at
@@ -1055,6 +1070,7 @@ useEffect(() => {
             activity_type,
             availability_status,
             notes,
+            shift_time_definition_id,
             created_by,
             created_at,
             updated_at
@@ -2276,6 +2292,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                           isContinuation={true}
                                           originalStartTime={times.start}
                                           shiftDescription={getShiftDescription(entry, employee)}
+                                          shiftDefinitionTimes={getShiftTimesFromDefinition(entry)}
                                           onClick={(e) => {
                                             e?.stopPropagation();
                                             if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
@@ -2337,6 +2354,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                               userRole={userRoles.length > 0 ? userRoles[0].role : ""}
                                               showNotes={isTeamMember() && !isManager() && !isPlanner()}
                                               shiftDescription={getShiftDescription(entry, employee)}
+                                              shiftDefinitionTimes={getShiftTimesFromDefinition(entry)}
                                               onClick={(e) => {
                                                 e?.stopPropagation();
                                                 if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
