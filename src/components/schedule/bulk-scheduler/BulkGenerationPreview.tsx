@@ -157,10 +157,10 @@ export const BulkGenerationPreview = ({
               applicableShift = countryShifts[0] || selectedShiftDef;
               
               console.log(`🔍 [PREVIEW] User ${profile.first_name} (${userCountry}) on ${format(day, 'EEE MMM d')}:`, {
-                selectedShift: selectedShiftDef.description,
+                selectedShift: selectedShiftDef?.description || 'Unknown',
                 countrySpecificFound: countryShifts.length > 0,
-                usingShift: applicableShift.description,
-                times: `${applicableShift.start_time.slice(0, 5)}-${applicableShift.end_time.slice(0, 5)}`
+                usingShift: applicableShift?.description || 'Unknown',
+                times: applicableShift ? `${applicableShift.start_time?.slice(0, 5)}-${applicableShift.end_time?.slice(0, 5)}` : 'N/A'
               });
             } else {
               // Fallback if selected shift ID not found

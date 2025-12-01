@@ -144,6 +144,25 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
     setLoading(true);
 
     try {
+      // Validate that the selected shift exists (if not custom)
+      if (config.shiftType && config.shiftType !== 'custom') {
+        const { data: shiftExists } = await supabase
+          .from('shift_time_definitions')
+          .select('id')
+          .eq('id', config.shiftType)
+          .maybeSingle();
+        
+        if (!shiftExists) {
+          toast({
+            title: "Invalid Shift Type",
+            description: "The selected shift type no longer exists. Please select a different shift type.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       // Fetch team members if needed (with country codes)
       let members = teamMembers;
       if (config.mode === 'team' && config.teamId) {

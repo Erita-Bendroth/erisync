@@ -50,16 +50,19 @@ export const calculateBulkEntries = async (
   
   if (config.shiftType && config.shiftType !== 'custom') {
     shiftDefinitionId = config.shiftType;
-    const { data: shiftDef } = await supabase
+    const { data: shiftDef, error: shiftError } = await supabase
       .from('shift_time_definitions')
-      .select('shift_type')
+      .select('id, shift_type, description')
       .eq('id', config.shiftType)
       .maybeSingle();
     
-    if (shiftDef) {
-      selectedShiftEnumType = shiftDef.shift_type;
-      console.log(`✅ Resolved shift definition ${config.shiftType} to enum type: ${selectedShiftEnumType}`);
+    if (!shiftDef) {
+      console.error('❌ Selected shift type not found in database:', config.shiftType);
+      throw new Error('Selected shift type not found. Please re-select your shift type.');
     }
+    
+    selectedShiftEnumType = shiftDef.shift_type;
+    console.log(`✅ Resolved shift definition ${config.shiftType} to enum type: ${selectedShiftEnumType}`);
   }
 
   const entries: ScheduleEntryDraft[] = [];
