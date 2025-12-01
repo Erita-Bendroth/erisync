@@ -32,7 +32,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
     region_code?: string | null 
   }>>([]);
   const { toast } = useToast();
-  const { generateHotlineSchedule, saveDrafts } = useHotlineScheduler();
+  const { generateHotlineSchedule, saveDrafts, generateAndSaveHotlineForTeam } = useHotlineScheduler();
 
   const handleApplyPreset = (presetConfig: any) => {
     setConfig(prev => ({
@@ -183,9 +183,22 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
 
           if (error) throw error;
 
+          // Auto-generate hotline if team has config
+          let hotlineCount = 0;
+          if (config.teamId) {
+            hotlineCount = await generateAndSaveHotlineForTeam(
+              config.teamId,
+              config.dateRange.start,
+              config.dateRange.end,
+              userId
+            );
+          }
+
           toast({
             title: "✨ Schedule created!",
-            description: `${filteredEntries.length} shifts added (${entries.length - filteredEntries.length} skipped due to conflicts)`,
+            description: hotlineCount > 0 
+              ? `${filteredEntries.length} shifts + ${hotlineCount} hotline assignments (${entries.length - filteredEntries.length} skipped due to conflicts)`
+              : `${filteredEntries.length} shifts added (${entries.length - filteredEntries.length} skipped due to conflicts)`,
           });
         } else {
           // No conflicts, insert all
@@ -195,9 +208,22 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
 
           if (error) throw error;
 
+          // Auto-generate hotline if team has config
+          let hotlineCount = 0;
+          if (config.teamId) {
+            hotlineCount = await generateAndSaveHotlineForTeam(
+              config.teamId,
+              config.dateRange.start,
+              config.dateRange.end,
+              userId
+            );
+          }
+
           toast({
             title: "✨ Schedule created!",
-            description: `${entries.length} shifts added successfully`,
+            description: hotlineCount > 0 
+              ? `${entries.length} shifts + ${hotlineCount} hotline assignments`
+              : `${entries.length} shifts added successfully`,
           });
         }
       } else {
@@ -217,9 +243,22 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
 
         if (error) throw error;
 
+        // Auto-generate hotline if team has config
+        let hotlineCount = 0;
+        if (config.teamId) {
+          hotlineCount = await generateAndSaveHotlineForTeam(
+            config.teamId,
+            config.dateRange.start,
+            config.dateRange.end,
+            userId
+          );
+        }
+
         toast({
           title: "✨ Schedule created!",
-          description: `${entries.length} shifts added successfully`,
+          description: hotlineCount > 0 
+            ? `${entries.length} shifts + ${hotlineCount} hotline assignments`
+            : `${entries.length} shifts added successfully`,
         });
       }
 
