@@ -133,6 +133,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   const [pendingSwapRequestsCount, setPendingSwapRequestsCount] = useState(0);
   const [editingVacationRequest, setEditingVacationRequest] = useState<any>(null);
   const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
+  const [dutyAssignments, setDutyAssignments] = useState<any[]>([]);
 
   // Access control hook for standard view mode
   const {
@@ -310,6 +311,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchScheduleEntries();
       fetchHolidays();
       fetchShiftTimeDefinitions();
+      fetchDutyAssignments();
       fetchPendingRequestsCount();
       fetchPendingSwapRequestsCount();
     }, 150); // Debounce 150ms
@@ -874,6 +876,55 @@ useEffect(() => {
     });
     
     return applicableDef?.description || '';
+  };
+
+  const fetchDutyAssignments = async () => {
+    try {
+      const weekEnd = addDays(weekStart, 6);
+      const dateStart = format(weekStart, "yyyy-MM-dd");
+      const dateEnd = format(weekEnd, "yyyy-MM-dd");
+      
+      let teamIds: string[] = [];
+      const isAllTeams = selectedTeams.includes("all");
+      
+      if (isAllTeams) {
+        if (isPlanner()) {
+          const { data: allTeams } = await supabase
+            .from('teams')
+            .select('id')
+            .limit(10000);
+          teamIds = allTeams?.map(t => t.id) || [];
+        } else if (isManager()) {
+          const { data: accessibleTeamIds } = await supabase
+            .rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+          teamIds = accessibleTeamIds || [];
+        }
+      } else if (selectedTeams.length > 0) {
+        teamIds = selectedTeams;
+      }
+      
+      if (teamIds.length === 0) {
+        setDutyAssignments([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('duty_assignments')
+        .select('*')
+        .eq('duty_type', 'hotline')
+        .gte('date', dateStart)
+        .lte('date', dateEnd)
+        .in('team_id', teamIds);
+      
+      if (!error && data) {
+        setDutyAssignments(data);
+      } else {
+        setDutyAssignments([]);
+      }
+    } catch (error) {
+      console.error('Error fetching duty assignments:', error);
+      setDutyAssignments([]);
+    }
   };
 
   const fetchScheduleEntries = async (silent: boolean = false) => {
@@ -2196,6 +2247,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
                           const dayHolidays = getHolidaysForEmployeeAndDay(employee.user_id, day);
                           const isToday = isSameDay(day, new Date());
                           
+                          // Get hotline assignment for this user and day
+                          const dayStr = format(day, 'yyyy-MM-dd');
+                          const hotlineAssignment = dutyAssignments.find(
+                            da => da.user_id === employee.user_id && da.date === dayStr
+                          );
+                          
                           return (
                             <TableCell
                               key={dayIndex} 
@@ -2255,69 +2312,87 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                 </TooltipProvider>
                                 
                                 {/* Show work entries */}
-                                  {dayEntries.length === 0 && continuationEntries.length === 0 ? (
+                                  {dayEntries.length === 0 && continuationEntries.length === 0 && !hotlineAssignment ? (
                                     <span className="text-xs text-muted-foreground">
                                       {(isManager() || isPlanner()) && !multiSelectMode ? "+" : "-"}
                                     </span>
                                   ) : (
-                                  dayEntries.map((entry) => {
-                                    const canView = canViewActivityDetails(entry.user_id);
-                                    
-                                    return (
-                                      <div key={entry.id} className="space-y-1">
-                                        {multiSelectMode && canView && (
-                                          <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
-                                            <Checkbox
-                                              checked={selectedShiftIds.includes(entry.id)}
-                                              onCheckedChange={() => toggleShiftSelection(entry.id)}
-                                            />
-                                          </div>
-                                        )}
-                                        {canView ? (
-                                          <TimeBlockDisplay
-                                            entry={entry}
-                                            userRole={userRoles.length > 0 ? userRoles[0].role : ""}
-                                            showNotes={isTeamMember() && !isManager() && !isPlanner()}
-                                            shiftDescription={getShiftDescription(entry, employee)}
-                                            onClick={(e) => {
-                                              e?.stopPropagation();
-                                              if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
-                                                // Check if manager can edit this team before opening edit modal
-                                                if (canEditTeam(entry.team_id)) {
-                                                  handleEditShift(entry);
-                                                } else {
-                                                  toast({ 
-                                                    title: "View Only", 
-                                                    description: "You can view this schedule but cannot edit it", 
-                                                    variant: "default" 
-                                                  });
-                                                }
-                                              }
-                                            }}
-                                          />
-                                        ) : (
-                                          <Badge
-                                            variant="secondary"
-                                            className={`${getActivityColor(entry)} block text-xs pointer-events-none`}
-                                          >
-                                            <div className="flex flex-col items-center py-1">
-                                              <span className="font-medium">{getActivityDisplay(entry)}</span>
+                                  <>
+                                    {dayEntries.map((entry) => {
+                                      const canView = canViewActivityDetails(entry.user_id);
+                                      
+                                      return (
+                                        <div key={entry.id} className="space-y-1">
+                                          {multiSelectMode && canView && (
+                                            <div className="flex items-center justify-center mb-1" onClick={(e) => e.stopPropagation()}>
+                                              <Checkbox
+                                                checked={selectedShiftIds.includes(entry.id)}
+                                                onCheckedChange={() => toggleShiftSelection(entry.id)}
+                                              />
                                             </div>
-                                          </Badge>
-                                        )}
+                                          )}
+                                          {canView ? (
+                                            <TimeBlockDisplay
+                                              entry={entry}
+                                              userRole={userRoles.length > 0 ? userRoles[0].role : ""}
+                                              showNotes={isTeamMember() && !isManager() && !isPlanner()}
+                                              shiftDescription={getShiftDescription(entry, employee)}
+                                              onClick={(e) => {
+                                                e?.stopPropagation();
+                                                if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
+                                                  // Check if manager can edit this team before opening edit modal
+                                                  if (canEditTeam(entry.team_id)) {
+                                                    handleEditShift(entry);
+                                                  } else {
+                                                    toast({ 
+                                                      title: "View Only", 
+                                                      description: "You can view this schedule but cannot edit it", 
+                                                      variant: "default" 
+                                                    });
+                                                  }
+                                                }
+                                              }}
+                                            />
+                                          ) : (
+                                            <Badge
+                                              variant="secondary"
+                                              className={`${getActivityColor(entry)} block text-xs pointer-events-none`}
+                                            >
+                                              <div className="flex flex-col items-center py-1">
+                                                <span className="font-medium">{getActivityDisplay(entry)}</span>
+                                              </div>
+                                            </Badge>
+                                          )}
 
-                                        {(() => {
-                                          const cleanNotes = getCleanNotesForDisplay(entry.notes);
-                                          return canView && cleanNotes && (
-                                            <p className="text-xs text-muted-foreground truncate" title={cleanNotes}>
-                                              {cleanNotes.length > 20 ? `${cleanNotes.substring(0, 20)}...` : cleanNotes}
-                                            </p>
-                                          );
-                                        })()}
-                                      </div>
-                                    );
-                                  })
-                                )}
+                                          {(() => {
+                                            const cleanNotes = getCleanNotesForDisplay(entry.notes);
+                                            return canView && cleanNotes && (
+                                              <p className="text-xs text-muted-foreground truncate" title={cleanNotes}>
+                                                {cleanNotes.length > 20 ? `${cleanNotes.substring(0, 20)}...` : cleanNotes}
+                                              </p>
+                                            );
+                                          })()}
+                                        </div>
+                                      );
+                                    })}
+                                    
+                                    {/* Show hotline assignment badge */}
+                                    {hotlineAssignment && (
+                                      <TooltipProvider>
+                                        <Tooltip delayDuration={200}>
+                                          <TooltipTrigger asChild>
+                                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] cursor-help">
+                                              📞H {hotlineAssignment.notes ? `(${hotlineAssignment.notes.split('-')[0]})` : ''}
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="z-[100]" side="top">
+                                            <p>Hotline Duty: {hotlineAssignment.notes || 'No time specified'}</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                  </>
+                                  )}
                               </div>
                             </TableCell>
                           );

@@ -227,14 +227,19 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
           });
         }
       } else {
-        // Overwrite mode - delete existing and insert new
-        const dates = [...new Set(entries.map(e => e.date))];
+        // Overwrite mode - delete ALL entries in the full date range (including skipped days like weekends)
+        const fullDateRange: string[] = [];
+        const current = new Date(config.dateRange.start);
+        while (current <= config.dateRange.end) {
+          fullDateRange.push(current.toISOString().split('T')[0]);
+          current.setDate(current.getDate() + 1);
+        }
         const userIds = [...new Set(entries.map(e => e.user_id))];
         
         await supabase
           .from('schedule_entries')
           .delete()
-          .in('date', dates)
+          .in('date', fullDateRange)
           .in('user_id', userIds);
 
         const { error } = await supabase
