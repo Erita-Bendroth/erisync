@@ -86,8 +86,9 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const [useHourSplit, setUseHourSplit] = useState(false);
   const [sendNotification, setSendNotification] = useState(false);
   const [showHotlineReassignment, setShowHotlineReassignment] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'delete' | 'vacation' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'delete' | 'vacation' | 'remove_block' | null>(null);
   const [hotlineDetails, setHotlineDetails] = useState<{ start_time: string; end_time: string } | null>(null);
+  const [pendingBlockIndex, setPendingBlockIndex] = useState<number | null>(null);
   const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([
     { activity_type: "work", start_time: "09:00", end_time: "17:00" }
   ]);
@@ -123,7 +124,13 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         try {
           const timesData = JSON.parse(match[1]);
           if (Array.isArray(timesData)) {
-            setWorkBlocks(timesData);
+            // Normalize times to HH:MM format (remove seconds if present)
+            const normalizedBlocks = timesData.map(block => ({
+              ...block,
+              start_time: block.start_time?.substring(0, 5) || block.start_time,
+              end_time: block.end_time?.substring(0, 5) || block.end_time,
+            }));
+            setWorkBlocks(normalizedBlocks);
           }
         } catch (e) {
           console.error("Failed to parse time split data");
@@ -150,6 +157,21 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
   const removeWorkBlock = (index: number) => {
     if (workBlocks.length > 1) {
+      const blockToRemove = workBlocks[index];
+      
+      // Check if this is a hotline block
+      if (blockToRemove.activity_type === 'hotline_support') {
+        // Show hotline reassignment dialog
+        setHotlineDetails({
+          start_time: blockToRemove.start_time,
+          end_time: blockToRemove.end_time
+        });
+        setPendingAction('remove_block');
+        setPendingBlockIndex(index);
+        setShowHotlineReassignment(true);
+        return;
+      }
+      
       setWorkBlocks(workBlocks.filter((_, i) => i !== index));
     }
   };
@@ -452,11 +474,20 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         });
       }
 
-      // Proceed with the original action (delete or vacation)
+      // Proceed with the original action (delete, vacation, or remove block)
       if (pendingAction === 'delete') {
         await performDelete();
       } else if (pendingAction === 'vacation') {
         await performSave();
+      } else if (pendingAction === 'remove_block' && pendingBlockIndex !== null) {
+        // Remove the hotline block from workBlocks
+        setWorkBlocks(workBlocks.filter((_, i) => i !== pendingBlockIndex));
+        setPendingBlockIndex(null);
+        setLoading(false);
+        toast({
+          title: 'Hotline Block Removed',
+          description: 'Hotline time block has been removed and reassigned'
+        });
       }
 
       // Reset state

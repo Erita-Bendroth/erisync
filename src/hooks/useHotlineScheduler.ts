@@ -523,12 +523,36 @@ export const useHotlineScheduler = () => {
                   timeBlocks = [getDefaultTimeBlock(existingEntry.shift_type)];
                 }
 
-            // Add hotline time block with normalized time format
-            timeBlocks.push({
-              activity_type: "hotline_support",
-              start_time: formatTimeWithoutSeconds(startTime),
-              end_time: formatTimeWithoutSeconds(endTime)
-            });
+                // Normalize hotline times
+                const hotlineStart = formatTimeWithoutSeconds(startTime);
+                const hotlineEnd = formatTimeWithoutSeconds(endTime);
+
+                // Auto-adjust existing work blocks to not overlap with hotline
+                timeBlocks = timeBlocks.map(block => {
+                  if (block.activity_type !== 'work') return block;
+                  
+                  const workStart = block.start_time;
+                  const workEnd = block.end_time;
+                  
+                  // If work block overlaps with hotline, adjust it
+                  // Case: work starts before or at hotline start and ends after hotline start
+                  if (workStart <= hotlineStart && workEnd > hotlineStart) {
+                    // Set work to start after hotline ends
+                    return {
+                      ...block,
+                      start_time: hotlineEnd,
+                    };
+                  }
+                  
+                  return block;
+                });
+
+                // Add hotline time block with normalized time format
+                timeBlocks.push({
+                  activity_type: "hotline_support",
+                  start_time: hotlineStart,
+                  end_time: hotlineEnd
+                });
 
                 // Update entry with new notes containing all time blocks
                 const { error: updateError } = await supabase
