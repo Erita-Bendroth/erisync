@@ -829,6 +829,7 @@ export type Database = {
           id: string
           notes: string | null
           roster_id: string
+          shift_type: string | null
           team_id: string
           user_id: string | null
           week_number: number
@@ -839,6 +840,7 @@ export type Database = {
           id?: string
           notes?: string | null
           roster_id: string
+          shift_type?: string | null
           team_id: string
           user_id?: string | null
           week_number: number
@@ -849,6 +851,7 @@ export type Database = {
           id?: string
           notes?: string | null
           roster_id?: string
+          shift_type?: string | null
           team_id?: string
           user_id?: string | null
           week_number?: number
@@ -1974,6 +1977,17 @@ export type Database = {
           initials: string
           last_name: string
           region_code: string
+          user_id: string
+        }[]
+      }
+      get_partnership_team_members: {
+        Args: { p_partnership_id: string }
+        Returns: {
+          first_name: string
+          initials: string
+          last_name: string
+          team_id: string
+          team_name: string
           user_id: string
         }[]
       }

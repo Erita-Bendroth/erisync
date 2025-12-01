@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { PartnershipRotationManager } from './partnerships/PartnershipRotationManager';
+import { ShiftRequirements } from './partnerships/ShiftRequirements';
 
 interface PartnershipCapacityConfigProps {
   partnershipId: string;
@@ -151,8 +152,9 @@ export const PartnershipCapacityConfig: React.FC<PartnershipCapacityConfigProps>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="capacity">Capacity Config</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="capacity">General</TabsTrigger>
+            <TabsTrigger value="shifts">Shift Requirements</TabsTrigger>
             <TabsTrigger value="rotations">Rotation Rosters</TabsTrigger>
           </TabsList>
 
@@ -257,6 +259,10 @@ export const PartnershipCapacityConfig: React.FC<PartnershipCapacityConfigProps>
                 </DialogFooter>
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="shifts">
+            <ShiftRequirements partnershipId={partnershipId} />
           </TabsContent>
 
           <TabsContent value="rotations">

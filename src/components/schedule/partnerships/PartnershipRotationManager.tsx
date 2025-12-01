@@ -98,16 +98,6 @@ export function PartnershipRotationManager({
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getShiftTypeLabel = (shiftType: string) => {
-    const labels: Record<string, string> = {
-      late: "Late Shift",
-      early: "Early Shift",
-      weekend: "Weekend Shift",
-      normal: "Normal Shift",
-    };
-    return labels[shiftType] || shiftType;
-  };
-
   if (loading) {
     return <div className="text-muted-foreground">Loading rosters...</div>;
   }
@@ -116,27 +106,27 @@ export function PartnershipRotationManager({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Rotation Rosters</h3>
+          <h3 className="text-lg font-semibold">Rotation Schedules</h3>
           <p className="text-sm text-muted-foreground">
-            Manage weekly rotation schedules for {partnershipName}
+            Manage unified weekly rotation schedules for {partnershipName}
           </p>
         </div>
         <Button onClick={handleCreateNew}>
           <Plus className="h-4 w-4 mr-2" />
-          Create New Rotation
+          Create New Schedule
         </Button>
       </div>
 
       {rosters.length === 0 ? (
         <Card className="p-8 text-center">
           <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h4 className="text-lg font-medium mb-2">No Rotation Rosters</h4>
+          <h4 className="text-lg font-medium mb-2">No Rotation Schedules</h4>
           <p className="text-sm text-muted-foreground mb-4">
-            Create your first rotation roster to manage weekly shift assignments across teams
+            Create your first rotation schedule to assign shifts to team members across the partnership
           </p>
           <Button onClick={handleCreateNew}>
             <Plus className="h-4 w-4 mr-2" />
-            Create Rotation Roster
+            Create Schedule
           </Button>
         </Card>
       ) : (
@@ -150,10 +140,6 @@ export function PartnershipRotationManager({
                     {getStatusBadge(roster.status)}
                   </div>
                   <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span>{getShiftTypeLabel(roster.shift_type)} Rotation</span>
-                    </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       <span>{roster.cycle_length_weeks} week cycle</span>

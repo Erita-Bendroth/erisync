@@ -45,13 +45,9 @@ export function RosterBuilderDialog({
   onSuccess,
 }: RosterBuilderDialogProps) {
   const [rosterName, setRosterName] = useState(roster?.roster_name || "");
-  const [shiftType, setShiftType] = useState(roster?.shift_type || "late");
   const [cycleLength, setCycleLength] = useState(roster?.cycle_length_weeks || 5);
   const [startDate, setStartDate] = useState(
     roster?.start_date || new Date().toISOString().split("T")[0]
-  );
-  const [defaultShift, setDefaultShift] = useState(
-    roster?.default_shift_for_non_duty || "normal"
   );
   const [teams, setTeams] = useState<Team[]>([]);
   const [rosterId, setRosterId] = useState(roster?.id || null);
@@ -105,11 +101,11 @@ export function RosterBuilderDialog({
       const rosterData = {
         partnership_id: partnershipId,
         roster_name: rosterName,
-        shift_type: shiftType,
+        shift_type: "mixed", // Placeholder since we now do per-person assignments
         cycle_length_weeks: cycleLength,
         start_date: startDate,
         end_date: null,
-        default_shift_for_non_duty: defaultShift,
+        default_shift_for_non_duty: "normal", // Placeholder
         status: "draft",
       };
 
@@ -193,7 +189,7 @@ export function RosterBuilderDialog({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {roster ? "Edit" : "Create"} Rotation Roster - {partnershipName}
+            {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
           </DialogTitle>
         </DialogHeader>
 
@@ -205,31 +201,10 @@ export function RosterBuilderDialog({
                 id="rosterName"
                 value={rosterName}
                 onChange={(e) => setRosterName(e.target.value)}
-                placeholder="e.g., Late Shift Rotation 2025"
+                placeholder="e.g., Q1 2025 Rotation Schedule"
                 disabled={isReadOnly}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="shiftType">Rotating Duty Type</Label>
-              <Select
-                value={shiftType}
-                onValueChange={setShiftType}
-                disabled={isReadOnly}
-              >
-                <SelectTrigger id="shiftType">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="late">Late Shift</SelectItem>
-                  <SelectItem value="early">Early Shift</SelectItem>
-                  <SelectItem value="weekend">Weekend Shift</SelectItem>
-                  <SelectItem value="normal">Normal Shift</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cycleLength">Cycle Length (weeks)</Label>
               <Input
@@ -242,6 +217,9 @@ export function RosterBuilderDialog({
                 disabled={isReadOnly}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>
               <Input
@@ -252,71 +230,38 @@ export function RosterBuilderDialog({
                 disabled={isReadOnly}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="defaultShift">Non-Duty Schedule</Label>
-              <Select
-                value={defaultShift}
-                onValueChange={setDefaultShift}
-                disabled={isReadOnly}
-              >
-                <SelectTrigger id="defaultShift">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="normal">Normal Shifts</SelectItem>
-                  <SelectItem value="early">Early Shifts</SelectItem>
-                  <SelectItem value="late">Late Shifts</SelectItem>
-                  <SelectItem value="none">No Shifts</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="build">Build Roster</TabsTrigger>
-              <TabsTrigger value="preview">Calendar Preview</TabsTrigger>
-              <TabsTrigger value="approvals">Approvals</TabsTrigger>
-            </TabsList>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="build">Weekly Assignments</TabsTrigger>
+            <TabsTrigger value="approvals">Manager Approvals</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="build" className="space-y-4">
-              {rosterId ? (
-                <RosterWeekGrid
-                  rosterId={rosterId}
-                  teams={teams}
-                  cycleLength={cycleLength}
-                  isReadOnly={isReadOnly}
-                />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Please save the roster draft first to build assignments
-                </div>
-              )}
-            </TabsContent>
+          <TabsContent value="build" className="space-y-4">
+            {rosterId ? (
+              <RosterWeekGrid
+                rosterId={rosterId}
+                partnershipId={partnershipId}
+                cycleLength={cycleLength}
+                isReadOnly={isReadOnly}
+              />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Please save the roster draft first to build assignments
+              </div>
+            )}
+          </TabsContent>
 
-            <TabsContent value="preview">
-              {rosterId ? (
-                <RosterCalendarPreview
-                  rosterId={rosterId}
-                  startDate={startDate}
-                  cycleLength={cycleLength}
-                />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Save the roster to see calendar preview
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="approvals">
-              {rosterId ? (
-                <RosterApprovalPanel rosterId={rosterId} teams={teams} />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Save and submit roster to manage approvals
-                </div>
-              )}
-            </TabsContent>
+          <TabsContent value="approvals">
+            {rosterId ? (
+              <RosterApprovalPanel rosterId={rosterId} teams={teams} />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Save and submit roster to manage approvals
+              </div>
+            )}
+          </TabsContent>
           </Tabs>
 
           <div className="flex justify-between pt-4 border-t">
