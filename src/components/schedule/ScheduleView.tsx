@@ -814,16 +814,55 @@ useEffect(() => {
     }
   };
 
-  const getShiftTimesFromDefinition = (entry: ScheduleEntry): { startTime: string; endTime: string } | null => {
-    if (!entry.shift_time_definition_id) return null;
-    
-    const def = shiftTimeDefinitions.find(d => d.id === entry.shift_time_definition_id);
-    if (def) {
-      return {
-        startTime: def.start_time.substring(0, 5),
-        endTime: def.end_time.substring(0, 5)
-      };
+  const getShiftTimesFromDefinition = (entry: ScheduleEntry, employee?: Employee): { startTime: string; endTime: string } | null => {
+    // Priority 1: Use shift_time_definition_id if available
+    if (entry.shift_time_definition_id) {
+      const def = shiftTimeDefinitions.find(d => d.id === entry.shift_time_definition_id);
+      if (def) {
+        return {
+          startTime: def.start_time.substring(0, 5),
+          endTime: def.end_time.substring(0, 5)
+        };
+      }
     }
+    
+    // Priority 2: Look up by team/country/day (smart lookup)
+    if (entry.shift_type && entry.team_id) {
+      const date = new Date(entry.date);
+      const dayOfWeek = date.getDay();
+      
+      const applicableDef = shiftTimeDefinitions.find(def => {
+        // Match shift type
+        if (def.shift_type !== entry.shift_type) return false;
+        
+        // Match team
+        const teamMatch = (def.team_ids?.includes(entry.team_id)) || (def.team_id === entry.team_id);
+        if (!teamMatch) return false;
+        
+        // Match country (if employee provided)
+        const countryMatch = employee?.country_code && 
+          def.country_codes?.includes(employee.country_code);
+        
+        // Match day of week
+        const dayMatch = def.day_of_week?.includes(dayOfWeek);
+        
+        // Priority matching: team+country+day > team+country > team+day > team
+        if (countryMatch && dayMatch) return true;
+        if (countryMatch && (!def.day_of_week || def.day_of_week.length === 0)) return true;
+        if (dayMatch) return true;
+        if (!def.day_of_week || def.day_of_week.length === 0) return true;
+        
+        return false;
+      });
+      
+      if (applicableDef) {
+        return {
+          startTime: applicableDef.start_time.substring(0, 5),
+          endTime: applicableDef.end_time.substring(0, 5)
+        };
+      }
+    }
+    
     return null;
   };
 
@@ -1406,7 +1445,7 @@ useEffect(() => {
       case 'early':
         return { start: '06:00', end: '14:30' };
       case 'late':
-        return { start: '13:00', end: '21:30' };
+        return { start: '10:00', end: '18:00' };
       default:
         return { start: '08:00', end: '16:30' };
     }
@@ -2292,7 +2331,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                           isContinuation={true}
                                           originalStartTime={times.start}
                                           shiftDescription={getShiftDescription(entry, employee)}
-                                          shiftDefinitionTimes={getShiftTimesFromDefinition(entry)}
+                                          shiftDefinitionTimes={getShiftTimesFromDefinition(entry, employee)}
                                           onClick={(e) => {
                                             e?.stopPropagation();
                                             if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
@@ -2354,7 +2393,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                               userRole={userRoles.length > 0 ? userRoles[0].role : ""}
                                               showNotes={isTeamMember() && !isManager() && !isPlanner()}
                                               shiftDescription={getShiftDescription(entry, employee)}
-                                              shiftDefinitionTimes={getShiftTimesFromDefinition(entry)}
+                                              shiftDefinitionTimes={getShiftTimesFromDefinition(entry, employee)}
                                               onClick={(e) => {
                                                 e?.stopPropagation();
                                                 if (!multiSelectMode && (isManager() || isPlanner()) && canView) {

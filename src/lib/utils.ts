@@ -69,7 +69,7 @@ export function getShiftTimes(
     case 'early':
       return { start: '06:00', end: '14:30' };
     case 'late':
-      return { start: '13:00', end: '21:30' };
+      return { start: '10:00', end: '18:00' };
     default:
       return { start: '08:00', end: '16:30' };
   }
