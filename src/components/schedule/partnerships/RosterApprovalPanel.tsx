@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, XCircle, Loader2, Rocket } from "lucide-react";
+import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
 import { toast } from "sonner";
 
 interface Team {
@@ -26,14 +27,16 @@ interface Approval {
 interface RosterApprovalPanelProps {
   rosterId: string;
   teams: Team[];
+  onRosterActivated?: () => void;
 }
 
-export function RosterApprovalPanel({ rosterId, teams }: RosterApprovalPanelProps) {
+export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: RosterApprovalPanelProps) {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [comments, setComments] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -190,6 +193,33 @@ export function RosterApprovalPanel({ rosterId, teams }: RosterApprovalPanelProp
   const allApproved = approvals.every((a) => a.approved);
   const pendingCount = approvals.filter((a) => !a.approved).length;
 
+  const handleActivateFromPanel = async () => {
+    const confirmed = confirm(
+      "This will generate all schedule entries based on the approved roster. Continue?"
+    );
+    if (!confirmed) return;
+
+    setActivating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const result = await generateRosterSchedules(rosterId, user.id);
+
+      if (result.success) {
+        toast.success(`Roster activated! Created ${result.entriesCreated} schedule entries.`);
+        if (onRosterActivated) onRosterActivated();
+      } else {
+        throw new Error(result.error || "Failed to generate schedules");
+      }
+    } catch (error) {
+      console.error("Error activating roster:", error);
+      toast.error("Failed to activate roster");
+    } finally {
+      setActivating(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
@@ -256,13 +286,21 @@ export function RosterApprovalPanel({ rosterId, teams }: RosterApprovalPanelProp
       )}
 
       {allApproved && (
-        <Card className="p-4 bg-green-50 dark:bg-green-950">
+        <Card className="p-4 bg-green-50 dark:bg-green-950 space-y-3">
           <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">
               All managers have approved this roster!
             </span>
           </div>
+          <Button
+            onClick={handleActivateFromPanel}
+            disabled={activating}
+            className="w-full gap-2"
+          >
+            <Rocket className="h-4 w-4" />
+            {activating ? "Activating..." : "Activate Roster - Generate Schedule Entries"}
+          </Button>
         </Card>
       )}
 

@@ -20,6 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterWeekGrid } from "./RosterWeekGrid";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
 import { RosterCalendarPreview } from "./RosterCalendarPreview";
+import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
+import { Rocket, Key } from "lucide-react";
 import { toast } from "sonner";
 
 interface Team {
@@ -54,16 +56,32 @@ export function RosterBuilderDialog({
   const [status, setStatus] = useState(roster?.status || "draft");
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("build");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
     if (open) {
       fetchTeams();
+      checkAdminStatus();
       if (roster) {
         setRosterId(roster.id);
         setStatus(roster.status);
       }
     }
   }, [open, partnershipId, roster]);
+
+  const checkAdminStatus = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ["admin", "planner"]);
+
+    setIsAdmin((roles?.length || 0) > 0);
+  };
 
   const fetchTeams = async () => {
     try {
@@ -182,7 +200,69 @@ export function RosterBuilderDialog({
     }
   };
 
-  const isReadOnly = status !== "draft";
+  // Allow editing during draft and pending_approval, lock only after approved/implemented
+  const isReadOnly = status === "approved" || status === "implemented";
+
+  const handleAdminActivate = async () => {
+    if (!rosterId) return;
+
+    const confirmed = confirm(
+      "Admin Override: This will skip all approvals and immediately activate the roster. Continue?"
+    );
+    if (!confirmed) return;
+
+    setActivating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Directly generate schedules
+      const result = await generateRosterSchedules(rosterId, user.id);
+
+      if (result.success) {
+        toast.success(`Roster activated! Created ${result.entriesCreated} schedule entries.`);
+        setStatus("implemented");
+        onSuccess();
+      } else {
+        throw new Error(result.error || "Failed to generate schedules");
+      }
+    } catch (error) {
+      console.error("Error activating roster:", error);
+      toast.error("Failed to activate roster");
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleActivateRoster = async () => {
+    if (!rosterId) return;
+
+    const confirmed = confirm(
+      "This will generate all schedule entries based on the approved roster. Continue?"
+    );
+    if (!confirmed) return;
+
+    setActivating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const result = await generateRosterSchedules(rosterId, user.id);
+
+      if (result.success) {
+        toast.success(`Roster activated! Created ${result.entriesCreated} schedule entries.`);
+        setStatus("implemented");
+        onSuccess();
+      } else {
+        throw new Error(result.error || "Failed to generate schedules");
+      }
+    } catch (error) {
+      console.error("Error activating roster:", error);
+      toast.error("Failed to activate roster");
+    } finally {
+      setActivating(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -255,7 +335,14 @@ export function RosterBuilderDialog({
 
           <TabsContent value="approvals">
             {rosterId ? (
-              <RosterApprovalPanel rosterId={rosterId} teams={teams} />
+              <RosterApprovalPanel 
+                rosterId={rosterId} 
+                teams={teams}
+                onRosterActivated={() => {
+                  setStatus("implemented");
+                  onSuccess();
+                }}
+              />
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 Save and submit roster to manage approvals
@@ -269,21 +356,40 @@ export function RosterBuilderDialog({
               Close
             </Button>
             <div className="flex gap-2">
-              {status === "draft" && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleSaveDraft}
-                    disabled={saving}
-                  >
-                    Save Draft
-                  </Button>
-                  {rosterId && (
-                    <Button onClick={handleSubmitForApproval}>
-                      Submit for Approval
-                    </Button>
-                  )}
-                </>
+              {(status === "draft" || status === "pending_approval") && (
+                <Button
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={saving}
+                >
+                  Save Draft
+                </Button>
+              )}
+              {status === "draft" && rosterId && (
+                <Button onClick={handleSubmitForApproval}>
+                  Submit for Approval
+                </Button>
+              )}
+              {isAdmin && (status === "draft" || status === "pending_approval") && rosterId && (
+                <Button
+                  onClick={handleAdminActivate}
+                  disabled={activating}
+                  variant="secondary"
+                  className="gap-2"
+                >
+                  <Key className="h-4 w-4" />
+                  {activating ? "Activating..." : "Admin: Activate Now"}
+                </Button>
+              )}
+              {status === "approved" && rosterId && (
+                <Button
+                  onClick={handleActivateRoster}
+                  disabled={activating}
+                  className="gap-2"
+                >
+                  <Rocket className="h-4 w-4" />
+                  {activating ? "Activating..." : "Activate Roster"}
+                </Button>
               )}
             </div>
           </div>
