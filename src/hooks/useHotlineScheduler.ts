@@ -349,10 +349,114 @@ export const useHotlineScheduler = () => {
     }
   };
 
+  const generateAndSaveHotlineForTeam = async (
+    teamId: string,
+    startDate: Date,
+    endDate: Date,
+    userId: string
+  ): Promise<number> => {
+    try {
+      // Fetch team config
+      const { data: config, error: configError } = await supabase
+        .from("hotline_team_config")
+        .select("*")
+        .eq("team_id", teamId)
+        .single();
+
+      if (configError || !config) {
+        return 0; // No config, skip hotline
+      }
+
+      // Fetch eligible members
+      const eligibleMembers = await fetchEligibleMembers(teamId);
+
+      if (eligibleMembers.length === 0) {
+        return 0; // No eligible members
+      }
+
+      // Sort by least recent assignment
+      const sortedMembers = [...eligibleMembers].sort((a, b) => {
+        const aTime = a.last_hotline_date?.getTime() || 0;
+        const bTime = b.last_hotline_date?.getTime() || 0;
+        return aTime - bTime;
+      });
+
+      // Generate assignments for each weekday
+      const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+      let memberIndex = 0;
+      const assignments: any[] = [];
+
+      for (const date of dateRange) {
+        const dayOfWeek = getDay(date);
+
+        // Skip weekends
+        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+        const isFriday = dayOfWeek === 5;
+        const startTime = isFriday
+          ? config.friday_start_time
+          : config.weekday_start_time;
+        const endTime = isFriday
+          ? config.friday_end_time
+          : config.weekday_end_time;
+
+        // Assign required number of staff
+        for (let i = 0; i < config.min_staff_required; i++) {
+          let assigned = false;
+          let attempts = 0;
+
+          while (!assigned && attempts < sortedMembers.length) {
+            const member = sortedMembers[memberIndex % sortedMembers.length];
+
+            // Check availability
+            const isAvailable = await checkAvailability(member.user_id, date, teamId);
+
+            if (isAvailable) {
+              assignments.push({
+                team_id: teamId,
+                user_id: member.user_id,
+                date: format(date, "yyyy-MM-dd"),
+                duty_type: "hotline" as const,
+                is_substitute: attempts > 0,
+                year: date.getFullYear(),
+                week_number: Math.ceil(
+                  (date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) /
+                    (7 * 24 * 60 * 60 * 1000)
+                ),
+                notes: `${startTime}-${endTime}`,
+                created_by: userId,
+              });
+              assigned = true;
+              memberIndex++;
+            } else {
+              attempts++;
+              memberIndex++;
+            }
+          }
+        }
+      }
+
+      // Insert directly into duty_assignments
+      if (assignments.length > 0) {
+        const { error: insertError } = await supabase
+          .from("duty_assignments")
+          .insert(assignments);
+
+        if (insertError) throw insertError;
+      }
+
+      return assignments.length;
+    } catch (error: any) {
+      console.error("Error auto-generating hotline:", error);
+      return 0;
+    }
+  };
+
   return {
     loading,
     generateHotlineSchedule,
     saveDrafts,
     finalizeDrafts,
+    generateAndSaveHotlineForTeam,
   };
 };
