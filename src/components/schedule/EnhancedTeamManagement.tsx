@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ import { formatUserName } from "@/lib/utils";
 import { TeamCapacityConfig } from '@/components/admin/TeamCapacityConfig';
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import { DelegateAccessModal } from "./DelegateAccessModal";
+import { HotlineTeamConfig } from "./hotline/HotlineTeamConfig";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format as formatDate, startOfYear, endOfYear } from "date-fns";
@@ -94,6 +95,8 @@ const EnhancedTeamManagement = () => {
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
   const [tempPasswordMember, setTempPasswordMember] = useState<any>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [hotlineConfigOpen, setHotlineConfigOpen] = useState(false);
+  const [hotlineConfigTeam, setHotlineConfigTeam] = useState<{ id: string; name: string } | null>(null);
 
   // Get all user IDs from all teams for time stats
   const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
@@ -975,6 +978,18 @@ const EnhancedTeamManagement = () => {
                             size="sm" 
                             onClick={(e) => {
                               e.stopPropagation();
+                              setHotlineConfigTeam({ id: team.id, name: team.name });
+                              setHotlineConfigOpen(true);
+                            }}
+                          >
+                            <Phone className="w-4 h-4 mr-2" />
+                            Hotline
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={(e) => {
+                              e.stopPropagation();
                               openDownloadDialog(team.id);
                             }}
                           >
@@ -1298,6 +1313,16 @@ const EnhancedTeamManagement = () => {
           )}
           userEmail={tempPasswordMember.profiles.email}
           onSuccess={fetchTeamsAndMembers}
+        />
+      )}
+
+      {/* Hotline Configuration Modal */}
+      {hotlineConfigTeam && (
+        <HotlineTeamConfig
+          open={hotlineConfigOpen}
+          onOpenChange={setHotlineConfigOpen}
+          teamId={hotlineConfigTeam.id}
+          teamName={hotlineConfigTeam.name}
         />
       )}
     </div>

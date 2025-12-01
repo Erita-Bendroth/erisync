@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, User, Repeat } from "lucide-react";
+import { Users, User, Repeat, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WizardData } from "./BulkScheduleWizard";
 
@@ -31,6 +31,13 @@ export const ModeSelectionStep = ({ wizardData, updateWizardData }: ModeSelectio
       icon: Repeat,
       advanced: true,
     },
+    {
+      id: "hotline",
+      title: "Hotline Rotation",
+      description: "Generate fair hotline assignments from configured teams",
+      icon: Phone,
+      advanced: false,
+    },
   ];
 
   return (
@@ -40,7 +47,7 @@ export const ModeSelectionStep = ({ wizardData, updateWizardData }: ModeSelectio
         <p className="text-muted-foreground">Choose the type of schedule you want to generate</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {modes.map((mode) => {
           const Icon = mode.icon;
           const isSelected = wizardData.mode === mode.id;
