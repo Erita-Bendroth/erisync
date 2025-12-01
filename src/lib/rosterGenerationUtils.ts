@@ -62,7 +62,7 @@ export async function generateRosterSchedules(
       .select(`
         user_id,
         team_id,
-        profiles!inner (
+        profiles!team_members_user_id_fkey (
           country_code,
           region_code
         )
