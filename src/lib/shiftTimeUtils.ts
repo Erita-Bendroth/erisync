@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { matchesCountryCode } from './countryCodeUtils';
 
 export interface ShiftTimeDefinition {
   id: string;
@@ -34,6 +35,7 @@ export interface ApplicableShiftTime {
 export async function getApplicableShiftTimes({
   teamId,
   regionCode,
+  countryCode,
   shiftType,
   dayOfWeek,
   date,
@@ -41,26 +43,24 @@ export async function getApplicableShiftTimes({
 }: {
   teamId?: string;
   regionCode?: string;
+  countryCode?: string;
   shiftType: "normal" | "early" | "late" | "weekend";
   dayOfWeek?: number;
   date?: string;
   shiftTimeDefinitionId?: string;
 }): Promise<ApplicableShiftTime> {
-  // Priority 0: If specific shift definition ID is provided, use it directly
+  // Priority 0: If specific shift definition ID provided, get its shift_type as base
+  // but still find best match for the specific day
+  let baseShiftType = shiftType;
   if (shiftTimeDefinitionId) {
     const { data: specificShift, error } = await supabase
       .from("shift_time_definitions")
-      .select("*")
+      .select("shift_type")
       .eq("id", shiftTimeDefinitionId)
-      .maybeSingle();
+      .single();
     
     if (specificShift && !error) {
-      return {
-        id: specificShift.id,
-        startTime: specificShift.start_time,
-        endTime: specificShift.end_time,
-        description: specificShift.description || "",
-      };
+      baseShiftType = specificShift.shift_type;
     }
   }
 
@@ -81,7 +81,7 @@ export async function getApplicableShiftTimes({
   const { data, error } = await supabase
     .from("shift_time_definitions")
     .select("*")
-    .eq("shift_type", shiftType)
+    .eq("shift_type", baseShiftType)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -95,141 +95,166 @@ export async function getApplicableShiftTimes({
 
   // For weekend shift type, automatically match if it's Sat/Sun or a public holiday
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const shouldApplyWeekendShift = shiftType === 'weekend' && (isWeekend || isPublicHoliday);
+  const shouldApplyWeekendShift = baseShiftType === 'weekend' && (isWeekend || isPublicHoliday);
 
-  // Priority 1: Team + region + day(s)
-  if (dayOfWeek !== undefined || shouldApplyWeekendShift) {
-    const teamRegionDay = data.find(
+  // Priority 1: Team + Country + specific day (most specific)
+  if (teamId && dayOfWeek !== undefined) {
+    const teamCountryDay = data.find(
       (def) => {
         const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
-        const matchesRegion = def.region_code === regionCode;
-        
-        // For weekend shift type, ignore day_of_week check
-        const matchesDay = shiftType === 'weekend' 
+        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const matchesDay = baseShiftType === 'weekend' 
           ? shouldApplyWeekendShift
-          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek!));
+          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek));
         
-        return matchesTeam && matchesRegion && matchesDay;
+        return matchesTeam && matchesCountry && matchesDay;
       }
     );
-    if (teamRegionDay) {
+    if (teamCountryDay) {
       return {
-        id: teamRegionDay.id,
-        startTime: teamRegionDay.start_time,
-        endTime: teamRegionDay.end_time,
-        description: teamRegionDay.description || "",
-      };
-    }
-    
-    // Priority 1.5: Team + day (no region requirement) - IMPORTANT for most shifts!
-    const teamDay = data.find(
-      (def) => {
-        const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
-        const noRegion = def.region_code === null;
-        
-        // For weekend shift type, ignore day_of_week check
-        const matchesDay = shiftType === 'weekend' 
-          ? shouldApplyWeekendShift
-          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek!));
-        
-        return matchesTeam && noRegion && matchesDay;
-      }
-    );
-    if (teamDay) {
-      return {
-        id: teamDay.id,
-        startTime: teamDay.start_time,
-        endTime: teamDay.end_time,
-        description: teamDay.description || "",
+        id: teamCountryDay.id,
+        startTime: teamCountryDay.start_time,
+        endTime: teamCountryDay.end_time,
+        description: teamCountryDay.description || "",
       };
     }
   }
 
-  // Priority 2: Team + region (no specific days)
-  const teamRegion = data.find(
-    (def) => {
-      const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
-      const matchesRegion = def.region_code === regionCode;
-      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
-      
-      // For weekend shift type, still apply if it's weekend/holiday
-      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
-        return false;
+  // Priority 2: Team + Country (no day restriction)
+  if (teamId && countryCode) {
+    const teamCountry = data.find(
+      (def) => {
+        const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const noDay = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+        
+        // For weekend shift type, still apply if it's weekend/holiday
+        if (baseShiftType === 'weekend' && !shouldApplyWeekendShift) {
+          return false;
+        }
+        
+        return matchesTeam && matchesCountry && noDay;
       }
-      
-      return matchesTeam && matchesRegion && noSpecificDays;
+    );
+    if (teamCountry) {
+      return {
+        id: teamCountry.id,
+        startTime: teamCountry.start_time,
+        endTime: teamCountry.end_time,
+        description: teamCountry.description || "",
+      };
     }
-  );
-  if (teamRegion) {
-    return {
-      id: teamRegion.id,
-      startTime: teamRegion.start_time,
-      endTime: teamRegion.end_time,
-      description: teamRegion.description || "",
-    };
   }
 
-  // Priority 3: Team only
-  const teamOnly = data.find(
-    (def) => {
-      const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
-      const noRegion = def.region_code === null;
-      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
-      
-      // For weekend shift type, still apply if it's weekend/holiday
-      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
-        return false;
+  // Priority 3: Team only + specific day (no country requirement)
+  if (teamId && dayOfWeek !== undefined) {
+    const teamDayOnly = data.find(
+      (def) => {
+        const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+        const matchesDay = baseShiftType === 'weekend' 
+          ? shouldApplyWeekendShift
+          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek));
+        
+        return matchesTeam && matchesDay;
       }
-      
-      return matchesTeam && noRegion && noSpecificDays;
+    );
+    if (teamDayOnly) {
+      return {
+        id: teamDayOnly.id,
+        startTime: teamDayOnly.start_time,
+        endTime: teamDayOnly.end_time,
+        description: teamDayOnly.description || "",
+      };
     }
-  );
-  if (teamOnly) {
-    return {
-      id: teamOnly.id,
-      startTime: teamOnly.start_time,
-      endTime: teamOnly.end_time,
-      description: teamOnly.description || "",
-    };
   }
 
-  // Priority 4: Region only
-  const regionOnly = data.find(
-    (def) => {
-      const noTeam = def.team_id === null;
-      const matchesRegion = def.region_code === regionCode;
-      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
-      
-      // For weekend shift type, still apply if it's weekend/holiday
-      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
-        return false;
+  // Priority 4: Team only (no country or day restriction)
+  if (teamId) {
+    const teamOnlyNoDay = data.find(
+      (def) => {
+        const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+        const noDay = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+        
+        // For weekend shift type, still apply if it's weekend/holiday
+        if (baseShiftType === 'weekend' && !shouldApplyWeekendShift) {
+          return false;
+        }
+        
+        return matchesTeam && noDay;
       }
-      
-      return noTeam && matchesRegion && noSpecificDays;
+    );
+    if (teamOnlyNoDay) {
+      return {
+        id: teamOnlyNoDay.id,
+        startTime: teamOnlyNoDay.start_time,
+        endTime: teamOnlyNoDay.end_time,
+        description: teamOnlyNoDay.description || "",
+      };
     }
-  );
-  if (regionOnly) {
-    return {
-      id: regionOnly.id,
-      startTime: regionOnly.start_time,
-      endTime: regionOnly.end_time,
-      description: regionOnly.description || "",
-    };
   }
 
-  // Priority 5: Global default
+  // Priority 5: Country only + specific day
+  if (countryCode && dayOfWeek !== undefined) {
+    const countryDayOnly = data.find(
+      (def) => {
+        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const noTeam = (def.team_id === null || def.team_ids === null || (Array.isArray(def.team_ids) && def.team_ids.length === 0));
+        const matchesDay = baseShiftType === 'weekend' 
+          ? shouldApplyWeekendShift
+          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek));
+        
+        return matchesCountry && noTeam && matchesDay;
+      }
+    );
+    if (countryDayOnly) {
+      return {
+        id: countryDayOnly.id,
+        startTime: countryDayOnly.start_time,
+        endTime: countryDayOnly.end_time,
+        description: countryDayOnly.description || "",
+      };
+    }
+  }
+
+  // Priority 6: Country only (no day restriction)
+  if (countryCode) {
+    const countryOnly = data.find(
+      (def) => {
+        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const noTeam = (def.team_id === null || def.team_ids === null || (Array.isArray(def.team_ids) && def.team_ids.length === 0));
+        const noDay = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+        
+        // For weekend shift type, still apply if it's weekend/holiday
+        if (baseShiftType === 'weekend' && !shouldApplyWeekendShift) {
+          return false;
+        }
+        
+        return matchesCountry && noTeam && noDay;
+      }
+    );
+    if (countryOnly) {
+      return {
+        id: countryOnly.id,
+        startTime: countryOnly.start_time,
+        endTime: countryOnly.end_time,
+        description: countryOnly.description || "",
+      };
+    }
+  }
+
+  // Priority 7: Global default (no team, no country, no day)
   const globalDefault = data.find(
     (def) => {
-      const noTeam = def.team_id === null;
-      const noRegion = def.region_code === null;
-      const noSpecificDays = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
+      const noTeam = def.team_id === null && (def.team_ids === null || (Array.isArray(def.team_ids) && def.team_ids.length === 0));
+      const noCountry = def.country_codes === null || (Array.isArray(def.country_codes) && def.country_codes.length === 0);
+      const noDay = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
       
       // For weekend shift type, still apply if it's weekend/holiday
-      if (shiftType === 'weekend' && !shouldApplyWeekendShift) {
+      if (baseShiftType === 'weekend' && !shouldApplyWeekendShift) {
         return false;
       }
       
-      return noTeam && noRegion && noSpecificDays;
+      return noTeam && noCountry && noDay;
     }
   );
   if (globalDefault) {
