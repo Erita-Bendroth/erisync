@@ -348,6 +348,141 @@ export type Database = {
         }
         Relationships: []
       }
+      hotline_draft_assignments: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          date: string
+          end_time: string
+          id: string
+          is_substitute: boolean | null
+          original_user_id: string | null
+          start_time: string
+          status: string | null
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          date: string
+          end_time: string
+          id?: string
+          is_substitute?: boolean | null
+          original_user_id?: string | null
+          start_time: string
+          status?: string | null
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          date?: string
+          end_time?: string
+          id?: string
+          is_substitute?: boolean | null
+          original_user_id?: string | null
+          start_time?: string
+          status?: string | null
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotline_draft_assignments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotline_eligible_members: {
+        Row: {
+          added_by: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          team_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          team_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          team_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotline_eligible_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotline_team_config: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          friday_end_time: string | null
+          friday_start_time: string | null
+          id: string
+          min_staff_required: number | null
+          team_id: string
+          updated_at: string | null
+          weekday_end_time: string | null
+          weekday_start_time: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          friday_end_time?: string | null
+          friday_start_time?: string | null
+          id?: string
+          min_staff_required?: number | null
+          team_id: string
+          updated_at?: string | null
+          weekday_end_time?: string | null
+          weekday_start_time?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          friday_end_time?: string | null
+          friday_start_time?: string | null
+          id?: string
+          min_staff_required?: number | null
+          team_id?: string
+          updated_at?: string | null
+          weekday_end_time?: string | null
+          weekday_start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotline_team_config_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manager_delegations: {
         Row: {
           created_at: string
@@ -1826,7 +1961,7 @@ export type Database = {
         | "working_from_home"
       app_role: "manager" | "planner" | "teammember" | "admin"
       availability_status: "available" | "unavailable"
-      duty_type: "weekend" | "lateshift" | "earlyshift"
+      duty_type: "weekend" | "lateshift" | "earlyshift" | "hotline"
       shift_swap_status:
         | "pending"
         | "approved"
@@ -1973,7 +2108,7 @@ export const Constants = {
       ],
       app_role: ["manager", "planner", "teammember", "admin"],
       availability_status: ["available", "unavailable"],
-      duty_type: ["weekend", "lateshift", "earlyshift"],
+      duty_type: ["weekend", "lateshift", "earlyshift", "hotline"],
       shift_swap_status: [
         "pending",
         "approved",

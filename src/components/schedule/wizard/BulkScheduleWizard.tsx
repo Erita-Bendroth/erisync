@@ -15,11 +15,15 @@ import { ShiftPatternStep } from "./ShiftPatternStep";
 import { AdvancedOptionsStep } from "./AdvancedOptionsStep";
 import { ReviewStep } from "./ReviewStep";
 import { WizardProgress } from "./WizardProgress";
+import { HotlineGenerationStep } from "../hotline/HotlineGenerationStep";
+import { HotlineDraftPreview } from "../hotline/HotlineDraftPreview";
+import { useHotlineScheduler } from "@/hooks/useHotlineScheduler";
 
 export interface WizardData {
-  mode: "team" | "users" | "rotation";
+  mode: "team" | "users" | "rotation" | "hotline";
   selectedTeam: string;
   selectedUsers: string[];
+  selectedHotlineTeams?: string[];
   startDate?: Date;
   endDate?: Date;
   excludedDays: number[];
@@ -64,6 +68,7 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     mode: "users",
     selectedTeam: "",
     selectedUsers: [],
+    selectedHotlineTeams: [],
     excludedDays: [0, 6],
     skipHolidays: true,
     shiftType: "custom",
@@ -80,6 +85,8 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     rotationCycles: 1,
     shiftPattern: {},
   });
+  
+  const { generateHotlineSchedule, saveDrafts } = useHotlineScheduler();
 
   useEffect(() => {
     checkPermissions();
@@ -116,7 +123,14 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     setWizardData(prev => ({ ...prev, ...updates }));
   };
 
-  const steps = wizardData.mode === "rotation" 
+  const steps = wizardData.mode === "hotline"
+    ? [
+        { id: 0, label: "Mode", component: ModeSelectionStep },
+        { id: 1, label: "Teams", component: HotlineGenerationStep },
+        { id: 2, label: "Dates", component: DateRangeStep },
+        { id: 3, label: "Preview", component: HotlineDraftPreview },
+      ]
+    : wizardData.mode === "rotation" 
     ? [
         { id: 0, label: "Mode", component: ModeSelectionStep },
         { id: 1, label: "Team & People", component: TeamPeopleStep },
@@ -144,6 +158,8 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     switch (currentStepInfo.label) {
       case "Mode":
         return wizardData.mode !== null;
+      case "Teams":
+        return wizardData.selectedHotlineTeams && wizardData.selectedHotlineTeams.length > 0;
       case "Team & People":
         if (wizardData.mode === "team") {
           return wizardData.selectedTeam !== "";
@@ -178,7 +194,31 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Special handling for hotline mode
+    if (wizardData.mode === "hotline" && currentStep === 2) {
+      // Generate drafts before moving to preview
+      if (wizardData.startDate && wizardData.endDate && wizardData.selectedHotlineTeams) {
+        setLoading(true);
+        try {
+          const drafts = await generateHotlineSchedule(
+            wizardData.selectedHotlineTeams,
+            wizardData.startDate,
+            wizardData.endDate
+          );
+          if (drafts.length > 0 && user) {
+            await saveDrafts(drafts, user.id);
+            setCurrentStep(prev => prev + 1);
+          }
+        } catch (error) {
+          console.error("Error generating hotline schedule:", error);
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+    }
+    
     if (currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
@@ -216,17 +256,38 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
 
       <Card>
         <CardContent className="p-6">
-          {currentStep === steps.length - 1 ? (
-            <ReviewStep
-              wizardData={wizardData}
-              onScheduleGenerated={onScheduleGenerated}
-            />
-          ) : (
-            <CurrentStepComponent
-              wizardData={wizardData}
-              updateWizardData={updateWizardData}
-            />
-          )}
+          {(() => {
+            if (wizardData.mode === "hotline" && currentStep === 1) {
+              return (
+                <HotlineGenerationStep
+                  selectedTeams={wizardData.selectedHotlineTeams || []}
+                  onTeamsChange={(teams) => updateWizardData({ selectedHotlineTeams: teams })}
+                />
+              );
+            }
+            if (wizardData.mode === "hotline" && currentStep === 3) {
+              return (
+                <HotlineDraftPreview
+                  teamIds={wizardData.selectedHotlineTeams || []}
+                  onFinalized={onScheduleGenerated}
+                />
+              );
+            }
+            if (currentStep === steps.length - 1 && wizardData.mode !== "hotline") {
+              return (
+                <ReviewStep
+                  wizardData={wizardData}
+                  onScheduleGenerated={onScheduleGenerated}
+                />
+              );
+            }
+            return (
+              <CurrentStepComponent
+                wizardData={wizardData}
+                updateWizardData={updateWizardData}
+              />
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -245,7 +306,7 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
             onClick={handleNext}
             disabled={!canProceed() || loading}
           >
-            Continue
+            {loading ? "Generating..." : "Continue"}
             <ChevronRight className="w-4 h-4 ml-2" />
           </Button>
         )}
