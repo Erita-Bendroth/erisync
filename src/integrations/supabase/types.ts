@@ -605,6 +605,97 @@ export type Database = {
           },
         ]
       }
+      partnership_rotation_rosters: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          cycle_length_weeks: number
+          default_shift_for_non_duty: string | null
+          end_date: string | null
+          id: string
+          partnership_id: string
+          roster_name: string
+          shift_type: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          cycle_length_weeks?: number
+          default_shift_for_non_duty?: string | null
+          end_date?: string | null
+          id?: string
+          partnership_id: string
+          roster_name: string
+          shift_type: string
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          cycle_length_weeks?: number
+          default_shift_for_non_duty?: string | null
+          end_date?: string | null
+          id?: string
+          partnership_id?: string
+          roster_name?: string
+          shift_type?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_rotation_rosters_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "team_planning_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partnership_shift_requirements: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          partnership_id: string
+          shift_type: string
+          staff_required: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          partnership_id: string
+          shift_type: string
+          staff_required?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          partnership_id?: string
+          shift_type?: string
+          staff_required?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_shift_requirements_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "team_planning_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_access_log: {
         Row: {
           access_time: string
@@ -679,6 +770,105 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      roster_manager_approvals: {
+        Row: {
+          approved: boolean
+          approved_at: string | null
+          comments: string | null
+          created_at: string
+          id: string
+          manager_id: string
+          roster_id: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved?: boolean
+          approved_at?: string | null
+          comments?: string | null
+          created_at?: string
+          id?: string
+          manager_id: string
+          roster_id: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved?: boolean
+          approved_at?: string | null
+          comments?: string | null
+          created_at?: string
+          id?: string
+          manager_id?: string
+          roster_id?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_manager_approvals_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_rotation_rosters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_manager_approvals_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_week_assignments: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          roster_id: string
+          team_id: string
+          user_id: string | null
+          week_number: number
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          roster_id: string
+          team_id: string
+          user_id?: string | null
+          week_number: number
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          roster_id?: string
+          team_id?: string
+          user_id?: string | null
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_week_assignments_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_rotation_rosters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_week_assignments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       schedule_bookmarks: {
         Row: {
