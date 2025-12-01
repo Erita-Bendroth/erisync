@@ -14,6 +14,7 @@ export interface ShiftTimeDefinition {
 }
 
 export interface ApplicableShiftTime {
+  id: string;  // The shift_time_definition_id that was matched
   startTime: string;
   endTime: string;
   description: string;
@@ -55,6 +56,7 @@ export async function getApplicableShiftTimes({
     
     if (specificShift && !error) {
       return {
+        id: specificShift.id,
         startTime: specificShift.start_time,
         endTime: specificShift.end_time,
         description: specificShift.description || "",
@@ -112,9 +114,33 @@ export async function getApplicableShiftTimes({
     );
     if (teamRegionDay) {
       return {
+        id: teamRegionDay.id,
         startTime: teamRegionDay.start_time,
         endTime: teamRegionDay.end_time,
         description: teamRegionDay.description || "",
+      };
+    }
+    
+    // Priority 1.5: Team + day (no region requirement) - IMPORTANT for most shifts!
+    const teamDay = data.find(
+      (def) => {
+        const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
+        const noRegion = def.region_code === null;
+        
+        // For weekend shift type, ignore day_of_week check
+        const matchesDay = shiftType === 'weekend' 
+          ? shouldApplyWeekendShift
+          : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek!));
+        
+        return matchesTeam && noRegion && matchesDay;
+      }
+    );
+    if (teamDay) {
+      return {
+        id: teamDay.id,
+        startTime: teamDay.start_time,
+        endTime: teamDay.end_time,
+        description: teamDay.description || "",
       };
     }
   }
@@ -136,6 +162,7 @@ export async function getApplicableShiftTimes({
   );
   if (teamRegion) {
     return {
+      id: teamRegion.id,
       startTime: teamRegion.start_time,
       endTime: teamRegion.end_time,
       description: teamRegion.description || "",
@@ -159,6 +186,7 @@ export async function getApplicableShiftTimes({
   );
   if (teamOnly) {
     return {
+      id: teamOnly.id,
       startTime: teamOnly.start_time,
       endTime: teamOnly.end_time,
       description: teamOnly.description || "",
@@ -182,6 +210,7 @@ export async function getApplicableShiftTimes({
   );
   if (regionOnly) {
     return {
+      id: regionOnly.id,
       startTime: regionOnly.start_time,
       endTime: regionOnly.end_time,
       description: regionOnly.description || "",
@@ -205,6 +234,7 @@ export async function getApplicableShiftTimes({
   );
   if (globalDefault) {
     return {
+      id: globalDefault.id,
       startTime: globalDefault.start_time,
       endTime: globalDefault.end_time,
       description: globalDefault.description || "",
@@ -218,10 +248,10 @@ function getDefaultShiftTime(
   shiftType: "normal" | "early" | "late" | "weekend"
 ): ApplicableShiftTime {
   const defaults = {
-    normal: { startTime: "08:00", endTime: "16:30", description: "Normal shift" },
-    early: { startTime: "06:00", endTime: "14:00", description: "Early shift" },
-    late: { startTime: "14:00", endTime: "22:00", description: "Late shift" },
-    weekend: { startTime: "08:00", endTime: "16:00", description: "Weekend / National Holiday shift" },
+    normal: { id: "default-normal", startTime: "08:00", endTime: "16:30", description: "Normal shift" },
+    early: { id: "default-early", startTime: "06:00", endTime: "14:00", description: "Early shift" },
+    late: { id: "default-late", startTime: "14:00", endTime: "22:00", description: "Late shift" },
+    weekend: { id: "default-weekend", startTime: "08:00", endTime: "16:00", description: "Weekend / National Holiday shift" },
   };
   return defaults[shiftType];
 }
