@@ -113,18 +113,14 @@ export const calculateBulkEntries = async (
       info => info.isPublicHoliday || info.isWeekend
     );
     
-    // Determine if we should include this day:
-    // - Always include if autoDetectWeekends is ON and it's a weekend
-    // - Always include if autoDetectHolidays is ON and there's a holiday
-    // - Otherwise, respect excludedDays list
-    const shouldIncludeDay = 
-      (config.autoDetectWeekends && isWeekend) ||
-      (config.autoDetectHolidays && hasAnyHoliday) ||
-      !config.excludedDays.includes(dayOfWeek);
-    
-    if (!shouldIncludeDay) {
+    // Skip days that are in the excluded days list (e.g., weekends)
+    // excludedDays takes priority - if user says skip weekends, we skip them
+    if (config.excludedDays.includes(dayOfWeek)) {
       continue;
     }
+    
+    // autoDetectWeekends/autoDetectHolidays only affect WHICH SHIFT TYPE to use,
+    // not whether to include the day (that's controlled by excludedDays)
 
     if (config.mode === 'rotation' && config.advanced.rotationEnabled) {
       // Rotation mode: assign one user per day in sequence

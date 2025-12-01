@@ -24,6 +24,7 @@ interface WeeklyGridViewProps {
   teamSections: TeamSectionData[];
   dates: string[];
   scheduleEntries: ScheduleEntry[];
+  dutyAssignments: any[];
   state: SchedulerState;
   cellsBeingEdited: Record<string, any[]>;
   handlers: {
@@ -57,6 +58,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
   teamSections,
   dates,
   scheduleEntries,
+  dutyAssignments,
   state,
   cellsBeingEdited,
   handlers,
@@ -183,6 +185,7 @@ export const WeeklyGridView: React.FC<WeeklyGridViewProps> = ({
                 members={section.members}
                 dates={weekDates}
                 scheduleEntries={scheduleEntries.filter(e => weekDates.includes(e.date))}
+                dutyAssignments={dutyAssignments.filter(d => weekDates.includes(d.date))}
                 selectedUsers={state.selectedUsers}
                 selectedCells={state.selectedCells}
                 hoveredCell={state.hoveredCell}
