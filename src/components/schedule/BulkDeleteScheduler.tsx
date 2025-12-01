@@ -108,12 +108,36 @@ export const BulkDeleteScheduler = ({ userId, onDeleted }: BulkDeleteSchedulerPr
       }
 
       try {
-        // Build date array
-        const dates: string[] = [];
+        // Helper to format date locally (avoid timezone issues)
+        const formatLocalDate = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        // Build date array, respecting excluded days
+        let dates: string[] = [];
         const current = new Date(dateRange.start);
         while (current <= dateRange.end) {
-          dates.push(current.toISOString().split('T')[0]);
+          const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+          
+          // Only include this date if its day is NOT excluded
+          if (!excludedDays.includes(dayOfWeek)) {
+            dates.push(formatLocalDate(current));
+          }
           current.setDate(current.getDate() + 1);
+        }
+
+        // Filter out holidays if skipHolidays is checked
+        if (skipHolidays && dates.length > 0) {
+          const { data: holidays } = await supabase
+            .from('holidays')
+            .select('date')
+            .in('date', dates);
+          
+          const holidayDates = new Set(holidays?.map(h => h.date) || []);
+          dates = dates.filter(d => !holidayDates.has(d));
         }
 
         // Get user IDs (from selection or all team members)
@@ -135,6 +159,7 @@ export const BulkDeleteScheduler = ({ userId, onDeleted }: BulkDeleteSchedulerPr
         let scheduleQuery = supabase
           .from('schedule_entries')
           .select('*', { count: 'exact', head: true })
+          .eq('team_id', teamId)
           .in('date', dates)
           .in('user_id', userIds);
 
@@ -169,7 +194,7 @@ export const BulkDeleteScheduler = ({ userId, onDeleted }: BulkDeleteSchedulerPr
     };
 
     calculatePreview();
-  }, [dateRange, teamId, selectedUserIds, activityTypes, shiftTypes, deleteHotlineAssignments]);
+  }, [dateRange, teamId, selectedUserIds, activityTypes, shiftTypes, deleteHotlineAssignments, excludedDays, skipHolidays]);
 
   const isValid = useMemo(() => {
     return (
@@ -194,12 +219,36 @@ export const BulkDeleteScheduler = ({ userId, onDeleted }: BulkDeleteSchedulerPr
     setShowConfirmDialog(false);
 
     try {
-      // Build date array
-      const dates: string[] = [];
+      // Helper to format date locally (avoid timezone issues)
+      const formatLocalDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      // Build date array, respecting excluded days
+      let dates: string[] = [];
       const current = new Date(dateRange.start!);
       while (current <= dateRange.end!) {
-        dates.push(current.toISOString().split('T')[0]);
+        const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+        
+        // Only include this date if its day is NOT excluded
+        if (!excludedDays.includes(dayOfWeek)) {
+          dates.push(formatLocalDate(current));
+        }
         current.setDate(current.getDate() + 1);
+      }
+
+      // Filter out holidays if skipHolidays is checked
+      if (skipHolidays && dates.length > 0) {
+        const { data: holidays } = await supabase
+          .from('holidays')
+          .select('date')
+          .in('date', dates);
+        
+        const holidayDates = new Set(holidays?.map(h => h.date) || []);
+        dates = dates.filter(d => !holidayDates.has(d));
       }
 
       // Get user IDs
@@ -216,6 +265,7 @@ export const BulkDeleteScheduler = ({ userId, onDeleted }: BulkDeleteSchedulerPr
       let scheduleQuery = supabase
         .from('schedule_entries')
         .delete()
+        .eq('team_id', teamId!)
         .in('date', dates)
         .in('user_id', userIds);
 
