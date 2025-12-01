@@ -170,9 +170,16 @@ export const calculateBulkEntries = async (
       
       let resolvedShiftType: ShiftType = requestedShiftType;
 
+      // Include shift times in notes so they display correctly
+      const shiftTimesJson = JSON.stringify([{
+        activity_type: 'work',
+        start_time: applicableShift.startTime,
+        end_time: applicableShift.endTime
+      }]);
+      
       const notes = shouldUseWeekendShift 
-        ? `Bulk generated (rotation) - ${userHolidayInfo?.holidayName || 'Weekend'}`
-        : 'Bulk generated (rotation)';
+        ? `Bulk generated (rotation) - ${userHolidayInfo?.holidayName || 'Weekend'}\nShift: ${applicableShift.description}\nTimes: ${shiftTimesJson}`
+        : `Bulk generated (rotation)\nShift: ${applicableShift.description}\nTimes: ${shiftTimesJson}`;
 
       console.log(`📝 Creating entry for ${rotationUserId} on ${dateStr}: shift_type=${resolvedShiftType}`);
 
@@ -229,9 +236,16 @@ export const calculateBulkEntries = async (
         
         let resolvedShiftType: ShiftType = requestedShiftType;
         
+        // Include shift times in notes so they display correctly
+        const shiftTimesJson = JSON.stringify([{
+          activity_type: 'work',
+          start_time: applicableShift.startTime,
+          end_time: applicableShift.endTime
+        }]);
+        
         const notes = shouldUseWeekendShift 
-          ? `Bulk generated - ${userHolidayInfo?.holidayName || 'Weekend'}`
-          : 'Bulk generated';
+          ? `Bulk generated - ${userHolidayInfo?.holidayName || 'Weekend'}\nShift: ${applicableShift.description}\nTimes: ${shiftTimesJson}`
+          : `Bulk generated\nShift: ${applicableShift.description}\nTimes: ${shiftTimesJson}`;
 
         console.log(`📝 Creating entry for ${targetUserId} on ${dateStr}: shift_type=${resolvedShiftType}`);
 

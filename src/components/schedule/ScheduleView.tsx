@@ -841,7 +841,7 @@ useEffect(() => {
     const teamId = entry.team_id;
     const regionCode = employeeData?.region_code;
     const date = new Date(entry.date);
-    const dayOfWeek = (date.getDay() + 6) % 7; // Convert to ISO format (0=Monday, 6=Sunday)
+    const dayOfWeek = date.getDay(); // Use JavaScript format (0=Sunday, 1=Monday, etc.) - matches database storage
     
     // Priority matching (same as shiftTimeUtils.ts)
     const applicableDef = shiftTimeDefinitions.find(def => {
