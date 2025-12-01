@@ -44,6 +44,24 @@ export const calculateBulkEntries = async (
     mode: config.mode
   });
 
+  // Fetch the selected shift definition to get its actual enum type
+  let selectedShiftEnumType: ShiftType = 'normal';
+  let shiftDefinitionId: string | null = null;
+  
+  if (config.shiftType && config.shiftType !== 'custom') {
+    shiftDefinitionId = config.shiftType;
+    const { data: shiftDef } = await supabase
+      .from('shift_time_definitions')
+      .select('shift_type')
+      .eq('id', config.shiftType)
+      .maybeSingle();
+    
+    if (shiftDef) {
+      selectedShiftEnumType = shiftDef.shift_type;
+      console.log(`✅ Resolved shift definition ${config.shiftType} to enum type: ${selectedShiftEnumType}`);
+    }
+  }
+
   const entries: ScheduleEntryDraft[] = [];
   const days = eachDayOfInterval({
     start: config.dateRange.start,
@@ -132,10 +150,7 @@ export const calculateBulkEntries = async (
       console.log(`🌍 User ${rotationUserId} location: ${userCountryCode}/${userRegionCode}`);
       
       // Determine which shift type to request
-      let requestedShiftType: ShiftType = config.shiftType as ShiftType || 'normal';
-      if (shouldUseWeekendShift) {
-        requestedShiftType = 'weekend';
-      }
+      let requestedShiftType: ShiftType = shouldUseWeekendShift ? 'weekend' : selectedShiftEnumType;
       
       // Use country-aware shift selection
       const applicableShift = await getApplicableShiftTimes({
@@ -144,7 +159,13 @@ export const calculateBulkEntries = async (
         shiftType: requestedShiftType,
         dayOfWeek,
         date: dateStr,
+        shiftTimeDefinitionId: shiftDefinitionId || undefined,
       });
+      
+      if (!applicableShift) {
+        console.warn(`⚠️ No applicable shift found for ${dateStr}, skipping`);
+        continue;
+      }
       
       console.log(`✅ Using shift for ${userCountryCode}: ${applicableShift.description || `${applicableShift.startTime}-${applicableShift.endTime}`}`);
       
@@ -161,7 +182,7 @@ export const calculateBulkEntries = async (
         team_id: config.teamId,
         date: dateStr,
         shift_type: resolvedShiftType,
-        shift_time_definition_id: config.shiftType || null,
+        shift_time_definition_id: shiftDefinitionId,
         activity_type: 'work' as ActivityType,
         availability_status: 'available' as AvailabilityStatus,
         created_by: userId,
@@ -188,10 +209,7 @@ export const calculateBulkEntries = async (
         console.log(`🌍 User ${targetUserId} location: ${userCountryCode}/${userRegionCode}`);
         
         // Determine which shift type to request
-        let requestedShiftType: ShiftType = config.shiftType as ShiftType || 'normal';
-        if (shouldUseWeekendShift) {
-          requestedShiftType = 'weekend';
-        }
+        let requestedShiftType: ShiftType = shouldUseWeekendShift ? 'weekend' : selectedShiftEnumType;
         
         // Use country-aware shift selection
         const applicableShift = await getApplicableShiftTimes({
@@ -200,7 +218,13 @@ export const calculateBulkEntries = async (
           shiftType: requestedShiftType,
           dayOfWeek,
           date: dateStr,
+          shiftTimeDefinitionId: shiftDefinitionId || undefined,
         });
+        
+        if (!applicableShift) {
+          console.warn(`⚠️ No applicable shift found for ${targetUserId} on ${dateStr}, skipping`);
+          continue;
+        }
         
         console.log(`✅ Using shift for ${userCountryCode}: ${applicableShift.description || `${applicableShift.startTime}-${applicableShift.endTime}`}`);
         
@@ -217,7 +241,7 @@ export const calculateBulkEntries = async (
           team_id: config.teamId,
           date: dateStr,
           shift_type: resolvedShiftType,
-          shift_time_definition_id: config.shiftType || null,
+          shift_time_definition_id: shiftDefinitionId,
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
           created_by: userId,
