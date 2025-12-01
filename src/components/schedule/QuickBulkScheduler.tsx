@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Sparkles, Loader2, Phone, Trash2 } from "lucide-react";
@@ -27,6 +29,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
   const { config, setConfig, validation, preview } = useBulkSchedulerState(userId);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [teamHasHotlineConfig, setTeamHasHotlineConfig] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Array<{ 
     user_id: string; 
     country_code?: string; 
@@ -34,6 +37,31 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
   }>>([]);
   const { toast } = useToast();
   const { generateHotlineSchedule, saveDrafts, generateAndSaveHotlineForTeam } = useHotlineScheduler();
+
+  // Check if selected team has hotline configuration
+  useEffect(() => {
+    const checkHotlineConfig = async () => {
+      if (!config.teamId) {
+        setTeamHasHotlineConfig(false);
+        return;
+      }
+      
+      const { data } = await supabase
+        .from('hotline_team_config')
+        .select('team_id')
+        .eq('team_id', config.teamId)
+        .single();
+      
+      setTeamHasHotlineConfig(!!data);
+      
+      // Reset includeHotline if team doesn't have config
+      if (!data && config.includeHotline) {
+        setConfig(prev => ({ ...prev, includeHotline: false }));
+      }
+    };
+    
+    checkHotlineConfig();
+  }, [config.teamId]);
 
   const handleApplyPreset = (presetConfig: any) => {
     setConfig(prev => ({
@@ -184,9 +212,9 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
 
           if (error) throw error;
 
-          // Auto-generate hotline if team has config
+          // Generate hotline if checkbox is checked
           let hotlineCount = 0;
-          if (config.teamId) {
+          if (config.includeHotline && config.teamId) {
             hotlineCount = await generateAndSaveHotlineForTeam(
               config.teamId,
               config.dateRange.start,
@@ -209,9 +237,9 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
 
           if (error) throw error;
 
-          // Auto-generate hotline if team has config
+          // Generate hotline if checkbox is checked
           let hotlineCount = 0;
-          if (config.teamId) {
+          if (config.includeHotline && config.teamId) {
             hotlineCount = await generateAndSaveHotlineForTeam(
               config.teamId,
               config.dateRange.start,
@@ -379,10 +407,29 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
               />
             </div>
           </div>
+
+          {teamHasHotlineConfig && (
+            <div className="flex items-center space-x-2 p-3 rounded-lg border bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
+              <Checkbox
+                id="include-hotline"
+                checked={config.includeHotline}
+                onCheckedChange={(checked) => 
+                  setConfig({ ...config, includeHotline: checked as boolean })
+                }
+              />
+              <Label 
+                htmlFor="include-hotline" 
+                className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+              >
+                <Phone className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                Also generate hotline assignments
+              </Label>
+            </div>
+          )}
         </>
       )}
 
-      {config.mode !== 'hotline' && (
+      {config.mode !== 'hotline' && config.mode !== 'delete' && (
         <>
           <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
             <CollapsibleTrigger asChild>

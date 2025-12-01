@@ -21,6 +21,7 @@ export interface BulkSchedulerConfig {
   autoDetectHolidays: boolean;
   skipUsersWithHolidays: boolean;
   weekendShiftOverride: string | null;
+  includeHotline: boolean;
   advanced: {
     fairnessEnabled: boolean;
     fairnessWeight: number;
@@ -53,6 +54,7 @@ export const useBulkSchedulerState = (userId: string | undefined) => {
     autoDetectHolidays: true,
     skipUsersWithHolidays: true,
     weekendShiftOverride: null,
+    includeHotline: false,
     advanced: {
       fairnessEnabled: false,
       fairnessWeight: 50,
