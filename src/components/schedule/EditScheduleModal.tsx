@@ -14,6 +14,8 @@ import { TimeSelect } from "@/components/ui/time-select";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { formatUserName } from "@/lib/utils";
 import { useShiftTypes } from "@/hooks/useShiftTypes";
+import { useHotlineScheduler } from "@/hooks/useHotlineScheduler";
+import { HotlineReassignmentDialog } from "@/components/schedule/hotline/HotlineReassignmentDialog";
 
 interface ScheduleEntry {
   id: string;
@@ -79,9 +81,13 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const { showScheduleChangeNotification } = useDesktopNotifications();
   const teamIds = entry?.team_id ? [entry.team_id] : [];
   const { shiftTypes, loading: loadingShiftTypes } = useShiftTypes(teamIds);
+  const { detectHotlineInEntry, formatTimeWithoutSeconds } = useHotlineScheduler();
   const [loading, setLoading] = useState(false);
   const [useHourSplit, setUseHourSplit] = useState(false);
   const [sendNotification, setSendNotification] = useState(false);
+  const [showHotlineReassignment, setShowHotlineReassignment] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'delete' | 'vacation' | null>(null);
+  const [hotlineDetails, setHotlineDetails] = useState<{ start_time: string; end_time: string } | null>(null);
   const [workBlocks, setWorkBlocks] = useState<WorkBlock[]>([
     { activity_type: "work", start_time: "09:00", end_time: "17:00" }
   ]);
@@ -164,6 +170,28 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (!entry) return;
+
+    // Check if changing to vacation from non-vacation AND entry has hotline
+    const originalWasNotVacation = entry?.activity_type !== 'vacation';
+    const changingToVacation = formData.activity_type === 'vacation';
+    
+    if (originalWasNotVacation && changingToVacation && !entry.id.startsWith('temp-')) {
+      const { hasHotline, hotlineBlock } = detectHotlineInEntry(entry.notes || null);
+      
+      if (hasHotline && hotlineBlock) {
+        // Show hotline reassignment dialog
+        setHotlineDetails(hotlineBlock);
+        setPendingAction('vacation');
+        setShowHotlineReassignment(true);
+        return;
+      }
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     if (!entry) return;
 
     try {
@@ -301,6 +329,23 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const handleDelete = async () => {
     if (!entry || entry.id.startsWith('temp-')) return;
 
+    // Check if entry has hotline duty
+    const { hasHotline, hotlineBlock } = detectHotlineInEntry(entry.notes || null);
+    
+    if (hasHotline && hotlineBlock) {
+      // Show hotline reassignment dialog instead of deleting immediately
+      setHotlineDetails(hotlineBlock);
+      setPendingAction('delete');
+      setShowHotlineReassignment(true);
+      return;
+    }
+
+    await performDelete();
+  };
+
+  const performDelete = async () => {
+    if (!entry || entry.id.startsWith('temp-')) return;
+
     try {
       setLoading(true);
 
@@ -324,10 +369,134 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     }
   };
 
+  const handleHotlineReassignment = async (newUserId: string | null) => {
+    if (!entry || !hotlineDetails) return;
+
+    try {
+      setLoading(true);
+
+      // If a new user was selected, reassign hotline to them
+      if (newUserId) {
+        const { data: authData } = await supabase.auth.getUser();
+        
+        // Check if the new user already has a schedule entry for this date
+        const { data: existingEntry } = await supabase
+          .from('schedule_entries')
+          .select('id, notes, shift_type, activity_type')
+          .eq('user_id', newUserId)
+          .eq('team_id', entry.team_id)
+          .eq('date', entry.date)
+          .maybeSingle();
+
+        if (existingEntry) {
+          // Add hotline block to existing entry
+          let timeBlocks: any[] = [];
+          const timeSplitPattern = /Times:\s*(\[.*?\])/;
+          const match = existingEntry.notes?.match(timeSplitPattern);
+          
+          if (match) {
+            try {
+              timeBlocks = JSON.parse(match[1]);
+            } catch (e) {
+              console.error('Failed to parse existing time blocks');
+            }
+          } else {
+            // Create default time block based on shift type
+            const shiftStart = existingEntry.shift_type === 'early' ? '06:00' : 
+                              existingEntry.shift_type === 'late' ? '14:00' : '08:00';
+            const shiftEnd = existingEntry.shift_type === 'early' ? '14:00' : 
+                            existingEntry.shift_type === 'late' ? '22:00' : '16:00';
+            timeBlocks = [{
+              activity_type: existingEntry.activity_type,
+              start_time: shiftStart,
+              end_time: shiftEnd
+            }];
+          }
+
+          // Add hotline time block
+          timeBlocks.push({
+            activity_type: "hotline_support",
+            start_time: formatTimeWithoutSeconds(hotlineDetails.start_time),
+            end_time: formatTimeWithoutSeconds(hotlineDetails.end_time)
+          });
+
+          const newNotes = `Times: ${JSON.stringify(timeBlocks)}`;
+
+          await supabase
+            .from('schedule_entries')
+            .update({ notes: newNotes })
+            .eq('id', existingEntry.id);
+        } else {
+          // Create new entry with just hotline
+          const timeBlocks = [{
+            activity_type: "hotline_support",
+            start_time: formatTimeWithoutSeconds(hotlineDetails.start_time),
+            end_time: formatTimeWithoutSeconds(hotlineDetails.end_time)
+          }];
+
+          await supabase.from('schedule_entries').insert({
+            user_id: newUserId,
+            team_id: entry.team_id,
+            date: entry.date,
+            shift_type: 'normal',
+            activity_type: 'hotline_support',
+            availability_status: 'available',
+            notes: `Times: ${JSON.stringify(timeBlocks)}`,
+            created_by: authData.user?.id
+          });
+        }
+
+        toast({
+          title: 'Hotline Reassigned',
+          description: 'Hotline duty has been reassigned successfully'
+        });
+      }
+
+      // Proceed with the original action (delete or vacation)
+      if (pendingAction === 'delete') {
+        await performDelete();
+      } else if (pendingAction === 'vacation') {
+        await performSave();
+      }
+
+      // Reset state
+      setShowHotlineReassignment(false);
+      setPendingAction(null);
+      setHotlineDetails(null);
+    } catch (error) {
+      console.error('Error reassigning hotline:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reassign hotline duty',
+        variant: 'destructive'
+      });
+      setLoading(false);
+    }
+  };
+
+  const handleCancelReassignment = () => {
+    setShowHotlineReassignment(false);
+    setPendingAction(null);
+    setHotlineDetails(null);
+  };
+
   if (!entry) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <>
+      <HotlineReassignmentDialog
+        open={showHotlineReassignment}
+        onOpenChange={setShowHotlineReassignment}
+        teamId={entry.team_id}
+        date={entry.date}
+        originalUserId={entry.user_id}
+        originalUserName={entry.profiles ? formatUserName(entry.profiles.first_name, entry.profiles.last_name, entry.profiles.initials) : 'User'}
+        hotlineTimeBlock={hotlineDetails || { start_time: '08:00', end_time: '15:00' }}
+        onReassigned={handleHotlineReassignment}
+        onCancel={handleCancelReassignment}
+      />
+
+      <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Schedule Entry</DialogTitle>
@@ -550,5 +719,6 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 };

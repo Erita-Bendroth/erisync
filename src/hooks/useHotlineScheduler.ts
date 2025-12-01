@@ -362,6 +362,39 @@ export const useHotlineScheduler = () => {
     return time;
   };
 
+  // Helper: Detect if a schedule entry has hotline duty
+  const detectHotlineInEntry = (notes: string | null): { 
+    hasHotline: boolean; 
+    hotlineBlock?: { start_time: string; end_time: string } 
+  } => {
+    if (!notes) return { hasHotline: false };
+    
+    const timeSplitPattern = /Times:\s*(\[.*?\])/;
+    const match = notes.match(timeSplitPattern);
+    
+    if (match) {
+      try {
+        const timeBlocks = JSON.parse(match[1]);
+        const hotlineBlock = timeBlocks.find(
+          (block: any) => block.activity_type === "hotline_support"
+        );
+        if (hotlineBlock) {
+          return { 
+            hasHotline: true, 
+            hotlineBlock: { 
+              start_time: hotlineBlock.start_time, 
+              end_time: hotlineBlock.end_time 
+            } 
+          };
+        }
+      } catch (e) {
+        console.error('Failed to parse time blocks for hotline detection:', e);
+      }
+    }
+    
+    return { hasHotline: false };
+  };
+
   // Helper: Parse time blocks from notes
   const parseTimeBlocksFromNotes = (notes: string | null): Array<{ activity_type: string; start_time: string; end_time: string }> | null => {
     if (!notes) return null;
@@ -565,5 +598,7 @@ export const useHotlineScheduler = () => {
     saveDrafts,
     finalizeDrafts,
     generateAndSaveHotlineForTeam,
+    detectHotlineInEntry,
+    formatTimeWithoutSeconds,
   };
 };
