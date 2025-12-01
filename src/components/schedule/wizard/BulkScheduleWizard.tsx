@@ -257,6 +257,7 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
       <Card>
         <CardContent className="p-6">
           {(() => {
+            // Hotline mode - Team selection step
             if (wizardData.mode === "hotline" && currentStep === 1) {
               return (
                 <HotlineGenerationStep
@@ -265,6 +266,8 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
                 />
               );
             }
+            
+            // Hotline mode - Draft preview step
             if (wizardData.mode === "hotline" && currentStep === 3) {
               return (
                 <HotlineDraftPreview
@@ -273,6 +276,8 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
                 />
               );
             }
+            
+            // Regular modes - Final review step
             if (currentStep === steps.length - 1 && wizardData.mode !== "hotline") {
               return (
                 <ReviewStep
@@ -281,8 +286,15 @@ export const BulkScheduleWizard = ({ onScheduleGenerated, onCancel }: BulkSchedu
                 />
               );
             }
+            
+            // All other steps use standard wizard props
+            const StepComponent = CurrentStepComponent as React.ComponentType<{
+              wizardData: WizardData;
+              updateWizardData: (updates: Partial<WizardData>) => void;
+            }>;
+            
             return (
-              <CurrentStepComponent
+              <StepComponent
                 wizardData={wizardData}
                 updateWizardData={updateWizardData}
               />
