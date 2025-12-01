@@ -37,6 +37,7 @@ interface BulkGenerationPreviewProps {
   weekendShiftOverride?: string | null;
   selectedUserIds?: string[];
   mode?: 'users' | 'team' | 'rotation';
+  excludedDays?: number[];
 }
 
 export const BulkGenerationPreview = ({
@@ -52,6 +53,7 @@ export const BulkGenerationPreview = ({
   weekendShiftOverride,
   selectedUserIds = [],
   mode = 'users',
+  excludedDays = [],
 }: BulkGenerationPreviewProps) => {
   const { shiftTypes } = useShiftTypes(teamId ? [teamId] : []);
   const selectedShift = shiftTypes.find(s => s.type === shiftType);
@@ -104,6 +106,10 @@ export const BulkGenerationPreview = ({
         for (const day of days) {
           const isWeekendDay = isWeekend(day);
           const dayOfWeek = day.getDay();
+          
+          // Skip excluded days
+          if (excludedDays && excludedDays.includes(dayOfWeek)) continue;
+          
           const shouldUseWeekend = autoDetectWeekends && isWeekendDay;
 
           // Find applicable shift
@@ -190,7 +196,7 @@ export const BulkGenerationPreview = ({
     };
 
     generateUserBreakdown();
-  }, [selectedUserIds, startDate, endDate, allShifts, shiftType, autoDetectWeekends, weekendShiftOverride, teamId]);
+  }, [selectedUserIds, startDate, endDate, allShifts, shiftType, autoDetectWeekends, weekendShiftOverride, teamId, excludedDays]);
 
   // Generate day previews when configuration changes
   useEffect(() => {
@@ -415,7 +421,7 @@ export const BulkGenerationPreview = ({
           <p className="text-xs font-medium mb-2 text-muted-foreground">Date Range Preview:</p>
           <TooltipProvider>
             <div className="grid grid-cols-7 gap-2">
-              {previewDays.map((preview) => {
+              {previewDays.filter(preview => !excludedDays.includes(preview.date.getDay())).map((preview) => {
                 const dayLabel = format(preview.date, 'EEE');
                 
                 return (
