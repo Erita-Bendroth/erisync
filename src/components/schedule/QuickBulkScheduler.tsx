@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Sparkles, Loader2, Phone } from "lucide-react";
+import { ChevronDown, Sparkles, Loader2, Phone, Trash2 } from "lucide-react";
 import { useBulkSchedulerState } from "@/hooks/useBulkSchedulerState";
 import { QuickPresetButtons } from "./bulk-scheduler/QuickPresetButtons";
 import { TeamPeopleSelector } from "./bulk-scheduler/TeamPeopleSelector";
@@ -12,6 +12,7 @@ import { ShiftTypeSelector } from "./bulk-scheduler/ShiftTypeSelector";
 import { AdvancedOptionsPanel } from "./bulk-scheduler/AdvancedOptionsPanel";
 import { BulkGenerationPreview } from "./bulk-scheduler/BulkGenerationPreview";
 import { HotlineQuickPanel } from "./bulk-scheduler/HotlineQuickPanel";
+import { BulkDeleteScheduler } from "./BulkDeleteScheduler";
 import { calculateBulkEntries } from "@/lib/bulkSchedulerUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -293,7 +294,7 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
           value={config.mode}
           onValueChange={(value: any) => setConfig(prev => ({ ...prev, mode: value }))}
         >
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="users">Selected People</TabsTrigger>
             <TabsTrigger value="team">Entire Team</TabsTrigger>
             <TabsTrigger value="rotation">Rotation</TabsTrigger>
@@ -301,11 +302,20 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
               <Phone className="h-4 w-4" />
               Hotline
             </TabsTrigger>
+            <TabsTrigger value="delete" className="gap-2 text-destructive">
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {config.mode === 'hotline' ? (
+      {config.mode === 'delete' ? (
+        <BulkDeleteScheduler 
+          userId={userId} 
+          onDeleted={onScheduleGenerated}
+        />
+      ) : config.mode === 'hotline' ? (
         <HotlineQuickPanel
           onGenerate={handleHotlineGenerate}
           loading={loading}
