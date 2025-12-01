@@ -400,10 +400,10 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
         // Fallback to defaults if no definitions found
         console.log('Using fallback templates - no definitions found');
         setShiftTemplates([
-          { id: 'normal', name: 'Normal Shift (08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
-          { id: 'early', name: 'Early Shift (06:00-14:30)', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-          { id: 'late', name: 'Late Shift (13:00-21:30)', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
-          { id: 'weekend', name: 'Weekend / National Holiday (08:00-16:00)', startTime: '08:00', endTime: '16:00', days: [0, 6] },
+        { id: 'normal', name: 'Normal Shift (08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
+        { id: 'early', name: 'Early Shift (06:00-14:30)', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
+        { id: 'late', name: 'Late Shift (10:00-18:00)', startTime: '10:00', endTime: '18:00', days: [1, 2, 3, 4, 5] },
+        { id: 'weekend', name: 'Weekend / National Holiday (08:00-16:00)', startTime: '08:00', endTime: '16:00', days: [0, 6] },
           { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
         ]);
       }
@@ -413,7 +413,7 @@ const BulkScheduleGenerator = ({ onScheduleGenerated }: BulkScheduleGeneratorPro
       setShiftTemplates([
         { id: 'normal', name: 'Normal Shift (08:00-16:30)', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
         { id: 'early', name: 'Early Shift (06:00-14:30)', startTime: '06:00', endTime: '14:30', days: [1, 2, 3, 4, 5] },
-        { id: 'late', name: 'Late Shift (13:00-21:30)', startTime: '13:00', endTime: '21:30', days: [1, 2, 3, 4, 5] },
+        { id: 'late', name: 'Late Shift (10:00-18:00)', startTime: '10:00', endTime: '18:00', days: [1, 2, 3, 4, 5] },
         { id: 'weekend', name: 'Weekend / National Holiday (08:00-16:00)', startTime: '08:00', endTime: '16:00', days: [0, 6] },
         { id: 'custom', name: 'Custom Shift', startTime: '08:00', endTime: '16:30', days: [1, 2, 3, 4, 5] },
       ]);

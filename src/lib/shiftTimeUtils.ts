@@ -275,7 +275,7 @@ function getDefaultShiftTime(
   const defaults = {
     normal: { id: "default-normal", startTime: "08:00", endTime: "16:30", description: "Normal shift" },
     early: { id: "default-early", startTime: "06:00", endTime: "14:00", description: "Early shift" },
-    late: { id: "default-late", startTime: "14:00", endTime: "22:00", description: "Late shift" },
+    late: { id: "default-late", startTime: "10:00", endTime: "18:00", description: "Late shift" },
     weekend: { id: "default-weekend", startTime: "08:00", endTime: "16:00", description: "Weekend / National Holiday shift" },
   };
   return defaults[shiftType];
