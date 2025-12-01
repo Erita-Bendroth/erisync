@@ -353,6 +353,50 @@ export const useHotlineScheduler = () => {
     }
   };
 
+  // Helper: Parse time blocks from notes
+  const parseTimeBlocksFromNotes = (notes: string | null): Array<{ activity_type: string; start_time: string; end_time: string }> | null => {
+    if (!notes) return null;
+    
+    const timeSplitPattern = /Times:\s*(.+)/;
+    const match = notes.match(timeSplitPattern);
+    
+    if (match) {
+      try {
+        const timesData = JSON.parse(match[1]);
+        if (Array.isArray(timesData)) {
+          return timesData;
+        }
+      } catch (e) {
+        console.error("Failed to parse time blocks from notes");
+      }
+    }
+    
+    return null;
+  };
+
+  // Helper: Create default time block from shift type
+  const getDefaultTimeBlock = (shiftType: string | null): { activity_type: string; start_time: string; end_time: string } => {
+    let start = '08:00';
+    let end = '16:30';
+    
+    switch (shiftType) {
+      case 'early':
+        start = '06:00';
+        end = '14:30';
+        break;
+      case 'late':
+        start = '13:00';
+        end = '21:30';
+        break;
+    }
+    
+    return {
+      activity_type: 'work',
+      start_time: start,
+      end_time: end
+    };
+  };
+
   const generateAndSaveHotlineForTeam = async (
     teamId: string,
     startDate: Date,
@@ -387,19 +431,9 @@ export const useHotlineScheduler = () => {
 
       // Generate date strings for the range
       const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
-      const dateStrings = dateRange.map(d => format(d, "yyyy-MM-dd"));
-
-      // Delete existing hotline entries for this team and date range
-      await supabase
-        .from("schedule_entries")
-        .delete()
-        .eq("team_id", teamId)
-        .eq("activity_type", "hotline_support")
-        .in("date", dateStrings);
-
+      
       let memberIndex = 0;
-      const scheduleEntries: any[] = [];
-      const assignedDates = new Map<string, number>(); // Track assignments per date
+      let updatedCount = 0;
 
       for (const date of dateRange) {
         const dayOfWeek = getDay(date);
@@ -416,9 +450,8 @@ export const useHotlineScheduler = () => {
           : config.weekday_end_time;
 
         const dateStr = format(date, "yyyy-MM-dd");
-        assignedDates.set(dateStr, 0);
 
-        // Assign exactly min_staff_required per day (no more, no less)
+        // Assign exactly min_staff_required per day
         for (let i = 0; i < config.min_staff_required; i++) {
           let assigned = false;
           let attempts = 0;
@@ -430,20 +463,74 @@ export const useHotlineScheduler = () => {
             const isAvailable = await checkAvailability(member.user_id, date, teamId);
 
             if (isAvailable) {
-              scheduleEntries.push({
-                team_id: teamId,
-                user_id: member.user_id,
-                date: dateStr,
-                activity_type: "hotline_support" as const,
-                availability_status: "available" as const,
-                shift_type: null,
-                notes: `${startTime}-${endTime}`,
-                created_by: userId,
-              });
+              // Fetch existing schedule entry for this user/date/team
+              const { data: existingEntry } = await supabase
+                .from("schedule_entries")
+                .select("id, notes, activity_type, shift_type")
+                .eq("user_id", member.user_id)
+                .eq("date", dateStr)
+                .eq("team_id", teamId)
+                .single();
+
+              if (existingEntry) {
+                // Parse existing time blocks or create default
+                let timeBlocks = parseTimeBlocksFromNotes(existingEntry.notes);
+                
+                if (!timeBlocks) {
+                  // No existing time blocks, create from shift_type
+                  timeBlocks = [getDefaultTimeBlock(existingEntry.shift_type)];
+                }
+
+                // Add hotline time block
+                timeBlocks.push({
+                  activity_type: "hotline_support",
+                  start_time: startTime,
+                  end_time: endTime
+                });
+
+                // Update entry with new notes containing all time blocks
+                const { error: updateError } = await supabase
+                  .from("schedule_entries")
+                  .update({ 
+                    notes: `Times: ${JSON.stringify(timeBlocks)}`,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq("id", existingEntry.id);
+
+                if (updateError) {
+                  console.error("Error updating entry with hotline:", updateError);
+                } else {
+                  updatedCount++;
+                }
+              } else {
+                // No existing entry - create hotline-only entry (shouldn't happen in bulk scheduling)
+                const { error: insertError } = await supabase
+                  .from("schedule_entries")
+                  .insert({
+                    team_id: teamId,
+                    user_id: member.user_id,
+                    date: dateStr,
+                    activity_type: "hotline_support",
+                    availability_status: "available",
+                    shift_type: null,
+                    notes: `Times: ${JSON.stringify([{
+                      activity_type: "hotline_support",
+                      start_time: startTime,
+                      end_time: endTime
+                    }])}`,
+                    created_by: userId,
+                  });
+
+                if (insertError) {
+                  console.error("Error creating hotline entry:", insertError);
+                } else {
+                  updatedCount++;
+                }
+              }
+
               assigned = true;
-              assignedDates.set(dateStr, (assignedDates.get(dateStr) || 0) + 1);
               memberIndex++;
-              break; // Stop after successful assignment
+              break;
             } else {
               attempts++;
               memberIndex++;
@@ -451,22 +538,12 @@ export const useHotlineScheduler = () => {
           }
 
           if (!assigned) {
-            // Could not find available person for this slot
             console.warn(`Could not assign hotline for ${dateStr}, slot ${i + 1}`);
           }
         }
       }
 
-      // Insert into schedule_entries
-      if (scheduleEntries.length > 0) {
-        const { error: insertError } = await supabase
-          .from("schedule_entries")
-          .insert(scheduleEntries);
-
-        if (insertError) throw insertError;
-      }
-
-      return scheduleEntries.length;
+      return updatedCount;
     } catch (error: any) {
       console.error("Error auto-generating hotline:", error);
       return 0;
