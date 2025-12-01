@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { TimeSelect } from "@/components/ui/time-select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -234,32 +235,28 @@ export const HotlineTeamConfig = ({ open, onOpenChange, teamId, teamName }: Hotl
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Monday-Thursday</Label>
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="time"
+                  <TimeSelect
                     value={weekdayStart}
-                    onChange={(e) => setWeekdayStart(e.target.value)}
+                    onValueChange={setWeekdayStart}
                   />
                   <span>-</span>
-                  <Input
-                    type="time"
+                  <TimeSelect
                     value={weekdayEnd}
-                    onChange={(e) => setWeekdayEnd(e.target.value)}
+                    onValueChange={setWeekdayEnd}
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Friday</Label>
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="time"
+                  <TimeSelect
                     value={fridayStart}
-                    onChange={(e) => setFridayStart(e.target.value)}
+                    onValueChange={setFridayStart}
                   />
                   <span>-</span>
-                  <Input
-                    type="time"
+                  <TimeSelect
                     value={fridayEnd}
-                    onChange={(e) => setFridayEnd(e.target.value)}
+                    onValueChange={setFridayEnd}
                   />
                 </div>
               </div>
