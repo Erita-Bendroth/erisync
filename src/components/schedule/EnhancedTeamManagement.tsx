@@ -45,6 +45,7 @@ interface TeamMember {
     email: string;
     initials?: string;
     user_id: string;
+    country_code?: string;
   };
   user_roles: Array<{
     role: string;
@@ -198,7 +199,7 @@ const EnhancedTeamManagement = () => {
             .in('user_id', userIds),
           supabase
             .from('profiles')
-            .select('user_id, first_name, last_name, email, initials')
+            .select('user_id, first_name, last_name, email, initials, country_code')
             .in('user_id', userIds) as any
         ]);
 
@@ -211,7 +212,7 @@ const EnhancedTeamManagement = () => {
         const profilesMap = (profilesResponse.data || []).reduce((acc, profile) => {
           acc[profile.user_id] = profile;
           return acc;
-        }, {} as { [key: string]: { first_name: string; last_name: string; email: string; user_id: string; initials?: string } });
+        }, {} as { [key: string]: { first_name: string; last_name: string; email: string; user_id: string; initials?: string; country_code?: string } });
 
         // Filter out members with incomplete profile data and map them properly
         const membersWithRoles = (members || [])
@@ -354,7 +355,7 @@ const EnhancedTeamManagement = () => {
             .in('user_id', userIds),
           supabase
             .from('profiles')
-            .select('user_id, first_name, last_name, email, initials')
+            .select('user_id, first_name, last_name, email, initials, country_code')
             .in('user_id', userIds) as any
         ]);
 
@@ -367,7 +368,7 @@ const EnhancedTeamManagement = () => {
         const profilesMap = (profilesResponse.data || []).reduce((acc, profile) => {
           acc[profile.user_id] = profile;
           return acc;
-        }, {} as { [key: string]: { first_name: string; last_name: string; email: string; user_id: string; initials?: string } });
+        }, {} as { [key: string]: { first_name: string; last_name: string; email: string; user_id: string; initials?: string; country_code?: string } });
 
         // Filter out members with incomplete profile data and map them properly
         const membersWithRoles = (members || [])
@@ -481,7 +482,7 @@ const EnhancedTeamManagement = () => {
       first_name: member.profiles.first_name,
       last_name: member.profiles.last_name,
       initials: member.profiles.initials || '',
-      country_code: 'US', // Will be fetched in modal
+      country_code: member.profiles.country_code || 'US',
       requires_password_change: false,
       roles: member.user_roles.map(r => ({ id: '', role: r.role })),
       teams: [{ id: member.team_id, name: '' }]
