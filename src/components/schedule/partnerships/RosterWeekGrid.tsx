@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +89,7 @@ export function RosterWeekGrid({
     }
   };
 
-  const handleAssignmentChange = async (
+  const handleAssignmentChange = useCallback(async (
     weekNumber: number,
     userId: string,
     teamId: string,
@@ -153,7 +153,14 @@ export function RosterWeekGrid({
             .select()
             .single();
 
-          if (error) throw error;
+          if (error) {
+            // Handle duplicate key constraint violation
+            if (error.code === '23505') {
+              toast.error("Assignment already exists for this day/week");
+              return;
+            }
+            throw error;
+          }
 
           if (data) {
             setAssignments((prev) => [...prev, data]);
@@ -162,23 +169,29 @@ export function RosterWeekGrid({
       }
 
       toast.success("Assignment updated");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating assignment:", error);
-      toast.error("Failed to update assignment");
+      const errorMessage = error.message || "Failed to update assignment";
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
-  };
+  }, [assignments, rosterId, isReadOnly]);
 
-  const getAssignment = (userId: string, teamId: string, weekNumber: number, dayOfWeek: number | null) => {
-    return assignments.find(
-      (a) =>
-        a.user_id === userId &&
-        a.team_id === teamId &&
-        a.week_number === weekNumber &&
-        a.day_of_week === dayOfWeek
-    );
-  };
+  // Memoized assignment lookup map for better performance
+  const assignmentMap = useMemo(() => {
+    const map = new Map<string, Assignment>();
+    assignments.forEach((assignment) => {
+      const key = `${assignment.user_id}_${assignment.team_id}_${assignment.week_number}_${assignment.day_of_week ?? 'null'}`;
+      map.set(key, assignment);
+    });
+    return map;
+  }, [assignments]);
+
+  const getAssignment = useCallback((userId: string, teamId: string, weekNumber: number, dayOfWeek: number | null) => {
+    const key = `${userId}_${teamId}_${weekNumber}_${dayOfWeek ?? 'null'}`;
+    return assignmentMap.get(key);
+  }, [assignmentMap]);
 
   const getShiftTypeLabel = (shiftType: string | null) => {
     if (!shiftType) return "Not assigned";
