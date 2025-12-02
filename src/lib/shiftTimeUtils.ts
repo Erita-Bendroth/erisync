@@ -49,20 +49,27 @@ export async function getApplicableShiftTimes({
   date?: string;
   shiftTimeDefinitionId?: string;
 }): Promise<ApplicableShiftTime> {
-  // Priority 0: If specific shift definition ID provided, get its shift_type as base
-  // but still find best match for the specific day
-  let baseShiftType = shiftType;
+  // Priority 0: If specific shift definition ID provided, return it directly
   if (shiftTimeDefinitionId) {
     const { data: specificShift, error } = await supabase
       .from("shift_time_definitions")
-      .select("shift_type")
+      .select("id, start_time, end_time, description")
       .eq("id", shiftTimeDefinitionId)
       .single();
     
     if (specificShift && !error) {
-      baseShiftType = specificShift.shift_type;
+      // Return the exact stored definition - don't re-calculate!
+      return {
+        id: specificShift.id,
+        startTime: specificShift.start_time,
+        endTime: specificShift.end_time,
+        description: specificShift.description || "",
+      };
     }
   }
+
+  // No specific ID or failed to fetch - proceed with priority matching
+  const baseShiftType = shiftType;
 
   // For weekend shift type, check if date is a public holiday
   let isPublicHoliday = false;

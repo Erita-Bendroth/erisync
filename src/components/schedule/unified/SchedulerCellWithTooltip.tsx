@@ -14,6 +14,7 @@ interface SchedulerCellWithTooltipProps {
   date: string;
   teamId?: string;
   regionCode?: string;
+  countryCode?: string | null;
   shiftType: ShiftType | null;
   shiftTimeDefinitionId?: string | null;
   availabilityStatus: AvailabilityStatus;
@@ -39,7 +40,7 @@ interface SchedulerCellWithTooltipProps {
 }
 
 export const SchedulerCellWithTooltip: React.FC<SchedulerCellWithTooltipProps> = (props) => {
-  const { shiftType, shiftTimeDefinitionId, date, teamId, regionCode } = props;
+  const { shiftType, shiftTimeDefinitionId, date, teamId, regionCode, countryCode } = props;
   const [shiftTimes, setShiftTimes] = useState<{ startTime: string; endTime: string; description: string } | null>(null);
 
   useEffect(() => {
@@ -48,13 +49,14 @@ export const SchedulerCellWithTooltip: React.FC<SchedulerCellWithTooltipProps> =
       getApplicableShiftTimes({
         teamId,
         regionCode,
+        countryCode: countryCode || undefined,
         shiftType,
         dayOfWeek,
         date, // Pass date for holiday checking
         shiftTimeDefinitionId: shiftTimeDefinitionId || undefined,
       }).then(times => setShiftTimes(times));
     }
-  }, [shiftType, shiftTimeDefinitionId, date, teamId, regionCode]);
+  }, [shiftType, shiftTimeDefinitionId, date, teamId, regionCode, countryCode]);
 
   if (!shiftType || !shiftTimes) {
     return <SchedulerCell {...props} />;

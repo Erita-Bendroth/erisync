@@ -13,6 +13,7 @@ interface TeamMember {
   first_name: string;
   last_name: string;
   initials: string;
+  country_code?: string | null;
 }
 
 interface TeamSectionProps {
@@ -141,6 +142,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                       userId={member.user_id}
                       date={date}
                       teamId={teamId}
+                      countryCode={member.country_code}
                       shiftType={entry?.shift_type || null}
                       shiftTimeDefinitionId={entry?.shift_time_definition_id || null}
                       availabilityStatus={entry?.availability_status || 'available'}
