@@ -7,12 +7,14 @@ const corsHeaders = {
 };
 
 interface NotificationRequest {
-  type: 'request_created' | 'request_approved' | 'request_rejected';
+  type: 'request_created' | 'request_approved' | 'request_rejected' | 'manager_direct_swap';
   requesting_user_id: string;
   target_user_id: string;
   swap_date: string;
+  swap_date_b?: string;
   team_id: string;
   review_notes?: string;
+  manager_name?: string;
 }
 
 serve(async (req) => {
@@ -26,7 +28,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { type, requesting_user_id, target_user_id, swap_date, team_id, review_notes }: NotificationRequest = await req.json();
+    const { type, requesting_user_id, target_user_id, swap_date, swap_date_b, team_id, review_notes, manager_name }: NotificationRequest = await req.json();
 
     console.log('Sending swap notification:', { type, requesting_user_id, target_user_id, swap_date });
 
@@ -162,6 +164,40 @@ serve(async (req) => {
           link: `/schedule?tab=schedule&showRequests=true`,
           metadata: { swap_date }
         });
+        break;
+
+      case 'manager_direct_swap':
+        const dateAFormatted = new Date(swap_date).toLocaleDateString();
+        const dateBFormatted = swap_date_b ? new Date(swap_date_b).toLocaleDateString() : dateAFormatted;
+        const swapDescription = swap_date === swap_date_b || !swap_date_b
+          ? `on ${dateAFormatted}`
+          : `between ${dateAFormatted} and ${dateBFormatted}`;
+
+        // Create in-app notifications for both employees
+        await supabase.from('notifications').insert([
+          {
+            user_id: requesting_user_id,
+            type: 'schedule_change',
+            title: 'Schedule Update by Manager',
+            message: `${manager_name || 'Your manager'} has swapped your shift with ${targetUser?.first_name} ${targetUser?.last_name} ${swapDescription}${review_notes ? '. ' + review_notes : ''}`,
+            link: `/schedule?tab=schedule`,
+            metadata: { swap_date, swap_date_b }
+          },
+          {
+            user_id: target_user_id,
+            type: 'schedule_change',
+            title: 'Schedule Update by Manager',
+            message: `${manager_name || 'Your manager'} has swapped your shift with ${requestingUser?.first_name} ${requestingUser?.last_name} ${swapDescription}${review_notes ? '. ' + review_notes : ''}`,
+            link: `/schedule?tab=schedule`,
+            metadata: { swap_date, swap_date_b }
+          }
+        ]);
+
+        notificationMessage = `Manager initiated shift swap between ${requestingUser?.first_name} and ${targetUser?.first_name} ${swapDescription}`;
+        recipients = [
+          ...(requestingUser?.email ? [requestingUser.email] : []),
+          ...(targetUser?.email ? [targetUser.email] : [])
+        ];
         break;
     }
 

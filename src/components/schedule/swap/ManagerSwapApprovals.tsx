@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { BulkActionBar } from '@/components/shared/BulkActionBar';
+import { ManagerDirectSwapDialog } from './ManagerDirectSwapDialog';
 
 interface SwapRequest {
   id: string;
@@ -50,6 +51,7 @@ export function ManagerSwapApprovals() {
   const [bulkApproveDialogOpen, setBulkApproveDialogOpen] = useState(false);
   const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
   const [bulkNotes, setBulkNotes] = useState('');
+  const [directSwapDialogOpen, setDirectSwapDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -387,6 +389,14 @@ export function ManagerSwapApprovals() {
   return (
     <>
       <div className="space-y-4">
+        {/* Direct Swap Button */}
+        <div className="flex justify-end">
+          <Button onClick={() => setDirectSwapDialogOpen(true)}>
+            <ArrowLeftRight className="mr-2 h-4 w-4" />
+            Direct Swap (Manager)
+          </Button>
+        </div>
+
         {swapRequests.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-8 text-center">
@@ -633,6 +643,13 @@ export function ManagerSwapApprovals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Manager Direct Swap Dialog */}
+      <ManagerDirectSwapDialog
+        open={directSwapDialogOpen}
+        onOpenChange={setDirectSwapDialogOpen}
+        onSuccess={fetchPendingSwaps}
+      />
     </>
   );
 }
