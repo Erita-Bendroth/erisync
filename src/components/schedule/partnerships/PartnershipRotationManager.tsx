@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Users, AlertCircle } from "lucide-react";
+import { Plus, Calendar, Users, AlertCircle, Copy } from "lucide-react";
 import { RosterBuilderDialog } from "./RosterBuilderDialog";
+import { CloneRosterDialog } from "./CloneRosterDialog";
 import { toast } from "sonner";
 
 interface Roster {
@@ -32,6 +33,8 @@ export function PartnershipRotationManager({
   const [loading, setLoading] = useState(true);
   const [selectedRoster, setSelectedRoster] = useState<Roster | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showCloneDialog, setShowCloneDialog] = useState(false);
+  const [rosterToClone, setRosterToClone] = useState<Roster | null>(null);
 
   useEffect(() => {
     fetchRosters();
@@ -63,6 +66,85 @@ export function PartnershipRotationManager({
   const handleEditRoster = (roster: Roster) => {
     setSelectedRoster(roster);
     setShowBuilder(true);
+  };
+
+  const handleCloneRoster = (roster: Roster) => {
+    setRosterToClone(roster);
+    setShowCloneDialog(true);
+  };
+
+  const handleConfirmClone = async (newName: string, newStartDate: string) => {
+    if (!rosterToClone) return;
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("You must be logged in to clone a roster");
+        return;
+      }
+
+      // Create new roster record
+      const { data: newRoster, error: rosterError } = await supabase
+        .from("partnership_rotation_rosters")
+        .insert({
+          partnership_id: partnershipId,
+          roster_name: newName,
+          shift_type: rosterToClone.shift_type,
+          cycle_length_weeks: rosterToClone.cycle_length_weeks,
+          start_date: newStartDate,
+          default_shift_for_non_duty: rosterToClone.default_shift_for_non_duty,
+          status: "draft",
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (rosterError) throw rosterError;
+
+      // Fetch all assignments from source roster
+      const { data: sourceAssignments, error: assignmentsError } = await supabase
+        .from("roster_week_assignments")
+        .select("*")
+        .eq("roster_id", rosterToClone.id);
+
+      if (assignmentsError) throw assignmentsError;
+
+      // Clone all assignments to new roster
+      if (sourceAssignments && sourceAssignments.length > 0) {
+        const clonedAssignments = sourceAssignments.map((assignment) => ({
+          roster_id: newRoster.id,
+          week_number: assignment.week_number,
+          team_id: assignment.team_id,
+          user_id: assignment.user_id,
+          shift_type: assignment.shift_type,
+          day_of_week: assignment.day_of_week,
+          notes: assignment.notes,
+          assigned_by: user.id,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("roster_week_assignments")
+          .insert(clonedAssignments);
+
+        if (insertError) throw insertError;
+      }
+
+      toast.success(
+        `Roster cloned successfully with ${sourceAssignments?.length || 0} assignments`
+      );
+      
+      fetchRosters();
+      
+      // Open the cloned roster in edit mode
+      setSelectedRoster(newRoster as Roster);
+      setShowBuilder(true);
+    } catch (error) {
+      console.error("Error cloning roster:", error);
+      toast.error("Failed to clone roster");
+    }
   };
 
   const handleDeleteRoster = async (roster: Roster) => {
@@ -174,6 +256,14 @@ export function PartnershipRotationManager({
                     {roster.status === "draft" ? "Edit" : "View"}
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCloneRoster(roster)}
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Clone
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteRoster(roster)}
@@ -198,6 +288,16 @@ export function PartnershipRotationManager({
             fetchRosters();
             setShowBuilder(false);
           }}
+        />
+      )}
+
+      {showCloneDialog && rosterToClone && (
+        <CloneRosterDialog
+          open={showCloneDialog}
+          onOpenChange={setShowCloneDialog}
+          sourceRosterName={rosterToClone.roster_name}
+          sourceStartDate={rosterToClone.start_date}
+          onConfirm={handleConfirmClone}
         />
       )}
     </div>
