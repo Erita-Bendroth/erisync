@@ -50,7 +50,6 @@ export function RosterWeekGrid({
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [dayByDayMode, setDayByDayMode] = useState(false);
 
   useEffect(() => {
@@ -98,9 +97,22 @@ export function RosterWeekGrid({
   ) => {
     if (isReadOnly) return;
 
-    setSaving(true);
-    try {
-      const existingAssignment = assignments.find(
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    
+    // OPTIMISTIC UPDATE - Update UI immediately
+    if (newShiftType === "none" || newShiftType === null) {
+      // Remove from state optimistically
+      setAssignments((prev) => 
+        prev.filter((a) => !(
+          a.week_number === weekNumber &&
+          a.user_id === userId &&
+          a.team_id === teamId &&
+          a.day_of_week === dayOfWeek
+        ))
+      );
+    } else {
+      // Add/update in state optimistically
+      const existing = assignments.find(
         (a) =>
           a.week_number === weekNumber &&
           a.user_id === userId &&
@@ -108,8 +120,44 @@ export function RosterWeekGrid({
           a.day_of_week === dayOfWeek
       );
 
+      if (existing) {
+        setAssignments((prev) =>
+          prev.map((a) => 
+            a.id === existing.id 
+              ? { ...a, shift_type: newShiftType }
+              : a
+          )
+        );
+      } else {
+        setAssignments((prev) => [
+          ...prev,
+          {
+            id: tempId,
+            roster_id: rosterId,
+            week_number: weekNumber,
+            user_id: userId,
+            team_id: teamId,
+            shift_type: newShiftType,
+            day_of_week: dayOfWeek,
+            assigned_by: null,
+            notes: null,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
+    }
+
+    // BACKGROUND SAVE - Don't block UI
+    try {
       if (newShiftType === "none" || newShiftType === null) {
-        // Delete assignment
+        const existingAssignment = assignments.find(
+          (a) =>
+            a.week_number === weekNumber &&
+            a.user_id === userId &&
+            a.team_id === teamId &&
+            a.day_of_week === dayOfWeek
+        );
+
         if (existingAssignment) {
           const { error } = await supabase
             .from("roster_week_assignments")
@@ -117,13 +165,16 @@ export function RosterWeekGrid({
             .eq("id", existingAssignment.id);
 
           if (error) throw error;
-
-          setAssignments((prev) =>
-            prev.filter((a) => a.id !== existingAssignment.id)
-          );
         }
       } else {
-        // Update or insert assignment
+        const existingAssignment = assignments.find(
+          (a) =>
+            a.week_number === weekNumber &&
+            a.user_id === userId &&
+            a.team_id === teamId &&
+            a.day_of_week === dayOfWeek
+        );
+
         if (existingAssignment) {
           const { error } = await supabase
             .from("roster_week_assignments")
@@ -131,14 +182,6 @@ export function RosterWeekGrid({
             .eq("id", existingAssignment.id);
 
           if (error) throw error;
-
-          setAssignments((prev) =>
-            prev.map((a) =>
-              a.id === existingAssignment.id
-                ? { ...a, shift_type: newShiftType }
-                : a
-            )
-          );
         } else {
           const { data, error } = await supabase
             .from("roster_week_assignments")
@@ -154,29 +197,29 @@ export function RosterWeekGrid({
             .single();
 
           if (error) {
-            // Handle duplicate key constraint violation
             if (error.code === '23505') {
               toast.error("Assignment already exists for this day/week");
+              fetchAssignments(); // Refetch to sync state
               return;
             }
             throw error;
           }
 
+          // Replace temp ID with real ID
           if (data) {
-            setAssignments((prev) => [...prev, data]);
+            setAssignments((prev) => 
+              prev.map((a) => a.id === tempId ? data : a)
+            );
           }
         }
       }
-
-      toast.success("Assignment updated");
     } catch (error: any) {
       console.error("Error updating assignment:", error);
-      const errorMessage = error.message || "Failed to update assignment";
-      toast.error(errorMessage);
-    } finally {
-      setSaving(false);
+      toast.error("Failed to save - reverting changes");
+      // Refetch to restore correct state on error
+      fetchAssignments();
     }
-  }, [assignments, rosterId, isReadOnly]);
+  }, [assignments, rosterId, isReadOnly, fetchAssignments]);
 
   // Memoized assignment lookup map for better performance
   const assignmentMap = useMemo(() => {
@@ -317,7 +360,7 @@ export function RosterWeekGrid({
                                 null
                               )
                             }
-                            disabled={isReadOnly || saving}
+                        disabled={isReadOnly}
                           >
                             <SelectTrigger className="w-full">
                               <SelectValue>
@@ -399,7 +442,7 @@ export function RosterWeekGrid({
                                       dayOfWeek
                                     )
                                   }
-                                  disabled={isReadOnly || saving}
+                                  disabled={isReadOnly}
                                 >
                                   <SelectTrigger className="w-full h-8 text-xs">
                                     <SelectValue />
