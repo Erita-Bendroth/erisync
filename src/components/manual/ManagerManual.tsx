@@ -167,6 +167,46 @@ export const ManagerManual = () => {
             horizontal scrolling to navigate through all dates.
           </AlertDescription>
         </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Bulk Deletion</h3>
+        
+        <p className="text-muted-foreground mb-4">
+          Bulk delete allows you to remove multiple schedule entries at once. Use carefully as 
+          deletion is permanent.
+        </p>
+
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Permanent Action</AlertTitle>
+          <AlertDescription>
+            Bulk deletion is permanent and cannot be undone. Always review the preview count 
+            carefully before confirming deletion.
+          </AlertDescription>
+        </Alert>
+
+        <h4 className="font-semibold mb-2">Accessing Bulk Delete</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Quick Bulk Scheduler</strong></li>
+          <li>Click the <strong>"Delete"</strong> tab (red indicator)</li>
+          <li>Use for clearing incorrectly generated schedules or resetting data</li>
+        </ol>
+
+        <h4 className="font-semibold mb-2 mt-4">Available Filters</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Date range:</strong> Select start and end dates</li>
+          <li><strong>Activity type:</strong> Filter by work, vacation, hotline, etc.</li>
+          <li><strong>Shift type:</strong> Filter by normal, early, late, weekend</li>
+          <li><strong>Days of week:</strong> Exclude specific days</li>
+          <li><strong>Hotline assignments:</strong> Option to also delete hotline duties</li>
+        </ul>
+
+        <h4 className="font-semibold mb-2 mt-4">Preview and Confirmation</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>System shows count of entries to be deleted</li>
+          <li>Review the breakdown carefully</li>
+          <li>Must confirm in dialog before permanent deletion</li>
+          <li>Deletion executes immediately after confirmation</li>
+        </ol>
       </section>
 
       <Separator />
@@ -202,6 +242,47 @@ export const ManagerManual = () => {
           <AlertDescription>
             Managers cannot create or delete teams. Contact your planner to create new teams 
             or modify team structure.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Hotline Management</h3>
+        
+        <p className="text-muted-foreground mb-4">
+          If your team is configured for hotline support, you can view and manage hotline assignments 
+          to ensure continuous coverage.
+        </p>
+
+        <h4 className="font-semibold mb-2">Viewing Hotline Assignments</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Hotline assignments appear in the schedule view with a phone icon</li>
+          <li>See who's on hotline duty for any day</li>
+          <li>View hotline hours for each assignment</li>
+        </ul>
+
+        <h4 className="font-semibold mb-2 mt-4">If You Have Configuration Permissions</h4>
+        <p className="mb-2">Managers with appropriate permissions can:</p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Configure eligible members for your team</li>
+          <li>Set hotline hours (weekday and Friday hours)</li>
+          <li>Generate hotline assignments for your team</li>
+        </ul>
+
+        <h4 className="font-semibold mb-2 mt-4">Hotline Reassignment</h4>
+        <p className="mb-4">
+          If you change a schedule entry for someone on hotline duty, the system will prompt you to:
+        </p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Select an alternative team member from the eligible list</li>
+          <li>Reassign the hotline duty to maintain coverage</li>
+          <li>The system ensures no gaps in hotline coverage</li>
+        </ol>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Continuous Coverage</AlertTitle>
+          <AlertDescription>
+            The hotline reassignment prompt ensures that hotline coverage is never accidentally 
+            dropped when making schedule changes. Always select an available replacement.
           </AlertDescription>
         </Alert>
       </section>
@@ -379,6 +460,72 @@ export const ManagerManual = () => {
           <AlertDescription>
             Partnerships help prevent situations where multiple teams have low coverage simultaneously, 
             ensuring business continuity across functional areas.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Partnership Rotation Rosters</h3>
+        
+        <p className="text-muted-foreground mb-4">
+          Partnership Rotation Rosters enable yearly duty rotation schedules managed collaboratively 
+          across partnership teams.
+        </p>
+
+        <h4 className="font-semibold mb-2">Understanding Rotation Rosters</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Planners create the roster structure</li>
+          <li>Managers from all partnership teams contribute and approve</li>
+          <li>Unified view of duty rotations across the year</li>
+          <li>Each person gets a complete weekly schedule pattern</li>
+        </ul>
+
+        <h4 className="font-semibold mb-2 mt-4">Editing Roster Assignments</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Planning Partnerships</strong> → Select Partnership</li>
+          <li>Click <strong>"Edit Roster"</strong> for the roster you want to modify</li>
+          <li>Choose assignment mode:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li><strong>Week-by-week:</strong> Assign one shift type per person per week</li>
+              <li><strong>Day-by-day:</strong> Toggle switch for granular daily assignments</li>
+            </ul>
+          </li>
+          <li>Make assignments for your team members</li>
+        </ol>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Day-by-Day Mode Tips</AlertTitle>
+          <AlertDescription>
+            Day-by-day mode is optimized for speed. Click a cell → select shift → instant update. 
+            Rapid-fire selections are supported. Changes save automatically in the background. 
+            All managers see the same view, so coordinate with your partner team managers.
+          </AlertDescription>
+        </Alert>
+
+        <h4 className="font-semibold mb-2 mt-4">Approving Rosters</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to the <strong>"Approvals"</strong> tab</li>
+          <li>Review all assignments across partnership teams</li>
+          <li>Verify your team members have correct assignments</li>
+          <li>Add optional comments explaining your approval decision</li>
+          <li>Click <strong>"Approve for [Your Team]"</strong></li>
+          <li>Once all managers approve, roster can be activated by planners</li>
+        </ol>
+
+        <h4 className="font-semibold mb-2 mt-4">Viewing the Preview</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Use the <strong>"Preview"</strong> tab to see actual schedule dates</li>
+          <li>Verify assignments are correct for your team members</li>
+          <li>Check that shift times match your team's locations</li>
+          <li>Review before approving to ensure accuracy</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Collaborative Editing</AlertTitle>
+          <AlertDescription>
+            All partnership team managers can view and edit roster assignments. Coordinate with 
+            your partner team managers to ensure complete coverage before approving. Use comments 
+            in the approval process to communicate any concerns.
           </AlertDescription>
         </Alert>
       </section>

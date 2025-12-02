@@ -179,6 +179,161 @@ export const PlannerManual = () => {
 
       <Separator />
 
+      <section id="partnership-rotation-rosters">
+        <h2 className="text-2xl font-bold mb-4">3.6 Partnership Rotation Rosters</h2>
+        
+        <p className="text-muted-foreground mb-4">
+          Partnership Rotation Rosters enable you to create unified yearly schedules for duty rotations 
+          across partnership teams. All partnership team managers collaborate on assignments, with a 
+          multi-manager approval workflow before activation.
+        </p>
+
+        <h3 className="text-xl font-semibold mb-3">What are Rotation Rosters?</h3>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Unified yearly schedule for duty rotations across partnership teams</li>
+          <li>Assign people to late shifts, early shifts, and weekend duty throughout the year</li>
+          <li>Collaborative editing where all partnership team managers contribute</li>
+          <li>Multi-manager approval workflow before activation</li>
+          <li>Location-aware: Uses correct shift times based on team member's country/region</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3">Creating a Rotation Roster</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Planning Partnerships</strong></li>
+          <li>Select a partnership from the list</li>
+          <li>Click <strong>"Create Rotation Roster"</strong></li>
+          <li>Configure roster settings:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li><strong>Roster Name:</strong> e.g., "2025 Duty Rotation"</li>
+              <li><strong>Cycle Length:</strong> Number of weeks in rotation pattern (e.g., 5 weeks)</li>
+              <li><strong>Start Date:</strong> When the rotation begins</li>
+              <li><strong>Shift Type:</strong> Choose the duty rotation type (late, early, or weekend)</li>
+            </ul>
+          </li>
+          <li>Click <strong>"Create Roster"</strong> to save as draft</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Assignment Modes</h3>
+        <p className="mb-4">Choose between two assignment modes based on your needs:</p>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Week-by-Week Mode (Default)</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Assign one shift type per person per week</li>
+            <li>Ideal for simple rotation patterns</li>
+            <li>Dropdown with full descriptions and emojis</li>
+            <li>Use for: "Person A does late shift every 3 weeks"</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h4 className="font-semibold mb-2">Day-by-Day Mode (Optimized for Performance)</h4>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Toggle <strong>"Day-by-day assignments"</strong> switch at the top</li>
+            <li>See Mon-Sun columns for each week</li>
+            <li>Quick dropdown for each day cell</li>
+            <li>Available shift types per day: Normal, Early, Late, Weekend, Off</li>
+            <li>Use for: "Person A does early Mon-Wed, late Thu-Fri"</li>
+          </ul>
+        </div>
+
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Day-by-Day Performance</AlertTitle>
+          <AlertDescription>
+            The day-by-day mode is optimized for rapid editing. Shift selections update instantly - 
+            changes are saved in the background without blocking your workflow. You can quickly click 
+            through multiple cells without delays.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Shift Types Reference</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse border border-border">
+            <thead>
+              <tr className="bg-muted">
+                <th className="border border-border p-2 text-left">Icon</th>
+                <th className="border border-border p-2 text-left">Shift Type</th>
+                <th className="border border-border p-2 text-left">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-border p-2">🌙</td>
+                <td className="border border-border p-2">Late Shift</td>
+                <td className="border border-border p-2">Late shift Monday-Friday</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">☀️</td>
+                <td className="border border-border p-2">Early Shift</td>
+                <td className="border border-border p-2">Early shift Monday-Friday</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">💼</td>
+                <td className="border border-border p-2">Normal Shift</td>
+                <td className="border border-border p-2">Normal shift Monday-Friday</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">📅</td>
+                <td className="border border-border p-2">Weekend Only</td>
+                <td className="border border-border p-2">Weekend duty only</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">📅+</td>
+                <td className="border border-border p-2">Weekend + Normal</td>
+                <td className="border border-border p-2">Weekend duty + normal weekdays</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">📅+</td>
+                <td className="border border-border p-2">Weekend + Early</td>
+                <td className="border border-border p-2">Weekend duty + early weekdays</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">📅+</td>
+                <td className="border border-border p-2">Weekend + Late</td>
+                <td className="border border-border p-2">Weekend duty + late weekdays</td>
+              </tr>
+              <tr>
+                <td className="border border-border p-2">🏖️</td>
+                <td className="border border-border p-2">Off</td>
+                <td className="border border-border p-2">Off for the entire week</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Approval Workflow</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>After assignments are complete, navigate to the <strong>"Approvals"</strong> tab</li>
+          <li>All partnership team managers must approve before activation</li>
+          <li>Each manager approves for their team with optional comments</li>
+          <li>View approval status for each team in the partnership</li>
+          <li>Admin bypass available: <strong>"Admin: Activate Now"</strong> button for testing/emergency</li>
+        </ol>
+
+        <h3 className="text-xl font-semibold mb-3">Preview and Activation</h3>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Use the <strong>"Preview"</strong> tab to see actual calendar dates</li>
+          <li>Verify assignments are correct for each team member</li>
+          <li>Ensure shift times match team member locations</li>
+          <li>Once all managers approve, roster can be activated</li>
+          <li>Activation generates schedule entries for the entire year</li>
+          <li>System uses Shift Time Definitions based on each member's country/region</li>
+        </ol>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Location-Aware Scheduling</AlertTitle>
+          <AlertDescription>
+            Rosters automatically use the correct shift times from Shift Time Definitions based on 
+            each team member's country and region. For example, "Late shift" in Central Europe may 
+            have different hours than "Late shift" in the UK.
+          </AlertDescription>
+        </Alert>
+      </section>
+
+      <Separator />
+
       <section id="team-management">
         <h2 className="text-2xl font-bold mb-4">3. Team Management</h2>
         
@@ -218,6 +373,69 @@ export const PlannerManual = () => {
           <AlertDescription>
             Users marked as team managers can manage schedules and approve vacation requests 
             for their assigned teams only.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Hotline Configuration & Auto-Assignment</h3>
+        
+        <p className="text-muted-foreground mb-4">
+          Configure teams for hotline support duty and automatically generate fair rotation schedules 
+          based on availability and recent assignment history.
+        </p>
+
+        <h4 className="font-semibold mb-2">Hotline Team Configuration</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Team Management</strong> → Select Team</li>
+          <li>Click <strong>"Configure Hotline"</strong></li>
+          <li>Set configuration:
+            <ul className="list-disc list-inside ml-6 mt-2 space-y-1">
+              <li><strong>Staff Required:</strong> Number of people needed per day (1-4)</li>
+              <li><strong>Weekday Hours:</strong> Monday-Thursday hours (e.g., 08:00-15:00)</li>
+              <li><strong>Friday Hours:</strong> Friday hours (e.g., 08:00-13:00)</li>
+            </ul>
+          </li>
+          <li>Select eligible team members who can be assigned hotline duty</li>
+          <li>View "Last Assignment" date for each member to ensure fair rotation</li>
+          <li>Click <strong>"Save Configuration"</strong></li>
+        </ol>
+
+        <h4 className="font-semibold mb-2 mt-4">Automatic Hotline Generation</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Quick Bulk Scheduler → Hotline</strong> tab</li>
+          <li>Select teams with hotline configuration</li>
+          <li>View eligible member count and staffing requirements per team</li>
+          <li>Select date range for generation</li>
+          <li>Click <strong>"Generate Hotline Schedule"</strong></li>
+        </ol>
+
+        <p className="mb-4 text-sm text-muted-foreground">
+          The system automatically:
+        </p>
+        <ul className="list-disc list-inside space-y-1 mb-4 text-sm text-muted-foreground ml-4">
+          <li>Prioritizes members who haven't been assigned recently</li>
+          <li>Checks availability (skips vacation, holidays, other absences)</li>
+          <li>Creates assignments as draft for review before finalization</li>
+          <li>Respects configured hours per team (weekday vs. Friday)</li>
+        </ul>
+
+        <h4 className="font-semibold mb-2 mt-4">Hotline in Regular Schedule Generation</h4>
+        <p className="mb-2">
+          When generating bulk schedules, if the selected team has hotline configuration, 
+          you'll see a checkbox option:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>"Also generate hotline assignments"</strong> checkbox appears automatically</li>
+          <li>System creates both work shifts AND hotline assignments</li>
+          <li>Hotline hours automatically adjust work shift times</li>
+          <li>Example: Hotline 08:00-15:00 with work 08:00-16:30 becomes work 15:00-16:30</li>
+        </ul>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Hotline Reassignment</AlertTitle>
+          <AlertDescription>
+            If you delete or change a schedule entry for someone with hotline duty, you'll be 
+            prompted to reassign the hotline to another eligible team member to prevent coverage gaps.
           </AlertDescription>
         </Alert>
       </section>
@@ -342,6 +560,100 @@ export const PlannerManual = () => {
             The wizard shows your progress at the top with completed steps marked. Use "Back" to change previous selections or "Cancel" to exit without saving.
           </AlertDescription>
         </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Bulk Deletion</h3>
+        
+        <p className="text-muted-foreground mb-4">
+          Bulk delete allows you to selectively remove schedule entries and hotline assignments 
+          with multiple filter levels. Use carefully as deletion is permanent.
+        </p>
+
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Permanent Action</AlertTitle>
+          <AlertDescription>
+            Bulk deletion cannot be undone. Always review the preview count carefully before 
+            confirming deletion. Common use cases: clearing incorrectly generated schedules, 
+            removing old data during cleanup, resetting schedules before regeneration.
+          </AlertDescription>
+        </Alert>
+
+        <h4 className="font-semibold mb-2">Accessing Bulk Delete</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Navigate to <strong>Schedule → Quick Bulk Scheduler</strong></li>
+          <li>Click the <strong>"Delete"</strong> tab (red indicator for destructive action)</li>
+        </ol>
+
+        <h4 className="font-semibold mb-2 mt-4">Filter Options</h4>
+        <p className="mb-2">Configure exactly what to delete using multiple filter layers:</p>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h5 className="font-semibold mb-2 text-sm">Team & User Selection</h5>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Choose which team's entries to delete</li>
+            <li>Select specific people or entire team</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h5 className="font-semibold mb-2 text-sm">Date Range & Exclusions</h5>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Start and end dates with quick selectors</li>
+            <li>Exclude specific days of week</li>
+            <li>Skip weekends option</li>
+            <li>Skip holidays option</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h5 className="font-semibold mb-2 text-sm">Activity Type Filters</h5>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Work shifts</li>
+            <li>Vacation</li>
+            <li>Hotline support</li>
+            <li>Out of office</li>
+            <li>Training</li>
+            <li>Flextime</li>
+            <li>Working from home</li>
+            <li>Other</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h5 className="font-semibold mb-2 text-sm">Shift Type Filters</h5>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li>Normal shifts</li>
+            <li>Early shifts</li>
+            <li>Late shifts</li>
+            <li>Weekend shifts</li>
+          </ul>
+        </div>
+
+        <div className="bg-accent/20 border border-accent/40 rounded-lg p-4 mb-4">
+          <h5 className="font-semibold mb-2 text-sm">Additional Options</h5>
+          <ul className="list-disc list-inside space-y-1 text-sm ml-2">
+            <li><strong>"Also delete hotline assignments"</strong> checkbox</li>
+            <li>Includes hotline duty entries when checked</li>
+          </ul>
+        </div>
+
+        <h4 className="font-semibold mb-2 mt-4">Preview Before Deletion</h4>
+        <p className="mb-4">
+          Before deletion, the system shows exactly how many entries will be deleted:
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Schedule entries count</li>
+          <li>Hotline assignments count (if checkbox selected)</li>
+          <li>Warning: "This action cannot be undone"</li>
+        </ul>
+
+        <h4 className="font-semibold mb-2 mt-4">Confirmation Dialog</h4>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Review final count breakdown</li>
+          <li>Verify you're deleting the correct entries</li>
+          <li>Click <strong>"Delete Permanently"</strong> button to confirm</li>
+          <li>Deletion executes immediately</li>
+        </ol>
 
         <h3 className="text-xl font-semibold mb-3">Editing Schedules</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
