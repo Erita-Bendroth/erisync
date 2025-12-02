@@ -826,6 +826,7 @@ export type Database = {
         Row: {
           assigned_by: string | null
           created_at: string
+          day_of_week: number | null
           id: string
           notes: string | null
           roster_id: string
@@ -837,6 +838,7 @@ export type Database = {
         Insert: {
           assigned_by?: string | null
           created_at?: string
+          day_of_week?: number | null
           id?: string
           notes?: string | null
           roster_id: string
@@ -848,6 +850,7 @@ export type Database = {
         Update: {
           assigned_by?: string | null
           created_at?: string
+          day_of_week?: number | null
           id?: string
           notes?: string | null
           roster_id?: string

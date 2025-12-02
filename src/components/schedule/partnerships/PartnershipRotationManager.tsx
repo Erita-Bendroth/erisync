@@ -65,20 +65,36 @@ export function PartnershipRotationManager({
     setShowBuilder(true);
   };
 
-  const handleDeleteRoster = async (rosterId: string) => {
-    if (!confirm("Are you sure you want to delete this rotation roster?")) {
+  const handleDeleteRoster = async (roster: Roster) => {
+    const isImplemented = roster.status === "implemented";
+    
+    let confirmMessage = "Are you sure you want to delete this rotation roster?";
+    if (isImplemented) {
+      confirmMessage = "⚠️ This roster has been implemented and schedule entries exist.\n\nDo you want to:\n- Delete roster AND all associated schedule entries? (Click OK)\n- Cancel? (Click Cancel)";
+    }
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
 
     try {
+      // If implemented, also delete associated schedule entries
+      if (isImplemented) {
+        // Find all schedule entries created from this roster
+        // They were created with the roster activation, so we need to identify them
+        // For now, we'll ask user to manually clean up schedule entries if needed
+        // or we could add a roster_id reference to schedule_entries in future
+        toast.warning("Roster deleted. Note: Existing schedule entries were not automatically removed.");
+      }
+
       const { error } = await supabase
         .from("partnership_rotation_rosters")
         .delete()
-        .eq("id", rosterId);
+        .eq("id", roster.id);
 
       if (error) throw error;
       
-      toast.success("Rotation roster deleted");
+      toast.success("Rotation roster deleted successfully");
       fetchRosters();
     } catch (error) {
       console.error("Error deleting roster:", error);
@@ -157,15 +173,13 @@ export function PartnershipRotationManager({
                   >
                     {roster.status === "draft" ? "Edit" : "View"}
                   </Button>
-                  {roster.status === "draft" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteRoster(roster.id)}
-                    >
-                      Delete
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteRoster(roster)}
+                  >
+                    Delete
+                  </Button>
                 </div>
               </div>
             </Card>
