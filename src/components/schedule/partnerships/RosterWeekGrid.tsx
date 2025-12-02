@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,88 +98,83 @@ export function RosterWeekGrid({
     if (isReadOnly) return;
 
     const tempId = `temp-${Date.now()}-${Math.random()}`;
+    let existingAssignmentId: string | null = null;
     
-    // OPTIMISTIC UPDATE - Update UI immediately
+    // OPTIMISTIC UPDATE - Update UI immediately using functional updates to avoid closure issues
     if (newShiftType === "none" || newShiftType === null) {
       // Remove from state optimistically
-      setAssignments((prev) => 
-        prev.filter((a) => !(
+      setAssignments((prev) => {
+        const existing = prev.find(
+          (a) =>
+            a.week_number === weekNumber &&
+            a.user_id === userId &&
+            a.team_id === teamId &&
+            a.day_of_week === dayOfWeek
+        );
+        if (existing) existingAssignmentId = existing.id;
+        
+        return prev.filter((a) => !(
           a.week_number === weekNumber &&
           a.user_id === userId &&
           a.team_id === teamId &&
           a.day_of_week === dayOfWeek
-        ))
-      );
+        ));
+      });
     } else {
       // Add/update in state optimistically
-      const existing = assignments.find(
-        (a) =>
-          a.week_number === weekNumber &&
-          a.user_id === userId &&
-          a.team_id === teamId &&
-          a.day_of_week === dayOfWeek
-      );
+      setAssignments((prev) => {
+        const existing = prev.find(
+          (a) =>
+            a.week_number === weekNumber &&
+            a.user_id === userId &&
+            a.team_id === teamId &&
+            a.day_of_week === dayOfWeek
+        );
 
-      if (existing) {
-        setAssignments((prev) =>
-          prev.map((a) => 
+        if (existing) {
+          existingAssignmentId = existing.id;
+          return prev.map((a) => 
             a.id === existing.id 
               ? { ...a, shift_type: newShiftType }
               : a
-          )
-        );
-      } else {
-        setAssignments((prev) => [
-          ...prev,
-          {
-            id: tempId,
-            roster_id: rosterId,
-            week_number: weekNumber,
-            user_id: userId,
-            team_id: teamId,
-            shift_type: newShiftType,
-            day_of_week: dayOfWeek,
-            assigned_by: null,
-            notes: null,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-      }
+          );
+        } else {
+          return [
+            ...prev,
+            {
+              id: tempId,
+              roster_id: rosterId,
+              week_number: weekNumber,
+              user_id: userId,
+              team_id: teamId,
+              shift_type: newShiftType,
+              day_of_week: dayOfWeek,
+              assigned_by: null,
+              notes: null,
+              created_at: new Date().toISOString(),
+            },
+          ];
+        }
+      });
     }
 
     // BACKGROUND SAVE - Don't block UI
     try {
       if (newShiftType === "none" || newShiftType === null) {
-        const existingAssignment = assignments.find(
-          (a) =>
-            a.week_number === weekNumber &&
-            a.user_id === userId &&
-            a.team_id === teamId &&
-            a.day_of_week === dayOfWeek
-        );
-
-        if (existingAssignment) {
+        if (existingAssignmentId) {
           const { error } = await supabase
             .from("roster_week_assignments")
             .delete()
-            .eq("id", existingAssignment.id);
+            .eq("id", existingAssignmentId);
 
           if (error) throw error;
         }
       } else {
-        const existingAssignment = assignments.find(
-          (a) =>
-            a.week_number === weekNumber &&
-            a.user_id === userId &&
-            a.team_id === teamId &&
-            a.day_of_week === dayOfWeek
-        );
-
-        if (existingAssignment) {
+        if (existingAssignmentId) {
           const { error } = await supabase
             .from("roster_week_assignments")
             .update({ shift_type: newShiftType })
-            .eq("id", existingAssignment.id);
+            .eq("id", existingAssignmentId);
 
           if (error) throw error;
         } else {
@@ -219,7 +214,7 @@ export function RosterWeekGrid({
       // Refetch to restore correct state on error
       fetchAssignments();
     }
-  }, [assignments, rosterId, isReadOnly, fetchAssignments]);
+  }, [rosterId, isReadOnly, fetchAssignments]);
 
   // Memoized assignment lookup map for better performance
   const assignmentMap = useMemo(() => {
@@ -268,6 +263,31 @@ export function RosterWeekGrid({
 
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const dayValues = [1, 2, 3, 4, 5, 6, 0]; // ISO day of week
+
+  // Memoized DayCell component for performance - only re-renders when its own props change
+  const DayCell = memo(({ 
+    currentValue, 
+    onValueChange, 
+    isDisabled 
+  }: { 
+    currentValue: string; 
+    onValueChange: (value: string) => void; 
+    isDisabled: boolean;
+  }) => (
+    <select
+      value={currentValue}
+      onChange={(e) => onValueChange(e.target.value)}
+      disabled={isDisabled}
+      className="w-full h-8 text-xs border rounded px-1 bg-background hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <option value="none">-</option>
+      <option value="normal">Normal</option>
+      <option value="early">Early</option>
+      <option value="late">Late</option>
+      <option value="weekend">Weekend</option>
+      <option value="off">Off</option>
+    </select>
+  ));
 
   if (loading) {
     return (
@@ -431,8 +451,8 @@ export function RosterWeekGrid({
 
                             return (
                               <td key={idx} className="border p-1">
-                                <Select
-                                  value={currentValue}
+                                <DayCell
+                                  currentValue={currentValue}
                                   onValueChange={(value) =>
                                     handleAssignmentChange(
                                       weekNumber,
@@ -442,20 +462,8 @@ export function RosterWeekGrid({
                                       dayOfWeek
                                     )
                                   }
-                                  disabled={isReadOnly}
-                                >
-                                  <SelectTrigger className="w-full h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">-</SelectItem>
-                                    <SelectItem value="normal">Normal</SelectItem>
-                                    <SelectItem value="early">Early</SelectItem>
-                                    <SelectItem value="late">Late</SelectItem>
-                                    <SelectItem value="weekend">Weekend</SelectItem>
-                                    <SelectItem value="off">Off</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                  isDisabled={isReadOnly}
+                                />
                               </td>
                             );
                           })}
