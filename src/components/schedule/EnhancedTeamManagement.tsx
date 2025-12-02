@@ -169,6 +169,73 @@ const EnhancedTeamManagement = () => {
     }
   };
 
+  // Lightweight refresh for member data only (no loading state)
+  const refreshMemberData = async () => {
+    if (!user || userRoles.length === 0 || teams.length === 0) return;
+
+    try {
+      // Re-fetch members for each existing team without showing loading state
+      const membersMap: { [key: string]: TeamMember[] } = {};
+      
+      for (const team of teams) {
+        const { data: members, error: membersError } = await supabase
+          .from('team_members')
+          .select('id, user_id, team_id, is_manager')
+          .eq('team_id', team.id);
+
+        if (membersError) {
+          console.error(`Error fetching members for team ${team.name}:`, membersError);
+          continue;
+        }
+
+        // Get user roles and profiles separately
+        const userIds = members?.map(m => m.user_id) || [];
+        
+        const [rolesResponse, profilesResponse] = await Promise.all([
+          supabase
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', userIds),
+          supabase
+            .from('profiles')
+            .select('user_id, first_name, last_name, email, initials')
+            .in('user_id', userIds) as any
+        ]);
+
+        const rolesMap = (rolesResponse.data || []).reduce((acc, role) => {
+          if (!acc[role.user_id]) acc[role.user_id] = [];
+          acc[role.user_id].push({ role: role.role });
+          return acc;
+        }, {} as { [key: string]: Array<{role: string}> });
+
+        const profilesMap = (profilesResponse.data || []).reduce((acc, profile) => {
+          acc[profile.user_id] = profile;
+          return acc;
+        }, {} as { [key: string]: { first_name: string; last_name: string; email: string; user_id: string; initials?: string } });
+
+        // Filter out members with incomplete profile data and map them properly
+        const membersWithRoles = (members || [])
+          .filter(member => profilesMap[member.user_id])
+          .map(member => ({
+            ...member,
+            profiles: profilesMap[member.user_id],
+            user_roles: rolesMap[member.user_id] || []
+          }));
+
+        membersMap[team.id] = membersWithRoles;
+      }
+
+      setTeamMembers(membersMap);
+    } catch (error) {
+      console.error('Error refreshing member data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh member data",
+        variant: "destructive",
+      });
+    }
+  };
+
   const fetchTeamsAndMembers = async () => {
     if (!user || userRoles.length === 0) {
       setLoading(false);
@@ -1296,7 +1363,7 @@ const EnhancedTeamManagement = () => {
           availableRoles={getAvailableRoles()}
           isOpen={showEditModal}
           onClose={handleCloseEditModal}
-          onUserUpdated={fetchTeamsAndMembers}
+          onUserUpdated={refreshMemberData}
         />
       )}
 
@@ -1312,7 +1379,7 @@ const EnhancedTeamManagement = () => {
             tempPasswordMember.profiles.initials
           )}
           userEmail={tempPasswordMember.profiles.email}
-          onSuccess={fetchTeamsAndMembers}
+          onSuccess={refreshMemberData}
         />
       )}
 
