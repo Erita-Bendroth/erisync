@@ -180,7 +180,7 @@ export async function getApplicableShiftTimes({
     }
   }
 
-  // Priority 4: Team only (no country or day restriction)
+  // Priority 4: Team only (no country or day restriction, OR matching country)
   if (teamId) {
     const teamOnlyNoDay = data.find(
       (def) => {
@@ -192,7 +192,11 @@ export async function getApplicableShiftTimes({
           return false;
         }
         
-        return matchesTeam && noDay;
+        // Country check: definition must either have no country restriction OR match user's country
+        const hasCountryCodes = def.country_codes && Array.isArray(def.country_codes) && def.country_codes.length > 0;
+        const countryOk = !hasCountryCodes || matchesCountryCode(countryCode, def.country_codes);
+        
+        return matchesTeam && noDay && countryOk;
       }
     );
     if (teamOnlyNoDay) {
