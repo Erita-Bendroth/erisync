@@ -869,7 +869,15 @@ useEffect(() => {
   const getShiftDescription = (entry: ScheduleEntry, employeeData?: Employee): string => {
     if (entry.activity_type !== 'work') return '';
     
-    // First, check if shift name is stored in notes (from bulk generator)
+    // Priority 0: Use stored shift_time_definition_id if available (most reliable)
+    if (entry.shift_time_definition_id) {
+      const storedDef = shiftTimeDefinitions.find(d => d.id === entry.shift_time_definition_id);
+      if (storedDef?.description) {
+        return storedDef.description;
+      }
+    }
+    
+    // Second, check if shift name is stored in notes (from bulk generator)
     if (entry.notes) {
       // NEW FORMAT: "Shift: {name}"
       const newFormatMatch = entry.notes.match(/Shift:\s*(.+?)(?:\n|$)/);
@@ -890,13 +898,13 @@ useEffect(() => {
       }
     }
     
-    // Find applicable shift time definition
+    // Find applicable shift time definition using country_code (not region_code)
     const teamId = entry.team_id;
-    const regionCode = employeeData?.region_code;
+    const countryCode = employeeData?.country_code;
     const date = new Date(entry.date);
     const dayOfWeek = date.getDay(); // Use JavaScript format (0=Sunday, 1=Monday, etc.) - matches database storage
     
-    // Priority matching (same as shiftTimeUtils.ts)
+    // Priority matching using country_code
     const applicableDef = shiftTimeDefinitions.find(def => {
       if (def.shift_type !== entry.shift_type) return false;
       
@@ -905,25 +913,28 @@ useEffect(() => {
                         (def.team_id === teamId);
       const noTeam = !def.team_ids && !def.team_id;
       
-      // Check region match
-      const regionMatch = def.region_code === regionCode;
-      const noRegion = !def.region_code;
+      // Check country match (using country_codes array)
+      const hasCountryCodes = def.country_codes && Array.isArray(def.country_codes) && def.country_codes.length > 0;
+      const countryMatch = hasCountryCodes && countryCode && def.country_codes!.includes(countryCode);
+      const noCountry = !hasCountryCodes;
       
       // Check day match
       const dayMatch = def.day_of_week && Array.isArray(def.day_of_week) && 
                       def.day_of_week.includes(dayOfWeek);
       const noDay = !def.day_of_week || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0);
       
-      // Priority 1: Team + region + day
-      if (teamMatch && regionMatch && dayMatch) return true;
-      // Priority 2: Team + region (no day)
-      if (teamMatch && regionMatch && noDay) return true;
-      // Priority 3: Team only (no region, no day)
-      if (teamMatch && noRegion && noDay) return true;
-      // Priority 4: Region only (no team, no day)
-      if (noTeam && regionMatch && noDay) return true;
-      // Priority 5: Global (no team, no region, no day)
-      if (noTeam && noRegion && noDay) return true;
+      // Priority 1: Team + country + day
+      if (teamMatch && countryMatch && dayMatch) return true;
+      // Priority 2: Team + country (no day)
+      if (teamMatch && countryMatch && noDay) return true;
+      // Priority 3: Team only + day (but only if no country specified OR country matches)
+      if (teamMatch && (noCountry || countryMatch) && dayMatch) return true;
+      // Priority 4: Team only (no country, no day)
+      if (teamMatch && noCountry && noDay) return true;
+      // Priority 5: Country only (no team, no day)
+      if (noTeam && countryMatch && noDay) return true;
+      // Priority 6: Global (no team, no country, no day)
+      if (noTeam && noCountry && noDay) return true;
       
       return false;
     });

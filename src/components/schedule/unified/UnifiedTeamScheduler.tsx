@@ -405,6 +405,8 @@ export const UnifiedTeamScheduler: React.FC = () => {
           first_name: m.first_name || 'Unknown',
           last_name: m.last_name || 'User',
           initials: m.initials || '??',
+          country_code: m.country_code,
+          region_code: m.region_code,
         }));
 
         sections.push({

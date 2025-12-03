@@ -153,7 +153,8 @@ export async function getApplicableShiftTimes({
     }
   }
 
-  // Priority 3: Team only + specific day (no country requirement)
+  // Priority 3: Team + specific day (only if no country restriction OR country matches)
+  // This prevents country-specific definitions from being matched for wrong countries
   if (teamId && dayOfWeek !== undefined) {
     const teamDayOnly = data.find(
       (def) => {
@@ -162,7 +163,11 @@ export async function getApplicableShiftTimes({
           ? shouldApplyWeekendShift
           : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek));
         
-        return matchesTeam && matchesDay;
+        // Country check: definition must either have no country restriction OR match user's country
+        const hasCountryCodes = def.country_codes && Array.isArray(def.country_codes) && def.country_codes.length > 0;
+        const countryOk = !hasCountryCodes || matchesCountryCode(countryCode, def.country_codes);
+        
+        return matchesTeam && matchesDay && countryOk;
       }
     );
     if (teamDayOnly) {
