@@ -59,6 +59,16 @@ export function RosterWeekGrid({
     fetchAssignments();
   }, [rosterId, partnershipId]);
 
+  // Auto-detect day-by-day mode based on existing assignments
+  useEffect(() => {
+    if (assignments.length > 0) {
+      const hasDayByDayAssignments = assignments.some(a => a.day_of_week !== null);
+      if (hasDayByDayAssignments && !dayByDayMode) {
+        setDayByDayMode(true);
+      }
+    }
+  }, [assignments]);
+
   const fetchTeamMembers = async () => {
     try {
       const { data, error } = await supabase.rpc("get_partnership_team_members", {

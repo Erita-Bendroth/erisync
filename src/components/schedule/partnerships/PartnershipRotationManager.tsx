@@ -121,6 +121,7 @@ export function PartnershipRotationManager({
           user_id: assignment.user_id,
           shift_type: assignment.shift_type,
           day_of_week: assignment.day_of_week,
+          include_weekends: assignment.include_weekends,
           notes: assignment.notes,
           assigned_by: user.id,
         }));
