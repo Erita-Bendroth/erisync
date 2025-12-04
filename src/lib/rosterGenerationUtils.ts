@@ -18,6 +18,7 @@ interface WeekAssignment {
   team_id: string;
   shift_type: string | null;
   day_of_week: number | null;
+  include_weekends: boolean;
 }
 
 interface TeamMember {
@@ -197,11 +198,13 @@ async function generateScheduleEntries(
               notes: `${shiftTimes.startTime}-${shiftTimes.endTime}`,
             });
           }
-        } else if (isCompoundShift) {
-        // Handle compound shifts: weekend + weekday combination
-        const weekdayShift = shiftType.replace("weekend_", "") as "normal" | "early" | "late";
+      } else if (isCompoundShift || assignment.include_weekends) {
+        // Handle compound shifts OR weekday shift with include_weekends checkbox
+        const weekdayShift = isCompoundShift 
+          ? shiftType.replace("weekend_", "") as "normal" | "early" | "late"
+          : shiftType as "normal" | "early" | "late";
 
-        // Generate weekend entries (Sat/Sun)
+        // Generate weekend entries (Sat/Sun) - uses member's country for correct times
         for (let dayOffset = 5; dayOffset <= 6; dayOffset++) {
           const entryDate = addDays(currentDate, dayOffset);
           if (entryDate > endDate) continue;
