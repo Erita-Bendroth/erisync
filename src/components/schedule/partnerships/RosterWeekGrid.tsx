@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -32,6 +33,7 @@ interface Assignment {
   team_id: string;
   shift_type: string | null;
   day_of_week: number | null;
+  include_weekends: boolean;
 }
 
 interface RosterWeekGridProps {
@@ -149,6 +151,7 @@ export function RosterWeekGrid({
               team_id: teamId,
               shift_type: newShiftType,
               day_of_week: dayOfWeek,
+              include_weekends: false,
               assigned_by: null,
               notes: null,
               created_at: new Date().toISOString(),
@@ -230,6 +233,40 @@ export function RosterWeekGrid({
     const key = `${userId}_${teamId}_${weekNumber}_${dayOfWeek ?? 'null'}`;
     return assignmentMap.get(key);
   }, [assignmentMap]);
+
+  const handleWeekendToggle = useCallback(async (
+    weekNumber: number,
+    userId: string,
+    teamId: string,
+    includeWeekends: boolean
+  ) => {
+    if (isReadOnly) return;
+
+    // Find the existing assignment
+    const assignment = getAssignment(userId, teamId, weekNumber, null);
+    if (!assignment) return;
+
+    // Optimistic update
+    setAssignments((prev) =>
+      prev.map((a) =>
+        a.id === assignment.id ? { ...a, include_weekends: includeWeekends } : a
+      )
+    );
+
+    // Background save
+    try {
+      const { error } = await supabase
+        .from("roster_week_assignments")
+        .update({ include_weekends: includeWeekends })
+        .eq("id", assignment.id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error updating weekend toggle:", error);
+      toast.error("Failed to save weekend preference");
+      fetchAssignments();
+    }
+  }, [isReadOnly, getAssignment, fetchAssignments]);
 
   const getShiftTypeLabel = (shiftType: string | null) => {
     if (!shiftType) return "Not assigned";
@@ -366,43 +403,63 @@ export function RosterWeekGrid({
                     {Array.from({ length: cycleLength }, (_, i) => i + 1).map((weekNumber) => {
                       const assignment = getAssignment(member.user_id, member.team_id, weekNumber, null);
                       const shiftType = assignment?.shift_type || null;
+                      const includeWeekends = assignment?.include_weekends || false;
+                      // Enable weekend checkbox only for weekday shifts (not weekend-only, compound, or off)
+                      const canIncludeWeekend = shiftType && ['normal', 'early', 'late'].includes(shiftType);
 
                       return (
                         <td key={weekNumber} className="border p-2">
-                          <Select
-                            value={shiftType || "none"}
-                            onValueChange={(value) =>
-                              handleAssignmentChange(
-                                weekNumber,
-                                member.user_id,
-                                member.team_id,
-                                value === "none" ? null : value,
-                                null
-                              )
-                            }
-                        disabled={isReadOnly}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue>
-                                <span className={getShiftTypeBadgeColor(shiftType)}>
-                                  {getShiftTypeLabel(shiftType)}
-                                </span>
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">
-                                <span className="text-muted-foreground italic">Not assigned</span>
-                              </SelectItem>
-                              <SelectItem value="late">🌙 Late Shift (Mon-Fri only)</SelectItem>
-                              <SelectItem value="early">☀️ Early Shift (Mon-Fri only)</SelectItem>
-                              <SelectItem value="normal">💼 Normal Shift (Mon-Fri only)</SelectItem>
-                              <SelectItem value="weekend">📅 Weekend Only</SelectItem>
-                              <SelectItem value="weekend_normal">📅 Weekend + Normal weekdays</SelectItem>
-                              <SelectItem value="weekend_early">📅 Weekend + Early weekdays</SelectItem>
-                              <SelectItem value="weekend_late">📅 Weekend + Late weekdays</SelectItem>
-                              <SelectItem value="off">🏖️ Off (entire week)</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-2">
+                            <Select
+                              value={shiftType || "none"}
+                              onValueChange={(value) =>
+                                handleAssignmentChange(
+                                  weekNumber,
+                                  member.user_id,
+                                  member.team_id,
+                                  value === "none" ? null : value,
+                                  null
+                                )
+                              }
+                              disabled={isReadOnly}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue>
+                                  <span className={getShiftTypeBadgeColor(shiftType)}>
+                                    {getShiftTypeLabel(shiftType)}
+                                  </span>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <span className="text-muted-foreground italic">Not assigned</span>
+                                </SelectItem>
+                                <SelectItem value="late">🌙 Late Shift (Mon-Fri)</SelectItem>
+                                <SelectItem value="early">☀️ Early Shift (Mon-Fri)</SelectItem>
+                                <SelectItem value="normal">💼 Normal Shift (Mon-Fri)</SelectItem>
+                                <SelectItem value="weekend">📅 Weekend Only</SelectItem>
+                                <SelectItem value="off">🏖️ Off (entire week)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {canIncludeWeekend && (
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`weekend-${member.user_id}-${weekNumber}`}
+                                  checked={includeWeekends}
+                                  onCheckedChange={(checked) =>
+                                    handleWeekendToggle(weekNumber, member.user_id, member.team_id, !!checked)
+                                  }
+                                  disabled={isReadOnly}
+                                />
+                                <Label
+                                  htmlFor={`weekend-${member.user_id}-${weekNumber}`}
+                                  className="text-xs text-muted-foreground cursor-pointer"
+                                >
+                                  + Weekend
+                                </Label>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       );
                     })}

@@ -828,6 +828,7 @@ export type Database = {
           created_at: string
           day_of_week: number | null
           id: string
+          include_weekends: boolean | null
           notes: string | null
           roster_id: string
           shift_type: string | null
@@ -840,6 +841,7 @@ export type Database = {
           created_at?: string
           day_of_week?: number | null
           id?: string
+          include_weekends?: boolean | null
           notes?: string | null
           roster_id: string
           shift_type?: string | null
@@ -852,6 +854,7 @@ export type Database = {
           created_at?: string
           day_of_week?: number | null
           id?: string
+          include_weekends?: boolean | null
           notes?: string | null
           roster_id?: string
           shift_type?: string | null
