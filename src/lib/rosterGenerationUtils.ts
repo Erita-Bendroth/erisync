@@ -88,7 +88,7 @@ export async function generateRosterSchedules(
       userId
     );
 
-    // Insert schedule entries in batches
+    // Insert schedule entries in batches using upsert to handle existing entries
     const batchSize = 100;
     let entriesCreated = 0;
 
@@ -96,7 +96,10 @@ export async function generateRosterSchedules(
       const batch = scheduleEntries.slice(i, i + batchSize);
       const { error: insertError } = await supabase
         .from("schedule_entries")
-        .insert(batch);
+        .upsert(batch, { 
+          onConflict: 'user_id,date,team_id',
+          ignoreDuplicates: false 
+        });
 
       if (insertError) {
         console.error("Error inserting batch:", insertError);
