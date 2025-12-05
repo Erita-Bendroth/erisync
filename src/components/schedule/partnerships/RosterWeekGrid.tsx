@@ -451,24 +451,22 @@ export function RosterWeekGrid({
                                 <SelectItem value="off">🏖️ Off (entire week)</SelectItem>
                               </SelectContent>
                             </Select>
-                            {canIncludeWeekend && (
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`weekend-${member.user_id}-${weekNumber}`}
-                                  checked={includeWeekends}
-                                  onCheckedChange={(checked) =>
-                                    handleWeekendToggle(weekNumber, member.user_id, member.team_id, !!checked)
-                                  }
-                                  disabled={isReadOnly}
-                                />
-                                <Label
-                                  htmlFor={`weekend-${member.user_id}-${weekNumber}`}
-                                  className="text-xs text-muted-foreground cursor-pointer"
-                                >
-                                  + Weekend
-                                </Label>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id={`weekend-${member.user_id}-${weekNumber}`}
+                                checked={includeWeekends}
+                                onCheckedChange={(checked) =>
+                                  handleWeekendToggle(weekNumber, member.user_id, member.team_id, !!checked)
+                                }
+                                disabled={isReadOnly || !canIncludeWeekend}
+                              />
+                              <Label
+                                htmlFor={`weekend-${member.user_id}-${weekNumber}`}
+                                className={`text-xs cursor-pointer ${canIncludeWeekend ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}
+                              >
+                                + Weekend
+                              </Label>
+                            </div>
                           </div>
                         </td>
                       );
