@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addWeeks, startOfYear, endOfYear, startOfQuarter, endOfQuarter } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -41,10 +41,67 @@ export const DateRangeQuickPicker = ({
     return workDays;
   };
 
+  const quickPresets = [
+    {
+      label: "This Week",
+      getRange: () => {
+        const now = new Date();
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+      },
+    },
+    {
+      label: "Next Week",
+      getRange: () => {
+        const nextWeek = addWeeks(new Date(), 1);
+        return { start: startOfWeek(nextWeek, { weekStartsOn: 1 }), end: endOfWeek(nextWeek, { weekStartsOn: 1 }) };
+      },
+    },
+    {
+      label: "This Month",
+      getRange: () => {
+        const now = new Date();
+        return { start: startOfMonth(now), end: endOfMonth(now) };
+      },
+    },
+    {
+      label: "This Quarter",
+      getRange: () => {
+        const now = new Date();
+        return { start: startOfQuarter(now), end: endOfQuarter(now) };
+      },
+    },
+    {
+      label: "1 Year",
+      getRange: () => {
+        const now = new Date();
+        return { start: startOfYear(now), end: endOfYear(now) };
+      },
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Date Range</Label>
+        
+        {/* Quick preset buttons */}
+        <div className="flex flex-wrap gap-2 mb-2">
+          {quickPresets.map((preset) => (
+            <Button
+              key={preset.label}
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const range = preset.getRange();
+                onDateRangeChange(range.start, range.end);
+              }}
+              className="text-xs"
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -57,7 +114,7 @@ export const DateRangeQuickPicker = ({
               <CalendarIcon className="mr-2 h-4 w-4" />
               {startDate && endDate ? (
                 <>
-                  {format(startDate, "MMM dd")} - {format(endDate, "MMM dd, yyyy")}
+                  {format(startDate, "MMM dd, yyyy")} - {format(endDate, "MMM dd, yyyy")}
                 </>
               ) : (
                 <span>Pick a date range</span>
@@ -75,6 +132,7 @@ export const DateRangeQuickPicker = ({
                 onDateRangeChange(range?.from || null, range?.to || null);
               }}
               numberOfMonths={2}
+              className="pointer-events-auto"
             />
           </PopoverContent>
         </Popover>
