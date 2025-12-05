@@ -88,12 +88,22 @@ export async function generateRosterSchedules(
       userId
     );
 
+    // De-duplicate entries before insertion (same user+date+team should only have one entry)
+    const uniqueEntriesMap = new Map<string, typeof scheduleEntries[0]>();
+    for (const entry of scheduleEntries) {
+      const key = `${entry.user_id}_${entry.date}_${entry.team_id}`;
+      uniqueEntriesMap.set(key, entry); // Later entries override earlier ones
+    }
+    const deduplicatedEntries = Array.from(uniqueEntriesMap.values());
+
+    console.log(`Generated ${scheduleEntries.length} entries, deduplicated to ${deduplicatedEntries.length}`);
+
     // Insert schedule entries in batches using upsert to handle existing entries
     const batchSize = 100;
     let entriesCreated = 0;
 
-    for (let i = 0; i < scheduleEntries.length; i += batchSize) {
-      const batch = scheduleEntries.slice(i, i + batchSize);
+    for (let i = 0; i < deduplicatedEntries.length; i += batchSize) {
+      const batch = deduplicatedEntries.slice(i, i + batchSize);
       const { error: insertError } = await supabase
         .from("schedule_entries")
         .upsert(batch, { 

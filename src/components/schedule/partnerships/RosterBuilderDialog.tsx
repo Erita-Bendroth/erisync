@@ -161,6 +161,9 @@ export function RosterBuilderDialog({
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       // Update roster status
       const { error: updateError } = await supabase
         .from("partnership_rotation_rosters")
@@ -178,11 +181,13 @@ export function RosterBuilderDialog({
 
       if (membersError) throw membersError;
 
+      // Auto-approve the current user's approval (the submitting manager)
       const approvals = teamMembers.map(tm => ({
         roster_id: rosterId,
         manager_id: tm.user_id,
         team_id: tm.team_id,
-        approved: false,
+        approved: tm.user_id === user.id, // Auto-approve for submitter
+        approved_at: tm.user_id === user.id ? new Date().toISOString() : null,
       }));
 
       const { error: approvalsError } = await supabase
@@ -192,7 +197,7 @@ export function RosterBuilderDialog({
       if (approvalsError) throw approvalsError;
 
       setStatus("pending_approval");
-      toast.success("Roster submitted for approval");
+      toast.success("Your planning is submitted. Waiting for other team managers to complete their assignments.");
       onSuccess();
     } catch (error) {
       console.error("Error submitting for approval:", error);
