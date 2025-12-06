@@ -14,6 +14,7 @@ import { Loader2, Calendar, Clock, AlertCircle, Info, UserCheck } from 'lucide-r
 import { formatUserName } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
+import { format } from 'date-fns';
 
 interface Planner {
   user_id: string;
@@ -341,7 +342,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
         const { data: hasOverlap, error: overlapError } = await supabase
           .rpc('check_vacation_overlap', {
             _user_id: user.id,
-            _requested_date: day.toISOString().split('T')[0],
+            _requested_date: format(day, 'yyyy-MM-dd'),
             _start_time: isFullDay ? null : startTime,
             _end_time: isFullDay ? null : endTime,
             _is_full_day: isFullDay,
@@ -367,7 +368,7 @@ export const VacationRequestModal: React.FC<VacationRequestModalProps> = ({
       const requests = workingDays.map(day => ({
         user_id: user.id,
         team_id: teamMember.team_id,
-        requested_date: day.toISOString().split('T')[0],
+        requested_date: format(day, 'yyyy-MM-dd'),
         is_full_day: isFullDay,
         start_time: isFullDay ? null : startTime,
         end_time: isFullDay ? null : endTime,
