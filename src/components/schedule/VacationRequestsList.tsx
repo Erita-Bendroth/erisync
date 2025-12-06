@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { formatUserName } from '@/lib/utils';
 
 interface VacationRequest {
@@ -103,6 +103,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
   const [bulkRejectionReason, setBulkRejectionReason] = useState('');
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [approvalMessage, setApprovalMessage] = useState('');
 
   useEffect(() => {
     fetchCurrentUser();
@@ -279,74 +281,85 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     }
   };
 
-  const handleApprove = async (request: GroupedRequest) => {
-    setProcessingId(request.id);
+  const approveSingleRequest = async (request: GroupedRequest, message?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    // Delete any existing schedule entries for all dates in the group
+    await supabase
+      .from('schedule_entries')
+      .delete()
+      .eq('user_id', request.user_id)
+      .eq('team_id', request.team_id)
+      .in('date', request.dates);
+
+    // Update all request statuses in the group
+    const { error: updateError } = await supabase
+      .from('vacation_requests')
+      .update({
+        status: 'approved',
+        approver_id: user.id,
+        approved_at: new Date().toISOString(),
+      })
+      .in('id', request.requestIds);
+
+    if (updateError) throw updateError;
+
+    // Create schedule entries for all vacation days
+    const scheduleEntries = request.dates.map(date => ({
+      user_id: request.user_id,
+      team_id: request.team_id,
+      date,
+      activity_type: 'vacation' as const,
+      availability_status: 'unavailable' as const,
+      shift_type: 'normal' as const,
+      notes: `Vacation - ${request.is_full_day ? 'Full Day' : `${request.start_time} - ${request.end_time}`}${request.notes ? ` | ${request.notes}` : ''}`,
+      created_by: user.id,
+    }));
+
+    const { error: scheduleError } = await supabase
+      .from('schedule_entries')
+      .insert(scheduleEntries);
+
+    if (scheduleError) throw scheduleError;
+
+    // Send notifications
+    await supabase.functions.invoke('vacation-request-notification', {
+      body: {
+        requestId: request.id,
+        type: 'approval',
+        groupId: request.groupId,
+        approvalMessage: message || null,
+      },
+    });
+  };
+
+  const openApproveDialog = (request: GroupedRequest) => {
+    setSelectedRequest(request);
+    setApprovalMessage('Reminder to input your vacation into your time-schedule, like VSP, Cozone etc.');
+    setApproveDialogOpen(true);
+  };
+
+  const handleApprove = async () => {
+    if (!selectedRequest) return;
+    
+    setProcessingId(selectedRequest.id);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      await approveSingleRequest(selectedRequest, approvalMessage.trim() || undefined);
 
-      // Delete any existing schedule entries for all dates in the group
-      const { error: deleteError } = await supabase
-        .from('schedule_entries')
-        .delete()
-        .eq('user_id', request.user_id)
-        .eq('team_id', request.team_id)
-        .in('date', request.dates);
-
-      if (deleteError) {
-        console.error('Failed to delete existing schedule entries:', deleteError);
-        // Continue with approval even if delete fails
-      }
-
-      // Update all request statuses in the group
-      const { error: updateError } = await supabase
-        .from('vacation_requests')
-        .update({
-          status: 'approved',
-          approver_id: user.id,
-          approved_at: new Date().toISOString(),
-        })
-        .in('id', request.requestIds);
-
-      if (updateError) throw updateError;
-
-      // Create schedule entries for all vacation days
-      const scheduleEntries = request.dates.map(date => ({
-        user_id: request.user_id,
-        team_id: request.team_id,
-        date,
-        activity_type: 'vacation' as const,
-        availability_status: 'unavailable' as const,
-        shift_type: 'normal' as const,
-        notes: `Vacation - ${request.is_full_day ? 'Full Day' : `${request.start_time} - ${request.end_time}`}${request.notes ? ` | ${request.notes}` : ''}`,
-        created_by: user.id,
-      }));
-
-      const { error: scheduleError } = await supabase
-        .from('schedule_entries')
-        .insert(scheduleEntries);
-
-      if (scheduleError) throw scheduleError;
-
-      // Send notifications (to requester and manager) - only once for the group
-      await supabase.functions.invoke('vacation-request-notification', {
-        body: {
-          requestId: request.id,
-          type: 'approval',
-          groupId: request.groupId,
-        },
-      });
-
-      const daysText = request.dates.length === 1 
+      const daysText = selectedRequest.dates.length === 1 
         ? "1 day" 
-        : `${request.dates.length} working days`;
+        : `${selectedRequest.dates.length} working days`;
 
       toast({
         title: "Request approved",
         description: `Vacation for ${daysText} has been approved, added to the schedule, and notifications sent.`,
       });
 
+      setApproveDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalMessage('');
       await fetchRequests();
       onRequestProcessed?.();
     } catch (error: any) {
@@ -507,7 +520,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
     for (const request of requestsToApprove) {
       try {
-        await handleApprove(request);
+        await approveSingleRequest(request, 'Reminder to input your vacation into your time-schedule, like VSP, Cozone etc.');
         successCount++;
       } catch (error) {
         errorCount++;
@@ -516,6 +529,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
     setSelectedRequestIds(new Set());
     setProcessingId(null);
+    await fetchRequests();
+    onRequestProcessed?.();
     
     toast({
       title: successCount > 0 ? "Bulk approval complete" : "Bulk approval failed",
@@ -601,8 +616,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     const isMultiDay = request.dates.length > 1;
     
     const dateStr = isMultiDay
-      ? `${format(new Date(request.startDate), 'MMM d, yyyy')} - ${format(new Date(request.endDate), 'MMM d, yyyy')}`
-      : format(new Date(request.startDate), 'EEEE, MMMM d, yyyy');
+      ? `${format(parseISO(request.startDate), 'MMM d, yyyy')} - ${format(parseISO(request.endDate), 'MMM d, yyyy')}`
+      : format(parseISO(request.startDate), 'EEEE, MMMM d, yyyy');
     
     const timeStr = request.is_full_day
       ? 'Full Day'
@@ -686,7 +701,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => handleApprove(request)}
+                      onClick={() => openApproveDialog(request)}
                       disabled={processingId === request.id}
                       className="gap-1.5"
                     >
@@ -985,8 +1000,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
           {selectedRequest && (
             <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
               <p className="text-sm">
-                <strong>Dates:</strong> {format(new Date(selectedRequest.startDate), 'MMM d, yyyy')}
-                {selectedRequest.dates.length > 1 && ` - ${format(new Date(selectedRequest.endDate), 'MMM d, yyyy')}`}
+                <strong>Dates:</strong> {format(parseISO(selectedRequest.startDate), 'MMM d, yyyy')}
+                {selectedRequest.dates.length > 1 && ` - ${format(parseISO(selectedRequest.endDate), 'MMM d, yyyy')}`}
               </p>
               <p className="text-sm">
                 <strong>Working days:</strong> {selectedRequest.dates.length}
@@ -1056,6 +1071,65 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             >
               {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Reject {selectedRequestIds.size} Request(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Dialog */}
+      <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Vacation Request</DialogTitle>
+            <DialogDescription>
+              Add an optional message for the employee about their approved vacation.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedRequest && (
+            <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
+              <p className="text-sm">
+                <strong>Employee:</strong> {formatUserName(selectedRequest.requester.first_name, selectedRequest.requester.last_name)}
+              </p>
+              <p className="text-sm">
+                <strong>Dates:</strong> {format(parseISO(selectedRequest.startDate), 'MMM d, yyyy')}
+                {selectedRequest.dates.length > 1 && ` - ${format(parseISO(selectedRequest.endDate), 'MMM d, yyyy')}`}
+              </p>
+              <p className="text-sm">
+                <strong>Working days:</strong> {selectedRequest.dates.length}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="approval-message">Message (optional)</Label>
+            <Textarea
+              id="approval-message"
+              value={approvalMessage}
+              onChange={(e) => setApprovalMessage(e.target.value)}
+              placeholder="Add a message for the employee..."
+              rows={4}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setApproveDialogOpen(false);
+                setSelectedRequest(null);
+                setApprovalMessage('');
+              }}
+              disabled={processingId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApprove}
+              disabled={processingId !== null}
+            >
+              {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Approve Request
             </Button>
           </DialogFooter>
         </DialogContent>
