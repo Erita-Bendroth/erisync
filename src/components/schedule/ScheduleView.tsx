@@ -12,8 +12,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
-import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths } from 'date-fns';
-import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText } from 'lucide-react';
+import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths, parseISO } from 'date-fns';
+import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useLocation } from 'react-router-dom';
@@ -135,6 +135,15 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
   const [editingVacationRequest, setEditingVacationRequest] = useState<any>(null);
   const [shiftTimeDefinitions, setShiftTimeDefinitions] = useState<any[]>([]);
   const [dutyAssignments, setDutyAssignments] = useState<any[]>([]);
+  const [pendingVacationRequests, setPendingVacationRequests] = useState<{
+    id: string;
+    user_id: string;
+    requested_date: string;
+    is_full_day: boolean;
+    start_time: string | null;
+    end_time: string | null;
+    notes: string | null;
+  }[]>([]);
 
   // Access control hook for standard view mode
   const {
@@ -315,6 +324,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchDutyAssignments();
       fetchPendingRequestsCount();
       fetchPendingSwapRequestsCount();
+      fetchPendingVacationRequestsForSchedule();
     }, 150); // Debounce 150ms
     
     return () => clearTimeout(timer);
@@ -440,6 +450,43 @@ const fetchPendingSwapRequestsCount = async () => {
   } catch (error) {
     console.error('Error fetching pending swap requests count:', error);
   }
+};
+
+// Fetch pending vacation requests for schedule display (managers/planners only)
+const fetchPendingVacationRequestsForSchedule = async () => {
+  try {
+    if (!user || (!isManager() && !isPlanner())) {
+      setPendingVacationRequests([]);
+      return;
+    }
+
+    const startDate = format(weekStart, 'yyyy-MM-dd');
+    const endDate = format(weekEnd, 'yyyy-MM-dd');
+
+    const { data, error } = await supabase
+      .from('vacation_requests')
+      .select('id, user_id, requested_date, is_full_day, start_time, end_time, notes')
+      .eq('status', 'pending')
+      .gte('requested_date', startDate)
+      .lte('requested_date', endDate);
+
+    if (error) {
+      console.error('Error fetching pending vacation requests:', error);
+      return;
+    }
+
+    setPendingVacationRequests(data || []);
+  } catch (error) {
+    console.error('Error fetching pending vacation requests:', error);
+  }
+};
+
+// Get pending vacation requests for a specific employee and day
+const getPendingVacationForEmployeeAndDay = (employeeId: string, date: Date) => {
+  const dayStr = format(date, 'yyyy-MM-dd');
+  return pendingVacationRequests.filter(
+    req => req.user_id === employeeId && req.requested_date === dayStr
+  );
 };
 
 // Subscribe to vacation request changes for real-time badge updates (all users)
@@ -2311,6 +2358,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                           const dayEntries = getEntriesForEmployeeAndDay(employee.user_id, day);
                           const continuationEntries = getContinuationEntriesForDay(employee.user_id, day);
                           const dayHolidays = getHolidaysForEmployeeAndDay(employee.user_id, day);
+                          const pendingVacations = getPendingVacationForEmployeeAndDay(employee.user_id, day);
                           const isToday = isSameDay(day, new Date());
                           
                           // Get hotline assignment for this user and day
@@ -2327,6 +2375,37 @@ const getActivityColor = (entry: ScheduleEntry) => {
                               title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : ""}
                             >
                               <div className="space-y-1 min-h-16 flex flex-col justify-center">
+                                {/* Show pending vacation request indicator for managers/planners */}
+                                {pendingVacations.length > 0 && (isManager() || isPlanner()) && (
+                                  <TooltipProvider>
+                                    <Tooltip delayDuration={200}>
+                                      <TooltipTrigger asChild>
+                                        <div className="w-full cursor-help">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700 max-w-full block pointer-events-auto"
+                                          >
+                                            <span className="truncate flex items-center justify-center gap-1">
+                                              <Clock className="w-3 h-3" />
+                                              Pending
+                                            </span>
+                                          </Badge>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="z-[100]" side="top">
+                                        <p className="font-medium">Vacation request pending approval</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {pendingVacations[0].is_full_day ? 'Full Day' : `${pendingVacations[0].start_time} - ${pendingVacations[0].end_time}`}
+                                        </p>
+                                        {pendingVacations[0].notes && (
+                                          <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                                            Note: {pendingVacations[0].notes}
+                                          </p>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
                                 {/* Show continuation from previous day first */}
                                 {continuationEntries.map((entry) => {
                                   const times = getShiftTimesFromEntry(entry);
