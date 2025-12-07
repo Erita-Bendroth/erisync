@@ -38,6 +38,7 @@ export const MyRequestsDialog: React.FC<MyRequestsDialogProps> = ({
       <TabsContent value="vacation" className="space-y-4 mt-0 overflow-y-auto flex-1">
         <VacationRequestsList
           isPlanner={isPlanner}
+          isManager={isManager}
           onRequestProcessed={onRequestProcessed}
           onEditRequest={onEditRequest}
         />

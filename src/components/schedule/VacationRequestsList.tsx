@@ -81,15 +81,19 @@ interface GroupedRequest {
 
 interface VacationRequestsListProps {
   isPlanner: boolean;
+  isManager?: boolean;
   onRequestProcessed?: () => void;
   onEditRequest?: (request: GroupedRequest) => void;
 }
 
 export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   isPlanner,
+  isManager = false,
   onRequestProcessed,
   onEditRequest,
 }) => {
+  // Allow both planners and managers to approve/reject requests
+  const canApproveRequests = isPlanner || isManager;
   const { toast } = useToast();
   const [requests, setRequests] = useState<VacationRequest[]>([]);
   const [groupedRequests, setGroupedRequests] = useState<GroupedRequest[]>([]);
@@ -650,7 +654,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                 </div>
               )}
               <div className="flex-1">
-                {isPlanner && (
+              {canApproveRequests && (
                   <div className="flex items-center gap-2 mb-3">
                     <div className="p-1.5 rounded-full bg-primary/10">
                       <User className="h-4 w-4 text-primary" />
@@ -697,7 +701,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                   )}
                 </div>
 
-                {isPlanner && request.status === 'pending' && (
+                {canApproveRequests && request.status === 'pending' && (
                   <div className="flex gap-2">
                     <Button
                       size="sm"
