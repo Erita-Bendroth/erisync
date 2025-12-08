@@ -26,19 +26,44 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
   const scheduleRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'pdf'>('pdf');
-  const [exportRange, setExportRange] = useState<'current' | 'month'>('current');
+  const [exportRange, setExportRange] = useState<'week' | 'month' | '3months' | '6months' | 'year'>('month');
   const [entries, setEntries] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
   const getRange = () => {
-    if (exportRange === 'month') {
-      const start = startOfMonth(currentWeek);
-      const end = endOfMonth(currentWeek);
-      return { start, end };
+    const today = new Date();
+    switch (exportRange) {
+      case 'week': {
+        const start = startOfWeek(currentWeek, { weekStartsOn: 1 });
+        const end = addDays(start, 6);
+        return { start, end };
+      }
+      case 'month': {
+        const start = startOfMonth(currentWeek);
+        const end = endOfMonth(currentWeek);
+        return { start, end };
+      }
+      case '3months': {
+        const start = startOfMonth(today);
+        const end = endOfMonth(addDays(start, 89));
+        return { start, end };
+      }
+      case '6months': {
+        const start = startOfMonth(today);
+        const end = endOfMonth(addDays(start, 179));
+        return { start, end };
+      }
+      case 'year': {
+        const start = startOfMonth(today);
+        const end = endOfMonth(addDays(start, 364));
+        return { start, end };
+      }
+      default: {
+        const start = startOfWeek(currentWeek, { weekStartsOn: 1 });
+        const end = addDays(start, 6);
+        return { start, end };
+      }
     }
-    const start = startOfWeek(currentWeek, { weekStartsOn: 1 });
-    const end = addDays(start, 6);
-    return { start, end };
   };
 
   useEffect(() => {
@@ -308,12 +333,14 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
       entries.forEach(entry => {
         const date = new Date(entry.date);
         const dateStr = format(date, 'yyyyMMdd');
+        const nextDay = addDays(date, 1);
+        const endDateStr = format(nextDay, 'yyyyMMdd');
         const shiftType = entry.shift_type || 'normal';
         const activityType = entry.activity_type || 'work';
 
         icsContent += 'BEGIN:VEVENT\n';
         icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
-        icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
+        icsContent += `DTEND;VALUE=DATE:${endDateStr}\n`;
         icsContent += `SUMMARY:${shiftType} - ${activityType}\n`;
         icsContent += `DESCRIPTION:Shift: ${shiftType}\\nActivity: ${activityType}\\nAvailability: ${entry.availability_status}`;
         if (entry.notes) {
@@ -388,13 +415,16 @@ const ScheduleExport: React.FC<ScheduleExportProps> = ({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Date Range</label>
-            <Select value={exportRange} onValueChange={(value: 'current' | 'month') => setExportRange(value)}>
+            <Select value={exportRange} onValueChange={(value: 'week' | 'month' | '3months' | '6months' | 'year') => setExportRange(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="current">Current Week</SelectItem>
+                <SelectItem value="week">Current Week</SelectItem>
                 <SelectItem value="month">Current Month</SelectItem>
+                <SelectItem value="3months">3 Months</SelectItem>
+                <SelectItem value="6months">6 Months</SelectItem>
+                <SelectItem value="year">1 Year</SelectItem>
               </SelectContent>
             </Select>
           </div>
