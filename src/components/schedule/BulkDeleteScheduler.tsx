@@ -261,6 +261,24 @@ export const BulkDeleteScheduler = ({ userId, onDeleted }: BulkDeleteSchedulerPr
         userIds = data?.map(m => m.user_id) || [];
       }
 
+      // If vacation is included in activity types, cancel corresponding vacation requests
+      if (activityTypes.includes('vacation')) {
+        const { error: vacationError } = await supabase
+          .from('vacation_requests')
+          .update({ 
+            status: 'rejected',
+            rejection_reason: 'Vacation removed from schedule via bulk delete'
+          })
+          .in('user_id', userIds)
+          .in('requested_date', dates)
+          .eq('status', 'approved');
+        
+        if (vacationError) {
+          console.error('Error updating vacation requests:', vacationError);
+          // Don't throw - still delete the schedule entries
+        }
+      }
+
       // Delete schedule entries
       let scheduleQuery = supabase
         .from('schedule_entries')

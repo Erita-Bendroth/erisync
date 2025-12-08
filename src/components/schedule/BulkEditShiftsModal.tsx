@@ -87,6 +87,30 @@ export const BulkEditShiftsModal = ({ open, onOpenChange, selectedShiftIds, onSu
   const handleDelete = async () => {
     setLoading(true);
     try {
+      // First, get the entries to check for vacation types
+      const { data: entries, error: fetchError } = await supabase
+        .from('schedule_entries')
+        .select('id, user_id, date, activity_type')
+        .in('id', selectedShiftIds);
+
+      if (fetchError) throw fetchError;
+
+      // Cancel vacation requests for any vacation entries being deleted
+      const vacationEntries = entries?.filter(e => e.activity_type === 'vacation') || [];
+      if (vacationEntries.length > 0) {
+        for (const entry of vacationEntries) {
+          await supabase
+            .from('vacation_requests')
+            .update({ 
+              status: 'rejected',
+              rejection_reason: 'Vacation removed from schedule via bulk edit'
+            })
+            .eq('user_id', entry.user_id)
+            .eq('requested_date', entry.date)
+            .eq('status', 'approved');
+        }
+      }
+
       const { error } = await supabase
         .from('schedule_entries')
         .delete()

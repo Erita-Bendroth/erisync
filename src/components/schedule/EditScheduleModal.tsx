@@ -371,6 +371,24 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     try {
       setLoading(true);
 
+      // If this is a vacation entry, also cancel the vacation request
+      if (entry.activity_type === 'vacation') {
+        const { error: vacationError } = await supabase
+          .from('vacation_requests')
+          .update({ 
+            status: 'rejected',
+            rejection_reason: 'Vacation removed from schedule'
+          })
+          .eq('user_id', entry.user_id)
+          .eq('requested_date', entry.date)
+          .eq('status', 'approved');
+        
+        if (vacationError) {
+          console.error('Error updating vacation request:', vacationError);
+          // Don't throw - still delete the schedule entry
+        }
+      }
+
       const { error } = await supabase
         .from('schedule_entries')
         .delete()
@@ -378,7 +396,12 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Schedule entry deleted successfully' });
+      toast({ 
+        title: 'Success', 
+        description: entry.activity_type === 'vacation' 
+          ? 'Vacation entry deleted and vacation days updated' 
+          : 'Schedule entry deleted successfully' 
+      });
       
       onDelete?.();
       onSave();
