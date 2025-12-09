@@ -114,7 +114,9 @@ export function AppSidebar() {
       key: `favorite-${fav.id}`,
       title: fav.name,
       icon: Star,
-      path: `/schedule?tab=unified-scheduler&favorite=${fav.id}`,
+      path: fav.view_context === 'schedule' 
+        ? `/schedule?tab=schedule&favorite=${fav.id}`
+        : `/schedule?tab=unified-scheduler&favorite=${fav.id}`,
       favoriteId: fav.id,
       section: 'favorites',
     }));
@@ -140,7 +142,8 @@ export function AppSidebar() {
     ];
 
     setAllItems(getSortedItems(combinedItems));
-  }, [favorites, getSortedItems, isManagerOrPlanner, userRole]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favorites, isManagerOrPlanner, userRole]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
