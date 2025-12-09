@@ -289,6 +289,34 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     }
   }, [location.search]);
 
+  // Handle favorite from URL parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const favoriteId = params.get('favorite');
+    
+    if (favoriteId && favorites.length > 0 && teams.length > 0) {
+      const favorite = favorites.find(f => f.id === favoriteId);
+      if (favorite) {
+        // Apply the favorite's team selection
+        setSelectedTeams(favorite.team_ids);
+        // Switch to team-availability view to show the filtered team(s)
+        setViewMode('team-availability');
+        
+        toast({
+          title: "Favorite Loaded",
+          description: `Showing teams for "${favorite.name}"`,
+        });
+        
+        // Clean up URL parameter
+        params.delete('favorite');
+        const newSearch = params.toString();
+        const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}`;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, favorites, teams]);
+
   useEffect(() => {
     if (initialTeamId && initialTeamId !== '' && teams.length > 0) {
       const teamExists = teams.find(team => team.id === initialTeamId);
