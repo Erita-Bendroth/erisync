@@ -23,6 +23,7 @@ import { RosterCalendarPreview } from "./RosterCalendarPreview";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
 import { Rocket, Key } from "lucide-react";
 import { toast } from "sonner";
+import { RosterValidationPanel } from "./RosterValidationPanel";
 
 interface Team {
   id: string;
@@ -324,6 +325,13 @@ export function RosterBuilderDialog({
           </TabsList>
 
           <TabsContent value="build" className="space-y-4">
+            {rosterId && (
+              <RosterValidationPanel
+                rosterId={rosterId}
+                partnershipId={partnershipId}
+                cycleLength={cycleLength}
+              />
+            )}
             {rosterId ? (
               <RosterWeekGrid
                 rosterId={rosterId}
