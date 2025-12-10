@@ -52,6 +52,53 @@ export type Database = {
           },
         ]
       }
+      country_shift_limits: {
+        Row: {
+          country_code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          max_shifts_per_year: number
+          notes: string | null
+          partnership_id: string | null
+          shift_type: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          country_code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_shifts_per_year: number
+          notes?: string | null
+          partnership_id?: string | null
+          shift_type: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_shifts_per_year?: number
+          notes?: string | null
+          partnership_id?: string | null
+          shift_type?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "country_shift_limits_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "team_planning_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_job_logs: {
         Row: {
           error_message: string | null
