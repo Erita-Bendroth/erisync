@@ -15,6 +15,7 @@ import AdminHolidayManager from "./AdminHolidayManager";
 import { ShiftTimeDefinitions } from "../schedule/ShiftTimeDefinitions";
 import { TeamGroupManager } from "../schedule/TeamGroupManager";
 import { ShiftRotationTemplateManager } from "../schedule/ShiftRotationTemplateManager";
+import { CountryShiftLimits } from "./CountryShiftLimits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
@@ -396,12 +397,13 @@ const AdminSetup = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
           <TabsTrigger value="shifts">Shift Times</TabsTrigger>
           <TabsTrigger value="groups">Team Groups</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="limits">Shift Limits</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users" className="space-y-6">
@@ -572,6 +574,10 @@ const AdminSetup = () => {
         
         <TabsContent value="templates" className="space-y-6">
           <ShiftRotationTemplateManager teams={teams} />
+        </TabsContent>
+        
+        <TabsContent value="limits" className="space-y-6">
+          <CountryShiftLimits />
         </TabsContent>
       </Tabs>
     </div>

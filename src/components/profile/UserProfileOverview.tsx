@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, differenceInDays, parseISO } from "date-fns";
 import * as XLSX from 'xlsx';
 import { formatUserName } from "@/lib/utils";
+import { ShiftLimitTracker } from "@/components/schedule/ShiftLimitTracker";
 
 interface UserProfileOverviewProps {
   userId: string;
@@ -456,6 +457,15 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
           </div>
         </CardContent>
       </Card>
+
+      {/* Shift Limit Tracker */}
+      {profile.country_code && (
+        <ShiftLimitTracker
+          userId={userId}
+          countryCode={profile.country_code}
+          year={new Date().getFullYear()}
+        />
+      )}
     </div>
   );
 };
