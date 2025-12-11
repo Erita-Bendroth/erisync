@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatUserName } from '@/lib/utils';
+import { useCoverageImpact, CoverageImpactResult } from '@/hooks/useCoverageImpact';
+import { CoverageImpactWarningDisplay } from '@/components/schedule/CoverageImpactWarning';
 
 interface VacationRequest {
   id: string;
@@ -109,6 +111,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   const [bulkRejectionReason, setBulkRejectionReason] = useState('');
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [approvalMessage, setApprovalMessage] = useState('');
+  const [impactAcknowledged, setImpactAcknowledged] = useState(false);
+  const coverageImpact = useCoverageImpact();
 
   useEffect(() => {
     fetchCurrentUser();
@@ -338,10 +342,14 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     });
   };
 
-  const openApproveDialog = (request: GroupedRequest) => {
+  const openApproveDialog = async (request: GroupedRequest) => {
     setSelectedRequest(request);
     setApprovalMessage('Reminder to input your vacation into your time-schedule, like VSP, Cozone etc.');
+    setImpactAcknowledged(false);
     setApproveDialogOpen(true);
+    
+    // Analyze coverage impact
+    await coverageImpact.analyzeImpact(request.user_id, request.team_id, request.dates);
   };
 
   const handleApprove = async () => {
@@ -1082,7 +1090,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
       {/* Approval Dialog */}
       <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Approve Vacation Request</DialogTitle>
             <DialogDescription>
@@ -1105,6 +1113,15 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             </div>
           )}
 
+          {/* Coverage Impact Warning */}
+          <CoverageImpactWarningDisplay
+            warnings={coverageImpact.warnings}
+            loading={coverageImpact.loading}
+            acknowledged={impactAcknowledged}
+            onAcknowledgeChange={setImpactAcknowledged}
+            showAcknowledge={coverageImpact.hasCriticalImpact}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="approval-message">Message (optional)</Label>
             <Textarea
@@ -1123,6 +1140,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                 setApproveDialogOpen(false);
                 setSelectedRequest(null);
                 setApprovalMessage('');
+                setImpactAcknowledged(false);
               }}
               disabled={processingId !== null}
             >
@@ -1130,7 +1148,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
             </Button>
             <Button
               onClick={handleApprove}
-              disabled={processingId !== null}
+              disabled={processingId !== null || (coverageImpact.hasCriticalImpact && !impactAcknowledged)}
             >
               {processingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Approve Request
