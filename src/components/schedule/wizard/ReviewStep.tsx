@@ -372,6 +372,11 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
               ? `Auto-generated ${finalShiftInfo.shiftName} (Rotation)`
               : `Auto-generated ${finalShiftInfo.shiftName}`;
             
+            // Include metadata for holiday cleanup tracking
+            const entryMetadata = wizardData.skipHolidays 
+              ? { skip_holidays: true, bulk_generated: true }
+              : { bulk_generated: true };
+
             entries.push({
               user_id: userProfile.userId,
               team_id: wizardData.selectedTeam,
@@ -381,6 +386,7 @@ export const ReviewStep = ({ wizardData, onScheduleGenerated }: ReviewStepProps)
               availability_status: "available" as const,
               notes: `Times: ${timeInfo}\n${description}`,
               created_by: user.id,
+              metadata: entryMetadata,
             });
           }
         }

@@ -1015,6 +1015,7 @@ export type Database = {
           created_by: string
           date: string
           id: string
+          metadata: Json | null
           notes: string | null
           shift_time_definition_id: string | null
           shift_type: Database["public"]["Enums"]["shift_type"] | null
@@ -1029,6 +1030,7 @@ export type Database = {
           created_by: string
           date: string
           id?: string
+          metadata?: Json | null
           notes?: string | null
           shift_time_definition_id?: string | null
           shift_type?: Database["public"]["Enums"]["shift_type"] | null
@@ -1043,6 +1045,7 @@ export type Database = {
           created_by?: string
           date?: string
           id?: string
+          metadata?: Json | null
           notes?: string | null
           shift_time_definition_id?: string | null
           shift_type?: Database["public"]["Enums"]["shift_type"] | null

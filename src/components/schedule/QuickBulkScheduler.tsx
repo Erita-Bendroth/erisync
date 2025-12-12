@@ -181,8 +181,8 @@ export const QuickBulkScheduler = ({ userId, onScheduleGenerated }: QuickBulkSch
         }
       }
 
-      // Calculate entries
-      const entries = await calculateBulkEntries(config, members, userId, supabase);
+      // Calculate entries - pass skipHolidays flag for metadata tracking
+      const entries = await calculateBulkEntries(config, members, userId, supabase, config.skipHolidays);
 
       if (entries.length === 0) {
         toast({
