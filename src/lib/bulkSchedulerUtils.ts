@@ -1,6 +1,6 @@
 import { format, eachDayOfInterval, isWeekend as isWeekendDate } from 'date-fns';
 import { BulkSchedulerConfig } from '@/hooks/useBulkSchedulerState';
-import { Database } from '@/integrations/supabase/types';
+import { Database, Json } from '@/integrations/supabase/types';
 import { detectHolidays, HolidayInfo } from './holidayDetection';
 import { getApplicableShiftTimes } from './shiftTimeUtils';
 
@@ -18,6 +18,7 @@ export interface ScheduleEntryDraft {
   availability_status: AvailabilityStatus;
   created_by: string;
   notes?: string;
+  metadata?: Json;
 }
 
 interface TeamMemberWithLocation {
@@ -30,7 +31,8 @@ export const calculateBulkEntries = async (
   config: BulkSchedulerConfig,
   allTeamMembers: Array<TeamMemberWithLocation>,
   userId: string,
-  supabase: any
+  supabase: any,
+  includeSkipHolidaysMetadata: boolean = false
 ): Promise<ScheduleEntryDraft[]> => {
   if (!config.dateRange.start || !config.dateRange.end || !config.teamId) {
     return [];
@@ -184,6 +186,10 @@ export const calculateBulkEntries = async (
 
       console.log(`📝 Creating entry for ${rotationUserId} on ${dateStr}: shift_type=${resolvedShiftType}`);
 
+      const entryMetadata = includeSkipHolidaysMetadata 
+        ? { skip_holidays: true, bulk_generated: true }
+        : { bulk_generated: true };
+
       entries.push({
         user_id: rotationUserId,
         team_id: config.teamId,
@@ -194,6 +200,7 @@ export const calculateBulkEntries = async (
         availability_status: 'available' as AvailabilityStatus,
         created_by: userId,
         notes,
+        metadata: entryMetadata,
       });
     } else {
       // Regular mode: assign to all selected users
@@ -251,6 +258,10 @@ export const calculateBulkEntries = async (
 
         console.log(`📝 Creating entry for ${targetUserId} on ${dateStr}: shift_type=${resolvedShiftType}`);
 
+        const entryMetadata = includeSkipHolidaysMetadata 
+          ? { skip_holidays: true, bulk_generated: true }
+          : { bulk_generated: true };
+
         entries.push({
           user_id: targetUserId,
           team_id: config.teamId,
@@ -261,6 +272,7 @@ export const calculateBulkEntries = async (
           availability_status: 'available' as AvailabilityStatus,
           created_by: userId,
           notes,
+          metadata: entryMetadata,
         });
       }
     }

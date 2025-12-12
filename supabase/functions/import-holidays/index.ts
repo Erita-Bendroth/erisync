@@ -428,9 +428,139 @@ Deno.serve(async (req) => {
 
     console.log(`Successfully upserted holidays for ${country_code} ${year}`)
 
+    // ============================================
+    // AUTO-CLEANUP: Remove conflicting schedule entries
+    // Only cleans up entries that were created with skip_holidays=true
+    // This handles the case where holidays were imported AFTER schedules were created
+    // ============================================
+    const holidayDates = holidayData.map(h => h.date);
+    let cleanedUpCount = 0;
+    let cleanedUpVacationCount = 0;
+
+    if (holidayDates.length > 0) {
+      console.log(`🧹 Starting auto-cleanup for ${holidayDates.length} holiday dates...`);
+
+      // Find users in this country/region
+      let usersQuery = supabaseClient
+        .from('profiles')
+        .select('user_id')
+        .eq('country_code', country_code);
+      
+      if (region_code) {
+        usersQuery = usersQuery.eq('region_code', region_code);
+      }
+
+      const { data: matchingUsers, error: usersError } = await usersQuery;
+
+      if (usersError) {
+        console.error('❌ Error fetching users for cleanup:', usersError);
+      } else if (matchingUsers && matchingUsers.length > 0) {
+        const userIds = matchingUsers.map(u => u.user_id);
+        console.log(`   Found ${userIds.length} users in ${country_code}/${region_code || 'all regions'}`);
+
+        // Delete work and vacation schedule entries that:
+        // 1. Fall on holiday dates
+        // 2. Belong to users in this country/region
+        // 3. Have metadata.skip_holidays = true (were created with "skip holidays" option)
+        const { data: deletedEntries, error: cleanupError } = await supabaseClient
+          .from('schedule_entries')
+          .delete()
+          .in('date', holidayDates)
+          .in('user_id', userIds)
+          .in('activity_type', ['work', 'vacation'])
+          .eq('metadata->>skip_holidays', 'true')
+          .select('id, user_id, date, activity_type, team_id');
+
+        if (cleanupError) {
+          console.warn('⚠️ Failed to clean up schedule entries:', cleanupError);
+        } else if (deletedEntries && deletedEntries.length > 0) {
+          cleanedUpCount = deletedEntries.filter(e => e.activity_type === 'work').length;
+          cleanedUpVacationCount = deletedEntries.filter(e => e.activity_type === 'vacation').length;
+          
+          console.log(`✅ Cleaned up ${cleanedUpCount} work entries and ${cleanedUpVacationCount} vacation entries on holiday dates`);
+
+          // Handle vacation_requests for deleted vacation entries
+          if (cleanedUpVacationCount > 0) {
+            const vacationEntries = deletedEntries.filter(e => e.activity_type === 'vacation');
+            
+            for (const entry of vacationEntries) {
+              // Find and update the corresponding vacation_request
+              const { error: vacationUpdateError } = await supabaseClient
+                .from('vacation_requests')
+                .update({
+                  status: 'rejected',
+                  rejection_reason: `Vacation day falls on public holiday - automatically removed`,
+                  rejected_at: new Date().toISOString()
+                })
+                .eq('user_id', entry.user_id)
+                .eq('requested_date', entry.date)
+                .eq('status', 'approved');
+
+              if (vacationUpdateError) {
+                console.warn(`⚠️ Failed to update vacation_request for ${entry.user_id} on ${entry.date}:`, vacationUpdateError);
+              }
+            }
+          }
+
+          // Log cleanup to schedule_change_log for audit trail
+          const changeLogEntries = deletedEntries.map(entry => ({
+            schedule_entry_id: null, // Entry was deleted
+            user_id: entry.user_id,
+            team_id: entry.team_id,
+            change_type: 'holiday_auto_cleanup',
+            changed_by: user.id,
+            old_values: { 
+              date: entry.date, 
+              activity_type: entry.activity_type,
+              reason: `Auto-removed: ${country_code} holiday imported` 
+            },
+            new_values: null
+          }));
+
+          const { error: logError } = await supabaseClient
+            .from('schedule_change_log')
+            .insert(changeLogEntries);
+
+          if (logError) {
+            console.warn('⚠️ Failed to log schedule changes:', logError);
+          }
+
+          // Create notifications for affected users
+          const affectedUserIds = [...new Set(deletedEntries.map(e => e.user_id))];
+          const notifications = affectedUserIds.map(userId => ({
+            user_id: userId,
+            type: 'schedule_change',
+            title: 'Schedule Updated',
+            message: `Some of your schedule entries were automatically removed because they fall on public holidays in your location.`,
+            link: '/schedule',
+            metadata: { 
+              cleanup_reason: 'holiday_import',
+              country_code,
+              region_code 
+            }
+          }));
+
+          const { error: notifyError } = await supabaseClient
+            .from('notifications')
+            .insert(notifications);
+
+          if (notifyError) {
+            console.warn('⚠️ Failed to create notifications:', notifyError);
+          } else {
+            console.log(`📬 Notified ${affectedUserIds.length} users about schedule cleanup`);
+          }
+        } else {
+          console.log('ℹ️ No conflicting schedule entries found to clean up');
+        }
+      } else {
+        console.log(`ℹ️ No users found in ${country_code}/${region_code || 'all regions'} - skipping cleanup`);
+      }
+    }
+
     // Update status to completed immediately - handle NULL region_code correctly
     console.log(`📊 Updating import status for ${country_code} ${year} ${region_code || '(no region)'}`);
     console.log(`   - Imported count: ${holidayData.length}`);
+    console.log(`   - Cleaned up: ${cleanedUpCount} work entries, ${cleanedUpVacationCount} vacation entries`);
     
     const statusUpdate = region_code 
       ? supabaseClient
@@ -467,7 +597,10 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         imported: holidayData.length,
-        message: `Holidays upserted successfully for ${country_code} ${year}`,
+        cleaned_up: cleanedUpCount + cleanedUpVacationCount,
+        cleaned_up_work: cleanedUpCount,
+        cleaned_up_vacation: cleanedUpVacationCount,
+        message: `Holidays upserted successfully for ${country_code} ${year}${cleanedUpCount + cleanedUpVacationCount > 0 ? `. Cleaned up ${cleanedUpCount + cleanedUpVacationCount} conflicting schedule entries.` : ''}`,
         total: holidayData.length
       }),
       { 
