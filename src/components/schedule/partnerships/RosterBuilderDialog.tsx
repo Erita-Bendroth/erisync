@@ -6,24 +6,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterWeekGrid } from "./RosterWeekGrid";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
-import { RosterCalendarPreview } from "./RosterCalendarPreview";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
-import { Rocket, Key } from "lucide-react";
+import { Rocket, Key, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
+import { addWeeks, format } from "date-fns";
 
 interface Team {
   id: string;
@@ -59,6 +62,8 @@ export function RosterBuilderDialog({
   const [activeTab, setActiveTab] = useState("build");
   const [isAdmin, setIsAdmin] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [showActivationDialog, setShowActivationDialog] = useState(false);
+  const [activationMode, setActivationMode] = useState<"normal" | "admin">("normal");
 
   useEffect(() => {
     if (open) {
@@ -209,24 +214,28 @@ export function RosterBuilderDialog({
   // Allow editing during draft and pending_approval, lock only after approved/implemented
   const isReadOnly = status === "approved" || status === "implemented";
 
-  const handleAdminActivate = async () => {
+  const handleRequestActivation = (mode: "normal" | "admin") => {
+    setActivationMode(mode);
+    setShowActivationDialog(true);
+  };
+
+  const handleConfirmActivation = async () => {
     if (!rosterId) return;
 
-    const confirmed = confirm(
-      "Admin Override: This will skip all approvals and immediately activate the roster. Continue?"
-    );
-    if (!confirmed) return;
-
+    setShowActivationDialog(false);
     setActivating(true);
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Directly generate schedules
       const result = await generateRosterSchedules(rosterId, user.id);
 
       if (result.success) {
-        toast.success(`Roster activated! Created ${result.entriesCreated} schedule entries.`);
+        const deletedMsg = result.entriesDeleted && result.entriesDeleted > 0 
+          ? `Replaced ${result.entriesDeleted} existing entries. ` 
+          : "";
+        toast.success(`Roster activated! ${deletedMsg}Created ${result.entriesCreated} schedule entries.`);
         setStatus("implemented");
         onSuccess();
       } else {
@@ -240,174 +249,189 @@ export function RosterBuilderDialog({
     }
   };
 
-  const handleActivateRoster = async () => {
-    if (!rosterId) return;
-
-    const confirmed = confirm(
-      "This will generate all schedule entries based on the approved roster. Continue?"
-    );
-    if (!confirmed) return;
-
-    setActivating(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const result = await generateRosterSchedules(rosterId, user.id);
-
-      if (result.success) {
-        toast.success(`Roster activated! Created ${result.entriesCreated} schedule entries.`);
-        setStatus("implemented");
-        onSuccess();
-      } else {
-        throw new Error(result.error || "Failed to generate schedules");
-      }
-    } catch (error) {
-      console.error("Error activating roster:", error);
-      toast.error("Failed to activate roster");
-    } finally {
-      setActivating(false);
-    }
+  // Calculate display dates for confirmation dialog
+  const getDateRangeDisplay = () => {
+    const start = new Date(startDate);
+    const end = addWeeks(start, 52);
+    return {
+      startDisplay: format(start, "MMM d, yyyy"),
+      endDisplay: format(end, "MMM d, yyyy"),
+    };
   };
+
+  const dateRange = getDateRangeDisplay();
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="rosterName">Roster Name</Label>
-              <Input
-                id="rosterName"
-                value={rosterName}
-                onChange={(e) => setRosterName(e.target.value)}
-                placeholder="e.g., Q1 2025 Rotation Schedule"
-                disabled={isReadOnly}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cycleLength">Cycle Length (weeks)</Label>
-              <Input
-                id="cycleLength"
-                type="number"
-                min="1"
-                max="52"
-                value={cycleLength}
-                onChange={(e) => setCycleLength(parseInt(e.target.value))}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="build">Weekly Assignments</TabsTrigger>
-            <TabsTrigger value="approvals">Manager Approvals</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="build" className="space-y-4">
-            {rosterId && (
-              <RosterValidationPanel
-                rosterId={rosterId}
-                partnershipId={partnershipId}
-                cycleLength={cycleLength}
-              />
-            )}
-            {rosterId ? (
-              <RosterWeekGrid
-                rosterId={rosterId}
-                partnershipId={partnershipId}
-                cycleLength={cycleLength}
-                isReadOnly={isReadOnly}
-              />
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Please save the roster draft first to build assignments
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rosterName">Roster Name</Label>
+                <Input
+                  id="rosterName"
+                  value={rosterName}
+                  onChange={(e) => setRosterName(e.target.value)}
+                  placeholder="e.g., Q1 2025 Rotation Schedule"
+                  disabled={isReadOnly}
+                />
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="approvals">
-            {rosterId ? (
-              <RosterApprovalPanel 
-                rosterId={rosterId} 
-                teams={teams}
-                onRosterActivated={() => {
-                  setStatus("implemented");
-                  onSuccess();
-                }}
-              />
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Save and submit roster to manage approvals
+              <div className="space-y-2">
+                <Label htmlFor="cycleLength">Cycle Length (weeks)</Label>
+                <Input
+                  id="cycleLength"
+                  type="number"
+                  min="1"
+                  max="52"
+                  value={cycleLength}
+                  onChange={(e) => setCycleLength(parseInt(e.target.value))}
+                  disabled={isReadOnly}
+                />
               </div>
-            )}
-          </TabsContent>
-          </Tabs>
+            </div>
 
-          <div className="flex justify-between pt-4 border-t">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-            <div className="flex gap-2">
-              {(status === "draft" || status === "pending_approval") && (
-                <Button
-                  variant="outline"
-                  onClick={handleSaveDraft}
-                  disabled={saving}
-                >
-                  Save Draft
-                </Button>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Start Date</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  disabled={isReadOnly}
+                />
+              </div>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="build">Weekly Assignments</TabsTrigger>
+              <TabsTrigger value="approvals">Manager Approvals</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="build" className="space-y-4">
+              {rosterId && (
+                <RosterValidationPanel
+                  rosterId={rosterId}
+                  partnershipId={partnershipId}
+                  cycleLength={cycleLength}
+                />
               )}
-              {status === "draft" && rosterId && (
-                <Button onClick={handleSubmitForApproval}>
-                  Submit for Approval
-                </Button>
+              {rosterId ? (
+                <RosterWeekGrid
+                  rosterId={rosterId}
+                  partnershipId={partnershipId}
+                  cycleLength={cycleLength}
+                  isReadOnly={isReadOnly}
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Please save the roster draft first to build assignments
+                </div>
               )}
-              {isAdmin && (status === "draft" || status === "pending_approval") && rosterId && (
-                <Button
-                  onClick={handleAdminActivate}
-                  disabled={activating}
-                  variant="secondary"
-                  className="gap-2"
-                >
-                  <Key className="h-4 w-4" />
-                  {activating ? "Activating..." : "Admin: Activate Now"}
-                </Button>
+            </TabsContent>
+
+            <TabsContent value="approvals">
+              {rosterId ? (
+                <RosterApprovalPanel 
+                  rosterId={rosterId} 
+                  teams={teams}
+                  onRosterActivated={() => {
+                    setStatus("implemented");
+                    onSuccess();
+                  }}
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Save and submit roster to manage approvals
+                </div>
               )}
-              {status === "approved" && rosterId && (
-                <Button
-                  onClick={handleActivateRoster}
-                  disabled={activating}
-                  className="gap-2"
-                >
-                  <Rocket className="h-4 w-4" />
-                  {activating ? "Activating..." : "Activate Roster"}
-                </Button>
-              )}
+            </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-between pt-4 border-t">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+              <div className="flex gap-2">
+                {(status === "draft" || status === "pending_approval") && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSaveDraft}
+                    disabled={saving}
+                  >
+                    Save Draft
+                  </Button>
+                )}
+                {status === "draft" && rosterId && (
+                  <Button onClick={handleSubmitForApproval}>
+                    Submit for Approval
+                  </Button>
+                )}
+                {isAdmin && (status === "draft" || status === "pending_approval") && rosterId && (
+                  <Button
+                    onClick={() => handleRequestActivation("admin")}
+                    disabled={activating}
+                    variant="secondary"
+                    className="gap-2"
+                  >
+                    <Key className="h-4 w-4" />
+                    {activating ? "Activating..." : "Admin: Activate Now"}
+                  </Button>
+                )}
+                {status === "approved" && rosterId && (
+                  <Button
+                    onClick={() => handleRequestActivation("normal")}
+                    disabled={activating}
+                    className="gap-2"
+                  >
+                    <Rocket className="h-4 w-4" />
+                    {activating ? "Activating..." : "Activate Roster"}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showActivationDialog} onOpenChange={setShowActivationDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {activationMode === "admin" ? "Admin Override: " : ""}Activate Roster
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This will <strong>REPLACE all existing work schedules</strong> for partnership 
+                members from <strong>{dateRange.startDisplay}</strong> to <strong>{dateRange.endDisplay}</strong>.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Vacations, training, and other non-work entries will be preserved.
+              </p>
+              {activationMode === "admin" && (
+                <p className="text-amber-600 font-medium">
+                  Admin mode: This will skip approval requirements.
+                </p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmActivation}>
+              Yes, Replace & Activate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

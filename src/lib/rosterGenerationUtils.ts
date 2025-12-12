@@ -31,7 +31,7 @@ interface TeamMember {
 export async function generateRosterSchedules(
   rosterId: string,
   userId: string
-): Promise<{ success: boolean; entriesCreated: number; error?: string }> {
+): Promise<{ success: boolean; entriesCreated: number; entriesDeleted?: number; error?: string }> {
   try {
     // Fetch roster configuration
     const { data: roster, error: rosterError } = await supabase
@@ -80,6 +80,38 @@ export async function generateRosterSchedules(
       region_code: tm.profiles.region_code,
     }));
 
+    // Calculate date range for cleanup
+    const startDate = new Date(roster.start_date);
+    const endDate = roster.end_date
+      ? new Date(roster.end_date)
+      : addWeeks(startDate, 52);
+    
+    const startDateStr = format(startDate, "yyyy-MM-dd");
+    const endDateStr = format(endDate, "yyyy-MM-dd");
+    
+    // Get unique user IDs and team IDs
+    const userIds = [...new Set(membersList.map(m => m.user_id))];
+    const teamIds = partnership.team_ids;
+
+    // Delete existing work entries for partnership members within date range
+    console.log(`🧹 Cleaning up existing work entries from ${startDateStr} to ${endDateStr} for ${userIds.length} users...`);
+    
+    const { error: deleteError, count: deletedCount } = await supabase
+      .from("schedule_entries")
+      .delete({ count: 'exact' })
+      .in("user_id", userIds)
+      .in("team_id", teamIds)
+      .gte("date", startDateStr)
+      .lte("date", endDateStr)
+      .eq("activity_type", "work");
+
+    if (deleteError) {
+      console.error("Error deleting existing entries:", deleteError);
+      throw deleteError;
+    }
+
+    console.log(`🧹 Deleted ${deletedCount || 0} existing work entries`);
+
     // Generate schedule entries
     const scheduleEntries = await generateScheduleEntries(
       roster,
@@ -127,7 +159,7 @@ export async function generateRosterSchedules(
 
     if (updateError) throw updateError;
 
-    return { success: true, entriesCreated };
+    return { success: true, entriesCreated, entriesDeleted: deletedCount || 0 };
   } catch (error) {
     console.error("Error generating roster schedules:", error);
     return {
