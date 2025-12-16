@@ -353,7 +353,13 @@ export function TimeEntryDialog({
                 <div className="font-medium">{formatDecimalHours(calculation.grossHours)}</div>
                 
                 <div className="text-muted-foreground">Break:</div>
-                <div className="font-medium">{breakMinutes} min</div>
+                <div className="font-medium">
+                  {calculation.grossHours <= 6 ? (
+                    <span className="text-muted-foreground">N/A <span className="text-xs">(not required for ≤6h)</span></span>
+                  ) : (
+                    <>{breakMinutes} min</>
+                  )}
+                </div>
                 
                 <div className="text-muted-foreground">Actual Worked:</div>
                 <div className="font-medium">{formatDecimalHours(calculation.actualHours)}</div>
