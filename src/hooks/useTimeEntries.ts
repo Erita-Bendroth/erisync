@@ -170,6 +170,35 @@ export function useTimeEntries(monthDate: Date) {
 
       if (error) throw error;
 
+      // Sync home_office entries to schedule_entries for manager visibility
+      if (input.entry_type === 'home_office') {
+        // Get user's team
+        const { data: teamMembership } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single();
+
+        if (teamMembership?.team_id) {
+          // Upsert schedule entry with working_from_home activity type
+          await supabase
+            .from('schedule_entries')
+            .upsert({
+              user_id: user.id,
+              team_id: teamMembership.team_id,
+              date: input.entry_date,
+              activity_type: 'working_from_home',
+              shift_type: 'normal',
+              availability_status: 'available',
+              created_by: user.id,
+              notes: input.comment || null,
+            }, {
+              onConflict: 'user_id,date,team_id',
+            });
+        }
+      }
+
       // Update monthly summary
       await updateMonthlySummary();
 
