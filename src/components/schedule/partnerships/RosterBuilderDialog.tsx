@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -16,14 +16,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterWeekGrid } from "./RosterWeekGrid";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
+import { RosterProgressStepper } from "./RosterProgressStepper";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
-import { Rocket, Key, AlertTriangle, Users } from "lucide-react";
+import { Rocket, Key, AlertTriangle, Users, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, format } from "date-fns";
@@ -64,6 +71,48 @@ export function RosterBuilderDialog({
   const [activating, setActivating] = useState(false);
   const [showActivationDialog, setShowActivationDialog] = useState(false);
   const [activationMode, setActivationMode] = useState<"normal" | "admin">("normal");
+  const [myTeamProgress, setMyTeamProgress] = useState({ completed: 0, total: 0 });
+  const [allTeamsProgress, setAllTeamsProgress] = useState({ completed: 0, total: 0 });
+
+  // Track progress updates from RosterWeekGrid
+  const handleProgressChange = useCallback((completed: number, total: number) => {
+    setMyTeamProgress({ completed, total });
+  }, []);
+
+  // Calculate all teams progress
+  useEffect(() => {
+    const fetchAllTeamsProgress = async () => {
+      if (!rosterId) return;
+      
+      try {
+        // Get all team members count
+        const { data: members } = await supabase.rpc("get_partnership_team_members", {
+          p_partnership_id: partnershipId,
+        });
+        
+        if (!members) return;
+        
+        // Get unique users with assignments
+        const { data: assignments } = await supabase
+          .from("roster_week_assignments")
+          .select("user_id, team_id")
+          .eq("roster_id", rosterId);
+        
+        const uniqueAssigned = new Set(assignments?.map(a => `${a.user_id}_${a.team_id}`) || []);
+        
+        setAllTeamsProgress({
+          completed: uniqueAssigned.size,
+          total: members.length,
+        });
+      } catch (error) {
+        console.error("Error fetching progress:", error);
+      }
+    };
+    
+    if (open && rosterId) {
+      fetchAllTeamsProgress();
+    }
+  }, [open, rosterId, partnershipId]);
 
   useEffect(() => {
     if (open) {
@@ -262,84 +311,113 @@ export function RosterBuilderDialog({
   const dateRange = getDateRangeDisplay();
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
-            </DialogTitle>
-          </DialogHeader>
+    <TooltipProvider>
+      <>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
+              </DialogTitle>
+            </DialogHeader>
 
-          {/* Workflow Guidance Banner */}
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="bg-blue-100 dark:bg-blue-900 rounded-full p-2 shrink-0">
-                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-semibold text-blue-900 dark:text-blue-100">
-                  📋 This is a shared roster for all partnership teams
-                </h4>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Each team manager edits <strong>their own team's rows</strong> below (highlighted in blue). 
-                  You can view other teams' assignments but should only edit your own.
-                  Once all teams have completed their planning, submit for approval.
-                </p>
-                {teams.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {teams.map(team => (
-                      <span 
-                        key={team.id}
-                        className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                      >
-                        {team.name}
-                      </span>
-                    ))}
+            {/* Progress Stepper + Guidance Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Progress Stepper */}
+              <RosterProgressStepper
+                rosterName={rosterName}
+                rosterId={rosterId}
+                status={status}
+                myTeamProgress={myTeamProgress}
+                allTeamsProgress={allTeamsProgress}
+              />
+
+              {/* Workflow Guidance Banner */}
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-100 dark:bg-blue-900 rounded-full p-2 shrink-0">
+                    <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="rosterName">Roster Name</Label>
-                <Input
-                  id="rosterName"
-                  value={rosterName}
-                  onChange={(e) => setRosterName(e.target.value)}
-                  placeholder="e.g., Q1 2025 Rotation Schedule"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cycleLength">Cycle Length (weeks)</Label>
-                <Input
-                  id="cycleLength"
-                  type="number"
-                  min="1"
-                  max="52"
-                  value={cycleLength}
-                  onChange={(e) => setCycleLength(parseInt(e.target.value))}
-                  disabled={isReadOnly}
-                />
+                  <div className="space-y-1">
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                      📋 Shared roster for all teams
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Edit <strong>your team's rows</strong> (highlighted in blue). 
+                      Other team managers will complete their sections.
+                    </p>
+                    {teams.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {teams.map(team => (
+                          <span 
+                            key={team.id}
+                            className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                          >
+                            {team.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  disabled={isReadOnly}
-                />
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rosterName">Roster Name</Label>
+                  <Input
+                    id="rosterName"
+                    value={rosterName}
+                    onChange={(e) => setRosterName(e.target.value)}
+                    placeholder="e.g., Q1 2025 Rotation Schedule"
+                    disabled={isReadOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cycleLength" className="flex items-center gap-1">
+                    How many weeks before pattern repeats?
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>If you have 5 people taking turns on late shift, set this to 5 weeks. The pattern will repeat every 5 weeks for the whole year.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    id="cycleLength"
+                    type="number"
+                    min="1"
+                    max="52"
+                    value={cycleLength}
+                    onChange={(e) => setCycleLength(parseInt(e.target.value))}
+                    disabled={isReadOnly}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="startDate" className="flex items-center gap-1">
+                    When should this schedule start?
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>The date when this rotation schedule becomes active. Usually the start of a quarter or year.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    disabled={isReadOnly}
+                  />
+                </div>
               </div>
-            </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
@@ -361,6 +439,7 @@ export function RosterBuilderDialog({
                   partnershipId={partnershipId}
                   cycleLength={cycleLength}
                   isReadOnly={isReadOnly}
+                  onProgressChange={handleProgressChange}
                 />
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -463,6 +542,7 @@ export function RosterBuilderDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+      </>
+    </TooltipProvider>
   );
 }

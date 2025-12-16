@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Loader2, Filter, Users } from "lucide-react";
+import { Loader2, Filter, Users, HelpCircle } from "lucide-react";
+import { RosterQuickActions } from "./RosterQuickActions";
 
 interface TeamMember {
   user_id: string;
@@ -42,6 +49,7 @@ interface RosterWeekGridProps {
   partnershipId: string;
   cycleLength: number;
   isReadOnly: boolean;
+  onProgressChange?: (myTeamAssigned: number, myTeamTotal: number) => void;
 }
 
 export function RosterWeekGrid({
@@ -49,6 +57,7 @@ export function RosterWeekGrid({
   partnershipId,
   cycleLength,
   isReadOnly,
+  onProgressChange,
 }: RosterWeekGridProps) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -56,6 +65,9 @@ export function RosterWeekGrid({
   const [dayByDayMode, setDayByDayMode] = useState(false);
   const [showOnlyMyTeam, setShowOnlyMyTeam] = useState(false);
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [undoStack, setUndoStack] = useState<Assignment[][]>([]);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     fetchCurrentUserTeams();
@@ -119,6 +131,17 @@ export function RosterWeekGrid({
     }
   };
 
+  // Calculate and report progress to parent
+  useEffect(() => {
+    if (onProgressChange && teamMembers.length > 0) {
+      const myTeamMembers = teamMembers.filter(m => userTeamIds.includes(m.team_id));
+      const myTeamAssigned = myTeamMembers.filter(m => 
+        assignments.some(a => a.user_id === m.user_id && a.team_id === m.team_id && a.shift_type)
+      ).length;
+      onProgressChange(myTeamAssigned, myTeamMembers.length);
+    }
+  }, [assignments, teamMembers, userTeamIds, onProgressChange]);
+
   const handleAssignmentChange = useCallback(async (
     weekNumber: number,
     userId: string,
@@ -128,8 +151,17 @@ export function RosterWeekGrid({
   ) => {
     if (isReadOnly) return;
 
+    // Save current state for undo
+    setUndoStack(prev => [...prev.slice(-4), assignments]);
+
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     let existingAssignmentId: string | null = null;
+    
+    // Show saving status
+    setSaveStatus("saving");
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
     
     // OPTIMISTIC UPDATE - Update UI immediately using functional updates to avoid closure issues
     if (newShiftType === "none" || newShiftType === null) {
@@ -227,6 +259,7 @@ export function RosterWeekGrid({
             if (error.code === '23505') {
               toast.error("Assignment already exists for this day/week");
               fetchAssignments(); // Refetch to sync state
+              setSaveStatus("error");
               return;
             }
             throw error;
@@ -240,13 +273,200 @@ export function RosterWeekGrid({
           }
         }
       }
+      
+      // Show saved status
+      setSaveStatus("saved");
+      saveTimeoutRef.current = setTimeout(() => {
+        setSaveStatus("idle");
+      }, 2000);
     } catch (error: any) {
       console.error("Error updating assignment:", error);
       toast.error("Failed to save - reverting changes");
+      setSaveStatus("error");
       // Refetch to restore correct state on error
       fetchAssignments();
     }
-  }, [rosterId, isReadOnly, fetchAssignments]);
+  }, [rosterId, isReadOnly, fetchAssignments, assignments]);
+
+  // Quick action: Copy Week 1 to all other weeks
+  const handleCopyWeekToAll = useCallback(async () => {
+    const week1Assignments = assignments.filter(a => a.week_number === 1);
+    if (week1Assignments.length === 0) {
+      toast.error("No assignments in Week 1 to copy");
+      return;
+    }
+
+    setUndoStack(prev => [...prev.slice(-4), assignments]);
+    setSaveStatus("saving");
+
+    try {
+      const newAssignments: any[] = [];
+      
+      for (let week = 2; week <= cycleLength; week++) {
+        for (const a of week1Assignments) {
+          // Only copy for my team
+          if (!userTeamIds.includes(a.team_id)) continue;
+          
+          newAssignments.push({
+            roster_id: rosterId,
+            week_number: week,
+            user_id: a.user_id,
+            team_id: a.team_id,
+            shift_type: a.shift_type,
+            day_of_week: a.day_of_week,
+            include_weekends: a.include_weekends,
+          });
+        }
+      }
+
+      if (newAssignments.length === 0) {
+        toast.error("No Week 1 assignments for your team to copy");
+        setSaveStatus("idle");
+        return;
+      }
+
+      // Delete existing assignments for weeks 2+ for my team
+      const { error: deleteError } = await supabase
+        .from("roster_week_assignments")
+        .delete()
+        .eq("roster_id", rosterId)
+        .in("team_id", userTeamIds)
+        .gt("week_number", 1);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new assignments
+      const { error: insertError } = await supabase
+        .from("roster_week_assignments")
+        .upsert(newAssignments, { onConflict: "roster_id,week_number,user_id,team_id,day_of_week" });
+
+      if (insertError) throw insertError;
+
+      await fetchAssignments();
+      toast.success(`Copied Week 1 to weeks 2-${cycleLength}`);
+      setSaveStatus("saved");
+      saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (error) {
+      console.error("Error copying week:", error);
+      toast.error("Failed to copy assignments");
+      setSaveStatus("error");
+    }
+  }, [assignments, cycleLength, rosterId, userTeamIds, fetchAssignments]);
+
+  // Quick action: Fill my team with a shift type
+  const handleFillMyTeam = useCallback(async (shiftType: string) => {
+    const myTeamMembers = teamMembers.filter(m => userTeamIds.includes(m.team_id));
+    if (myTeamMembers.length === 0) {
+      toast.error("No team members found");
+      return;
+    }
+
+    setUndoStack(prev => [...prev.slice(-4), assignments]);
+    setSaveStatus("saving");
+
+    try {
+      const newAssignments: any[] = [];
+      
+      for (const member of myTeamMembers) {
+        for (let week = 1; week <= cycleLength; week++) {
+          newAssignments.push({
+            roster_id: rosterId,
+            week_number: week,
+            user_id: member.user_id,
+            team_id: member.team_id,
+            shift_type: shiftType,
+            day_of_week: null,
+          });
+        }
+      }
+
+      const { error } = await supabase
+        .from("roster_week_assignments")
+        .upsert(newAssignments, { onConflict: "roster_id,week_number,user_id,team_id,day_of_week" });
+
+      if (error) throw error;
+
+      await fetchAssignments();
+      toast.success(`Filled your team with ${shiftType} shift`);
+      setSaveStatus("saved");
+      saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (error) {
+      console.error("Error filling team:", error);
+      toast.error("Failed to fill team");
+      setSaveStatus("error");
+    }
+  }, [teamMembers, userTeamIds, cycleLength, rosterId, assignments, fetchAssignments]);
+
+  // Quick action: Clear my team assignments
+  const handleClearMyTeam = useCallback(async () => {
+    setUndoStack(prev => [...prev.slice(-4), assignments]);
+    setSaveStatus("saving");
+
+    try {
+      const { error } = await supabase
+        .from("roster_week_assignments")
+        .delete()
+        .eq("roster_id", rosterId)
+        .in("team_id", userTeamIds);
+
+      if (error) throw error;
+
+      await fetchAssignments();
+      toast.success("Cleared all your team's assignments");
+      setSaveStatus("saved");
+      saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (error) {
+      console.error("Error clearing team:", error);
+      toast.error("Failed to clear team");
+      setSaveStatus("error");
+    }
+  }, [rosterId, userTeamIds, assignments, fetchAssignments]);
+
+  // Undo last action
+  const handleUndo = useCallback(async () => {
+    if (undoStack.length === 0) return;
+
+    const previousState = undoStack[undoStack.length - 1];
+    setUndoStack(prev => prev.slice(0, -1));
+    setSaveStatus("saving");
+
+    try {
+      // Delete all current assignments for my teams
+      await supabase
+        .from("roster_week_assignments")
+        .delete()
+        .eq("roster_id", rosterId)
+        .in("team_id", userTeamIds);
+
+      // Re-insert previous state
+      const myPreviousAssignments = previousState
+        .filter(a => userTeamIds.includes(a.team_id))
+        .map(a => ({
+          roster_id: rosterId,
+          week_number: a.week_number,
+          user_id: a.user_id,
+          team_id: a.team_id,
+          shift_type: a.shift_type,
+          day_of_week: a.day_of_week,
+          include_weekends: a.include_weekends,
+        }));
+
+      if (myPreviousAssignments.length > 0) {
+        await supabase
+          .from("roster_week_assignments")
+          .insert(myPreviousAssignments);
+      }
+
+      await fetchAssignments();
+      toast.success("Undone");
+      setSaveStatus("saved");
+      saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (error) {
+      console.error("Error undoing:", error);
+      toast.error("Failed to undo");
+      setSaveStatus("error");
+    }
+  }, [undoStack, rosterId, userTeamIds, fetchAssignments]);
 
   // Memoized assignment lookup map for better performance
   const assignmentMap = useMemo(() => {
@@ -395,55 +615,79 @@ export function RosterWeekGrid({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Controls Card */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="day-mode"
-                checked={dayByDayMode}
-                onCheckedChange={setDayByDayMode}
-                disabled={isReadOnly}
-              />
-              <Label htmlFor="day-mode" className="text-sm font-medium">
-                Day-by-day assignments
-              </Label>
-            </div>
-            
-            {/* My Team Filter */}
-            {userTeamIds.length > 0 && (
-              <div className="flex items-center gap-2 border-l pl-4">
-                <Button
-                  variant={showOnlyMyTeam ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowOnlyMyTeam(!showOnlyMyTeam)}
-                  className="gap-2"
-                >
-                  <Filter className="h-4 w-4" />
-                  {showOnlyMyTeam ? "Showing My Team Only" : "Show My Team Only"}
-                </Button>
-              </div>
-            )}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {showOnlyMyTeam 
-              ? `Showing ${filteredMembers.length} members from your team(s)`
-              : `${teamMembers.length} members total`
-            }
-          </div>
-        </div>
-      </Card>
+    <TooltipProvider>
+      <div className="space-y-4">
+        {/* Quick Actions Toolbar */}
+        <RosterQuickActions
+          saveStatus={saveStatus}
+          isReadOnly={isReadOnly}
+          hasAssignments={assignments.some(a => a.week_number === 1 && userTeamIds.includes(a.team_id))}
+          onCopyWeekToAll={handleCopyWeekToAll}
+          onFillMyTeamRow={handleFillMyTeam}
+          onClearMyTeam={handleClearMyTeam}
+          onUndo={handleUndo}
+          canUndo={undoStack.length > 0}
+        />
 
-      {!dayByDayMode ? (
-        // Week-based mode (original)
-        <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">
-            <p>• Assign each person's shift type for each week in the rotation cycle</p>
-            <p>• Leave as "Not assigned" if the person is not scheduled that week</p>
-            <p>• <strong>Your team rows are highlighted</strong> - focus on those first</p>
+        {/* Controls Card */}
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="day-mode"
+                  checked={dayByDayMode}
+                  onCheckedChange={setDayByDayMode}
+                  disabled={isReadOnly}
+                />
+                <Label htmlFor="day-mode" className="text-sm font-medium flex items-center gap-1">
+                  Different shifts per day?
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Enable this if team members need different shift types on different days of the week (e.g., early shift Mon-Wed, late shift Thu-Fri).</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+              </div>
+              
+              {/* My Team Filter */}
+              {userTeamIds.length > 0 && (
+                <div className="flex items-center gap-2 border-l pl-4">
+                  <Button
+                    variant={showOnlyMyTeam ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowOnlyMyTeam(!showOnlyMyTeam)}
+                    className="gap-2"
+                  >
+                    <Filter className="h-4 w-4" />
+                    {showOnlyMyTeam ? "Showing My Team Only" : "Show My Team Only"}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {showOnlyMyTeam 
+                ? `Showing ${filteredMembers.length} members from your team(s)`
+                : `${teamMembers.length} members total`
+              }
+            </div>
           </div>
+        </Card>
+
+        {!dayByDayMode ? (
+          // Week-based mode (original)
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+              <p className="font-medium mb-1">💡 How to use:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-xs">
+                <li>Select a shift type for each person for each week in the rotation</li>
+                <li>Check "+ Weekend" to include weekend duties alongside weekday shifts</li>
+                <li><strong>Your team rows are highlighted in blue</strong> - focus on those first</li>
+              </ul>
+            </div>
           
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">
@@ -672,6 +916,7 @@ export function RosterWeekGrid({
           })}
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
