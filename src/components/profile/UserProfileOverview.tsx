@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Clock, Calendar, Briefcase, User } from "lucide-react";
+import { Download, Clock, Calendar, Briefcase, User, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, differenceInDays, parseISO } from "date-fns";
@@ -30,6 +30,7 @@ interface ProfileData {
 interface WorkSummary {
   totalWorkDays: number;
   vacationDays: number;
+  homeOfficeDays: number;
   totalHours: number;
   availableDays: number;
   unavailableDays: number;
@@ -123,6 +124,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
       const summary: WorkSummary = {
         totalWorkDays: 0,
         vacationDays: 0,
+        homeOfficeDays: 0,
         totalHours: 0,
         availableDays: 0,
         unavailableDays: 0
@@ -139,9 +141,14 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
           case 'vacation':
             summary.vacationDays++;
             break;
+          case 'working_from_home':
+            summary.homeOfficeDays++;
+            summary.totalWorkDays++;
+            const homeOfficeHours = calculateHoursFromEntry(entry);
+            summary.totalHours += homeOfficeHours;
+            break;
           case 'hotline_support':
           case 'flextime':
-          case 'working_from_home':
             summary.totalWorkDays++;
             const workingHours = calculateHoursFromEntry(entry);
             summary.totalHours += workingHours;
@@ -235,6 +242,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
         ['Summary:'],
         ['Total Work Days', workSummary.totalWorkDays],
         ['Total Hours', workSummary.totalHours.toFixed(1)],
+        ['Home Office Days', workSummary.homeOfficeDays],
         ['Vacation Days', workSummary.vacationDays]
       ];
 
@@ -302,6 +310,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
               <h3>Work Summary</h3>
               <div class="summary-item"><span class="bold">Total Work Days:</span> ${workSummary.totalWorkDays}</div>
               <div class="summary-item"><span class="bold">Total Hours:</span> ${workSummary.totalHours.toFixed(1)}</div>
+              <div class="summary-item"><span class="bold">Home Office Days:</span> ${workSummary.homeOfficeDays}</div>
               <div class="summary-item"><span class="bold">Vacation Days:</span> ${workSummary.vacationDays}</div>
               <div class="summary-item"><span class="bold">Available Days:</span> ${workSummary.availableDays}</div>
               <div class="summary-item"><span class="bold">Unavailable Days:</span> ${workSummary.unavailableDays}</div>
@@ -394,7 +403,7 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
             </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="space-y-2">
               <div className="flex items-center">
                 <Briefcase className="w-4 h-4 mr-2 text-blue-500" />
@@ -404,6 +413,15 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
               <div className="text-xs text-muted-foreground">
                 {workSummary.totalHours.toFixed(1)} hours total
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Home className="w-4 h-4 mr-2 text-green-500" />
+                <span className="text-sm font-medium">Home Office</span>
+              </div>
+              <div className="text-2xl font-bold">{workSummary.homeOfficeDays}</div>
+              <div className="text-xs text-muted-foreground">days this year</div>
             </div>
 
             <div className="space-y-2">
