@@ -98,7 +98,7 @@ export function RosterCalendarView({
         .from("roster_week_assignments")
         .select(`
           *,
-          profiles!roster_week_assignments_user_id_fkey (
+          profiles (
             first_name,
             last_name,
             initials
