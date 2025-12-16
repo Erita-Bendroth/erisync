@@ -127,7 +127,12 @@ export function calculateActualHours(
   const breakHours = breakMinutes / 60;
   
   const grossHours = endHours - startHours;
-  const netHours = grossHours - breakHours;
+  
+  // German labor law: No mandatory break for ≤6 hours of work
+  // Only deduct break if working more than 6 hours
+  const netHours = grossHours <= 6 
+    ? grossHours  // No break deduction for 6 hours or less
+    : grossHours - breakHours;
   
   return Math.max(0, netHours);
 }
