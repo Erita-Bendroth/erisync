@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimeSelect } from "@/components/ui/time-select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -188,21 +189,19 @@ export function TimeEntryDialog({
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="start-time">Start Time</Label>
-                  <Input
-                    id="start-time"
-                    type="time"
+                  <Label>Start Time</Label>
+                  <TimeSelect
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onValueChange={setStartTime}
+                    placeholder="Select start time"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="end-time">End Time</Label>
-                  <Input
-                    id="end-time"
-                    type="time"
+                  <Label>End Time</Label>
+                  <TimeSelect
                     value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
+                    onValueChange={setEndTime}
+                    placeholder="Select end time"
                   />
                 </div>
               </div>
