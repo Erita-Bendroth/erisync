@@ -2529,8 +2529,8 @@ const getActivityColor = (entry: ScheduleEntry) => {
                               title={!multiSelectMode && isOwnCell && !isManager() && !isPlanner() ? "Click to record working hours" : (!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : "")}
                             >
                               <div className="space-y-1 min-h-16 flex flex-col justify-center">
-                                {/* Show time entry indicator for team members viewing their own schedule */}
-                                {isOwnCell && timeEntry && !isManager() && !isPlanner() && (
+                                {/* Show time entry indicator for user's own schedule */}
+                                {isOwnCell && timeEntry && (
                                   <TooltipProvider>
                                     <Tooltip delayDuration={200}>
                                       <TooltipTrigger asChild>
