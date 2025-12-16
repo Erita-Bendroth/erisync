@@ -10,12 +10,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Calendar, Clock, CheckCircle2, XCircle, Loader2, User, FileText, AlertCircle, CalendarOff } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatUserName } from '@/lib/utils';
 import { useCoverageImpact, CoverageImpactResult } from '@/hooks/useCoverageImpact';
 import { CoverageImpactWarningDisplay } from '@/components/schedule/CoverageImpactWarning';
+import { normalizeCountryCode } from '@/lib/countryCodeUtils';
 
+interface DetectedHoliday {
+  date: string;
+  name: string;
+}
 interface VacationRequest {
   id: string;
   user_id: string;
@@ -112,6 +118,9 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [approvalMessage, setApprovalMessage] = useState('');
   const [impactAcknowledged, setImpactAcknowledged] = useState(false);
+  const [detectedHolidays, setDetectedHolidays] = useState<DetectedHoliday[]>([]);
+  const [workingDates, setWorkingDates] = useState<string[]>([]);
+  const [holidayDetectionLoading, setHolidayDetectionLoading] = useState(false);
   const coverageImpact = useCoverageImpact();
 
   useEffect(() => {
@@ -289,9 +298,46 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     }
   };
 
-  const approveSingleRequest = async (request: GroupedRequest, message?: string) => {
+  const approveSingleRequest = async (request: GroupedRequest, message?: string, datesToApprove?: string[]) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
+
+    // If no filtered dates provided, detect holidays automatically
+    let finalDates = datesToApprove;
+    
+    if (!finalDates) {
+      // Fetch user's profile to get country_code and region_code
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('country_code, region_code')
+        .eq('user_id', request.user_id)
+        .single();
+      
+      if (profile?.country_code) {
+        // Query holidays for the request dates
+        const { data: holidays } = await supabase
+          .from('holidays')
+          .select('date, name, country_code, region_code')
+          .in('date', request.dates)
+          .eq('is_public', true)
+          .is('user_id', null);
+        
+        if (holidays && holidays.length > 0) {
+          // Filter holidays that match user's country (with normalized code)
+          const userHolidays = holidays.filter(h => 
+            normalizeCountryCode(h.country_code) === normalizeCountryCode(profile.country_code) &&
+            (h.region_code === null || h.region_code === profile.region_code)
+          );
+          
+          const holidayDates = userHolidays.map(h => h.date);
+          finalDates = request.dates.filter(d => !holidayDates.includes(d));
+        } else {
+          finalDates = request.dates;
+        }
+      } else {
+        finalDates = request.dates;
+      }
+    }
 
     // Delete any existing schedule entries for all dates in the group
     await supabase
@@ -299,7 +345,7 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
       .delete()
       .eq('user_id', request.user_id)
       .eq('team_id', request.team_id)
-      .in('date', request.dates);
+      .in('date', finalDates);
 
     // Update all request statuses in the group
     const { error: updateError } = await supabase
@@ -313,23 +359,25 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
 
     if (updateError) throw updateError;
 
-    // Create schedule entries for all vacation days
-    const scheduleEntries = request.dates.map(date => ({
-      user_id: request.user_id,
-      team_id: request.team_id,
-      date,
-      activity_type: 'vacation' as const,
-      availability_status: 'unavailable' as const,
-      shift_type: 'normal' as const,
-      notes: `Vacation - ${request.is_full_day ? 'Full Day' : `${request.start_time} - ${request.end_time}`}${request.notes ? ` | ${request.notes}` : ''}`,
-      created_by: user.id,
-    }));
+    // Create schedule entries only for working days (not holidays)
+    if (finalDates.length > 0) {
+      const scheduleEntries = finalDates.map(date => ({
+        user_id: request.user_id,
+        team_id: request.team_id,
+        date,
+        activity_type: 'vacation' as const,
+        availability_status: 'unavailable' as const,
+        shift_type: 'normal' as const,
+        notes: `Vacation - ${request.is_full_day ? 'Full Day' : `${request.start_time} - ${request.end_time}`}${request.notes ? ` | ${request.notes}` : ''}`,
+        created_by: user.id,
+      }));
 
-    const { error: scheduleError } = await supabase
-      .from('schedule_entries')
-      .insert(scheduleEntries);
+      const { error: scheduleError } = await supabase
+        .from('schedule_entries')
+        .insert(scheduleEntries);
 
-    if (scheduleError) throw scheduleError;
+      if (scheduleError) throw scheduleError;
+    }
 
     // Send notifications
     await supabase.functions.invoke('vacation-request-notification', {
@@ -346,9 +394,51 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     setSelectedRequest(request);
     setApprovalMessage('Reminder to input your vacation into your time-schedule, like VSP, Cozone etc.');
     setImpactAcknowledged(false);
+    setDetectedHolidays([]);
+    setWorkingDates(request.dates);
+    setHolidayDetectionLoading(true);
     setApproveDialogOpen(true);
     
-    // Analyze coverage impact
+    try {
+      // Fetch user's profile to get country_code and region_code
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('country_code, region_code')
+        .eq('user_id', request.user_id)
+        .single();
+      
+      if (profile?.country_code) {
+        // Query holidays for the request dates
+        const { data: holidays } = await supabase
+          .from('holidays')
+          .select('date, name, country_code, region_code')
+          .in('date', request.dates)
+          .eq('is_public', true)
+          .is('user_id', null);
+        
+        if (holidays && holidays.length > 0) {
+          // Filter holidays that match user's country (with normalized code)
+          const userHolidays = holidays.filter(h => 
+            normalizeCountryCode(h.country_code) === normalizeCountryCode(profile.country_code) &&
+            (h.region_code === null || h.region_code === profile.region_code)
+          );
+          
+          const holidayDates = userHolidays.map(h => h.date);
+          const detectedList = userHolidays.map(h => ({ date: h.date, name: h.name }));
+          const working = request.dates.filter(d => !holidayDates.includes(d));
+          
+          setDetectedHolidays(detectedList);
+          setWorkingDates(working);
+        }
+      }
+    } catch (error) {
+      console.error('Error detecting holidays:', error);
+      // On error, proceed with all dates
+    } finally {
+      setHolidayDetectionLoading(false);
+    }
+    
+    // Analyze coverage impact (only for working dates)
     await coverageImpact.analyzeImpact(request.user_id, request.team_id, request.dates);
   };
 
@@ -358,20 +448,33 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
     setProcessingId(selectedRequest.id);
 
     try {
-      await approveSingleRequest(selectedRequest, approvalMessage.trim() || undefined);
+      // Pass working dates (excluding holidays) to the approval function
+      await approveSingleRequest(selectedRequest, approvalMessage.trim() || undefined, workingDates);
 
-      const daysText = selectedRequest.dates.length === 1 
-        ? "1 day" 
-        : `${selectedRequest.dates.length} working days`;
+      const holidaysSkipped = detectedHolidays.length;
+      let description: string;
+      
+      if (workingDates.length === 0) {
+        description = `Request approved. All ${selectedRequest.dates.length} requested days fall on public holidays - no vacation days used.`;
+      } else if (holidaysSkipped > 0) {
+        const workingText = workingDates.length === 1 ? "1 working day" : `${workingDates.length} working days`;
+        const holidayText = holidaysSkipped === 1 ? "1 holiday" : `${holidaysSkipped} holidays`;
+        description = `${workingText} approved (${holidayText} skipped). Notifications sent.`;
+      } else {
+        const daysText = workingDates.length === 1 ? "1 day" : `${workingDates.length} working days`;
+        description = `Vacation for ${daysText} has been approved, added to the schedule, and notifications sent.`;
+      }
 
       toast({
         title: "Request approved",
-        description: `Vacation for ${daysText} has been approved, added to the schedule, and notifications sent.`,
+        description,
       });
 
       setApproveDialogOpen(false);
       setSelectedRequest(null);
       setApprovalMessage('');
+      setDetectedHolidays([]);
+      setWorkingDates([]);
       await fetchRequests();
       onRequestProcessed?.();
     } catch (error: any) {
@@ -1106,11 +1209,60 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
               <p className="text-sm">
                 <strong>Dates:</strong> {format(parseISO(selectedRequest.startDate), 'MMM d, yyyy')}
                 {selectedRequest.dates.length > 1 && ` - ${format(parseISO(selectedRequest.endDate), 'MMM d, yyyy')}`}
+                {' '}({selectedRequest.dates.length} {selectedRequest.dates.length === 1 ? 'day' : 'days'} requested)
               </p>
-              <p className="text-sm">
-                <strong>Working days:</strong> {selectedRequest.dates.length}
-              </p>
+              
+              {holidayDetectionLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Checking for public holidays...
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    <strong>Vacation days to use:</strong>{' '}
+                    <span className={workingDates.length === 0 ? 'text-green-600 dark:text-green-400' : ''}>
+                      {workingDates.length}
+                    </span>
+                    {detectedHolidays.length > 0 && (
+                      <span className="text-muted-foreground">
+                        {' '}({detectedHolidays.length} {detectedHolidays.length === 1 ? 'holiday' : 'holidays'} will be skipped)
+                      </span>
+                    )}
+                  </p>
+                </>
+              )}
             </div>
+          )}
+
+          {/* Holiday detection info */}
+          {!holidayDetectionLoading && detectedHolidays.length > 0 && (
+            <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+              <CalendarOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertTitle className="text-amber-800 dark:text-amber-200">Public Holidays Detected</AlertTitle>
+              <AlertDescription className="text-amber-700 dark:text-amber-300">
+                The following dates are public holidays and will be skipped (no vacation days used):
+                <ul className="mt-2 space-y-1">
+                  {detectedHolidays.map((h) => (
+                    <li key={h.date} className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">{format(parseISO(h.date), 'EEE, MMM d')}</span>
+                      <span className="text-amber-600 dark:text-amber-400">— {h.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Warning when all days are holidays */}
+          {!holidayDetectionLoading && workingDates.length === 0 && selectedRequest && selectedRequest.dates.length > 0 && (
+            <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertTitle className="text-green-800 dark:text-green-200">No Vacation Days Needed</AlertTitle>
+              <AlertDescription className="text-green-700 dark:text-green-300">
+                All requested dates fall on public holidays. The request will be approved but no vacation days will be deducted.
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Coverage Impact Warning */}
@@ -1141,6 +1293,8 @@ export const VacationRequestsList: React.FC<VacationRequestsListProps> = ({
                 setSelectedRequest(null);
                 setApprovalMessage('');
                 setImpactAcknowledged(false);
+                setDetectedHolidays([]);
+                setWorkingDates([]);
               }}
               disabled={processingId !== null}
             >
