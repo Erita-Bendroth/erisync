@@ -2546,6 +2546,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                           shiftDefinitionTimes={getShiftTimesFromDefinition(entry, employee)}
                                           onClick={(e) => {
                                             e?.stopPropagation();
+                                            // Team member clicking their own cell opens flex time dialog
+                                            if (isOwnCell && !isManager() && !isPlanner()) {
+                                              setTimeEntryDate(day);
+                                              setTimeEntryDialogOpen(true);
+                                              return;
+                                            }
                                             if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
                                               handleEditShift(entry);
                                             }
@@ -2608,6 +2614,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                               shiftDefinitionTimes={getShiftTimesFromDefinition(entry, employee)}
                                               onClick={(e) => {
                                                 e?.stopPropagation();
+                                                // Team member clicking their own cell opens flex time dialog
+                                                if (isOwnCell && !isManager() && !isPlanner()) {
+                                                  setTimeEntryDate(day);
+                                                  setTimeEntryDialogOpen(true);
+                                                  return;
+                                                }
                                                 if (!multiSelectMode && (isManager() || isPlanner()) && canView) {
                                                   // Check if manager can edit this team before opening edit modal
                                                   if (canEditTeam(entry.team_id)) {
