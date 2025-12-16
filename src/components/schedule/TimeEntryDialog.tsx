@@ -45,6 +45,7 @@ interface TimeEntryDialogProps {
   existingEntry?: DailyTimeEntry;
   onSave: (input: TimeEntryInput) => Promise<boolean>;
   onDelete?: (entryDate: string) => Promise<boolean>;
+  currentBalance?: number;
 }
 
 export function TimeEntryDialog({
@@ -54,12 +55,14 @@ export function TimeEntryDialog({
   existingEntry,
   onSave,
   onDelete,
+  currentBalance = 0,
 }: TimeEntryDialogProps) {
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [breakMinutes, setBreakMinutes] = useState<number>(30);
   const [entryType, setEntryType] = useState<EntryType>("work");
   const [comment, setComment] = useState<string>("");
+  const [fzaHours, setFzaHours] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -72,6 +75,7 @@ export function TimeEntryDialog({
         setBreakMinutes(existingEntry.break_duration_minutes || 30);
         setEntryType((existingEntry.entry_type as EntryType) || "work");
         setComment(existingEntry.comment || "");
+        setFzaHours(existingEntry.fza_hours || 0);
       } else {
         // Default values for new entry
         const defaultType: EntryType = "work";
@@ -80,6 +84,7 @@ export function TimeEntryDialog({
         setEndTime(getDefaultEndTime(date, defaultType));
         setBreakMinutes(30);
         setComment("");
+        setFzaHours(0);
       }
     }
   }, [open, date, existingEntry]);
@@ -89,34 +94,47 @@ export function TimeEntryDialog({
     setEntryType(newType);
     const config = ENTRY_TYPE_CONFIG[newType];
     
-    if (!config.requiresTimeEntry) {
+    if (config.requiresHoursInput) {
+      // FZA withdrawal - clear time fields
       setStartTime("");
       setEndTime("");
       setBreakMinutes(0);
+      if (!fzaHours) setFzaHours(1); // Default to 1 hour
+    } else if (!config.requiresTimeEntry) {
+      setStartTime("");
+      setEndTime("");
+      setBreakMinutes(0);
+      setFzaHours(0);
     } else if (!startTime && !endTime) {
       setStartTime(getDefaultStartTime(newType));
       setEndTime(getDefaultEndTime(date, newType));
       setBreakMinutes(30);
+      setFzaHours(0);
     }
   };
 
+  const entryConfig = ENTRY_TYPE_CONFIG[entryType];
+  
   // Calculate flextime
   const calculation = calculateFlexTime(date, {
     workStartTime: startTime || null,
     workEndTime: endTime || null,
     breakDurationMinutes: breakMinutes,
     entryType,
+    fzaHours: entryConfig.requiresHoursInput ? fzaHours : null,
   });
 
   // Validations
   const breakValidation = validateBreakRequirements(calculation.actualHours, breakMinutes);
   const dailyLimitValidation = validateDailyLimit(calculation.actualHours);
-  const entryConfig = ENTRY_TYPE_CONFIG[entryType];
   const requiresTime = entryConfig.requiresTimeEntry;
+  const requiresHoursInput = entryConfig.requiresHoursInput;
   const hasValidTimes = !requiresTime || (startTime && endTime);
+  const hasValidFzaHours = !requiresHoursInput || (fzaHours > 0);
+  const fzaExceedsBalance = requiresHoursInput && fzaHours > currentBalance;
 
   const handleSave = async () => {
-    if (!hasValidTimes) return;
+    if (!hasValidTimes || !hasValidFzaHours) return;
     
     setSaving(true);
     const success = await onSave({
@@ -126,6 +144,7 @@ export function TimeEntryDialog({
       break_duration_minutes: breakMinutes,
       entry_type: entryType,
       comment: comment || null,
+      fza_hours: requiresHoursInput ? fzaHours : null,
     });
     setSaving(false);
     
@@ -220,6 +239,71 @@ export function TimeEntryDialog({
             </>
           )}
 
+          {/* FZA Hours Input - only show for withdrawal */}
+          {requiresHoursInput && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fzaHours">Hours to Withdraw</Label>
+                <Input
+                  id="fzaHours"
+                  type="number"
+                  min="0.25"
+                  max="24"
+                  step="0.25"
+                  value={fzaHours}
+                  onChange={(e) => setFzaHours(parseFloat(e.target.value) || 0)}
+                  className="text-lg font-medium"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the number of FlexTime hours you want to use (e.g., 2.5 for leaving 2.5 hours early)
+                </p>
+              </div>
+
+              {/* FZA Preview */}
+              {fzaHours > 0 && (
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Current Balance:</span>
+                      <span className={cn(
+                        "font-medium",
+                        currentBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      )}>
+                        {formatFlexHours(currentBalance)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Withdrawal:</span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        -{fzaHours.toFixed(2)}h
+                      </span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between">
+                      <span className="font-medium">New Balance:</span>
+                      <span className={cn(
+                        "font-bold",
+                        (currentBalance - fzaHours) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      )}>
+                        {formatFlexHours(currentBalance - fzaHours)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Warning if exceeding balance */}
+              {fzaExceedsBalance && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    This withdrawal exceeds your current balance of {formatFlexHours(currentBalance)}. 
+                    You can still proceed, but your balance will go negative.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
           {/* Calculation Summary */}
           {requiresTime && startTime && endTime && (
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
@@ -300,7 +384,7 @@ export function TimeEntryDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving || !hasValidTimes}>
+            <Button onClick={handleSave} disabled={saving || !hasValidTimes || !hasValidFzaHours}>
               <Save className="w-4 h-4 mr-1" />
               {saving ? "Saving..." : "Save"}
             </Button>

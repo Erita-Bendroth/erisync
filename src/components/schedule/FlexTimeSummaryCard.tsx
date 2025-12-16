@@ -60,6 +60,15 @@ export function FlexTimeSummaryCard({
   const isOverLimit = absBalance > carryoverLimit;
   const isApproachingLimit = limitPercentage >= 80 && !isOverLimit;
 
+  // Calculate FZA breakdown
+  const fzaTotalHours = entries
+    .filter(e => e.entry_type === 'fza_withdrawal')
+    .reduce((sum, e) => sum + (e.fza_hours || 0), 0);
+  
+  const pureFlexDelta = entries
+    .filter(e => e.entry_type !== 'fza_withdrawal')
+    .reduce((sum, e) => sum + (e.flextime_delta || 0), 0);
+
   const getLimitBadge = () => {
     if (isOverLimit) {
       return (
@@ -160,17 +169,42 @@ export function FlexTimeSummaryCard({
               <div className="text-xs text-muted-foreground">Previous Balance</div>
             </div>
 
-            {/* This Month Change */}
-            <div className="space-y-1">
-              <div className={cn(
-                "text-xl font-bold flex items-center justify-center gap-1",
-                getValueColor(currentMonthDelta)
-              )}>
-                {getTrendIcon(currentMonthDelta)}
-                {formatFlexHours(currentMonthDelta)}
-              </div>
-              <div className="text-xs text-muted-foreground">This Month</div>
-            </div>
+            {/* This Month Change with breakdown */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="space-y-1 cursor-help">
+                    <div className={cn(
+                      "text-xl font-bold flex items-center justify-center gap-1",
+                      getValueColor(currentMonthDelta)
+                    )}>
+                      {getTrendIcon(currentMonthDelta)}
+                      {formatFlexHours(currentMonthDelta)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">This Month</div>
+                    {(fzaTotalHours > 0 || Math.abs(pureFlexDelta) > 0) && (
+                      <div className="text-[10px] text-muted-foreground space-x-2">
+                        <span className={pureFlexDelta >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                          FLEX: {formatFlexHours(pureFlexDelta)}
+                        </span>
+                        {fzaTotalHours > 0 && (
+                          <span className="text-red-600 dark:text-red-400">
+                            FZA: -{fzaTotalHours.toFixed(1)}h
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="space-y-1 text-xs">
+                    <p><strong>FLEX earned:</strong> {formatFlexHours(pureFlexDelta)}</p>
+                    <p><strong>FZA taken:</strong> {fzaTotalHours > 0 ? `-${fzaTotalHours.toFixed(2)}h` : "0.00h"}</p>
+                    <p className="text-muted-foreground mt-1">Net: {formatFlexHours(currentMonthDelta)}</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Current Balance */}
             <div className={cn(

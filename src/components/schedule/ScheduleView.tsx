@@ -2860,6 +2860,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
           onOpenChange={setTimeEntryDialogOpen}
           date={timeEntryDate}
           existingEntry={timeEntryDate ? getEntryForDate(format(timeEntryDate, 'yyyy-MM-dd')) : undefined}
+          currentBalance={currentBalance}
           onSave={async (data) => {
             try {
               await saveTimeEntry(data);

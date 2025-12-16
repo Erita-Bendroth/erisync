@@ -35,9 +35,10 @@ export function FlexTimeExportButton({
     try {
       const workbook = XLSX.utils.book_new();
 
-      // Sheet 1: Daily Time Entries
+      // Sheet 1: Daily Time Entries with FZA column
       const entriesData = entries.map((entry) => {
         const date = parseISO(entry.entry_date);
+        const isFzaEntry = entry.entry_type === 'fza_withdrawal';
         return {
           "Date": format(date, "dd.MM.yyyy"),
           "Day": format(date, "EEEE", { locale: de }),
@@ -50,7 +51,8 @@ export function FlexTimeExportButton({
             : "-",
           "Actual Hours": entry.actual_hours_worked?.toFixed(2) || "-",
           "Target Hours": entry.target_hours?.toFixed(2) || "-",
-          "FlexTime Delta": formatFlexHours(entry.flextime_delta || 0),
+          "FLEX": isFzaEntry ? "0.00" : formatFlexHours(entry.flextime_delta || 0),
+          "FZA": isFzaEntry ? `-${(entry.fza_hours || 0).toFixed(2)}` : "0.00",
           "Comment": entry.comment || "",
         };
       });
@@ -67,7 +69,8 @@ export function FlexTimeExportButton({
           "Gross Hours": "",
           "Actual Hours": "",
           "Target Hours": "",
-          "FlexTime Delta": "",
+          "FLEX": "",
+          "FZA": "",
           "Comment": "",
         } as any);
       }
@@ -78,25 +81,41 @@ export function FlexTimeExportButton({
       entriesSheet["!cols"] = [
         { wch: 12 }, // Date
         { wch: 12 }, // Day
-        { wch: 15 }, // Entry Type
+        { wch: 20 }, // Entry Type
         { wch: 10 }, // Start Time
         { wch: 10 }, // End Time
         { wch: 10 }, // Break
         { wch: 12 }, // Gross Hours
         { wch: 12 }, // Actual Hours
         { wch: 12 }, // Target Hours
-        { wch: 14 }, // FlexTime Delta
+        { wch: 10 }, // FLEX
+        { wch: 10 }, // FZA
         { wch: 30 }, // Comment
       ];
 
       XLSX.utils.book_append_sheet(workbook, entriesSheet, "Time Entries");
 
-      // Sheet 2: Monthly Summary
+      // Sheet 2: Monthly Summary with FLEX/FZA breakdown
       const monthName = format(monthDate, "MMMM yyyy", { locale: de });
+      
+      // Calculate FZA total for the month
+      const fzaTotalHours = entries
+        .filter(e => e.entry_type === 'fza_withdrawal')
+        .reduce((sum, e) => sum + (e.fza_hours || 0), 0);
+      
+      // Calculate pure flex (excluding FZA entries)
+      const pureFlexDelta = entries
+        .filter(e => e.entry_type !== 'fza_withdrawal')
+        .reduce((sum, e) => sum + (e.flextime_delta || 0), 0);
+
       const summaryData = [
         { "Metric": "Month", "Value": monthName },
         { "Metric": "Starting Balance", "Value": formatFlexHours(previousBalance) },
-        { "Metric": "Month Delta", "Value": formatFlexHours(currentMonthDelta) },
+        { "Metric": "", "Value": "" },
+        { "Metric": "FLEX Earned", "Value": formatFlexHours(pureFlexDelta) },
+        { "Metric": "FZA Taken", "Value": fzaTotalHours > 0 ? `-${fzaTotalHours.toFixed(2)}h` : "0.00h" },
+        { "Metric": "Net Month Delta", "Value": formatFlexHours(currentMonthDelta) },
+        { "Metric": "", "Value": "" },
         { "Metric": "Ending Balance", "Value": formatFlexHours(currentBalance) },
         { "Metric": "", "Value": "" },
         { "Metric": "Carryover Limit", "Value": formatFlexHours(carryoverLimit) },
