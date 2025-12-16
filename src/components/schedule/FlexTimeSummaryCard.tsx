@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, TrendingUp, TrendingDown, Minus, Settings, AlertTriangle } from "lucide-react";
 import { formatFlexHours } from "@/lib/flexTimeUtils";
 import { cn } from "@/lib/utils";
-import { FlexTimeExportButton } from "./FlexTimeExportButton";
+import { FlexTimeExportDialog } from "./FlexTimeExportDialog";
 import { FlexTimeSettingsDialog } from "./FlexTimeSettingsDialog";
 import type { DailyTimeEntry, MonthlyFlexSummary } from "@/hooks/useTimeEntries";
 import {
@@ -127,15 +127,10 @@ export function FlexTimeSummaryCard({
               {getLimitBadge()}
             </div>
             <div className="flex items-center gap-2">
-              <FlexTimeExportButton
-                entries={entries}
-                monthlySummary={monthlySummary}
-                previousBalance={previousBalance}
-                currentMonthDelta={currentMonthDelta}
-                currentBalance={currentBalance}
-                carryoverLimit={carryoverLimit}
-                monthDate={monthDate}
+              <FlexTimeExportDialog
+                currentMonthDate={monthDate}
                 userName={userName}
+                carryoverLimit={carryoverLimit}
               />
               <TooltipProvider>
                 <Tooltip>

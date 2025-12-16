@@ -30,7 +30,6 @@ export type EntryType =
   | 'training' 
   | 'vacation' 
   | 'public_holiday'
-  | 'flextime'
   | 'fza_withdrawal';
 
 export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
@@ -41,7 +40,6 @@ export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   training: 'Training',
   vacation: 'Vacation',
   public_holiday: 'Public Holiday',
-  flextime: 'Flextime',
   fza_withdrawal: 'FlexTime Withdrawal (FZA)',
 };
 
@@ -59,7 +57,6 @@ export const ENTRY_TYPE_CONFIG: Record<EntryType, {
   sick_leave: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
   vacation: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
   public_holiday: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
-  flextime: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
   fza_withdrawal: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero', requiresHoursInput: true, isWithdrawal: true },
 };
 
