@@ -28,7 +28,10 @@ import { PersonalMonthlyCalendar } from './PersonalMonthlyCalendar';
 import { TeamFavoritesManager } from './TeamFavoritesManager';
 import { TeamFavoritesQuickAccess } from './TeamFavoritesQuickAccess';
 import { BulkEditShiftsModal } from './BulkEditShiftsModal';
+import { TimeEntryDialog } from './TimeEntryDialog';
+import { FlexTimeSummaryCard } from './FlexTimeSummaryCard';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
+import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { cn, formatUserName, doesShiftCrossMidnight } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useShiftCounts } from '@/hooks/useShiftCounts';
@@ -37,6 +40,7 @@ import { useScheduleAccessControl } from '@/hooks/useScheduleAccessControl';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileScheduleCard } from '@/components/mobile/MobileScheduleCard';
 import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
+import { hoursToTimeString } from '@/lib/flexTimeUtils';
 
 interface ScheduleEntry {
   id: string;
@@ -145,7 +149,23 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
     notes: string | null;
   }[]>([]);
 
-  // Access control hook for standard view mode
+  // Time entry dialog state (for FlexTime recording)
+  const [timeEntryDialogOpen, setTimeEntryDialogOpen] = useState(false);
+  const [timeEntryDate, setTimeEntryDate] = useState<Date | null>(null);
+
+  // FlexTime entries hook - use current week's Monday for the month
+  const {
+    entries: timeEntries,
+    monthlySummary,
+    previousBalance,
+    currentMonthDelta,
+    currentBalance,
+    loading: timeEntriesLoading,
+    saveEntry: saveTimeEntry,
+    deleteEntry: deleteTimeEntry,
+    getEntryForDate,
+    refresh: refreshTimeEntries
+  } = useTimeEntries(currentWeek);
   const {
     canViewActivityDetails,
     canEditTeam,
@@ -2170,6 +2190,16 @@ const getActivityColor = (entry: ScheduleEntry) => {
         <TeamHierarchyInfo selectedTeamId={selectedTeams[0]} teams={teams} />
       )}
 
+      {/* FlexTime Summary Card for Team Members in Weekly View */}
+      {isTeamMember() && !isManager() && !isPlanner() && timeView === "weekly" && viewMode === "my-schedule" && (
+        <FlexTimeSummaryCard
+          previousBalance={previousBalance}
+          currentMonthDelta={currentMonthDelta}
+          currentBalance={currentBalance}
+          loading={timeEntriesLoading}
+        />
+      )}
+
       {/* Team Availability View for Team Members */}
       {isTeamMember() && !isManager() && !isPlanner() && viewMode === "team-availability" && timeView === "weekly" && (
         <TeamAvailabilityView workDays={workDays} userId={user!.id} />
@@ -2395,14 +2425,77 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             da => da.user_id === employee.user_id && da.date === dayStr
                           );
                           
+                          // Get time entry for this day (for team members viewing their own schedule)
+                          const isOwnCell = employee.user_id === user?.id;
+                          const timeEntry = isOwnCell ? getEntryForDate(dayStr) : null;
+                          
+                          // Handler for team member clicking their own cell for time entry
+                          const handleCellClick = () => {
+                            if (multiSelectMode) return;
+                            
+                            // Managers/planners can edit schedule entries
+                            if (isManager() || isPlanner()) {
+                              handleDateClick(employee.user_id, day);
+                              return;
+                            }
+                            
+                            // Team members can click their own cells to record time
+                            if (isTeamMember() && isOwnCell) {
+                              setTimeEntryDate(day);
+                              setTimeEntryDialogOpen(true);
+                            }
+                          };
+                          
                           return (
                             <TableCell
                               key={dayIndex} 
-                              className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[120px]`}
-                              onClick={() => !multiSelectMode && (isManager() || isPlanner()) && handleDateClick(employee.user_id, day)}
-                              title={!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : ""}
+                              className={`text-center ${isToday ? 'bg-primary/5' : ''} ${!multiSelectMode && (isManager() || isPlanner() || isOwnCell) ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors min-w-0 max-w-[120px]`}
+                              onClick={handleCellClick}
+                              title={!multiSelectMode && isOwnCell && !isManager() && !isPlanner() ? "Click to record working hours" : (!multiSelectMode && dayEntries.length === 0 && dayHolidays.length === 0 && continuationEntries.length === 0 ? "Click to add entry" : "")}
                             >
                               <div className="space-y-1 min-h-16 flex flex-col justify-center">
+                                {/* Show time entry indicator for team members viewing their own schedule */}
+                                {isOwnCell && timeEntry && !isManager() && !isPlanner() && (
+                                  <TooltipProvider>
+                                    <Tooltip delayDuration={200}>
+                                      <TooltipTrigger asChild>
+                                        <div className="w-full cursor-pointer">
+                                          <Badge
+                                            variant="outline"
+                                            className={`text-xs max-w-full block pointer-events-auto ${
+                                              timeEntry.flextime_delta && timeEntry.flextime_delta > 0
+                                                ? 'bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
+                                                : timeEntry.flextime_delta && timeEntry.flextime_delta < 0
+                                                ? 'bg-red-50 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
+                                                : 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
+                                            }`}
+                                          >
+                                            <span className="truncate flex items-center justify-center gap-1">
+                                              <Clock className="w-3 h-3" />
+                                              {timeEntry.flextime_delta !== null && timeEntry.flextime_delta !== undefined
+                                                ? hoursToTimeString(timeEntry.flextime_delta)
+                                                : '0:00'}
+                                            </span>
+                                          </Badge>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="z-[100]" side="top">
+                                        <p className="font-medium">FlexTime Recorded</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {timeEntry.work_start_time && timeEntry.work_end_time
+                                            ? `${timeEntry.work_start_time} - ${timeEntry.work_end_time}`
+                                            : 'No times recorded'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Actual: {timeEntry.actual_hours_worked?.toFixed(2) || 0}h / Target: {timeEntry.target_hours?.toFixed(2) || 0}h
+                                        </p>
+                                        <p className="text-xs font-medium mt-1">
+                                          Click to edit
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
                                 {/* Show pending vacation request indicator for managers/planners */}
                                 {pendingVacations.length > 0 && (isManager() || isPlanner()) && (
                                   <TooltipProvider>
@@ -2737,6 +2830,38 @@ const getActivityColor = (entry: ScheduleEntry) => {
         selectedShiftIds={selectedShiftIds}
         onSuccess={handleBulkEditSuccess}
       />
+
+      {/* Time Entry Dialog for FlexTime Recording (Team Members) */}
+      {timeEntryDate && (
+        <TimeEntryDialog
+          open={timeEntryDialogOpen}
+          onOpenChange={setTimeEntryDialogOpen}
+          date={timeEntryDate}
+          existingEntry={timeEntryDate ? getEntryForDate(format(timeEntryDate, 'yyyy-MM-dd')) : undefined}
+          onSave={async (data) => {
+            try {
+              await saveTimeEntry(data);
+              refreshTimeEntries();
+              return true;
+            } catch {
+              return false;
+            }
+          }}
+          onDelete={async (entryDate) => {
+            try {
+              const entry = getEntryForDate(entryDate);
+              if (entry?.id) {
+                await deleteTimeEntry(entry.id);
+                refreshTimeEntries();
+                return true;
+              }
+              return false;
+            } catch {
+              return false;
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
