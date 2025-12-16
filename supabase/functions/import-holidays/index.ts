@@ -408,11 +408,12 @@ Deno.serve(async (req) => {
     console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
 
     // Use upsert with ignoreDuplicates for faster operation - single DB call
+    // Note: The unique constraint is on (date, country_code, year, region_code) for public holidays
     console.log('Upserting holidays into database...')
     const { error } = await supabaseClient
       .from('holidays')
       .upsert(holidayData, { 
-        onConflict: 'date,country_code,region_code,user_id',
+        onConflict: 'date,country_code,year,region_code',
         ignoreDuplicates: true
       })
 
