@@ -2872,13 +2872,9 @@ const getActivityColor = (entry: ScheduleEntry) => {
           }}
           onDelete={async (entryDate) => {
             try {
-              const entry = getEntryForDate(entryDate);
-              if (entry?.id) {
-                await deleteTimeEntry(entry.id);
-                refreshTimeEntries();
-                return true;
-              }
-              return false;
+              await deleteTimeEntry(entryDate);
+              refreshTimeEntries();
+              return true;
             } catch {
               return false;
             }
