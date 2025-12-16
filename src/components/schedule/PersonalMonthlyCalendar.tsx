@@ -5,11 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Calendar, TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { cn } from "@/lib/utils";
 import { TimeBlockDisplay } from "./TimeBlockDisplay";
+import { FlexTimeSummaryCard } from "./FlexTimeSummaryCard";
+import { TimeEntryDialog } from "./TimeEntryDialog";
+import { useTimeEntries } from "@/hooks/useTimeEntries";
+import { formatFlexHours, ENTRY_TYPE_LABELS, type EntryType } from "@/lib/flexTimeUtils";
 
 type ViewMode = "single" | "multi";
 type DateRange = "1M" | "3M" | "6M" | "1Y";
@@ -81,6 +85,22 @@ export function PersonalMonthlyCalendar() {
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  
+  // Time entry state
+  const [timeEntryDialogOpen, setTimeEntryDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  
+  // Use the time entries hook
+  const {
+    entries: timeEntries,
+    previousBalance,
+    currentMonthDelta,
+    currentBalance,
+    loading: timeEntriesLoading,
+    saveEntry,
+    deleteEntry,
+    getEntryForDate,
+  } = useTimeEntries(currentMonth);
 
   useEffect(() => {
     if (user?.id) {
@@ -142,6 +162,11 @@ export function PersonalMonthlyCalendar() {
     };
   };
 
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date);
+    setTimeEntryDialogOpen(true);
+  };
+
   const renderMonthCalendar = (monthDate: Date) => {
     const monthStart = startOfMonth(monthDate);
     const monthEnd = endOfMonth(monthDate);
@@ -152,15 +177,6 @@ export function PersonalMonthlyCalendar() {
     const firstDayOfWeek = getDay(monthStart);
     // Create empty cells for alignment
     const emptyCells = Array.from({ length: firstDayOfWeek }, (_, i) => i);
-
-    const handleCellClick = (date: Date) => {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const entry = scheduleEntries.find(e => e.date.split('T')[0] === dateStr);
-      if (entry) {
-        setSelectedEntry(entry);
-        setDetailsOpen(true);
-      }
-    };
 
     return (
       <div key={format(monthDate, "yyyy-MM")} className="space-y-4">
@@ -229,38 +245,65 @@ export function PersonalMonthlyCalendar() {
             const dateStr = format(day, "yyyy-MM-dd");
             const dayEntries = scheduleEntries.filter(e => e.date.split('T')[0] === dateStr);
             const isWeekendDay = isWeekend(day);
+            const timeEntry = getEntryForDate(dateStr);
+            const hasTimeEntry = !!timeEntry;
 
             return (
               <button
                 key={dateStr}
-                onClick={() => dayEntries.length > 0 && handleCellClick(day)}
+                onClick={() => handleDayClick(day)}
                 className={cn(
                   "aspect-square p-1 rounded-lg border transition-all",
-                  "hover:border-primary hover:shadow-sm",
+                  "hover:border-primary hover:shadow-sm cursor-pointer",
                   isWeekendDay && "bg-muted/30",
-                  dayEntries.length > 0 && "cursor-pointer",
-                  dayEntries.length === 0 && "cursor-default opacity-60"
+                  hasTimeEntry && "ring-2 ring-primary/30"
                 )}
               >
-                <div className="flex flex-col items-center justify-center h-full gap-1">
-                  <span className={cn(
-                    "text-xs font-medium",
-                    isWeekendDay && "text-muted-foreground"
-                  )}>
-                    {format(day, "d")}
-                  </span>
-                  {dayEntries.map((entry, idx) => (
+                <div className="flex flex-col items-center justify-center h-full gap-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className={cn(
+                      "text-xs font-medium",
+                      isWeekendDay && "text-muted-foreground"
+                    )}>
+                      {format(day, "d")}
+                    </span>
+                    {hasTimeEntry && (
+                      <Clock className="w-3 h-3 text-primary" />
+                    )}
+                  </div>
+                  
+                  {/* Schedule entry badges */}
+                  {dayEntries.map((entry) => (
                     <Badge
                       key={entry.id}
                       variant="outline"
                       className={cn(
-                        "text-xs px-2 py-0.5 h-5 leading-tight font-medium",
+                        "text-xs px-1.5 py-0 h-4 leading-tight font-medium",
                         getShiftColor(entry.shift_type, entry.activity_type)
                       )}
                     >
                       {getShiftLabel(entry.shift_type, entry.activity_type)}
                     </Badge>
                   ))}
+                  
+                  {/* Time entry flex delta */}
+                  {timeEntry && timeEntry.flextime_delta !== null && (
+                    <span className={cn(
+                      "text-xs font-medium",
+                      timeEntry.flextime_delta > 0 && "text-green-600 dark:text-green-400",
+                      timeEntry.flextime_delta < 0 && "text-red-600 dark:text-red-400",
+                      timeEntry.flextime_delta === 0 && "text-muted-foreground"
+                    )}>
+                      {formatFlexHours(timeEntry.flextime_delta)}
+                    </span>
+                  )}
+                  
+                  {/* Entry type indicator for non-work entries */}
+                  {timeEntry && !['work', 'home_office', 'team_meeting', 'training'].includes(timeEntry.entry_type) && (
+                    <span className="text-xs text-muted-foreground truncate max-w-full">
+                      {ENTRY_TYPE_LABELS[timeEntry.entry_type as EntryType]?.slice(0, 3)}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -280,6 +323,14 @@ export function PersonalMonthlyCalendar() {
 
   return (
     <div className="space-y-6">
+      {/* FlexTime Summary Card */}
+      <FlexTimeSummaryCard
+        previousBalance={previousBalance}
+        currentMonthDelta={currentMonthDelta}
+        currentBalance={currentBalance}
+        loading={timeEntriesLoading}
+      />
+
       {/* Controls */}
       <Card>
         <CardHeader>
@@ -411,6 +462,18 @@ export function PersonalMonthlyCalendar() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Time Entry Dialog */}
+      {selectedDate && (
+        <TimeEntryDialog
+          open={timeEntryDialogOpen}
+          onOpenChange={setTimeEntryDialogOpen}
+          date={selectedDate}
+          existingEntry={getEntryForDate(format(selectedDate, "yyyy-MM-dd"))}
+          onSave={saveEntry}
+          onDelete={deleteEntry}
+        />
+      )}
     </div>
   );
 }

@@ -176,6 +176,68 @@ export type Database = {
           },
         ]
       }
+      daily_time_entries: {
+        Row: {
+          actual_hours_worked: number | null
+          break_duration_minutes: number | null
+          comment: string | null
+          created_at: string
+          entry_date: string
+          entry_type: string | null
+          flextime_delta: number | null
+          id: string
+          is_locked: boolean | null
+          schedule_entry_id: string | null
+          target_hours: number
+          updated_at: string
+          user_id: string
+          work_end_time: string | null
+          work_start_time: string | null
+        }
+        Insert: {
+          actual_hours_worked?: number | null
+          break_duration_minutes?: number | null
+          comment?: string | null
+          created_at?: string
+          entry_date: string
+          entry_type?: string | null
+          flextime_delta?: number | null
+          id?: string
+          is_locked?: boolean | null
+          schedule_entry_id?: string | null
+          target_hours?: number
+          updated_at?: string
+          user_id: string
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Update: {
+          actual_hours_worked?: number | null
+          break_duration_minutes?: number | null
+          comment?: string | null
+          created_at?: string
+          entry_date?: string
+          entry_type?: string | null
+          flextime_delta?: number | null
+          id?: string
+          is_locked?: boolean | null
+          schedule_entry_id?: string | null
+          target_hours?: number
+          updated_at?: string
+          user_id?: string
+          work_end_time?: string | null
+          work_start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_time_entries_schedule_entry_id_fkey"
+            columns: ["schedule_entry_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_preferences: {
         Row: {
           coverage_threshold: number | null
@@ -566,6 +628,45 @@ export type Database = {
           start_date?: string
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      monthly_flextime_summary: {
+        Row: {
+          created_at: string
+          ending_balance: number | null
+          id: string
+          is_finalized: boolean | null
+          month: number
+          month_delta: number | null
+          starting_balance: number | null
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          ending_balance?: number | null
+          id?: string
+          is_finalized?: boolean | null
+          month: number
+          month_delta?: number | null
+          starting_balance?: number | null
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          ending_balance?: number | null
+          id?: string
+          is_finalized?: boolean | null
+          month?: number
+          month_delta?: number | null
+          starting_balance?: number | null
+          updated_at?: string
+          user_id?: string
+          year?: number
         }
         Relationships: []
       }
