@@ -9,6 +9,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ChevronLeft, ChevronRight, Loader2, Moon, Sun, Calendar as CalendarIcon } from "lucide-react";
 import {
   addWeeks,
@@ -245,6 +250,18 @@ export function RosterCalendarView({
     );
   }
 
+  // Group assignments by team for popover display
+  const groupByTeam = (dayAssignments: Assignment[]) => {
+    const grouped: Record<string, Assignment[]> = {};
+    dayAssignments.forEach(a => {
+      if (!grouped[a.team_name]) {
+        grouped[a.team_name] = [];
+      }
+      grouped[a.team_name].push(a);
+    });
+    return grouped;
+  };
+
   return (
     <TooltipProvider>
       <div className="space-y-4">
@@ -301,7 +318,7 @@ export function RosterCalendarView({
           <div className="grid grid-cols-7 gap-1">
             {/* Padding for start of month */}
             {Array.from({ length: calendarDays.paddingStart }).map((_, i) => (
-              <div key={`pad-${i}`} className="min-h-[80px]" />
+              <div key={`pad-${i}`} className="min-h-[100px]" />
             ))}
 
             {/* Actual days */}
@@ -310,55 +327,90 @@ export function RosterCalendarView({
               const isBeforeRoster = isBefore(day, rosterStartDate);
               const dayOfWeek = getDay(day);
               const isWeekendDay = dayOfWeek === 0 || dayOfWeek === 6;
+              const groupedAssignments = groupByTeam(dayAssignments);
 
               return (
-                <div
-                  key={day.toISOString()}
-                  className={`
-                    min-h-[80px] p-1 rounded border
-                    ${isToday(day) ? "border-primary bg-primary/5" : "border-border"}
-                    ${isBeforeRoster ? "bg-muted/30 opacity-50" : ""}
-                    ${isWeekendDay && !isBeforeRoster ? "bg-muted/20" : ""}
-                  `}
-                >
-                  <div className={`text-xs font-medium mb-1 ${isToday(day) ? "text-primary" : "text-muted-foreground"}`}>
-                    {format(day, "d")}
-                  </div>
-                  <div className="space-y-0.5">
-                    {dayAssignments.slice(0, 3).map((assignment, idx) => {
-                      const shiftInfo = SHIFT_ICONS[assignment.shift_type || "normal"] || SHIFT_ICONS.normal;
-                      return (
-                        <Tooltip key={`${assignment.user_id}-${idx}`}>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={`
-                                flex items-center gap-0.5 px-1 py-0.5 rounded text-xs truncate cursor-default
-                                ${teamColorMap[assignment.team_id] || "bg-muted"}
-                              `}
-                            >
-                              {shiftInfo.icon}
-                              <span className="font-medium truncate">{assignment.initials}</span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-sm">
-                              <p className="font-medium">{assignment.user_name}</p>
-                              <p className="text-muted-foreground">{assignment.team_name}</p>
-                              <p className="text-muted-foreground capitalize">
-                                {shiftInfo.label} Shift
-                              </p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                    {dayAssignments.length > 3 && (
-                      <div className="text-xs text-muted-foreground">
-                        +{dayAssignments.length - 3} more
+                <Popover key={day.toISOString()}>
+                  <PopoverTrigger asChild>
+                    <div
+                      className={`
+                        min-h-[100px] p-1 rounded border cursor-pointer hover:bg-accent/50 transition-colors
+                        ${isToday(day) ? "border-primary bg-primary/5" : "border-border"}
+                        ${isBeforeRoster ? "bg-muted/30 opacity-50 cursor-default" : ""}
+                        ${isWeekendDay && !isBeforeRoster ? "bg-muted/20" : ""}
+                      `}
+                    >
+                      <div className={`text-xs font-medium mb-1 ${isToday(day) ? "text-primary" : "text-muted-foreground"}`}>
+                        {format(day, "d")}
                       </div>
-                    )}
-                  </div>
-                </div>
+                      <div className="flex flex-wrap gap-0.5">
+                        {dayAssignments.map((assignment, idx) => {
+                          const shiftInfo = SHIFT_ICONS[assignment.shift_type || "normal"] || SHIFT_ICONS.normal;
+                          return (
+                            <Tooltip key={`${assignment.user_id}-${idx}`}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`
+                                    flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] cursor-default
+                                    ${teamColorMap[assignment.team_id] || "bg-muted"}
+                                  `}
+                                >
+                                  {shiftInfo.icon}
+                                  <span className="font-medium">{assignment.initials}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-sm">
+                                  <p className="font-medium">{assignment.user_name}</p>
+                                  <p className="text-muted-foreground">{assignment.team_name}</p>
+                                  <p className="text-muted-foreground capitalize">
+                                    {shiftInfo.label} Shift
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </PopoverTrigger>
+                  {dayAssignments.length > 0 && !isBeforeRoster && (
+                    <PopoverContent className="w-80">
+                      <div className="space-y-3">
+                        <div className="font-semibold border-b pb-2">
+                          {format(day, "EEEE, MMMM d, yyyy")}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {dayAssignments.length} {dayAssignments.length === 1 ? "person" : "people"} assigned
+                        </div>
+                        {Object.entries(groupedAssignments).map(([teamName, teamAssignments]) => (
+                          <div key={teamName} className="space-y-1">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              {teamName}
+                            </div>
+                            <div className="space-y-1">
+                              {teamAssignments.map((assignment, idx) => {
+                                const shiftInfo = SHIFT_ICONS[assignment.shift_type || "normal"] || SHIFT_ICONS.normal;
+                                return (
+                                  <div
+                                    key={`${assignment.user_id}-${idx}`}
+                                    className={`flex items-center justify-between p-2 rounded ${teamColorMap[assignment.team_id] || "bg-muted"}`}
+                                  >
+                                    <span className="font-medium">{assignment.user_name}</span>
+                                    <Badge variant="secondary" className={`${shiftInfo.className} text-xs`}>
+                                      {shiftInfo.icon}
+                                      <span className="ml-1">{shiftInfo.label}</span>
+                                    </Badge>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  )}
+                </Popover>
               );
             })}
           </div>
@@ -366,9 +418,9 @@ export function RosterCalendarView({
 
         {/* Info Footer */}
         <div className="text-sm text-muted-foreground space-y-1">
+          <p>• Click on any day to see full assignment details</p>
           <p>• Cycle length: {cycleLength} weeks (pattern repeats)</p>
           <p>• Roster starts: {format(rosterStartDate, "MMMM d, yyyy")}</p>
-          <p>• Dates before roster start are grayed out</p>
         </div>
       </div>
     </TooltipProvider>

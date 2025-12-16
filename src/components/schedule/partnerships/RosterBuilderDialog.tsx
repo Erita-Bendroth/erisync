@@ -30,8 +30,9 @@ import { RosterWeekGrid } from "./RosterWeekGrid";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
 import { RosterProgressStepper } from "./RosterProgressStepper";
 import { RosterCalendarView } from "./RosterCalendarView";
+import { RosterActivityLog } from "./RosterActivityLog";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
-import { Rocket, Key, AlertTriangle, Users, HelpCircle, Calendar } from "lucide-react";
+import { Rocket, Key, AlertTriangle, Users, HelpCircle, Calendar, History } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, format } from "date-fns";
@@ -397,11 +398,15 @@ export function RosterBuilderDialog({
               </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="build">Weekly Assignments</TabsTrigger>
               <TabsTrigger value="calendar" className="gap-1">
                 <Calendar className="h-4 w-4" />
                 Calendar Preview
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="gap-1">
+                <History className="h-4 w-4" />
+                Activity Log
               </TabsTrigger>
               <TabsTrigger value="approvals">Manager Approvals</TabsTrigger>
             </TabsList>
@@ -440,6 +445,16 @@ export function RosterBuilderDialog({
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   Please save the roster draft first to preview the calendar
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="activity">
+              {rosterId ? (
+                <RosterActivityLog rosterId={rosterId} />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Please save the roster draft first to see activity
                 </div>
               )}
             </TabsContent>

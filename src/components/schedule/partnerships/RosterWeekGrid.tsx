@@ -142,6 +142,38 @@ export function RosterWeekGrid({
     }
   }, [assignments, teamMembers, userTeamIds, onProgressChange]);
 
+  // Log activity helper
+  const logActivity = useCallback(async (
+    action: string,
+    targetUserId: string | null,
+    targetTeamId: string | null,
+    weekNumber: number | null,
+    dayOfWeek: number | null,
+    oldValue: string | null,
+    newValue: string | null,
+    details?: any
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from("roster_activity_log").insert({
+        roster_id: rosterId,
+        user_id: user.id,
+        action,
+        target_user_id: targetUserId,
+        target_team_id: targetTeamId,
+        week_number: weekNumber,
+        day_of_week: dayOfWeek,
+        old_value: oldValue,
+        new_value: newValue,
+        details,
+      });
+    } catch (error) {
+      console.error("Error logging activity:", error);
+    }
+  }, [rosterId]);
+
   const handleAssignmentChange = useCallback(async (
     weekNumber: number,
     userId: string,
@@ -156,6 +188,7 @@ export function RosterWeekGrid({
 
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     let existingAssignmentId: string | null = null;
+    let oldShiftType: string | null = null;
     
     // Show saving status
     setSaveStatus("saving");
@@ -174,7 +207,10 @@ export function RosterWeekGrid({
             a.team_id === teamId &&
             a.day_of_week === dayOfWeek
         );
-        if (existing) existingAssignmentId = existing.id;
+        if (existing) {
+          existingAssignmentId = existing.id;
+          oldShiftType = existing.shift_type;
+        }
         
         return prev.filter((a) => !(
           a.week_number === weekNumber &&
@@ -196,6 +232,7 @@ export function RosterWeekGrid({
 
         if (existing) {
           existingAssignmentId = existing.id;
+          oldShiftType = existing.shift_type;
           return prev.map((a) => 
             a.id === existing.id 
               ? { ...a, shift_type: newShiftType }
@@ -232,6 +269,9 @@ export function RosterWeekGrid({
             .eq("id", existingAssignmentId);
 
           if (error) throw error;
+          
+          // Log removal
+          logActivity("removed", userId, teamId, weekNumber, dayOfWeek, oldShiftType, null);
         }
       } else {
         if (existingAssignmentId) {
@@ -241,6 +281,9 @@ export function RosterWeekGrid({
             .eq("id", existingAssignmentId);
 
           if (error) throw error;
+          
+          // Log change
+          logActivity("changed", userId, teamId, weekNumber, dayOfWeek, oldShiftType, newShiftType);
         } else {
           const { data, error } = await supabase
             .from("roster_week_assignments")
@@ -271,6 +314,9 @@ export function RosterWeekGrid({
               prev.map((a) => a.id === tempId ? data : a)
             );
           }
+          
+          // Log assignment
+          logActivity("assigned", userId, teamId, weekNumber, dayOfWeek, null, newShiftType);
         }
       }
       
@@ -286,7 +332,7 @@ export function RosterWeekGrid({
       // Refetch to restore correct state on error
       fetchAssignments();
     }
-  }, [rosterId, isReadOnly, fetchAssignments, assignments]);
+  }, [rosterId, isReadOnly, fetchAssignments, assignments, logActivity]);
 
   // Quick action: Copy Week 1 to all other weeks
   const handleCopyWeekToAll = useCallback(async () => {
@@ -343,6 +389,12 @@ export function RosterWeekGrid({
       if (insertError) throw insertError;
 
       await fetchAssignments();
+      
+      // Log the copy action
+      logActivity("copied", null, userTeamIds[0] || null, 1, null, null, null, {
+        to_weeks: `weeks 2-${cycleLength}`,
+      });
+      
       toast.success(`Copied Week 1 to weeks 2-${cycleLength}`);
       setSaveStatus("saved");
       saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -351,7 +403,7 @@ export function RosterWeekGrid({
       toast.error("Failed to copy assignments");
       setSaveStatus("error");
     }
-  }, [assignments, cycleLength, rosterId, userTeamIds, fetchAssignments]);
+  }, [assignments, cycleLength, rosterId, userTeamIds, fetchAssignments, logActivity]);
 
   // Quick action: Fill my team with a shift type
   const handleFillMyTeam = useCallback(async (shiftType: string) => {
@@ -387,6 +439,13 @@ export function RosterWeekGrid({
       if (error) throw error;
 
       await fetchAssignments();
+      
+      // Log the fill action
+      logActivity("assigned", null, userTeamIds[0] || null, null, null, null, shiftType, {
+        count: newAssignments.length,
+        team_members: myTeamMembers.length,
+      });
+      
       toast.success(`Filled your team with ${shiftType} shift`);
       setSaveStatus("saved");
       saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -395,10 +454,12 @@ export function RosterWeekGrid({
       toast.error("Failed to fill team");
       setSaveStatus("error");
     }
-  }, [teamMembers, userTeamIds, cycleLength, rosterId, assignments, fetchAssignments]);
+  }, [teamMembers, userTeamIds, cycleLength, rosterId, assignments, fetchAssignments, logActivity]);
 
   // Quick action: Clear my team assignments
   const handleClearMyTeam = useCallback(async () => {
+    const myAssignmentsCount = assignments.filter(a => userTeamIds.includes(a.team_id)).length;
+    
     setUndoStack(prev => [...prev.slice(-4), assignments]);
     setSaveStatus("saving");
 
@@ -412,6 +473,12 @@ export function RosterWeekGrid({
       if (error) throw error;
 
       await fetchAssignments();
+      
+      // Log the clear action
+      logActivity("cleared", null, userTeamIds[0] || null, null, null, null, null, {
+        count: myAssignmentsCount,
+      });
+      
       toast.success("Cleared all your team's assignments");
       setSaveStatus("saved");
       saveTimeoutRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -420,7 +487,7 @@ export function RosterWeekGrid({
       toast.error("Failed to clear team");
       setSaveStatus("error");
     }
-  }, [rosterId, userTeamIds, assignments, fetchAssignments]);
+  }, [rosterId, userTeamIds, assignments, fetchAssignments, logActivity]);
 
   // Undo last action
   const handleUndo = useCallback(async () => {
