@@ -62,9 +62,13 @@ export function TimeEntryDialog({
   const [breakMinutes, setBreakMinutes] = useState<number>(30);
   const [entryType, setEntryType] = useState<EntryType>("work");
   const [comment, setComment] = useState<string>("");
-  const [fzaHours, setFzaHours] = useState<number>(0);
+  const [fzaHoursInput, setFzaHoursInput] = useState<number>(0);
+  const [fzaMinutesInput, setFzaMinutesInput] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Calculate total FZA hours from separate inputs
+  const fzaHours = fzaHoursInput + (fzaMinutesInput / 60);
 
   // Reset form when dialog opens or date changes
   useEffect(() => {
@@ -75,7 +79,10 @@ export function TimeEntryDialog({
         setBreakMinutes(existingEntry.break_duration_minutes || 30);
         setEntryType((existingEntry.entry_type as EntryType) || "work");
         setComment(existingEntry.comment || "");
-        setFzaHours(existingEntry.fza_hours || 0);
+        // Convert decimal fza_hours back to hours + minutes
+        const existingFza = existingEntry.fza_hours || 0;
+        setFzaHoursInput(Math.floor(existingFza));
+        setFzaMinutesInput(Math.round((existingFza - Math.floor(existingFza)) * 60));
       } else {
         // Default values for new entry
         const defaultType: EntryType = "work";
@@ -84,7 +91,8 @@ export function TimeEntryDialog({
         setEndTime(getDefaultEndTime(date, defaultType));
         setBreakMinutes(30);
         setComment("");
-        setFzaHours(0);
+        setFzaHoursInput(0);
+        setFzaMinutesInput(0);
       }
     }
   }, [open, date, existingEntry]);
@@ -99,17 +107,21 @@ export function TimeEntryDialog({
       setStartTime("");
       setEndTime("");
       setBreakMinutes(0);
-      if (!fzaHours) setFzaHours(1); // Default to 1 hour
+      if (fzaHoursInput === 0 && fzaMinutesInput === 0) {
+        setFzaHoursInput(1); // Default to 1 hour
+      }
     } else if (!config.requiresTimeEntry) {
       setStartTime("");
       setEndTime("");
       setBreakMinutes(0);
-      setFzaHours(0);
+      setFzaHoursInput(0);
+      setFzaMinutesInput(0);
     } else if (!startTime && !endTime) {
       setStartTime(getDefaultStartTime(newType));
       setEndTime(getDefaultEndTime(date, newType));
       setBreakMinutes(30);
-      setFzaHours(0);
+      setFzaHoursInput(0);
+      setFzaMinutesInput(0);
     }
   };
 
@@ -243,19 +255,40 @@ export function TimeEntryDialog({
           {requiresHoursInput && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fzaHours">Hours to Withdraw</Label>
-                <Input
-                  id="fzaHours"
-                  type="number"
-                  min="0.25"
-                  max="24"
-                  step="0.25"
-                  value={fzaHours}
-                  onChange={(e) => setFzaHours(parseFloat(e.target.value) || 0)}
-                  className="text-lg font-medium"
-                />
+                <Label>Time to Withdraw</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="fzaHoursInput" className="text-xs text-muted-foreground">Hours</Label>
+                    <Input
+                      id="fzaHoursInput"
+                      type="number"
+                      min="0"
+                      max="24"
+                      value={fzaHoursInput}
+                      onChange={(e) => setFzaHoursInput(parseInt(e.target.value) || 0)}
+                      className="text-lg font-medium"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="fzaMinutesInput" className="text-xs text-muted-foreground">Minutes</Label>
+                    <Select 
+                      value={fzaMinutesInput.toString()} 
+                      onValueChange={(v) => setFzaMinutesInput(parseInt(v))}
+                    >
+                      <SelectTrigger className="text-lg font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">00</SelectItem>
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="30">30</SelectItem>
+                        <SelectItem value="45">45</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Enter the number of FlexTime hours you want to use (e.g., 2.5 for leaving 2.5 hours early)
+                  Enter the time you want to withdraw from your FlexTime balance
                 </p>
               </div>
 
@@ -275,7 +308,7 @@ export function TimeEntryDialog({
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Withdrawal:</span>
                       <span className="font-medium text-red-600 dark:text-red-400">
-                        -{fzaHours.toFixed(2)}h
+                        -{fzaHoursInput}:{fzaMinutesInput.toString().padStart(2, '0')}
                       </span>
                     </div>
                     <div className="border-t pt-1 flex justify-between">
