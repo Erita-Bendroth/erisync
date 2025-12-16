@@ -45,6 +45,7 @@ import { MonthlyGridView } from './MonthlyGridView';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
+import { TeamScheduleExportDialog } from './TeamScheduleExportDialog';
 
 interface TeamMember {
   user_id: string;
@@ -97,6 +98,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<any>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { favorites, refetchFavorites } = useTeamFavorites('multi-team');
@@ -752,7 +754,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={exportToExcel}
+                  onClick={() => setExportDialogOpen(true)}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export
@@ -1107,6 +1109,15 @@ export const UnifiedTeamScheduler: React.FC = () => {
         isOpen={editDialogOpen}
         onClose={handleCloseEditDialog}
         onSave={handleSaveEditDialog}
+      />
+
+      {/* Export Dialog */}
+      <TeamScheduleExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        teamIds={teamIds}
+        teamSections={teamSections}
+        defaultStartDate={dateStart}
       />
     </>
   );
