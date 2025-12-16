@@ -192,7 +192,7 @@ export function FlexTimeSummaryCard({
                         </span>
                         {fzaTotalHours > 0 && (
                           <span className="text-red-600 dark:text-red-400">
-                            FZA: -{fzaTotalHours.toFixed(1)}h
+                            FZA: {formatFlexHours(-fzaTotalHours)}
                           </span>
                         )}
                       </div>
@@ -202,7 +202,7 @@ export function FlexTimeSummaryCard({
                 <TooltipContent>
                   <div className="space-y-1 text-xs">
                     <p><strong>FLEX earned:</strong> {formatFlexHours(pureFlexDelta)}</p>
-                    <p><strong>FZA taken:</strong> {fzaTotalHours > 0 ? `-${fzaTotalHours.toFixed(2)}h` : "0.00h"}</p>
+                    <p><strong>FZA taken:</strong> {formatFlexHours(-fzaTotalHours)}</p>
                     <p className="text-muted-foreground mt-1">Net: {formatFlexHours(currentMonthDelta)}</p>
                   </div>
                 </TooltipContent>
