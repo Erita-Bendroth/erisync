@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { calculateFlexTime, getTargetHours, type EntryType } from '@/lib/flexTimeUtils';
+import { calculateFlexTime, type EntryType } from '@/lib/flexTimeUtils';
 
 export interface DailyTimeEntry {
   id: string;
@@ -50,6 +50,8 @@ export function useTimeEntries(monthDate: Date) {
   const [entries, setEntries] = useState<DailyTimeEntry[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlyFlexSummary | null>(null);
   const [previousBalance, setPreviousBalance] = useState<number>(0);
+  const [carryoverLimit, setCarryoverLimit] = useState<number>(40);
+  const [userName, setUserName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   const fetchEntries = useCallback(async () => {
@@ -100,6 +102,18 @@ export function useTimeEntries(monthDate: Date) {
         .maybeSingle();
 
       setPreviousBalance(prevSummary?.ending_balance || 0);
+
+      // Fetch user profile for carryover limit and name
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, flextime_carryover_limit')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileData) {
+        setCarryoverLimit(profileData.flextime_carryover_limit ?? 40);
+        setUserName(`${profileData.first_name} ${profileData.last_name}`);
+      }
 
     } catch (error) {
       console.error('Error fetching time entries:', error);
@@ -262,6 +276,35 @@ export function useTimeEntries(monthDate: Date) {
     }
   }, [user?.id, monthDate]);
 
+  const saveCarryoverLimit = useCallback(async (newLimit: number): Promise<boolean> => {
+    if (!user?.id) return false;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ flextime_carryover_limit: newLimit })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setCarryoverLimit(newLimit);
+      toast({
+        title: 'Saved',
+        description: 'Carryover limit updated successfully',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error saving carryover limit:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save carryover limit',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [user?.id, toast]);
+
   const getEntryForDate = useCallback((dateStr: string): DailyTimeEntry | undefined => {
     return entries.find(e => e.entry_date === dateStr);
   }, [entries]);
@@ -280,10 +323,13 @@ export function useTimeEntries(monthDate: Date) {
     previousBalance,
     currentMonthDelta,
     currentBalance,
+    carryoverLimit,
+    userName,
     loading,
     saveEntry,
     deleteEntry,
     getEntryForDate,
+    saveCarryoverLimit,
     refresh: fetchEntries,
   };
 }

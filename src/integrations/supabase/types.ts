@@ -880,6 +880,7 @@ export type Database = {
           created_at: string
           email: string
           first_name: string
+          flextime_carryover_limit: number | null
           id: string
           initials: string | null
           last_name: string
@@ -894,6 +895,7 @@ export type Database = {
           created_at?: string
           email: string
           first_name: string
+          flextime_carryover_limit?: number | null
           id?: string
           initials?: string | null
           last_name: string
@@ -908,6 +910,7 @@ export type Database = {
           created_at?: string
           email?: string
           first_name?: string
+          flextime_carryover_limit?: number | null
           id?: string
           initials?: string | null
           last_name?: string
