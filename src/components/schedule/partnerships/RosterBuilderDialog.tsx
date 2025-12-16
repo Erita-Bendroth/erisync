@@ -29,8 +29,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterWeekGrid } from "./RosterWeekGrid";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
 import { RosterProgressStepper } from "./RosterProgressStepper";
+import { RosterCalendarView } from "./RosterCalendarView";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
-import { Rocket, Key, AlertTriangle, Users, HelpCircle } from "lucide-react";
+import { Rocket, Key, AlertTriangle, Users, HelpCircle, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, format } from "date-fns";
@@ -420,8 +421,12 @@ export function RosterBuilderDialog({
               </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="build">Weekly Assignments</TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-1">
+                <Calendar className="h-4 w-4" />
+                Calendar Preview
+              </TabsTrigger>
               <TabsTrigger value="approvals">Manager Approvals</TabsTrigger>
             </TabsList>
 
@@ -444,6 +449,21 @@ export function RosterBuilderDialog({
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   Please save the roster draft first to build assignments
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="calendar">
+              {rosterId ? (
+                <RosterCalendarView
+                  rosterId={rosterId}
+                  startDate={startDate}
+                  cycleLength={cycleLength}
+                  partnershipId={partnershipId}
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Please save the roster draft first to preview the calendar
                 </div>
               )}
             </TabsContent>
