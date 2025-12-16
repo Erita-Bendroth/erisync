@@ -217,40 +217,16 @@ export function RosterBuilderDialog({
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      // Use edge function to create approval records with service role
+      const { data, error } = await supabase.functions.invoke("create-roster-approvals", {
+        body: {
+          rosterId,
+          teamIds: teams.map(t => t.id),
+        },
+      });
 
-      // Update roster status
-      const { error: updateError } = await supabase
-        .from("partnership_rotation_rosters")
-        .update({ status: "pending_approval" })
-        .eq("id", rosterId);
-
-      if (updateError) throw updateError;
-
-      // Create approval records for all team managers
-      const { data: teamMembers, error: membersError } = await supabase
-        .from("team_members")
-        .select("team_id, user_id")
-        .in("team_id", teams.map(t => t.id))
-        .eq("is_manager", true);
-
-      if (membersError) throw membersError;
-
-      // Auto-approve the current user's approval (the submitting manager)
-      const approvals = teamMembers.map(tm => ({
-        roster_id: rosterId,
-        manager_id: tm.user_id,
-        team_id: tm.team_id,
-        approved: tm.user_id === user.id, // Auto-approve for submitter
-        approved_at: tm.user_id === user.id ? new Date().toISOString() : null,
-      }));
-
-      const { error: approvalsError } = await supabase
-        .from("roster_manager_approvals")
-        .upsert(approvals, { onConflict: "roster_id,manager_id,team_id" });
-
-      if (approvalsError) throw approvalsError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       setStatus("pending_approval");
       toast.success("Your planning is submitted. Waiting for other team managers to complete their assignments.");
