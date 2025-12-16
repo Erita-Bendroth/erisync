@@ -125,6 +125,41 @@ export const TeamScheduleExportDialog: React.FC<TeamScheduleExportDialogProps> =
       // Create workbook
       const workbook = XLSX.utils.book_new();
 
+      // Track used sheet names to avoid duplicates
+      const usedSheetNames = new Set<string>();
+
+      const getUniqueSheetName = (baseName: string, teamId: string): string => {
+        // Excel sheet names are limited to 31 characters
+        // Remove invalid characters: : \ / ? * [ ]
+        const sanitizedBase = baseName.replace(/[:\\/?\*\[\]]/g, '-').trim();
+        
+        // Add short team ID suffix for distinguishability (first 4 chars)
+        const shortId = teamId.substring(0, 4).toUpperCase();
+        const suffix = ` [${shortId}]`;
+        
+        // Truncate base name to leave room for suffix (31 - 7 = 24 chars)
+        const maxBaseLength = 31 - suffix.length;
+        let sheetName = sanitizedBase.substring(0, maxBaseLength).trim() + suffix;
+        
+        if (!usedSheetNames.has(sheetName)) {
+          usedSheetNames.add(sheetName);
+          return sheetName;
+        }
+        
+        // If still duplicate (rare), add a number
+        let counter = 2;
+        let uniqueName: string;
+        do {
+          const numSuffix = ` (${counter})`;
+          const maxLen = 31 - suffix.length - numSuffix.length;
+          uniqueName = sanitizedBase.substring(0, maxLen).trim() + numSuffix + suffix;
+          counter++;
+        } while (usedSheetNames.has(uniqueName));
+        
+        usedSheetNames.add(uniqueName);
+        return uniqueName;
+      };
+
       // Create a sheet for each team
       teamSections.forEach((section) => {
         // Header row with dates
@@ -160,8 +195,8 @@ export const TeamScheduleExportDialog: React.FC<TeamScheduleExportDialogProps> =
         const colWidths = [{ wch: 20 }, ...dates.map(() => ({ wch: 12 }))];
         worksheet['!cols'] = colWidths;
 
-        // Add sheet to workbook (sheet names limited to 31 chars)
-        const sheetName = section.teamName.substring(0, 31);
+        // Add sheet to workbook with unique name including team ID
+        const sheetName = getUniqueSheetName(section.teamName, section.teamId);
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       });
 
