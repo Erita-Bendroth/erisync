@@ -2429,20 +2429,21 @@ const getActivityColor = (entry: ScheduleEntry) => {
                           const isOwnCell = employee.user_id === user?.id;
                           const timeEntry = isOwnCell ? getEntryForDate(dayStr) : null;
                           
-                          // Handler for team member clicking their own cell for time entry
+                          // Handler for clicking cells - own cells open time entry, others open schedule edit
                           const handleCellClick = () => {
                             if (multiSelectMode) return;
                             
-                            // Managers/planners can edit schedule entries
-                            if (isManager() || isPlanner()) {
-                              handleDateClick(employee.user_id, day);
+                            // Any user clicking their OWN cell opens flex time dialog
+                            // This allows all users (including managers) to record their own working hours
+                            if (isOwnCell) {
+                              setTimeEntryDate(day);
+                              setTimeEntryDialogOpen(true);
                               return;
                             }
                             
-                            // Team members can click their own cells to record time
-                            if (isTeamMember() && isOwnCell) {
-                              setTimeEntryDate(day);
-                              setTimeEntryDialogOpen(true);
+                            // Managers/planners can edit OTHER people's schedule entries
+                            if (isManager() || isPlanner()) {
+                              handleDateClick(employee.user_id, day);
                             }
                           };
                           
