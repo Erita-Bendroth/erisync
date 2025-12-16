@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RosterWeekGrid } from "./RosterWeekGrid";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
-import { Rocket, Key, AlertTriangle } from "lucide-react";
+import { Rocket, Key, AlertTriangle, Users } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, format } from "date-fns";
@@ -270,6 +270,37 @@ export function RosterBuilderDialog({
               {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
             </DialogTitle>
           </DialogHeader>
+
+          {/* Workflow Guidance Banner */}
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="bg-blue-100 dark:bg-blue-900 rounded-full p-2 shrink-0">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                  📋 This is a shared roster for all partnership teams
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Each team manager edits <strong>their own team's rows</strong> below (highlighted in blue). 
+                  You can view other teams' assignments but should only edit your own.
+                  Once all teams have completed their planning, submit for approval.
+                </p>
+                {teams.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {teams.map(team => (
+                      <span 
+                        key={team.id}
+                        className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                      >
+                        {team.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
