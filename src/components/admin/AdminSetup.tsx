@@ -16,6 +16,7 @@ import { ShiftTimeDefinitions } from "../schedule/ShiftTimeDefinitions";
 import { TeamGroupManager } from "../schedule/TeamGroupManager";
 import { ShiftRotationTemplateManager } from "../schedule/ShiftRotationTemplateManager";
 import { CountryShiftLimits } from "./CountryShiftLimits";
+import { CountryHOLimits } from "./CountryHOLimits";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
@@ -578,6 +579,7 @@ const AdminSetup = () => {
         
         <TabsContent value="limits" className="space-y-6">
           <CountryShiftLimits />
+          <CountryHOLimits />
         </TabsContent>
       </Tabs>
     </div>
