@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, TrendingUp, TrendingDown, Minus, Settings, AlertTriangle } from "lucide-react";
+import { Clock, TrendingUp, TrendingDown, Minus, Settings, AlertTriangle, Home } from "lucide-react";
 import { formatFlexHours } from "@/lib/flexTimeUtils";
 import { cn } from "@/lib/utils";
 import { FlexTimeExportDialog } from "./FlexTimeExportDialog";
 import { FlexTimeSettingsDialog } from "./FlexTimeSettingsDialog";
 import type { DailyTimeEntry, MonthlyFlexSummary } from "@/hooks/useTimeEntries";
+import { useHomeOfficeCompliance } from "@/hooks/useHomeOfficeCompliance";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Tooltip,
   TooltipContent,
@@ -40,8 +42,14 @@ export function FlexTimeSummaryCard({
   onSaveCarryoverLimit,
   loading = false,
 }: FlexTimeSummaryCardProps) {
+  const { user } = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
-
+  
+  // Fetch Home Office compliance for the current user
+  const { compliance: hoCompliance } = useHomeOfficeCompliance({
+    userId: user?.id || '',
+    referenceDate: monthDate,
+  });
   const getTrendIcon = (value: number) => {
     if (value > 0) return <TrendingUp className="w-4 h-4" />;
     if (value < 0) return <TrendingDown className="w-4 h-4" />;
@@ -225,6 +233,46 @@ export function FlexTimeSummaryCard({
               </div>
             </div>
           </div>
+
+          {/* Home Office Section */}
+          {hoCompliance && hoCompliance.limitType !== 'none' && (
+            <div className="mt-4 pt-3 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Home className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium">Home Office</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "text-sm font-semibold",
+                    hoCompliance.isOverLimit 
+                      ? "text-destructive" 
+                      : hoCompliance.isApproachingLimit 
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-foreground"
+                  )}>
+                    {hoCompliance.currentPeriodDays}/{hoCompliance.maxDays} days this {hoCompliance.limitType === 'weekly' ? 'week' : hoCompliance.limitType === 'monthly' ? 'month' : 'year'}
+                  </span>
+                  {hoCompliance.isOverLimit ? (
+                    <Badge variant="destructive" className="text-xs">Over limit</Badge>
+                  ) : hoCompliance.isApproachingLimit ? (
+                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                      {Math.round(hoCompliance.percentUsed)}%
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                      OK
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              {hoCompliance.limitType !== 'yearly' && (
+                <div className="text-xs text-muted-foreground mt-1 text-right">
+                  {hoCompliance.yearToDateDays} days YTD
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
