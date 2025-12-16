@@ -72,33 +72,47 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
 
   const fetchApprovals = async () => {
     try {
-      // Fetch existing approval records
+      // Fetch existing approval records without profiles join
       const { data, error } = await supabase
         .from("roster_manager_approvals")
-        .select(`
-          *,
-          profiles!roster_manager_approvals_manager_id_fkey (
-            first_name,
-            last_name
-          ),
-          teams (
-            name
-          )
-        `)
+        .select(`*, teams (name)`)
         .eq("roster_id", rosterId);
 
       if (error) throw error;
 
-      const formattedApprovals = data.map((approval: any) => ({
-        id: approval.id,
-        manager_id: approval.manager_id,
-        team_id: approval.team_id,
-        approved: approval.approved,
-        approved_at: approval.approved_at,
-        comments: approval.comments,
-        manager_name: `${approval.profiles.first_name} ${approval.profiles.last_name}`,
-        team_name: approval.teams.name,
-      }));
+      // Get unique manager IDs and fetch profiles separately
+      const managerIds = [...new Set(data.map((a: any) => a.manager_id))];
+      let managersMap: Record<string, { first_name: string; last_name: string }> = {};
+      
+      if (managerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name")
+          .in("user_id", managerIds);
+        
+        if (profiles) {
+          managersMap = profiles.reduce((acc, p) => {
+            acc[p.user_id] = p;
+            return acc;
+          }, {} as Record<string, any>);
+        }
+      }
+
+      const formattedApprovals = data.map((approval: any) => {
+        const manager = managersMap[approval.manager_id];
+        return {
+          id: approval.id,
+          manager_id: approval.manager_id,
+          team_id: approval.team_id,
+          approved: approval.approved,
+          approved_at: approval.approved_at,
+          comments: approval.comments,
+          manager_name: manager 
+            ? `${manager.first_name} ${manager.last_name}` 
+            : "Unknown Manager",
+          team_name: approval.teams?.name || "Unknown Team",
+        };
+      });
 
       setApprovals(formattedApprovals);
 
@@ -111,32 +125,41 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
         const missingTeamIds = teamsWithoutApprovals.map(t => t.id);
         const { data: teamManagers, error: managersError } = await supabase
           .from("team_members")
-          .select(`
-            team_id,
-            user_id,
-            profiles!team_members_user_id_fkey (
-              first_name,
-              last_name,
-              email
-            )
-          `)
+          .select(`team_id, user_id`)
           .in("team_id", missingTeamIds)
           .eq("is_manager", true);
 
         if (managersError) throw managersError;
 
+        // Fetch profiles for these managers
+        const missingManagerIds = teamManagers?.map(tm => tm.user_id).filter(Boolean) || [];
+        let missingManagersMap: Record<string, { first_name: string; last_name: string; email: string }> = {};
+        
+        if (missingManagerIds.length > 0) {
+          const { data: managerProfiles } = await supabase
+            .from("profiles")
+            .select("user_id, first_name, last_name, email")
+            .in("user_id", missingManagerIds);
+          
+          if (managerProfiles) {
+            missingManagersMap = managerProfiles.reduce((acc, p) => {
+              acc[p.user_id] = p;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+
         const missingList: MissingApproval[] = teamsWithoutApprovals.map(team => {
-          const manager = teamManagers?.find(tm => tm.team_id === team.id);
+          const teamManager = teamManagers?.find(tm => tm.team_id === team.id);
+          const profile = teamManager ? missingManagersMap[teamManager.user_id] : null;
           return {
             team_id: team.id,
             team_name: team.name,
-            manager_id: manager?.user_id || null,
-            manager_name: manager?.profiles 
-              ? `${(manager.profiles as any).first_name} ${(manager.profiles as any).last_name}` 
+            manager_id: teamManager?.user_id || null,
+            manager_name: profile 
+              ? `${profile.first_name} ${profile.last_name}` 
               : null,
-            manager_email: manager?.profiles 
-              ? (manager.profiles as any).email 
-              : null,
+            manager_email: profile?.email || null,
           };
         });
 

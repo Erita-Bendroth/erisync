@@ -94,39 +94,52 @@ export function RosterCalendarView({
 
   const fetchAssignments = async () => {
     try {
+      // Fetch assignments without profiles join
       const { data, error } = await supabase
         .from("roster_week_assignments")
-        .select(`
-          *,
-          profiles (
-            first_name,
-            last_name,
-            initials
-          ),
-          teams (
-            name
-          )
-        `)
+        .select(`*, teams (name)`)
         .eq("roster_id", rosterId)
         .order("week_number");
 
       if (error) throw error;
 
+      // Get unique user IDs
+      const userIds = [...new Set(data.filter((a: any) => a.user_id).map((a: any) => a.user_id))];
+
+      // Fetch profiles separately
+      let profilesMap: Record<string, { first_name: string; last_name: string; initials: string | null }> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name, initials")
+          .in("user_id", userIds);
+        
+        if (profiles) {
+          profilesMap = profiles.reduce((acc, p) => {
+            acc[p.user_id] = p;
+            return acc;
+          }, {} as Record<string, any>);
+        }
+      }
+
       const formattedAssignments = data
         .filter((a: any) => a.user_id !== null)
-        .map((assignment: any) => ({
-          week_number: assignment.week_number,
-          day_of_week: assignment.day_of_week,
-          user_id: assignment.user_id,
-          team_id: assignment.team_id,
-          shift_type: assignment.shift_type,
-          include_weekends: assignment.include_weekends || false,
-          user_name: assignment.profiles
-            ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
-            : "Unknown",
-          team_name: assignment.teams?.name || "Unknown Team",
-          initials: assignment.profiles?.initials || "?",
-        }));
+        .map((assignment: any) => {
+          const profile = profilesMap[assignment.user_id];
+          return {
+            week_number: assignment.week_number,
+            day_of_week: assignment.day_of_week,
+            user_id: assignment.user_id,
+            team_id: assignment.team_id,
+            shift_type: assignment.shift_type,
+            include_weekends: assignment.include_weekends || false,
+            user_name: profile
+              ? `${profile.first_name} ${profile.last_name}`
+              : "Unknown",
+            team_name: assignment.teams?.name || "Unknown Team",
+            initials: profile?.initials || "?",
+          };
+        });
 
       setAssignments(formattedAssignments);
 
