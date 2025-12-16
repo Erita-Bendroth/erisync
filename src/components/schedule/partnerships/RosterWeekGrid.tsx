@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -13,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Filter, Users } from "lucide-react";
 
 interface TeamMember {
   user_id: string;
@@ -53,11 +54,29 @@ export function RosterWeekGrid({
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [dayByDayMode, setDayByDayMode] = useState(false);
+  const [showOnlyMyTeam, setShowOnlyMyTeam] = useState(false);
+  const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
 
   useEffect(() => {
+    fetchCurrentUserTeams();
     fetchTeamMembers();
     fetchAssignments();
   }, [rosterId, partnershipId]);
+
+  const fetchCurrentUserTeams = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: memberships } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user.id)
+        .eq("is_manager", true);
+      
+      if (memberships) {
+        setUserTeamIds(memberships.map(m => m.team_id));
+      }
+    }
+  };
 
   // Auto-detect day-by-day mode based on existing assignments
   useEffect(() => {
@@ -311,6 +330,29 @@ export function RosterWeekGrid({
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const dayValues = [1, 2, 3, 4, 5, 6, 0]; // ISO day of week
 
+  // Filter members based on showOnlyMyTeam
+  const filteredMembers = useMemo(() => {
+    if (!showOnlyMyTeam) return teamMembers;
+    return teamMembers.filter(m => userTeamIds.includes(m.team_id));
+  }, [teamMembers, showOnlyMyTeam, userTeamIds]);
+
+  // Group members by team for visual separation
+  const membersByTeam = useMemo(() => {
+    const groups: Record<string, TeamMember[]> = {};
+    filteredMembers.forEach(member => {
+      if (!groups[member.team_id]) {
+        groups[member.team_id] = [];
+      }
+      groups[member.team_id].push(member);
+    });
+    return groups;
+  }, [filteredMembers]);
+
+  // Check if a member is from user's team
+  const isUserTeamMember = useCallback((teamId: string) => {
+    return userTeamIds.includes(teamId);
+  }, [userTeamIds]);
+
   // Memoized DayCell component for performance - only re-renders when its own props change
   const DayCell = memo(({ 
     currentValue, 
@@ -354,21 +396,42 @@ export function RosterWeekGrid({
 
   return (
     <div className="space-y-4">
+      {/* Controls Card */}
       <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Switch
-              id="day-mode"
-              checked={dayByDayMode}
-              onCheckedChange={setDayByDayMode}
-              disabled={isReadOnly}
-            />
-            <Label htmlFor="day-mode" className="text-sm font-medium">
-              Day-by-day assignments (Mon-Sun per week)
-            </Label>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="day-mode"
+                checked={dayByDayMode}
+                onCheckedChange={setDayByDayMode}
+                disabled={isReadOnly}
+              />
+              <Label htmlFor="day-mode" className="text-sm font-medium">
+                Day-by-day assignments
+              </Label>
+            </div>
+            
+            {/* My Team Filter */}
+            {userTeamIds.length > 0 && (
+              <div className="flex items-center gap-2 border-l pl-4">
+                <Button
+                  variant={showOnlyMyTeam ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowOnlyMyTeam(!showOnlyMyTeam)}
+                  className="gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  {showOnlyMyTeam ? "Showing My Team Only" : "Show My Team Only"}
+                </Button>
+              </div>
+            )}
           </div>
           <div className="text-sm text-muted-foreground">
-            {dayByDayMode ? "Assign shifts per day" : "Assign shifts per week"}
+            {showOnlyMyTeam 
+              ? `Showing ${filteredMembers.length} members from your team(s)`
+              : `${teamMembers.length} members total`
+            }
           </div>
         </div>
       </Card>
@@ -379,7 +442,7 @@ export function RosterWeekGrid({
           <div className="text-sm text-muted-foreground">
             <p>• Assign each person's shift type for each week in the rotation cycle</p>
             <p>• Leave as "Not assigned" if the person is not scheduled that week</p>
-            <p>• All managers can see all assignments to coordinate coverage</p>
+            <p>• <strong>Your team rows are highlighted</strong> - focus on those first</p>
           </div>
           
           <div className="overflow-x-auto">
@@ -400,79 +463,112 @@ export function RosterWeekGrid({
                 </tr>
               </thead>
               <tbody>
-                {teamMembers.map((member) => (
-                  <tr key={`${member.user_id}-${member.team_id}`}>
-                    <td className="border p-2 font-medium sticky left-0 bg-background z-10">
-                      <div>
-                        <div className="font-medium">
-                          {member.initials || `${member.first_name} ${member.last_name}`}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{member.team_name}</div>
-                      </div>
-                    </td>
-                    {Array.from({ length: cycleLength }, (_, i) => i + 1).map((weekNumber) => {
-                      const assignment = getAssignment(member.user_id, member.team_id, weekNumber, null);
-                      const shiftType = assignment?.shift_type || null;
-                      const includeWeekends = assignment?.include_weekends || false;
-                      // Enable weekend checkbox only for weekday shifts (not weekend-only, compound, or off)
-                      const canIncludeWeekend = shiftType && ['normal', 'early', 'late'].includes(shiftType);
-
-                      return (
-                        <td key={weekNumber} className="border p-2">
-                          <div className="space-y-2">
-                            <Select
-                              value={shiftType || "none"}
-                              onValueChange={(value) =>
-                                handleAssignmentChange(
-                                  weekNumber,
-                                  member.user_id,
-                                  member.team_id,
-                                  value === "none" ? null : value,
-                                  null
-                                )
-                              }
-                              disabled={isReadOnly}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue>
-                                  <span className={getShiftTypeBadgeColor(shiftType)}>
-                                    {getShiftTypeLabel(shiftType)}
-                                  </span>
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">
-                                  <span className="text-muted-foreground italic">Not assigned</span>
-                                </SelectItem>
-                                <SelectItem value="late">🌙 Late Shift (Mon-Fri)</SelectItem>
-                                <SelectItem value="early">☀️ Early Shift (Mon-Fri)</SelectItem>
-                                <SelectItem value="normal">💼 Normal Shift (Mon-Fri)</SelectItem>
-                                <SelectItem value="weekend">📅 Weekend Only</SelectItem>
-                                <SelectItem value="off">🏖️ Off (entire week)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                id={`weekend-${member.user_id}-${weekNumber}`}
-                                checked={includeWeekends}
-                                onCheckedChange={(checked) =>
-                                  handleWeekendToggle(weekNumber, member.user_id, member.team_id, !!checked)
-                                }
-                                disabled={isReadOnly || !canIncludeWeekend}
-                              />
-                              <Label
-                                htmlFor={`weekend-${member.user_id}-${weekNumber}`}
-                                className={`text-xs cursor-pointer ${canIncludeWeekend ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}
-                              >
-                                + Weekend
-                              </Label>
-                            </div>
+                {Object.entries(membersByTeam).map(([teamId, members]) => {
+                  const isMyTeam = isUserTeamMember(teamId);
+                  const teamName = members[0]?.team_name || "Unknown Team";
+                  
+                  return (
+                    <>
+                      {/* Team header row */}
+                      <tr key={`team-header-${teamId}`}>
+                        <td 
+                          colSpan={cycleLength + 1} 
+                          className={`border p-2 font-semibold ${
+                            isMyTeam 
+                              ? "bg-primary/10 text-primary border-primary/30" 
+                              : "bg-muted/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            {teamName}
+                            {isMyTeam && (
+                              <Badge className="bg-primary text-primary-foreground text-xs">
+                                Your Team
+                              </Badge>
+                            )}
                           </div>
                         </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                      </tr>
+                      {members.map((member) => (
+                        <tr 
+                          key={`${member.user_id}-${member.team_id}`}
+                          className={isMyTeam ? "bg-primary/5" : ""}
+                        >
+                          <td className={`border p-2 font-medium sticky left-0 z-10 ${
+                            isMyTeam ? "bg-primary/5" : "bg-background"
+                          }`}>
+                            <div>
+                              <div className="font-medium">
+                                {member.initials || `${member.first_name} ${member.last_name}`}
+                              </div>
+                            </div>
+                          </td>
+                          {Array.from({ length: cycleLength }, (_, i) => i + 1).map((weekNumber) => {
+                            const assignment = getAssignment(member.user_id, member.team_id, weekNumber, null);
+                            const shiftType = assignment?.shift_type || null;
+                            const includeWeekends = assignment?.include_weekends || false;
+                            const canIncludeWeekend = shiftType && ['normal', 'early', 'late'].includes(shiftType);
+
+                            return (
+                              <td key={weekNumber} className={`border p-2 ${isMyTeam ? "bg-primary/5" : ""}`}>
+                                <div className="space-y-2">
+                                  <Select
+                                    value={shiftType || "none"}
+                                    onValueChange={(value) =>
+                                      handleAssignmentChange(
+                                        weekNumber,
+                                        member.user_id,
+                                        member.team_id,
+                                        value === "none" ? null : value,
+                                        null
+                                      )
+                                    }
+                                    disabled={isReadOnly}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue>
+                                        <span className={getShiftTypeBadgeColor(shiftType)}>
+                                          {getShiftTypeLabel(shiftType)}
+                                        </span>
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">
+                                        <span className="text-muted-foreground italic">Not assigned</span>
+                                      </SelectItem>
+                                      <SelectItem value="late">🌙 Late Shift (Mon-Fri)</SelectItem>
+                                      <SelectItem value="early">☀️ Early Shift (Mon-Fri)</SelectItem>
+                                      <SelectItem value="normal">💼 Normal Shift (Mon-Fri)</SelectItem>
+                                      <SelectItem value="weekend">📅 Weekend Only</SelectItem>
+                                      <SelectItem value="off">🏖️ Off (entire week)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox
+                                      id={`weekend-${member.user_id}-${weekNumber}`}
+                                      checked={includeWeekends}
+                                      onCheckedChange={(checked) =>
+                                        handleWeekendToggle(weekNumber, member.user_id, member.team_id, !!checked)
+                                      }
+                                      disabled={isReadOnly || !canIncludeWeekend}
+                                    />
+                                    <Label
+                                      htmlFor={`weekend-${member.user_id}-${weekNumber}`}
+                                      className={`text-xs cursor-pointer ${canIncludeWeekend ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}
+                                    >
+                                      + Weekend
+                                    </Label>
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -500,40 +596,74 @@ export function RosterWeekGrid({
                       </tr>
                     </thead>
                     <tbody>
-                      {teamMembers.map((member) => (
-                        <tr key={`${member.user_id}-${member.team_id}-${weekNumber}`}>
-                          <td className="border p-2 sticky left-0 bg-background z-10">
-                            <div>
-                              <div className="font-medium text-xs">
-                                {member.initials || `${member.first_name} ${member.last_name}`}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground">{member.team_name}</div>
-                            </div>
-                          </td>
-                          {dayValues.map((dayOfWeek, idx) => {
-                            const assignment = getAssignment(member.user_id, member.team_id, weekNumber, dayOfWeek);
-                            const currentValue = assignment?.shift_type || "none";
-
-                            return (
-                              <td key={idx} className="border p-1">
-                                <DayCell
-                                  currentValue={currentValue}
-                                  onValueChange={(value) =>
-                                    handleAssignmentChange(
-                                      weekNumber,
-                                      member.user_id,
-                                      member.team_id,
-                                      value === "none" ? null : value,
-                                      dayOfWeek
-                                    )
-                                  }
-                                  isDisabled={isReadOnly}
-                                />
+                      {Object.entries(membersByTeam).map(([teamId, members]) => {
+                        const isMyTeam = isUserTeamMember(teamId);
+                        const teamName = members[0]?.team_name || "Unknown Team";
+                        
+                        return (
+                          <>
+                            {/* Team header row */}
+                            <tr key={`team-header-${teamId}-${weekNumber}`}>
+                              <td 
+                                colSpan={dayNames.length + 1} 
+                                className={`border p-2 font-semibold ${
+                                  isMyTeam 
+                                    ? "bg-primary/10 text-primary border-primary/30" 
+                                    : "bg-muted/50"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-4 w-4" />
+                                  {teamName}
+                                  {isMyTeam && (
+                                    <Badge className="bg-primary text-primary-foreground text-xs">
+                                      Your Team
+                                    </Badge>
+                                  )}
+                                </div>
                               </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
+                            </tr>
+                            {members.map((member) => (
+                              <tr 
+                                key={`${member.user_id}-${member.team_id}-${weekNumber}`}
+                                className={isMyTeam ? "bg-primary/5" : ""}
+                              >
+                                <td className={`border p-2 sticky left-0 z-10 ${
+                                  isMyTeam ? "bg-primary/5" : "bg-background"
+                                }`}>
+                                  <div>
+                                    <div className="font-medium text-xs">
+                                      {member.initials || `${member.first_name} ${member.last_name}`}
+                                    </div>
+                                  </div>
+                                </td>
+                                {dayValues.map((dayOfWeek, idx) => {
+                                  const assignment = getAssignment(member.user_id, member.team_id, weekNumber, dayOfWeek);
+                                  const currentValue = assignment?.shift_type || "none";
+
+                                  return (
+                                    <td key={idx} className={`border p-1 ${isMyTeam ? "bg-primary/5" : ""}`}>
+                                      <DayCell
+                                        currentValue={currentValue}
+                                        onValueChange={(value) =>
+                                          handleAssignmentChange(
+                                            weekNumber,
+                                            member.user_id,
+                                            member.team_id,
+                                            value === "none" ? null : value,
+                                            dayOfWeek
+                                          )
+                                        }
+                                        isDisabled={isReadOnly}
+                                      />
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
