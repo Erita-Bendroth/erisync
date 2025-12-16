@@ -45,10 +45,9 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [downloadingCSV, setDownloadingCSV] = useState(false);
 
-  // Home Office compliance hook
+  // Home Office compliance hook - don't pass countryCode to prevent double-fetch flashing
   const { compliance: hoCompliance, loading: hoLoading } = useHomeOfficeCompliance({
     userId,
-    countryCode: profile?.country_code,
   });
 
   useEffect(() => {
