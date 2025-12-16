@@ -185,6 +185,7 @@ export type Database = {
           entry_date: string
           entry_type: string | null
           flextime_delta: number | null
+          fza_hours: number | null
           id: string
           is_locked: boolean | null
           schedule_entry_id: string | null
@@ -202,6 +203,7 @@ export type Database = {
           entry_date: string
           entry_type?: string | null
           flextime_delta?: number | null
+          fza_hours?: number | null
           id?: string
           is_locked?: boolean | null
           schedule_entry_id?: string | null
@@ -219,6 +221,7 @@ export type Database = {
           entry_date?: string
           entry_type?: string | null
           flextime_delta?: number | null
+          fza_hours?: number | null
           id?: string
           is_locked?: boolean | null
           schedule_entry_id?: string | null

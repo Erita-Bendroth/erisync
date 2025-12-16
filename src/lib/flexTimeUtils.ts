@@ -11,6 +11,7 @@ export interface TimeEntryData {
   workEndTime: string | null;
   breakDurationMinutes: number;
   entryType: string;
+  fzaHours?: number | null;
 }
 
 export interface FlexTimeCalculation {
@@ -18,6 +19,7 @@ export interface FlexTimeCalculation {
   actualHours: number;
   flexDelta: number;
   grossHours: number;
+  fzaHours?: number;
 }
 
 export type EntryType = 
@@ -28,7 +30,8 @@ export type EntryType =
   | 'training' 
   | 'vacation' 
   | 'public_holiday'
-  | 'flextime';
+  | 'flextime'
+  | 'fza_withdrawal';
 
 export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   work: 'Regular Work',
@@ -39,12 +42,15 @@ export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   vacation: 'Vacation',
   public_holiday: 'Public Holiday',
   flextime: 'Flextime',
+  fza_withdrawal: 'FlexTime Withdrawal (FZA)',
 };
 
 export const ENTRY_TYPE_CONFIG: Record<EntryType, { 
   countsAsWork: boolean; 
   requiresTimeEntry: boolean;
   defaultTargetHours: 'normal' | 'zero';
+  requiresHoursInput?: boolean;
+  isWithdrawal?: boolean;
 }> = {
   work: { countsAsWork: true, requiresTimeEntry: true, defaultTargetHours: 'normal' },
   home_office: { countsAsWork: true, requiresTimeEntry: true, defaultTargetHours: 'normal' },
@@ -54,6 +60,7 @@ export const ENTRY_TYPE_CONFIG: Record<EntryType, {
   vacation: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
   public_holiday: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
   flextime: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero' },
+  fza_withdrawal: { countsAsWork: false, requiresTimeEntry: false, defaultTargetHours: 'zero', requiresHoursInput: true, isWithdrawal: true },
 };
 
 /**
@@ -146,6 +153,17 @@ export function calculateFlexTime(
   data: TimeEntryData
 ): FlexTimeCalculation {
   const entryConfig = ENTRY_TYPE_CONFIG[data.entryType as EntryType] || ENTRY_TYPE_CONFIG.work;
+  
+  // Special handling for FZA withdrawal - negative flex delta based on hours input
+  if (entryConfig.isWithdrawal && data.fzaHours) {
+    return {
+      targetHours: 0,
+      actualHours: 0,
+      flexDelta: -Math.abs(data.fzaHours), // Always negative for withdrawals
+      grossHours: 0,
+      fzaHours: Math.abs(data.fzaHours),
+    };
+  }
   
   // For non-work entry types (sick, vacation, holiday), target is 0 and no flex impact
   if (!entryConfig.countsAsWork) {

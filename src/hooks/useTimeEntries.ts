@@ -19,6 +19,7 @@ export interface DailyTimeEntry {
   comment: string | null;
   schedule_entry_id: string | null;
   is_locked: boolean;
+  fza_hours: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +43,7 @@ export interface TimeEntryInput {
   entry_type: string;
   comment?: string | null;
   schedule_entry_id?: string | null;
+  fza_hours?: number | null;
 }
 
 export function useTimeEntries(monthDate: Date) {
@@ -141,6 +143,7 @@ export function useTimeEntries(monthDate: Date) {
         workEndTime: input.work_end_time,
         breakDurationMinutes: input.break_duration_minutes,
         entryType: input.entry_type,
+        fzaHours: input.fza_hours,
       });
 
       const entryData = {
@@ -155,6 +158,7 @@ export function useTimeEntries(monthDate: Date) {
         entry_type: input.entry_type,
         comment: input.comment || null,
         schedule_entry_id: input.schedule_entry_id || null,
+        fza_hours: input.fza_hours || null,
       };
 
       // Upsert the entry

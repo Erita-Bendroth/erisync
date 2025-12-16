@@ -482,6 +482,7 @@ export function PersonalMonthlyCalendar() {
           existingEntry={getEntryForDate(format(selectedDate, "yyyy-MM-dd"))}
           onSave={saveEntry}
           onDelete={deleteEntry}
+          currentBalance={currentBalance}
         />
       )}
     </div>
