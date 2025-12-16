@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Clock, Calendar, Briefcase, User, Home } from "lucide-react";
+import { Download, Clock, Calendar, Briefcase, User, Home, AlertTriangle, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfYear, endOfYear, differenceInDays, parseISO } from "date-fns";
 import * as XLSX from 'xlsx';
-import { formatUserName } from "@/lib/utils";
+import { formatUserName, cn } from "@/lib/utils";
 import { ShiftLimitTracker } from "@/components/schedule/ShiftLimitTracker";
-
+import { useHomeOfficeCompliance } from "@/hooks/useHomeOfficeCompliance";
 interface UserProfileOverviewProps {
   userId: string;
   canView: boolean; // Only planners and managers can view
@@ -44,6 +44,12 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
   const [loading, setLoading] = useState(true);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [downloadingCSV, setDownloadingCSV] = useState(false);
+
+  // Home Office compliance hook
+  const { compliance: hoCompliance, loading: hoLoading } = useHomeOfficeCompliance({
+    userId,
+    countryCode: profile?.country_code,
+  });
 
   useEffect(() => {
     if (canView && userId) {
@@ -420,8 +426,40 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
                 <Home className="w-4 h-4 mr-2 text-green-500" />
                 <span className="text-sm font-medium">Home Office</span>
               </div>
-              <div className="text-2xl font-bold">{workSummary.homeOfficeDays}</div>
-              <div className="text-xs text-muted-foreground">days this year</div>
+              <div className="text-2xl font-bold flex items-center gap-2">
+                {workSummary.homeOfficeDays}
+                {/* Show HO compliance badge */}
+                {hoCompliance && hoCompliance.limitType !== 'none' && (
+                  hoCompliance.isOverLimit ? (
+                    <Badge variant="destructive" className="text-xs gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Over
+                    </Badge>
+                  ) : hoCompliance.isApproachingLimit ? (
+                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {Math.round(hoCompliance.percentUsed)}%
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      OK
+                    </Badge>
+                  )
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {hoCompliance && hoCompliance.limitType !== 'none' ? (
+                  <>
+                    {hoCompliance.currentPeriodDays}/{hoCompliance.maxDays} this {hoCompliance.limitType === 'weekly' ? 'week' : hoCompliance.limitType === 'monthly' ? 'month' : 'year'}
+                    {hoCompliance.limitType !== 'yearly' && (
+                      <span className="ml-1">({hoCompliance.yearToDateDays} YTD)</span>
+                    )}
+                  </>
+                ) : (
+                  'days this year'
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

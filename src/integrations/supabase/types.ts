@@ -460,6 +460,39 @@ export type Database = {
         }
         Relationships: []
       }
+      home_office_limits: {
+        Row: {
+          country_code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          limit_type: string
+          max_days: number
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          country_code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limit_type: string
+          max_days: number
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limit_type?: string
+          max_days?: number
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hotline_draft_assignments: {
         Row: {
           created_at: string | null
