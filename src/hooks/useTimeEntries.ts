@@ -161,6 +161,17 @@ export function useTimeEntries(monthDate: Date) {
         fza_hours: input.fza_hours || null,
       };
 
+      // Check if there's an existing entry to see if entry_type is changing
+      const { data: existingEntry } = await supabase
+        .from('daily_time_entries')
+        .select('entry_type')
+        .eq('user_id', user.id)
+        .eq('entry_date', input.entry_date)
+        .maybeSingle();
+
+      const wasHomeOffice = existingEntry?.entry_type === 'home_office';
+      const isHomeOffice = input.entry_type === 'home_office';
+
       // Upsert the entry
       const { error } = await supabase
         .from('daily_time_entries')
@@ -170,18 +181,17 @@ export function useTimeEntries(monthDate: Date) {
 
       if (error) throw error;
 
-      // Sync home_office entries to schedule_entries for manager visibility
-      if (input.entry_type === 'home_office') {
-        // Get user's team
-        const { data: teamMembership } = await supabase
-          .from('team_members')
-          .select('team_id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .single();
+      // Get user's team for schedule_entries sync
+      const { data: teamMembership } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
 
-        if (teamMembership?.team_id) {
-          // Upsert schedule entry with working_from_home activity type
+      if (teamMembership?.team_id) {
+        if (isHomeOffice) {
+          // Sync home_office entries to schedule_entries for manager visibility
           await supabase
             .from('schedule_entries')
             .upsert({
@@ -196,6 +206,25 @@ export function useTimeEntries(monthDate: Date) {
             }, {
               onConflict: 'user_id,date,team_id',
             });
+        } else if (wasHomeOffice && !isHomeOffice) {
+          // Entry type changed FROM home_office - remove/update schedule entry
+          // Check if there's a working_from_home schedule entry to update
+          const { data: scheduleEntry } = await supabase
+            .from('schedule_entries')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('date', input.entry_date)
+            .eq('team_id', teamMembership.team_id)
+            .eq('activity_type', 'working_from_home')
+            .maybeSingle();
+
+          if (scheduleEntry) {
+            // Change to work activity type instead of deleting
+            await supabase
+              .from('schedule_entries')
+              .update({ activity_type: 'work' })
+              .eq('id', scheduleEntry.id);
+          }
         }
       }
 
@@ -225,6 +254,14 @@ export function useTimeEntries(monthDate: Date) {
     if (!user?.id) return false;
 
     try {
+      // Check if entry is home_office before deleting
+      const { data: existingEntry } = await supabase
+        .from('daily_time_entries')
+        .select('entry_type')
+        .eq('user_id', user.id)
+        .eq('entry_date', entryDate)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('daily_time_entries')
         .delete()
@@ -232,6 +269,27 @@ export function useTimeEntries(monthDate: Date) {
         .eq('entry_date', entryDate);
 
       if (error) throw error;
+
+      // If entry was home_office, also remove/update the synced schedule_entry
+      if (existingEntry?.entry_type === 'home_office') {
+        const { data: teamMembership } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single();
+
+        if (teamMembership?.team_id) {
+          // Delete the working_from_home schedule entry
+          await supabase
+            .from('schedule_entries')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('date', entryDate)
+            .eq('team_id', teamMembership.team_id)
+            .eq('activity_type', 'working_from_home');
+        }
+      }
 
       await updateMonthlySummary();
       await fetchEntries();

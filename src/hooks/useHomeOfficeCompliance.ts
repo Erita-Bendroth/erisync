@@ -103,8 +103,9 @@ export function useHomeOfficeCompliance({
         periodLabel = format(now, 'yyyy');
       }
 
-      // Count HO days in current period from daily_time_entries
-      const { data: periodEntries, count: periodCount } = await supabase
+      // Count HO days in current period from daily_time_entries ONLY (source of truth)
+      // schedule_entries are synced FROM daily_time_entries, so we only count the source
+      const { count: periodCount } = await supabase
         .from('daily_time_entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
@@ -112,22 +113,13 @@ export function useHomeOfficeCompliance({
         .gte('entry_date', periodStart)
         .lte('entry_date', periodEnd);
 
-      // Also count from schedule_entries with activity_type = 'working_from_home'
-      const { count: scheduleCount } = await supabase
-        .from('schedule_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('activity_type', 'working_from_home')
-        .gte('date', periodStart)
-        .lte('date', periodEnd);
+      const currentPeriodDays = periodCount || 0;
 
-      const currentPeriodDays = (periodCount || 0) + (scheduleCount || 0);
-
-      // Count year-to-date HO days
+      // Count year-to-date HO days from daily_time_entries ONLY
       const yearStart = format(startOfYear(now), 'yyyy-MM-dd');
       const yearEnd = format(endOfYear(now), 'yyyy-MM-dd');
 
-      const { count: ytdEntryCount } = await supabase
+      const { count: ytdCount } = await supabase
         .from('daily_time_entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
@@ -135,15 +127,7 @@ export function useHomeOfficeCompliance({
         .gte('entry_date', yearStart)
         .lte('entry_date', yearEnd);
 
-      const { count: ytdScheduleCount } = await supabase
-        .from('schedule_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('activity_type', 'working_from_home')
-        .gte('date', yearStart)
-        .lte('date', yearEnd);
-
-      const yearToDateDays = (ytdEntryCount || 0) + (ytdScheduleCount || 0);
+      const yearToDateDays = ytdCount || 0;
 
       // Calculate compliance status
       const maxDays = limitData?.max_days || 0;
