@@ -919,6 +919,59 @@ export type Database = {
         }
         Relationships: []
       }
+      roster_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          day_of_week: number | null
+          details: Json | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          roster_id: string
+          target_team_id: string | null
+          target_user_id: string | null
+          user_id: string
+          week_number: number | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          day_of_week?: number | null
+          details?: Json | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          roster_id: string
+          target_team_id?: string | null
+          target_user_id?: string | null
+          user_id: string
+          week_number?: number | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          day_of_week?: number | null
+          details?: Json | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          roster_id?: string
+          target_team_id?: string | null
+          target_user_id?: string | null
+          user_id?: string
+          week_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_activity_log_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_rotation_rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roster_manager_approvals: {
         Row: {
           approved: boolean
