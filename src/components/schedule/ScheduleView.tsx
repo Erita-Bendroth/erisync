@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths, parseISO } from 'date-fns';
-import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useLocation } from 'react-router-dom';
@@ -148,6 +148,9 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
     end_time: string | null;
     notes: string | null;
   }[]>([]);
+
+  // Team time entries for manager view (FlexTime/Home Office badges)
+  const [teamTimeEntries, setTeamTimeEntries] = useState<Record<string, any[]>>({});
 
   // Time entry dialog state (for FlexTime recording)
   const [timeEntryDialogOpen, setTimeEntryDialogOpen] = useState(false);
@@ -376,6 +379,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       fetchPendingRequestsCount();
       fetchPendingSwapRequestsCount();
       fetchPendingVacationRequestsForSchedule();
+      fetchTeamTimeEntries();
     }, 150); // Debounce 150ms
     
     return () => clearTimeout(timer);
@@ -539,6 +543,67 @@ const getPendingVacationForEmployeeAndDay = (employeeId: string, date: Date) => 
     req => req.user_id === employeeId && req.requested_date === dayStr
   );
 };
+
+// Fetch team time entries for manager view (FlexTime/Home Office badges)
+const fetchTeamTimeEntries = async () => {
+  try {
+    if (!user || (!isManager() && !isPlanner())) {
+      setTeamTimeEntries({});
+      return;
+    }
+
+    const startDate = format(weekStart, 'yyyy-MM-dd');
+    const endDate = format(weekEnd, 'yyyy-MM-dd');
+    
+    // Get user IDs from current employees list
+    const userIds = employees.map(e => e.user_id).filter(id => id !== user.id);
+    
+    if (userIds.length === 0) {
+      setTeamTimeEntries({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('daily_time_entries')
+      .select('*')
+      .in('user_id', userIds)
+      .gte('entry_date', startDate)
+      .lte('entry_date', endDate);
+
+    if (error) {
+      console.error('Error fetching team time entries:', error);
+      return;
+    }
+
+    // Group by user_id for easy lookup
+    const grouped: Record<string, any[]> = {};
+    (data || []).forEach(entry => {
+      if (!grouped[entry.user_id]) {
+        grouped[entry.user_id] = [];
+      }
+      grouped[entry.user_id].push(entry);
+    });
+
+    setTeamTimeEntries(grouped);
+  } catch (error) {
+    console.error('Error fetching team time entries:', error);
+  }
+};
+
+// Get time entry for a specific employee and day (for manager view)
+const getTeamTimeEntryForDay = (employeeId: string, dateStr: string) => {
+  const entries = teamTimeEntries[employeeId];
+  if (!entries) return null;
+  return entries.find(e => e.entry_date === dateStr);
+};
+
+// Refetch team time entries when employees list changes
+useEffect(() => {
+  if (employees.length > 0 && (isManager() || isPlanner())) {
+    fetchTeamTimeEntries();
+  }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [employees, currentWeek]);
 
 // Subscribe to vacation request changes for real-time badge updates (all users)
 useEffect(() => {
@@ -2506,6 +2571,78 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                     </Tooltip>
                                   </TooltipProvider>
                                 )}
+                                {/* Show team member time entry badges for managers/planners */}
+                                {!isOwnCell && (isManager() || isPlanner()) && (() => {
+                                  const teamMemberEntry = getTeamTimeEntryForDay(employee.user_id, dayStr);
+                                  if (!teamMemberEntry) return null;
+                                  
+                                  const isHomeOffice = teamMemberEntry.entry_type === 'home_office';
+                                  const hasFlexDelta = teamMemberEntry.flextime_delta !== null && teamMemberEntry.flextime_delta !== undefined && teamMemberEntry.flextime_delta !== 0;
+                                  
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip delayDuration={200}>
+                                        <TooltipTrigger asChild>
+                                          <div className="w-full">
+                                            {isHomeOffice ? (
+                                              <Badge
+                                                variant="outline"
+                                                className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700 max-w-full block"
+                                              >
+                                                <span className="truncate flex items-center justify-center gap-1">
+                                                  <Home className="w-3 h-3" />
+                                                  HO
+                                                </span>
+                                              </Badge>
+                                            ) : hasFlexDelta ? (
+                                              <Badge
+                                                variant="outline"
+                                                className={`text-xs max-w-full block ${
+                                                  teamMemberEntry.flextime_delta > 0
+                                                    ? 'bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
+                                                    : 'bg-red-50 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
+                                                }`}
+                                              >
+                                                <span className="truncate flex items-center justify-center gap-1">
+                                                  <Clock className="w-3 h-3" />
+                                                  {hoursToTimeString(teamMemberEntry.flextime_delta)}
+                                                </span>
+                                              </Badge>
+                                            ) : (
+                                              <Badge
+                                                variant="outline"
+                                                className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 max-w-full block"
+                                              >
+                                                <span className="truncate flex items-center justify-center gap-1">
+                                                  <Clock className="w-3 h-3" />
+                                                  Logged
+                                                </span>
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-[100]" side="top">
+                                          <p className="font-medium">
+                                            {isHomeOffice ? 'Working from Home' : 'Time Recorded'}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {teamMemberEntry.work_start_time && teamMemberEntry.work_end_time
+                                              ? `${teamMemberEntry.work_start_time} - ${teamMemberEntry.work_end_time}`
+                                              : 'No times recorded'}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            Actual: {teamMemberEntry.actual_hours_worked?.toFixed(2) || 0}h / Target: {teamMemberEntry.target_hours?.toFixed(2) || 0}h
+                                          </p>
+                                          {hasFlexDelta && (
+                                            <p className={`text-xs font-medium mt-1 ${teamMemberEntry.flextime_delta > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                              FlexTime: {hoursToTimeString(teamMemberEntry.flextime_delta)}
+                                            </p>
+                                          )}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                })()}
                                 {/* Show pending vacation request indicator for managers/planners */}
                                 {pendingVacations.length > 0 && (isManager() || isPlanner()) && (
                                   <TooltipProvider>
