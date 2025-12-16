@@ -2530,53 +2530,68 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             >
                               <div className="space-y-1 min-h-16 flex flex-col justify-center">
                                 {/* Show time entry indicator for user's own schedule */}
-                                {isOwnCell && timeEntry && (
-                                  <TooltipProvider>
-                                    <Tooltip delayDuration={200}>
-                                      <TooltipTrigger asChild>
-                                        <div className="w-full cursor-pointer">
-                                          <Badge
-                                            variant="outline"
-                                            className={`text-xs max-w-full block pointer-events-auto ${
-                                              timeEntry.flextime_delta && timeEntry.flextime_delta > 0
-                                                ? 'bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
-                                                : timeEntry.flextime_delta && timeEntry.flextime_delta < 0
-                                                ? 'bg-red-50 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
-                                                : 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
-                                            }`}
-                                          >
-                                            <span className="truncate flex items-center justify-center gap-1">
-                                              <Clock className="w-3 h-3" />
-                                              {timeEntry.flextime_delta !== null && timeEntry.flextime_delta !== undefined
-                                                ? hoursToTimeString(timeEntry.flextime_delta)
-                                                : '0:00'}
-                                            </span>
-                                          </Badge>
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent className="z-[100]" side="top">
-                                        <p className="font-medium">FlexTime Recorded</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {timeEntry.work_start_time && timeEntry.work_end_time
-                                            ? `${timeEntry.work_start_time} - ${timeEntry.work_end_time}`
-                                            : 'No times recorded'}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Actual: {timeEntry.actual_hours_worked?.toFixed(2) || 0}h / Target: {timeEntry.target_hours?.toFixed(2) || 0}h
-                                        </p>
-                                        <p className="text-xs font-medium mt-1">
-                                          Click to edit
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
+                                {isOwnCell && timeEntry && (() => {
+                                  const entryTypeName = timeEntry.entry_type === 'home_office' ? 'Home Office' 
+                                    : timeEntry.entry_type === 'training' ? 'Training' 
+                                    : 'Work';
+                                  const entryTypeColor = timeEntry.entry_type === 'home_office' 
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-700'
+                                    : timeEntry.entry_type === 'training'
+                                    ? 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-700'
+                                    : 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600';
+                                  const formatTime = (time: string | null) => time?.slice(0, 5) || '';
+                                  const hasFlexDelta = timeEntry.flextime_delta !== null && timeEntry.flextime_delta !== undefined && timeEntry.flextime_delta !== 0;
+                                  
+                                  return (
+                                    <TooltipProvider>
+                                      <Tooltip delayDuration={200}>
+                                        <TooltipTrigger asChild>
+                                          <div className="w-full cursor-pointer">
+                                            <Badge
+                                              variant="outline"
+                                              className={`text-xs max-w-full block pointer-events-auto py-1 ${entryTypeColor}`}
+                                            >
+                                              <div className="flex flex-col items-center w-full">
+                                                <span className="font-medium text-[10px]">{entryTypeName}</span>
+                                                {timeEntry.work_start_time && timeEntry.work_end_time && (
+                                                  <span className="text-[9px] opacity-80">
+                                                    {formatTime(timeEntry.work_start_time)}–{formatTime(timeEntry.work_end_time)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </Badge>
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-[100]" side="top">
+                                          <p className="font-medium">{entryTypeName}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            Actual: {timeEntry.actual_hours_worked?.toFixed(2) || 0}h / Target: {timeEntry.target_hours?.toFixed(2) || 0}h
+                                          </p>
+                                          {hasFlexDelta && (
+                                            <p className={`text-xs font-medium mt-1 ${timeEntry.flextime_delta > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                              FlexTime: {hoursToTimeString(timeEntry.flextime_delta)}
+                                            </p>
+                                          )}
+                                          <p className="text-xs font-medium mt-1">Click to edit</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  );
+                                })()}
                                 {/* Show team member time entry badges for managers/planners */}
                                 {!isOwnCell && (isManager() || isPlanner()) && (() => {
                                   const teamMemberEntry = getTeamTimeEntryForDay(employee.user_id, dayStr);
                                   if (!teamMemberEntry) return null;
                                   
-                                  const isHomeOffice = teamMemberEntry.entry_type === 'home_office';
+                                  const entryTypeName = teamMemberEntry.entry_type === 'home_office' ? 'Home Office' 
+                                    : teamMemberEntry.entry_type === 'training' ? 'Training' 
+                                    : 'Work';
+                                  const entryTypeColor = teamMemberEntry.entry_type === 'home_office' 
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-700'
+                                    : teamMemberEntry.entry_type === 'training'
+                                    ? 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-700'
+                                    : 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600';
+                                  const formatTime = (time: string | null) => time?.slice(0, 5) || '';
                                   const hasFlexDelta = teamMemberEntry.flextime_delta !== null && teamMemberEntry.flextime_delta !== undefined && teamMemberEntry.flextime_delta !== 0;
                                   
                                   return (
@@ -2584,52 +2599,23 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       <Tooltip delayDuration={200}>
                                         <TooltipTrigger asChild>
                                           <div className="w-full">
-                                            {isHomeOffice ? (
-                                              <Badge
-                                                variant="outline"
-                                                className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700 max-w-full block"
-                                              >
-                                                <span className="truncate flex items-center justify-center gap-1">
-                                                  <Home className="w-3 h-3" />
-                                                  HO
-                                                </span>
-                                              </Badge>
-                                            ) : hasFlexDelta ? (
-                                              <Badge
-                                                variant="outline"
-                                                className={`text-xs max-w-full block ${
-                                                  teamMemberEntry.flextime_delta > 0
-                                                    ? 'bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
-                                                    : 'bg-red-50 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
-                                                }`}
-                                              >
-                                                <span className="truncate flex items-center justify-center gap-1">
-                                                  <Clock className="w-3 h-3" />
-                                                  {hoursToTimeString(teamMemberEntry.flextime_delta)}
-                                                </span>
-                                              </Badge>
-                                            ) : (
-                                              <Badge
-                                                variant="outline"
-                                                className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 max-w-full block"
-                                              >
-                                                <span className="truncate flex items-center justify-center gap-1">
-                                                  <Clock className="w-3 h-3" />
-                                                  Logged
-                                                </span>
-                                              </Badge>
-                                            )}
+                                            <Badge
+                                              variant="outline"
+                                              className={`text-xs max-w-full block py-1 ${entryTypeColor}`}
+                                            >
+                                              <div className="flex flex-col items-center w-full">
+                                                <span className="font-medium text-[10px]">{entryTypeName}</span>
+                                                {teamMemberEntry.work_start_time && teamMemberEntry.work_end_time && (
+                                                  <span className="text-[9px] opacity-80">
+                                                    {formatTime(teamMemberEntry.work_start_time)}–{formatTime(teamMemberEntry.work_end_time)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </Badge>
                                           </div>
                                         </TooltipTrigger>
                                         <TooltipContent className="z-[100]" side="top">
-                                          <p className="font-medium">
-                                            {isHomeOffice ? 'Working from Home' : 'Time Recorded'}
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {teamMemberEntry.work_start_time && teamMemberEntry.work_end_time
-                                              ? `${teamMemberEntry.work_start_time} - ${teamMemberEntry.work_end_time}`
-                                              : 'No times recorded'}
-                                          </p>
+                                          <p className="font-medium">{entryTypeName}</p>
                                           <p className="text-xs text-muted-foreground">
                                             Actual: {teamMemberEntry.actual_hours_worked?.toFixed(2) || 0}h / Target: {teamMemberEntry.target_hours?.toFixed(2) || 0}h
                                           </p>
