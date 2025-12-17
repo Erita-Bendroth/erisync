@@ -53,6 +53,7 @@ export function useTimeEntries(monthDate: Date) {
   const [monthlySummary, setMonthlySummary] = useState<MonthlyFlexSummary | null>(null);
   const [previousBalance, setPreviousBalance] = useState<number>(0);
   const [carryoverLimit, setCarryoverLimit] = useState<number>(40);
+  const [initialBalance, setInitialBalance] = useState<number>(0);
   const [userName, setUserName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -91,6 +92,19 @@ export function useTimeEntries(monthDate: Date) {
       if (summaryError) throw summaryError;
       setMonthlySummary(summaryData);
 
+      // Fetch user profile for carryover limit, initial balance, and name
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, flextime_carryover_limit, initial_flextime_balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileData) {
+        setCarryoverLimit(profileData.flextime_carryover_limit ?? 40);
+        setInitialBalance(profileData.initial_flextime_balance ?? 0);
+        setUserName(`${profileData.first_name} ${profileData.last_name}`);
+      }
+
       // Fetch previous month's ending balance
       const prevMonth = month === 1 ? 12 : month - 1;
       const prevYear = month === 1 ? year - 1 : year;
@@ -103,19 +117,9 @@ export function useTimeEntries(monthDate: Date) {
         .eq('month', prevMonth)
         .maybeSingle();
 
-      setPreviousBalance(prevSummary?.ending_balance || 0);
-
-      // Fetch user profile for carryover limit and name
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, flextime_carryover_limit')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileData) {
-        setCarryoverLimit(profileData.flextime_carryover_limit ?? 40);
-        setUserName(`${profileData.first_name} ${profileData.last_name}`);
-      }
+      // Use initial_flextime_balance if no previous month summary exists
+      const prevBalance = prevSummary?.ending_balance ?? (profileData?.initial_flextime_balance ?? 0);
+      setPreviousBalance(prevBalance);
 
     } catch (error) {
       console.error('Error fetching time entries:', error);
@@ -345,7 +349,16 @@ export function useTimeEntries(monthDate: Date) {
         .eq('month', prevMonth)
         .maybeSingle();
 
-      const startingBalance = prevSummary?.ending_balance || 0;
+      // If no previous summary, use initial balance from profile
+      let startingBalance = prevSummary?.ending_balance ?? 0;
+      if (!prevSummary) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('initial_flextime_balance')
+          .eq('user_id', user.id)
+          .single();
+        startingBalance = profile?.initial_flextime_balance ?? 0;
+      }
       const endingBalance = startingBalance + monthDelta;
 
       // Upsert the monthly summary
@@ -367,34 +380,43 @@ export function useTimeEntries(monthDate: Date) {
     }
   }, [user?.id, monthDate]);
 
-  const saveCarryoverLimit = useCallback(async (newLimit: number): Promise<boolean> => {
+  const saveFlexTimeSettings = useCallback(async (newLimit: number, newInitialBalance: number): Promise<boolean> => {
     if (!user?.id) return false;
 
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ flextime_carryover_limit: newLimit })
+        .update({ 
+          flextime_carryover_limit: newLimit,
+          initial_flextime_balance: newInitialBalance,
+        })
         .eq('user_id', user.id);
 
       if (error) throw error;
 
       setCarryoverLimit(newLimit);
+      setInitialBalance(newInitialBalance);
+      
+      // Recalculate monthly summary with new initial balance
+      await updateMonthlySummary();
+      await fetchEntries();
+
       toast({
         title: 'Saved',
-        description: 'Carryover limit updated successfully',
+        description: 'FlexTime settings updated successfully',
       });
 
       return true;
     } catch (error) {
-      console.error('Error saving carryover limit:', error);
+      console.error('Error saving flextime settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save carryover limit',
+        description: 'Failed to save FlexTime settings',
         variant: 'destructive',
       });
       return false;
     }
-  }, [user?.id, toast]);
+  }, [user?.id, toast, updateMonthlySummary, fetchEntries]);
 
   const getEntryForDate = useCallback((dateStr: string): DailyTimeEntry | undefined => {
     return entries.find(e => e.entry_date === dateStr);
@@ -415,12 +437,13 @@ export function useTimeEntries(monthDate: Date) {
     currentMonthDelta,
     currentBalance,
     carryoverLimit,
+    initialBalance,
     userName,
     loading,
     saveEntry,
     deleteEntry,
     getEntryForDate,
-    saveCarryoverLimit,
+    saveFlexTimeSettings,
     refresh: fetchEntries,
   };
 }
