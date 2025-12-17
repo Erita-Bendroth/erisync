@@ -99,11 +99,12 @@ export function PersonalMonthlyCalendar() {
     carryoverLimit,
     userName,
     monthlySummary,
+    initialBalance,
     loading: timeEntriesLoading,
     saveEntry,
     deleteEntry,
     getEntryForDate,
-    saveCarryoverLimit,
+    saveFlexTimeSettings,
   } = useTimeEntries(currentMonth);
 
   useEffect(() => {
@@ -333,11 +334,12 @@ export function PersonalMonthlyCalendar() {
         currentMonthDelta={currentMonthDelta}
         currentBalance={currentBalance}
         carryoverLimit={carryoverLimit}
+        initialBalance={initialBalance}
         entries={timeEntries}
         monthlySummary={monthlySummary}
         monthDate={currentMonth}
         userName={userName}
-        onSaveCarryoverLimit={saveCarryoverLimit}
+        onSaveFlexTimeSettings={saveFlexTimeSettings}
         loading={timeEntriesLoading}
       />
 

@@ -164,12 +164,13 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
     currentMonthDelta,
     currentBalance,
     carryoverLimit,
+    initialBalance,
     userName,
     loading: timeEntriesLoading,
     saveEntry: saveTimeEntry,
     deleteEntry: deleteTimeEntry,
     getEntryForDate,
-    saveCarryoverLimit,
+    saveFlexTimeSettings,
     refresh: refreshTimeEntries
   } = useTimeEntries(currentWeek);
   const {
@@ -2265,11 +2266,12 @@ const getActivityColor = (entry: ScheduleEntry) => {
           currentMonthDelta={currentMonthDelta}
           currentBalance={currentBalance}
           carryoverLimit={carryoverLimit}
+          initialBalance={initialBalance}
           entries={timeEntries}
           monthlySummary={monthlySummary}
           monthDate={currentWeek}
           userName={userName}
-          onSaveCarryoverLimit={saveCarryoverLimit}
+          onSaveFlexTimeSettings={saveFlexTimeSettings}
           loading={timeEntriesLoading}
         />
       )}

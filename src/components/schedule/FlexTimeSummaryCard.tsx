@@ -22,11 +22,12 @@ interface FlexTimeSummaryCardProps {
   currentMonthDelta: number;
   currentBalance: number;
   carryoverLimit: number;
+  initialBalance: number;
   entries: DailyTimeEntry[];
   monthlySummary: MonthlyFlexSummary | null;
   monthDate: Date;
   userName: string;
-  onSaveCarryoverLimit: (limit: number) => Promise<boolean>;
+  onSaveFlexTimeSettings: (limit: number, initialBalance: number) => Promise<boolean>;
   loading?: boolean;
 }
 
@@ -35,11 +36,12 @@ export function FlexTimeSummaryCard({
   currentMonthDelta,
   currentBalance,
   carryoverLimit,
+  initialBalance,
   entries,
   monthlySummary,
   monthDate,
   userName,
-  onSaveCarryoverLimit,
+  onSaveFlexTimeSettings,
   loading = false,
 }: FlexTimeSummaryCardProps) {
   const { user } = useAuth();
@@ -280,7 +282,8 @@ export function FlexTimeSummaryCard({
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         currentLimit={carryoverLimit}
-        onSave={onSaveCarryoverLimit}
+        currentInitialBalance={initialBalance}
+        onSave={onSaveFlexTimeSettings}
       />
     </>
   );
