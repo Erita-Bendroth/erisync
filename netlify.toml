@@ -1,6 +1,6 @@
 [build]
   publish = "dist"
-  command = "npm run build"
+  command = "npx update-browserslist-db@latest && npm run build"
 
 [build.environment]
   NODE_VERSION = "18"
