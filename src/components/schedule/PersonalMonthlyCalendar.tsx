@@ -14,6 +14,16 @@ import { FlexTimeSummaryCard } from "./FlexTimeSummaryCard";
 import { TimeEntryDialog } from "./TimeEntryDialog";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { formatFlexHours, ENTRY_TYPE_LABELS, type EntryType } from "@/lib/flexTimeUtils";
+import { HolidayBadge } from "./HolidayBadge";
+
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  country_code: string;
+  region_code: string | null;
+  is_public: boolean;
+}
 
 type ViewMode = "single" | "multi";
 type DateRange = "1M" | "3M" | "6M" | "1Y";
@@ -85,6 +95,7 @@ export function PersonalMonthlyCalendar() {
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   
   // Time entry state
   const [timeEntryDialogOpen, setTimeEntryDialogOpen] = useState(false);
@@ -122,6 +133,14 @@ export function PersonalMonthlyCalendar() {
       const startDate = startOfMonth(currentMonth);
       const endDate = endOfMonth(addMonths(currentMonth, monthsToFetch - 1));
 
+      // Fetch user's profile to get country_code
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("country_code, region_code")
+        .eq("user_id", user.id)
+        .single();
+
+      // Fetch schedule entries
       const { data, error } = await supabase
         .from("schedule_entries")
         .select("id, date, shift_type, activity_type, availability_status, notes")
@@ -132,11 +151,39 @@ export function PersonalMonthlyCalendar() {
 
       if (error) throw error;
       setScheduleEntries(data || []);
+
+      // Fetch holidays for user's country
+      if (profile?.country_code) {
+        let holidayQuery = supabase
+          .from("holidays")
+          .select("id, name, date, country_code, region_code, is_public")
+          .eq("country_code", profile.country_code)
+          .eq("is_public", true)
+          .gte("date", format(startDate, "yyyy-MM-dd"))
+          .lte("date", format(endDate, "yyyy-MM-dd"));
+
+        // If user has a region, include region-specific holidays or holidays without region
+        if (profile.region_code) {
+          holidayQuery = holidayQuery.or(`region_code.is.null,region_code.eq.${profile.region_code}`);
+        } else {
+          holidayQuery = holidayQuery.is("region_code", null);
+        }
+
+        const { data: holidaysData } = await holidayQuery;
+        setHolidays(holidaysData || []);
+      } else {
+        setHolidays([]);
+      }
     } catch (error) {
       console.error("Error fetching schedule:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getHolidayForDate = (date: Date): Holiday | undefined => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return holidays.find(h => h.date === dateStr);
   };
 
   const getMonthsCount = (range: DateRange): number => {
@@ -252,6 +299,7 @@ export function PersonalMonthlyCalendar() {
             const isWeekendDay = isWeekend(day);
             const timeEntry = getEntryForDate(dateStr);
             const hasTimeEntry = !!timeEntry;
+            const holiday = getHolidayForDate(day);
 
             return (
               <button
@@ -261,6 +309,7 @@ export function PersonalMonthlyCalendar() {
                   "aspect-square p-1 rounded-lg border transition-all",
                   "hover:border-primary hover:shadow-sm cursor-pointer",
                   isWeekendDay && "bg-muted/30",
+                  holiday && "bg-purple-50 dark:bg-purple-950/20",
                   hasTimeEntry && "ring-2 ring-primary/30"
                 )}
               >
@@ -272,6 +321,7 @@ export function PersonalMonthlyCalendar() {
                     )}>
                       {format(day, "d")}
                     </span>
+                    {holiday && <HolidayBadge holidayName={holiday.name} size="sm" />}
                     {hasTimeEntry && (
                       <Clock className="w-3 h-3 text-primary" />
                     )}
