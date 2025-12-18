@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { calculateFlexTime, type EntryType } from '@/lib/flexTimeUtils';
+import { calculateFlexTime, ENTRY_TYPE_LABELS, type EntryType } from '@/lib/flexTimeUtils';
 
 export interface DailyTimeEntry {
   id: string;
@@ -173,8 +173,12 @@ export function useTimeEntries(monthDate: Date) {
         .eq('entry_date', input.entry_date)
         .maybeSingle();
 
+      // Define entry type categories
+      const unavailableTypes: EntryType[] = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
       const wasHomeOffice = existingEntry?.entry_type === 'home_office';
       const isHomeOffice = input.entry_type === 'home_office';
+      const wasUnavailableType = existingEntry && unavailableTypes.includes(existingEntry.entry_type as EntryType);
+      const isUnavailableType = unavailableTypes.includes(input.entry_type as EntryType);
 
       // Upsert the entry
       const { error } = await supabase
@@ -210,25 +214,32 @@ export function useTimeEntries(monthDate: Date) {
             }, {
               onConflict: 'user_id,date,team_id',
             });
-        } else if (wasHomeOffice && !isHomeOffice) {
-          // Entry type changed FROM home_office - remove/update schedule entry
-          // Check if there's a working_from_home schedule entry to update
-          const { data: scheduleEntry } = await supabase
+        } else if (isUnavailableType) {
+          // Sync public_holiday, sick_leave, vacation, fza_withdrawal as unavailable
+          const entryLabel = ENTRY_TYPE_LABELS[input.entry_type as EntryType] || input.entry_type;
+          await supabase
             .from('schedule_entries')
-            .select('id')
+            .upsert({
+              user_id: user.id,
+              team_id: teamMembership.team_id,
+              date: input.entry_date,
+              activity_type: 'out_of_office',
+              shift_type: null,
+              availability_status: 'unavailable',
+              created_by: user.id,
+              notes: `${entryLabel}${input.comment ? ': ' + input.comment : ''}`,
+            }, {
+              onConflict: 'user_id,date,team_id',
+            });
+        } else if ((wasHomeOffice || wasUnavailableType) && !isHomeOffice && !isUnavailableType) {
+          // Entry type changed FROM home_office/unavailable to work type - remove schedule entry
+          await supabase
+            .from('schedule_entries')
+            .delete()
             .eq('user_id', user.id)
             .eq('date', input.entry_date)
             .eq('team_id', teamMembership.team_id)
-            .eq('activity_type', 'working_from_home')
-            .maybeSingle();
-
-          if (scheduleEntry) {
-            // Change to work activity type instead of deleting
-            await supabase
-              .from('schedule_entries')
-              .update({ activity_type: 'work' })
-              .eq('id', scheduleEntry.id);
-          }
+            .in('activity_type', ['working_from_home', 'out_of_office']);
         }
       }
 
@@ -258,7 +269,7 @@ export function useTimeEntries(monthDate: Date) {
     if (!user?.id) return false;
 
     try {
-      // Check if entry is home_office before deleting
+      // Check entry type before deleting
       const { data: existingEntry } = await supabase
         .from('daily_time_entries')
         .select('entry_type')
@@ -274,8 +285,11 @@ export function useTimeEntries(monthDate: Date) {
 
       if (error) throw error;
 
-      // If entry was home_office, also remove/update the synced schedule_entry
-      if (existingEntry?.entry_type === 'home_office') {
+      // Entry types that sync to schedule_entries
+      const syncedTypes: EntryType[] = ['home_office', 'public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+      
+      // If entry was a synced type, remove the schedule_entry
+      if (existingEntry && syncedTypes.includes(existingEntry.entry_type as EntryType)) {
         const { data: teamMembership } = await supabase
           .from('team_members')
           .select('team_id')
@@ -284,14 +298,14 @@ export function useTimeEntries(monthDate: Date) {
           .single();
 
         if (teamMembership?.team_id) {
-          // Delete the working_from_home schedule entry
+          // Delete the synced schedule entry
           await supabase
             .from('schedule_entries')
             .delete()
             .eq('user_id', user.id)
             .eq('date', entryDate)
             .eq('team_id', teamMembership.team_id)
-            .eq('activity_type', 'working_from_home');
+            .in('activity_type', ['working_from_home', 'out_of_office']);
         }
       }
 
