@@ -436,15 +436,93 @@ export const UnifiedTeamScheduler: React.FC = () => {
     if (teamIds.length === 0) return;
 
     try {
-      const { data, error } = await supabase
-        .from('schedule_entries')
-        .select('*')
-        .in('team_id', teamIds)
-        .gte('date', dates[0])
-        .lte('date', dates[dates.length - 1]);
+      // Get all user IDs from current team sections
+      const allUserIds = teamSections.flatMap(s => s.members.map(m => m.user_id));
+      
+      // Fetch schedule entries and time entries in parallel
+      const [scheduleResult, timeEntriesResult] = await Promise.all([
+        supabase
+          .from('schedule_entries')
+          .select('*')
+          .in('team_id', teamIds)
+          .gte('date', dates[0])
+          .lte('date', dates[dates.length - 1]),
+        // Fetch time entries that indicate unavailability (public_holiday, sick_leave, vacation, fza_withdrawal)
+        allUserIds.length > 0 
+          ? supabase
+              .from('daily_time_entries')
+              .select('id, user_id, entry_date, entry_type, comment')
+              .in('user_id', allUserIds)
+              .in('entry_type', ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'])
+              .gte('entry_date', dates[0])
+              .lte('entry_date', dates[dates.length - 1])
+          : Promise.resolve({ data: [], error: null })
+      ]);
 
-      if (error) throw error;
-      setScheduleEntries(data || []);
+      if (scheduleResult.error) throw scheduleResult.error;
+      
+      let entries: ScheduleEntry[] = (scheduleResult.data || []).map(e => ({
+        id: e.id,
+        user_id: e.user_id,
+        team_id: e.team_id,
+        date: e.date,
+        shift_type: e.shift_type,
+        shift_time_definition_id: e.shift_time_definition_id,
+        activity_type: e.activity_type,
+        availability_status: e.availability_status,
+        notes: e.notes || undefined,
+      }));
+      
+      // Convert time entries to synthetic schedule entries and merge (time entries take priority)
+      if (timeEntriesResult.data && timeEntriesResult.data.length > 0) {
+        const timeEntryOverrides = new Map<string, ScheduleEntry>();
+        
+        for (const te of timeEntriesResult.data) {
+          const key = `${te.user_id}:${te.entry_date}`;
+          
+          // Find the team for this user
+          const userTeam = teamSections.find(s => 
+            s.members.some(m => m.user_id === te.user_id)
+          );
+          
+          if (userTeam) {
+            // Map entry_type to notes format that TimeBlockDisplay expects
+            let notes = '';
+            if (te.entry_type === 'public_holiday') {
+              notes = `Public Holiday: ${te.comment || 'Company Holiday'}`;
+            } else if (te.entry_type === 'sick_leave') {
+              notes = `Sick Leave: ${te.comment || ''}`.trim();
+            } else if (te.entry_type === 'vacation') {
+              notes = `Vacation: ${te.comment || ''}`.trim();
+            } else if (te.entry_type === 'fza_withdrawal') {
+              notes = `FZA: ${te.comment || ''}`.trim();
+            }
+            
+            timeEntryOverrides.set(key, {
+              id: `time-entry-${te.id}`,
+              user_id: te.user_id,
+              team_id: userTeam.teamId,
+              date: te.entry_date,
+              shift_type: null,
+              activity_type: 'out_of_office',
+              availability_status: 'unavailable',
+              notes,
+              shift_time_definition_id: null,
+            });
+          }
+        }
+        
+        // Merge: remove any schedule entries that have a time entry override, then add overrides
+        if (timeEntryOverrides.size > 0) {
+          entries = entries.filter(e => {
+            const key = `${e.user_id}:${e.date}`;
+            return !timeEntryOverrides.has(key);
+          });
+          entries = [...entries, ...Array.from(timeEntryOverrides.values())];
+        }
+      }
+      
+      setScheduleEntries(entries);
     } catch (error) {
       console.error('Error fetching schedule:', error);
       toast({
