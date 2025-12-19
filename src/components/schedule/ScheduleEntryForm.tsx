@@ -216,14 +216,21 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
     setLoading(true);
 
     try {
+      // Handle public_holiday specially - store as out_of_office with prefixed notes
+      const isPublicHoliday = formData.activity_type === 'public_holiday';
+      const actualActivityType = isPublicHoliday ? 'out_of_office' : formData.activity_type;
+      const actualNotes = isPublicHoliday 
+        ? `Public Holiday: ${formData.notes || 'Company Holiday'}`.trim()
+        : formData.notes;
+      
       const scheduleData = {
         user_id: formData.user_id,
         team_id: formData.team_id,
         date: formData.date || (selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''),
         shift_type: formData.shift_type as "early" | "late" | "normal",
-        activity_type: formData.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home",
-        availability_status: (["work", "working_from_home", "hotline_support"].includes(formData.activity_type) ? "available" : "unavailable") as "available" | "unavailable",
-        notes: formData.notes,
+        activity_type: actualActivityType as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home",
+        availability_status: (["work", "working_from_home", "hotline_support"].includes(formData.activity_type) && !isPublicHoliday ? "available" : "unavailable") as "available" | "unavailable",
+        notes: actualNotes,
         created_by: user!.id,
       };
 
@@ -421,6 +428,7 @@ const ScheduleEntryForm: React.FC<ScheduleEntryFormProps> = ({
                 <SelectContent>
                   <SelectItem value="work">Work</SelectItem>
                   <SelectItem value="vacation">Vacation</SelectItem>
+                  <SelectItem value="public_holiday">Public Holiday</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                   <SelectItem value="hotline_support">Hotline Support</SelectItem>
                   <SelectItem value="out_of_office">Out of Office</SelectItem>
