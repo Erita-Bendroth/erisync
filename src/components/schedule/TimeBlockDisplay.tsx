@@ -106,12 +106,16 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   shiftDescription = "",
   shiftDefinitionTimes = null
 }) => {
-  // Check if this is a holiday entry (activity_type = 'other' with "Public holiday:" in notes)
-  const isHoliday = entry.activity_type === 'other' && entry.notes?.includes('Public holiday:');
+  // Check if this is a holiday entry - supports both formats:
+  // 1. Old format: activity_type = 'other' with "Public holiday:" prefix
+  // 2. New format: activity_type = 'out_of_office' with "Public Holiday:" prefix (from time entry sync)
+  const isHoliday = 
+    (entry.activity_type === 'other' && entry.notes?.toLowerCase().includes('public holiday:')) ||
+    (entry.activity_type === 'out_of_office' && entry.notes?.toLowerCase().includes('public holiday:'));
   
   // If it's a holiday, display ONLY the holiday name badge with NO time information
   if (isHoliday) {
-    const holidayName = entry.notes?.replace(/Public holiday:\s*/, '').trim() || 'Holiday';
+    const holidayName = entry.notes?.replace(/public holiday:\s*/i, '').trim() || 'Holiday';
     return (
       <div className={`w-full ${className}`}>
         <TooltipProvider>
