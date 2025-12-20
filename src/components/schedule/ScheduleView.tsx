@@ -1324,7 +1324,98 @@ useEffect(() => {
         allData = data || [];
       }
 
-      const data = allData;
+      // Fetch daily_time_entries for unavailable types to merge (public_holiday, sick_leave, vacation, fza_withdrawal)
+      const unavailableEntryTypes = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+      
+      // Get user IDs based on view mode
+      let timeEntryUserIds: string[] = [];
+      if (viewMode === 'my-schedule') {
+        timeEntryUserIds = [user!.id];
+      } else {
+        // Get all users from employees or from schedule entries
+        timeEntryUserIds = [...new Set([
+          ...employees.map(e => e.user_id),
+          ...allData.map(e => e.user_id)
+        ])];
+      }
+      
+      let timeEntriesData: any[] = [];
+      if (timeEntryUserIds.length > 0) {
+        const { data: timeEntries, error: timeEntriesError } = await supabase
+          .from('daily_time_entries')
+          .select('id, user_id, entry_date, entry_type, comment')
+          .in('user_id', timeEntryUserIds)
+          .in('entry_type', unavailableEntryTypes)
+          .gte('entry_date', dateStart)
+          .lte('entry_date', dateEnd);
+        
+        if (!timeEntriesError && timeEntries) {
+          timeEntriesData = timeEntries;
+          console.log(`📅 Found ${timeEntriesData.length} time entries to merge (public_holiday, sick_leave, etc.)`);
+        }
+      }
+      
+      // Create time entry overrides map
+      const timeEntryOverrides = new Map<string, any>();
+      for (const te of timeEntriesData) {
+        const key = `${te.user_id}:${te.entry_date}`;
+        
+        // Find the team for this user from existing data or employees
+        const existingEntry = allData.find(e => e.user_id === te.user_id);
+        const employee = employees.find(e => e.user_id === te.user_id);
+        
+        // Get team_id from existing entry, or look up from team_members
+        let teamId = existingEntry?.team_id;
+        if (!teamId) {
+          // Fetch team from team_members if not found
+          const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', te.user_id)
+            .limit(1)
+            .maybeSingle();
+          teamId = teamMember?.team_id;
+        }
+        
+        if (teamId) {
+          // Map entry_type to notes format that TimeBlockDisplay expects
+          let notes = '';
+          if (te.entry_type === 'public_holiday') {
+            notes = `Public Holiday: ${te.comment || 'Company Holiday'}`;
+          } else if (te.entry_type === 'sick_leave') {
+            notes = `Sick Leave: ${te.comment || ''}`.trim();
+          } else if (te.entry_type === 'vacation') {
+            notes = `Vacation: ${te.comment || ''}`.trim();
+          } else if (te.entry_type === 'fza_withdrawal') {
+            notes = `FZA: ${te.comment || ''}`.trim();
+          }
+          
+          timeEntryOverrides.set(key, {
+            id: `time-entry-${te.id}`,
+            user_id: te.user_id,
+            team_id: teamId,
+            date: te.entry_date,
+            shift_type: null,
+            activity_type: 'out_of_office',
+            availability_status: 'unavailable',
+            notes,
+            shift_time_definition_id: null,
+          });
+        }
+      }
+      
+      // Merge: filter out schedule entries that have time entry overrides, then add overrides
+      let mergedData = allData;
+      if (timeEntryOverrides.size > 0) {
+        console.log(`🔄 Merging ${timeEntryOverrides.size} time entry overrides into schedule`);
+        mergedData = allData.filter(e => {
+          const key = `${e.user_id}:${e.date}`;
+          return !timeEntryOverrides.has(key);
+        });
+        mergedData = [...mergedData, ...Array.from(timeEntryOverrides.values())];
+      }
+
+      const data = mergedData;
       const error = null;
 
       // Fetch user profiles for the entries (assignees AND creators)
