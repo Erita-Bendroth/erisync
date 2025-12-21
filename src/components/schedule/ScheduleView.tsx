@@ -1376,7 +1376,8 @@ useEffect(() => {
         
         if (!timeEntriesError && timeEntries) {
           timeEntriesData = timeEntries;
-          console.log(`📅 Found ${timeEntriesData.length} time entries to merge (public_holiday, sick_leave, etc.)`);
+          console.log(`📅 Found ${timeEntriesData.length} time entries to merge (public_holiday, sick_leave, etc.)`, 
+            timeEntriesData.map(te => ({ user_id: te.user_id.substring(0, 8), date: te.entry_date, type: te.entry_type })));
         }
       }
       
@@ -1391,15 +1392,18 @@ useEffect(() => {
         
         // Get team_id from existing entry, or look up from team_members
         let teamId = existingEntry?.team_id;
+        console.log(`🔍 Override lookup for ${te.user_id.substring(0, 8)}: existingEntry=${!!existingEntry}, employee=${!!employee}, teamId=${teamId}`);
+        
         if (!teamId) {
           // Fetch team from team_members if not found
-          const { data: teamMember } = await supabase
+          const { data: teamMember, error: tmError } = await supabase
             .from('team_members')
             .select('team_id')
             .eq('user_id', te.user_id)
             .limit(1)
             .maybeSingle();
           teamId = teamMember?.team_id;
+          console.log(`   📌 DB lookup for ${te.user_id.substring(0, 8)}: teamId=${teamId}, error=${tmError?.message || 'none'}`);
         }
         
         if (teamId) {
@@ -1415,7 +1419,7 @@ useEffect(() => {
             notes = `FZA: ${te.comment || ''}`.trim();
           }
           
-          timeEntryOverrides.set(key, {
+          const override = {
             id: `time-entry-${te.id}`,
             user_id: te.user_id,
             team_id: teamId,
@@ -1425,7 +1429,11 @@ useEffect(() => {
             availability_status: 'unavailable',
             notes,
             shift_time_definition_id: null,
-          });
+          };
+          console.log(`   ✅ Created override:`, override);
+          timeEntryOverrides.set(key, override);
+        } else {
+          console.warn(`   ⚠️ No teamId found for ${te.user_id.substring(0, 8)}, skipping override`);
         }
       }
       
@@ -1438,6 +1446,10 @@ useEffect(() => {
           return !timeEntryOverrides.has(key);
         });
         mergedData = [...mergedData, ...Array.from(timeEntryOverrides.values())];
+        
+        // Debug: show public holiday entries in final merged data
+        const publicHolidayEntries = mergedData.filter(e => e.notes?.includes('Public Holiday'));
+        console.log('🎉 Public holiday entries in merged data:', publicHolidayEntries);
       }
 
       const data = mergedData;
