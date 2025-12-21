@@ -2624,6 +2624,10 @@ const getActivityColor = (entry: ScheduleEntry) => {
                               <div className="space-y-1 min-h-16 flex flex-col justify-center">
                                 {/* Show time entry indicator for user's own schedule */}
                                 {isOwnCell && timeEntry && (() => {
+                                  // Skip display for unavailable types - they're shown via merged schedule entries
+                                  const unavailableTypes = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+                                  if (unavailableTypes.includes(timeEntry.entry_type)) return null;
+                                  
                                   const entryTypeName = timeEntry.entry_type === 'home_office' ? 'Home Office' 
                                     : timeEntry.entry_type === 'training' ? 'Training' 
                                     : 'Work';
@@ -2675,6 +2679,10 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                 {!isOwnCell && (isManager() || isPlanner()) && (() => {
                                   const teamMemberEntry = getTeamTimeEntryForDay(employee.user_id, dayStr);
                                   if (!teamMemberEntry) return null;
+                                  
+                                  // Skip display for unavailable types - they're shown via merged schedule entries
+                                  const unavailableTypes = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+                                  if (unavailableTypes.includes(teamMemberEntry.entry_type)) return null;
                                   
                                   const entryTypeName = teamMemberEntry.entry_type === 'home_office' ? 'Home Office' 
                                     : teamMemberEntry.entry_type === 'training' ? 'Training' 
