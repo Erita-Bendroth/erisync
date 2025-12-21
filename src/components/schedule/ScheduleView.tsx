@@ -1331,12 +1331,37 @@ useEffect(() => {
       let timeEntryUserIds: string[] = [];
       if (viewMode === 'my-schedule') {
         timeEntryUserIds = [user!.id];
+      } else if ((isManager() || isPlanner()) && selectedTeams.length > 0) {
+        // For managers/planners, fetch team members directly from DB to avoid race condition with employees state
+        let targetTeamIds: string[] = [];
+        
+        if (selectedTeams.includes('all')) {
+          if (isPlanner()) {
+            const { data: allTeamsData } = await supabase.from('teams').select('id').limit(10000);
+            targetTeamIds = allTeamsData?.map(t => t.id) || [];
+          } else {
+            const { data: managerTeamsData } = await supabase.rpc('get_manager_accessible_teams', { _manager_id: user!.id });
+            targetTeamIds = managerTeamsData || [];
+          }
+        } else {
+          targetTeamIds = selectedTeams;
+        }
+        
+        if (targetTeamIds.length > 0) {
+          const { data: teamMembersForTimeEntries } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .in('team_id', targetTeamIds)
+            .limit(10000);
+          
+          timeEntryUserIds = [...new Set([
+            ...(teamMembersForTimeEntries || []).map(tm => tm.user_id),
+            ...allData.map(e => e.user_id)
+          ])];
+        }
       } else {
-        // Get all users from employees or from schedule entries
-        timeEntryUserIds = [...new Set([
-          ...employees.map(e => e.user_id),
-          ...allData.map(e => e.user_id)
-        ])];
+        // Fallback: Get all users from schedule entries
+        timeEntryUserIds = [...new Set(allData.map(e => e.user_id))];
       }
       
       let timeEntriesData: any[] = [];
