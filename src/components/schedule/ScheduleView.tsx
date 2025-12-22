@@ -1329,9 +1329,10 @@ useEffect(() => {
       
       // Get user IDs based on view mode
       let timeEntryUserIds: string[] = [];
-      if (viewMode === 'my-schedule') {
+      // Only use current user when truly in my-schedule mode with no specific team selected
+      if (viewMode === 'my-schedule' && (selectedTeams.length === 0 || selectedTeams.includes('all'))) {
         timeEntryUserIds = [user!.id];
-      } else if ((isManager() || isPlanner()) && selectedTeams.length > 0) {
+      } else if ((isManager() || isPlanner()) && selectedTeams.length > 0 && !selectedTeams.includes('all')) {
         // For managers/planners, fetch team members directly from DB to avoid race condition with employees state
         let targetTeamIds: string[] = [];
         
@@ -2194,6 +2195,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                 value={topLevelTeam.name}
                                 onSelect={() => {
                                   setSelectedTeams([topLevelTeam.id]);
+                                  setViewMode('team-availability');
                                   setTeamDropdownOpen(false);
                                 }}
                                 className="py-3 font-semibold text-primary"
@@ -2220,6 +2222,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                       value={midTeam.name}
                                       onSelect={() => {
                                         setSelectedTeams([midTeam.id]);
+                                        setViewMode('team-availability');
                                         setTeamDropdownOpen(false);
                                       }}
                                       className="py-3 pl-8 font-medium"
@@ -2243,6 +2246,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                                         value={lowerTeam.name}
                                         onSelect={() => {
                                           setSelectedTeams([lowerTeam.id]);
+                                          setViewMode('team-availability');
                                           setTeamDropdownOpen(false);
                                         }}
                                         className="pl-12 text-sm"
@@ -2272,6 +2276,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
                             value={team.name}
                             onSelect={() => {
                               setSelectedTeams([team.id]);
+                              setViewMode('team-availability');
                               setTeamDropdownOpen(false);
                             }}
                           >
