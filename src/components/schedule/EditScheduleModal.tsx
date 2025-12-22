@@ -57,6 +57,7 @@ interface EditScheduleModalProps {
 const activityTypes = [
   { value: "work", label: "Work" },
   { value: "vacation", label: "Vacation" },
+  { value: "public_holiday", label: "Public Holiday" },
   { value: "other", label: "Other" },
   { value: "hotline_support", label: "Hotline Support" },
   { value: "out_of_office", label: "Out of Office" },
@@ -94,7 +95,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   ]);
   const [formData, setFormData] = useState<{
     shift_type: "normal" | "early" | "late" | "weekend";
-    activity_type: "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
+    activity_type: "work" | "vacation" | "public_holiday" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
     availability_status: "available" | "unavailable";
     notes: string;
   }>({
@@ -142,11 +143,16 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         setWorkBlocks([{ activity_type: "work", start_time: "09:00", end_time: "17:00" }]);
       }
 
+      // Check if notes indicate this is a public holiday entry
+      const isPublicHoliday = entry.notes?.startsWith('Public Holiday:') || 
+                               userNotes.startsWith('Public Holiday:');
+      
       setFormData({
         shift_type: (entry.shift_type as "normal" | "early" | "late" | "weekend") || "normal",
-        activity_type: (entry.activity_type as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
+        activity_type: isPublicHoliday ? "public_holiday" : 
+          (entry.activity_type as "work" | "vacation" | "public_holiday" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") || "work",
         availability_status: (entry.availability_status as "available" | "unavailable") || "available",
-        notes: userNotes
+        notes: isPublicHoliday ? userNotes.replace(/^Public Holiday:\s*/, '') : userNotes
       });
     }
   }, [entry]);
@@ -221,6 +227,31 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
       let notes = formData.notes.trim();
       let primaryActivityType = formData.activity_type;
+      let availabilityStatus = formData.availability_status;
+
+      // Handle public_holiday - store as out_of_office with prefix in notes
+      const isPublicHoliday = primaryActivityType === 'public_holiday';
+      if (isPublicHoliday) {
+        primaryActivityType = 'out_of_office' as any;
+        availabilityStatus = 'unavailable';
+        notes = `Public Holiday: ${notes || 'National Holiday'}`.trim();
+        
+        // Cancel any existing vacation request for this date to return vacation days
+        const { error: vacationError } = await supabase
+          .from('vacation_requests')
+          .update({ 
+            status: 'rejected',
+            rejection_reason: 'Converted to Public Holiday - vacation day returned'
+          })
+          .eq('user_id', entry.user_id)
+          .eq('requested_date', entry.date)
+          .in('status', ['approved', 'pending']);
+        
+        if (vacationError) {
+          console.error('Error cancelling vacation request:', vacationError);
+          // Don't throw - continue with save
+        }
+      }
 
       if (useHourSplit) {
         const timesData = JSON.stringify(workBlocks);
@@ -237,8 +268,8 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         primaryActivityType = primaryActivity.activity_type as any;
       }
 
-      // Use activity type directly - no mapping needed
-      const dbActivityType = primaryActivityType as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
+      // Use activity type directly - map public_holiday to out_of_office
+      const dbActivityType = (primaryActivityType === 'public_holiday' ? 'out_of_office' : primaryActivityType) as "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home";
 
       // Create if temp entry, otherwise update
       if (entry.id.startsWith('temp-')) {
@@ -249,26 +280,26 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           date: format(new Date(entry.date), 'yyyy-MM-dd'),
           shift_type: formData.shift_type,
           activity_type: dbActivityType,
-          availability_status: formData.availability_status,
+          availability_status: availabilityStatus,
           notes: notes || null,
           created_by: authData.user?.id,
         };
         const { error } = await supabase.from('schedule_entries').insert(insertPayload);
         if (error) throw error;
-        toast({ title: 'Success', description: 'Schedule entry created successfully' });
+        toast({ title: 'Success', description: isPublicHoliday ? 'Public holiday saved - vacation days returned' : 'Schedule entry created successfully' });
       } else {
         const { error } = await supabase
           .from('schedule_entries')
           .update({
             shift_type: formData.shift_type,
             activity_type: dbActivityType,
-            availability_status: formData.availability_status,
+            availability_status: availabilityStatus,
             notes: notes || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', entry.id);
         if (error) throw error;
-        toast({ title: 'Success', description: 'Schedule entry updated successfully' });
+        toast({ title: 'Success', description: isPublicHoliday ? 'Changed to public holiday - vacation days returned' : 'Schedule entry updated successfully' });
       }
 
       // Send notification if requested
@@ -687,7 +718,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               <Label htmlFor="activity_type">Activity Type</Label>
             <Select
               value={formData.activity_type}
-              onValueChange={(value: "work" | "vacation" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => 
+              onValueChange={(value: "work" | "vacation" | "public_holiday" | "other" | "hotline_support" | "out_of_office" | "training" | "flextime" | "working_from_home") => 
                 setFormData({ 
                   ...formData, 
                   activity_type: value,
