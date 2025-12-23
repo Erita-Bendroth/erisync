@@ -234,7 +234,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
       if (isPublicHoliday) {
         primaryActivityType = 'out_of_office' as any;
         availabilityStatus = 'unavailable';
-        notes = `Public Holiday: ${notes || 'National Holiday'}`.trim();
+        notes = `Public Holiday: ${notes || 'Company Holiday'}`.trim();
         
         // Cancel any existing vacation request for this date to return vacation days
         const { error: vacationError } = await supabase
