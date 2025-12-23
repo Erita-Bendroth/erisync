@@ -115,7 +115,9 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   
   // If it's a holiday, display ONLY the holiday name badge with NO time information
   if (isHoliday) {
-    const holidayName = entry.notes?.replace(/public holiday:\s*/i, '').trim() || 'Holiday';
+    // Extract just the holiday name after "Public Holiday:" prefix, ignoring any JSON before it
+    const holidayMatch = entry.notes?.match(/Public Holiday:\s*([^\n]+)/i);
+    const holidayName = holidayMatch?.[1]?.trim() || 'Company Holiday';
     return (
       <div className={`w-full ${className}`}>
         <TooltipProvider>
