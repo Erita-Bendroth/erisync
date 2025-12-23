@@ -117,7 +117,16 @@ export const TimeBlockDisplay: React.FC<TimeBlockDisplayProps> = ({
   if (isHoliday) {
     // Extract just the holiday name after "Public Holiday:" prefix, ignoring any JSON before it
     const holidayMatch = entry.notes?.match(/Public Holiday:\s*([^\n]+)/i);
-    const holidayName = holidayMatch?.[1]?.trim() || 'Company Holiday';
+    let holidayName = holidayMatch?.[1]?.trim() || 'Company Holiday';
+    
+    // Normalize generic/manual holiday names to "Company Holiday"
+    // Preserve specific imported holiday names (Julafton, Weihnachtstag, etc.)
+    const genericNames = ['public holiday', 'national holiday', 'holiday', 'company holiday'];
+    if (genericNames.includes(holidayName.toLowerCase()) || 
+        holidayName.toLowerCase().startsWith('publ') ||
+        holidayName.toLowerCase().startsWith('nat')) {
+      holidayName = 'Company Holiday';
+    }
     return (
       <div className={`w-full ${className}`}>
         <TooltipProvider>
