@@ -62,9 +62,10 @@ export const PendingRequestsCard = () => {
       const isPlanner = userRoles.some(r => r.role === 'planner');
       const isManager = userRoles.some(r => r.role === 'manager');
 
+      // Fetch actual data to count unique requests (grouped by request_group_id)
       let query = supabase
         .from("vacation_requests")
-        .select("id", { count: 'exact', head: true })
+        .select("id, request_group_id")
         .eq("status", "pending");
 
       if (!isAdmin && !isPlanner) {
@@ -86,8 +87,28 @@ export const PendingRequestsCard = () => {
         }
       }
 
-      const { count } = await query;
-      setVacationCount(count || 0);
+      const { data } = await query;
+      
+      if (!data || data.length === 0) {
+        setVacationCount(0);
+        return;
+      }
+
+      // Count unique requests:
+      // - Requests with same request_group_id count as 1
+      // - Requests without request_group_id count as 1 each
+      const uniqueGroups = new Set<string>();
+      let ungroupedCount = 0;
+      
+      data.forEach(req => {
+        if (req.request_group_id) {
+          uniqueGroups.add(req.request_group_id);
+        } else {
+          ungroupedCount++;
+        }
+      });
+
+      setVacationCount(uniqueGroups.size + ungroupedCount);
     } catch (error) {
       console.error("Error fetching vacation request count:", error);
       setVacationCount(0);
