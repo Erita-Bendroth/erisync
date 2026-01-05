@@ -154,6 +154,8 @@ export const calculateBulkEntries = async (
       let requestedShiftType: ShiftType = shouldUseWeekendShift ? 'weekend' : selectedShiftEnumType;
       
       // Use country-aware shift selection
+      // Do NOT pass shiftTimeDefinitionId - let the function find the correct
+      // shift for this user's country based on the shift TYPE (early, late, etc.)
       const applicableShift = await getApplicableShiftTimes({
         teamId: config.teamId,
         regionCode: userRegionCode || undefined,
@@ -161,7 +163,6 @@ export const calculateBulkEntries = async (
         shiftType: requestedShiftType,
         dayOfWeek,
         date: dateStr,
-        shiftTimeDefinitionId: shiftDefinitionId || undefined,
       });
       
       if (!applicableShift) {
@@ -226,6 +227,8 @@ export const calculateBulkEntries = async (
         let requestedShiftType: ShiftType = shouldUseWeekendShift ? 'weekend' : selectedShiftEnumType;
         
         // Use country-aware shift selection
+        // Do NOT pass shiftTimeDefinitionId - let the function find the correct
+        // shift for this user's country based on the shift TYPE (early, late, etc.)
         const applicableShift = await getApplicableShiftTimes({
           teamId: config.teamId,
           regionCode: userRegionCode || undefined,
@@ -233,7 +236,6 @@ export const calculateBulkEntries = async (
           shiftType: requestedShiftType,
           dayOfWeek,
           date: dateStr,
-          shiftTimeDefinitionId: shiftDefinitionId || undefined,
         });
         
         if (!applicableShift) {
