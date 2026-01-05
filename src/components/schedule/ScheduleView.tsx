@@ -356,36 +356,75 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     }
   }, [initialTeamId, teams]);
 
+  // Track if static data has been loaded
+  const [staticDataLoaded, setStaticDataLoaded] = useState(false);
+
+  // PHASE 1: Initial load - fetch static data once (roles, teams, shifts)
   useEffect(() => {
-    if (user) {
-      console.log('✅ User authenticated, fetching roles...');
-      fetchUserRoles();
-      fetchUserTeams();
-    } else {
+    if (!user) {
       console.log('❌ No authenticated user');
       setLoading(false);
+      return;
     }
+    
+    const loadStaticData = async () => {
+      console.log('✅ User authenticated, loading static data...');
+      setLoading(true);
+      
+      // Parallel fetch of static data that doesn't change often
+      await Promise.all([
+        fetchUserRoles(),
+        fetchUserTeams(),
+        fetchTeams(),
+        fetchShiftTimeDefinitions(),
+      ]);
+      
+      setStaticDataLoaded(true);
+    };
+    
+    loadStaticData();
   }, [user]);
 
-  // Consolidated useEffect with debouncing to prevent redundant fetches
+  // PHASE 2: Once static data loaded, fetch dynamic data
   useEffect(() => {
-    if (!user || userRoles.length === 0) return;
+    if (!user || !staticDataLoaded || userRoles.length === 0) return;
     
-    const timer = setTimeout(() => {
-      fetchTeams();
-      fetchEmployees();
-      fetchScheduleEntries();
-      fetchHolidays();
-      fetchShiftTimeDefinitions();
-      fetchDutyAssignments();
-      fetchPendingRequestsCount();
-      fetchPendingSwapRequestsCount();
-      fetchPendingVacationRequestsForSchedule();
-      fetchTeamTimeEntries();
-    }, 150); // Debounce 150ms
+    const loadDynamicData = async () => {
+      console.log('📊 Loading dynamic schedule data...');
+      
+      // First fetch employees (needed for other queries)
+      await fetchEmployees();
+      
+      // Then fetch remaining data in parallel
+      await Promise.all([
+        fetchScheduleEntries(),
+        fetchDutyAssignments(),
+        fetchPendingRequestsCount(),
+        fetchPendingSwapRequestsCount(),
+        fetchPendingVacationRequestsForSchedule(),
+      ]);
+    };
     
-    return () => clearTimeout(timer);
-  }, [user, currentWeek, userRoles, selectedTeams, viewMode, refreshTrigger, holidayRefetchTrigger]);
+    loadDynamicData();
+  }, [user, staticDataLoaded, userRoles, selectedTeams, viewMode, refreshTrigger]);
+
+  // PHASE 3: Fetch date-dependent data when week/month changes
+  useEffect(() => {
+    if (!user || !staticDataLoaded || employees.length === 0) return;
+    
+    const loadWeeklyData = async () => {
+      console.log('📅 Loading weekly data...');
+      
+      await Promise.all([
+        fetchScheduleEntries(true), // silent mode
+        fetchHolidays(),
+        fetchDutyAssignments(),
+        fetchTeamTimeEntries(),
+      ]);
+    };
+    
+    loadWeeklyData();
+  }, [currentWeek, holidayRefetchTrigger]);
 
 // Pre-populate managed users set for performance and deterministic rendering
 useEffect(() => {
@@ -599,13 +638,16 @@ const getTeamTimeEntryForDay = (employeeId: string, dateStr: string) => {
   return entries.find(e => e.entry_date === dateStr);
 };
 
-// Refetch team time entries when employees list changes
+// Fetch holidays when employees change (need their country codes)
 useEffect(() => {
-  if (employees.length > 0 && (isManager() || isPlanner())) {
-    fetchTeamTimeEntries();
+  if (employees.length > 0 && staticDataLoaded) {
+    fetchHolidays();
+    if (isManager() || isPlanner()) {
+      fetchTeamTimeEntries();
+    }
   }
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [employees, currentWeek]);
+}, [employees]);
 
 // Subscribe to vacation request changes for real-time badge updates (all users)
 useEffect(() => {
@@ -1600,91 +1642,74 @@ useEffect(() => {
 
   const fetchHolidays = async () => {
     try {
-      const weekEnd = addDays(weekStart, 6); // Sunday - full week to include weekend holidays
+      const weekEnd = addDays(weekStart, 6);
       
-      // Get all unique countries and regions from employees in current view
-      const employeeIds = employees.map(e => e.id);
+      // Use employee location data already in state to avoid extra query
+      const countryCodes = [...new Set(
+        employees
+          .map(e => e.country_code)
+          .filter((code): code is string => Boolean(code))
+      )];
       
-      if (employeeIds.length === 0) {
-        console.log('No employees to fetch holidays for');
+      if (countryCodes.length === 0) {
+        console.log('No country codes found for employees');
         setHolidays([]);
         return;
       }
 
-      // Fetch profiles for all employees to get their countries and regions
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id, country_code, region_code')
-        .in('user_id', employeeIds);
+      console.log(`🔍 Fetching holidays for ${countryCodes.length} countries:`, countryCodes);
 
-      if (profileError) {
-        console.error('Error fetching employee profiles:', profileError);
+      // SINGLE batched query instead of N queries (fixes N+1 pattern)
+      const { data: allHolidays, error } = await supabase
+        .from('holidays')
+        .select('*')
+        .in('country_code', countryCodes)
+        .is('user_id', null)
+        .gte('date', format(weekStart, "yyyy-MM-dd"))
+        .lte('date', format(weekEnd, "yyyy-MM-dd"))
+        .eq('is_public', true);
+
+      if (error) {
+        console.error('Error fetching holidays:', error);
         setHolidays([]);
         return;
       }
 
-      if (!profiles || profiles.length === 0) {
-        console.log('No profiles found for employees');
-        setHolidays([]);
-        return;
-      }
-
-      // Get unique country-region combinations
-      const locationSet = new Set(profiles.map(p => `${p.country_code}|${p.region_code || ''}`));
-      console.log(`🔍 Fetching holidays for ${locationSet.size} unique location(s):`, Array.from(locationSet));
-
-      // Fetch holidays for all country-region combinations
-      const allHolidays: any[] = [];
+      // Build location map from employees for region filtering
+      const employeeLocations = new Map(
+        employees.map(e => [e.user_id, { country_code: e.country_code, region_code: e.region_code }])
+      );
       
-      for (const location of locationSet) {
-        const [country_code, region_code] = location.split('|');
-        
-        if (!country_code) continue;
-
-        // Fetch all holidays for this country (centrally managed)
-        const { data: countryHolidays, error } = await supabase
-          .from('holidays')
-          .select('*')
-          .eq('country_code', country_code)
-          .is('user_id', null) // Only centrally managed holidays
-          .gte('date', format(weekStart, "yyyy-MM-dd"))
-          .lte('date', format(weekEnd, "yyyy-MM-dd"))
-          .eq('is_public', true);
-
-        if (error) {
-          console.error(`Error fetching holidays for ${country_code}:`, error);
-          continue;
+      // Get unique region codes per country for filtering
+      const regionsByCountry = new Map<string, Set<string>>();
+      employees.forEach(e => {
+        if (e.country_code && e.region_code) {
+          if (!regionsByCountry.has(e.country_code)) {
+            regionsByCountry.set(e.country_code, new Set());
+          }
+          regionsByCountry.get(e.country_code)!.add(e.region_code);
         }
+      });
 
-        // Filter holidays based on region
-        let applicableHolidays = countryHolidays || [];
-        if (country_code === 'DE' && region_code) {
-          // For Germany with region: prefer regional holidays, fallback to national
-          const regionalHolidays = applicableHolidays.filter(h => h.region_code === region_code);
-          const nationalHolidays = applicableHolidays.filter(h => !h.region_code);
-          
-          // For each date, prefer regional version over national if both exist
-          const holidaysByDate = new Map();
-          [...regionalHolidays, ...nationalHolidays].forEach(h => {
-            const dateKey = h.date;
-            if (!holidaysByDate.has(dateKey)) {
-              holidaysByDate.set(dateKey, h);
-            }
-          });
-          
-          applicableHolidays = Array.from(holidaysByDate.values());
-        } else {
-          // For other countries or no region: only national holidays
-          applicableHolidays = applicableHolidays.filter(h => !h.region_code);
+      // Filter holidays in-memory based on region requirements
+      const filteredHolidays = (allHolidays || []).filter(h => {
+        // For Germany with regional holidays
+        if (h.country_code === 'DE' && h.region_code) {
+          const employeeRegions = regionsByCountry.get('DE');
+          return employeeRegions?.has(h.region_code) ?? false;
         }
-
-        console.log(`📅 ${country_code}${region_code ? '-'+region_code : ''}: ${applicableHolidays.length} holidays`);
-        allHolidays.push(...applicableHolidays);
-      }
+        // For national holidays (no region_code) - always include
+        if (!h.region_code) {
+          return true;
+        }
+        // For other regional holidays
+        const employeeRegions = regionsByCountry.get(h.country_code);
+        return employeeRegions?.has(h.region_code) ?? false;
+      });
 
       // Remove duplicates by holiday id
       const uniqueHolidays = Array.from(
-        new Map(allHolidays.map(h => [h.id, h])).values()
+        new Map(filteredHolidays.map(h => [h.id, h])).values()
       );
       
       console.log(`✅ Total unique holidays fetched: ${uniqueHolidays.length}`);
