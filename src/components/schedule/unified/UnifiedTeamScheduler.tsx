@@ -374,10 +374,16 @@ export const UnifiedTeamScheduler: React.FC = () => {
   useEffect(() => {
     if (teamIds.length > 0) {
       fetchTeamSections();
-      fetchScheduleEntries();
       fetchDutyAssignments();
     }
   }, [teamIds, dateStart, rangeType, holidayRefetchTrigger]);
+
+  // Fetch schedule entries after team sections are loaded (to query by user_id)
+  useEffect(() => {
+    if (teamSections.length > 0) {
+      fetchScheduleEntries();
+    }
+  }, [teamSections, dateStart, rangeType]);
 
   const fetchTeamSections = async () => {
     setLoading(true);
@@ -433,18 +439,22 @@ export const UnifiedTeamScheduler: React.FC = () => {
   };
 
   const fetchScheduleEntries = async () => {
-    if (teamIds.length === 0) return;
+    // Wait for team sections to be loaded so we have user IDs
+    if (teamSections.length === 0) return;
 
     try {
       // Get all user IDs from current team sections
       const allUserIds = teamSections.flatMap(s => s.members.map(m => m.user_id));
       
-      // Fetch schedule entries and time entries in parallel
+      if (allUserIds.length === 0) return;
+      
+      // Query by user_id instead of team_id to handle hierarchical team membership
+      // This ensures entries are found regardless of which team_id they were saved with
       const [scheduleResult, timeEntriesResult] = await Promise.all([
         supabase
           .from('schedule_entries')
           .select('*')
-          .in('team_id', teamIds)
+          .in('user_id', allUserIds)
           .gte('date', dates[0])
           .lte('date', dates[dates.length - 1]),
         // Fetch time entries that indicate unavailability (public_holiday, sick_leave, vacation, fza_withdrawal)
