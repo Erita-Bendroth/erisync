@@ -633,16 +633,30 @@ Deno.serve(async (req) => {
     // Update import status to failed
     try {
       const requestBody = await req.clone().json();
-      const { error: failStatusError } = await supabaseClient
-        .from('holiday_import_status')
-        .update({
-          status: 'failed',
-          error_message: 'Import failed',
-          completed_at: new Date().toISOString()
-        })
-        .eq('country_code', requestBody.country_code)
-        .eq('year', requestBody.year)
-        .eq('region_code', requestBody.region_code || null);
+      // Handle NULL region_code correctly - use .is() for null, .eq() for values
+      const failStatusUpdate = requestBody.region_code 
+        ? supabaseClient
+            .from('holiday_import_status')
+            .update({
+              status: 'failed',
+              error_message: 'Import failed',
+              completed_at: new Date().toISOString()
+            })
+            .eq('country_code', requestBody.country_code)
+            .eq('year', requestBody.year)
+            .eq('region_code', requestBody.region_code)
+        : supabaseClient
+            .from('holiday_import_status')
+            .update({
+              status: 'failed',
+              error_message: 'Import failed',
+              completed_at: new Date().toISOString()
+            })
+            .eq('country_code', requestBody.country_code)
+            .eq('year', requestBody.year)
+            .is('region_code', null);
+      
+      const { error: failStatusError } = await failStatusUpdate;
       
       if (failStatusError) {
         console.error('Failed to update error status:', failStatusError);

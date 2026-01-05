@@ -1,7 +1,7 @@
 interface Team {
   id: string;
   name: string;
-  parent_team_id: string | null;
+  parent_team_id?: string | null;
 }
 
 interface HierarchicalTeams {

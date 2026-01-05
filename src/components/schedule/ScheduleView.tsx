@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths, parseISO } from 'date-fns';
+import { groupTeamsByHierarchy, getAllTeamIdsWithChildren } from '@/lib/teamHierarchyUtils';
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -738,11 +739,20 @@ useEffect(() => {
         if (!isAllTeams && selectedTeams.length > 0) {
           console.log('🎯 Selected specific teams:', selectedTeams);
           
-          // Get members from all selected teams
+          // Expand selected teams to include all child teams using hierarchy
+          const { childrenMap } = groupTeamsByHierarchy(teams);
+          const expandedTeamIds: string[] = [];
+          selectedTeams.forEach(teamId => {
+            expandedTeamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
+          });
+          const uniqueExpandedTeamIds = [...new Set(expandedTeamIds)];
+          console.log('📊 Expanded team IDs (including children):', uniqueExpandedTeamIds);
+          
+          // Get members from all expanded teams
           const { data: teamMembersRes, error: teamMembersError } = await supabase
             .from('team_members')
             .select('user_id')
-            .in('team_id', selectedTeams)
+            .in('team_id', uniqueExpandedTeamIds)
             .limit(10000);
 
           if (teamMembersError) {
@@ -752,8 +762,7 @@ useEffect(() => {
           }
 
           targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
-          console.log(`📊 Viewing ${selectedTeams.length} team(s) with ${targetUserIds.length} users`);
-          console.log('Target user IDs for teams:', targetUserIds);
+          console.log(`📊 Viewing ${selectedTeams.length} team(s) expanded to ${uniqueExpandedTeamIds.length} with ${targetUserIds.length} users`);
         } else {
           console.log('All teams view: fetching ALL team members across ALL accessible teams');
           
@@ -1128,7 +1137,12 @@ useEffect(() => {
           teamIds = accessibleTeamIds || [];
         }
       } else if (selectedTeams.length > 0) {
-        teamIds = selectedTeams;
+        // Expand selected teams to include child teams
+        const { childrenMap } = groupTeamsByHierarchy(teams);
+        selectedTeams.forEach(teamId => {
+          teamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
+        });
+        teamIds = [...new Set(teamIds)];
       }
       
       if (teamIds.length === 0) {
@@ -1293,9 +1307,15 @@ useEffect(() => {
           .lte("date", dateEnd)
           .order("date");
 
-        // Handle multiple specific teams selection
+        // Handle multiple specific teams selection - expand to include child teams
         if (!isAllTeams && selectedTeams.length > 0) {
-          query = query.in("team_id", selectedTeams);
+          const { childrenMap } = groupTeamsByHierarchy(teams);
+          const expandedTeamIds: string[] = [];
+          selectedTeams.forEach(teamId => {
+            expandedTeamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
+          });
+          const uniqueExpandedTeamIds = [...new Set(expandedTeamIds)];
+          query = query.in("team_id", uniqueExpandedTeamIds);
         } else if (isTeamMember()) {
           if (viewMode === "my-schedule") {
             query = query.eq("user_id", user!.id);
@@ -1345,7 +1365,12 @@ useEffect(() => {
             targetTeamIds = managerTeamsData || [];
           }
         } else {
-          targetTeamIds = selectedTeams;
+          // Expand selected teams to include child teams
+          const { childrenMap } = groupTeamsByHierarchy(teams);
+          selectedTeams.forEach(teamId => {
+            targetTeamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
+          });
+          targetTeamIds = [...new Set(targetTeamIds)];
         }
         
         if (targetTeamIds.length > 0) {
@@ -1586,7 +1611,7 @@ useEffect(() => {
 
   const fetchHolidays = async () => {
     try {
-      const weekEnd = addDays(weekStart, 4); // Friday
+      const weekEnd = addDays(weekStart, 6); // Sunday - full week to include weekend holidays
       
       // Get all unique countries and regions from employees in current view
       const employeeIds = employees.map(e => e.id);
@@ -1826,9 +1851,9 @@ const getAvailabilityStatus = (activityType: string) => {
     const employee = employees.find(e => e.id === employeeId);
     if (!employee || !employee.country_code) return [];
 
-    // Filter holidays for this specific date
+    // Filter holidays for this specific date - use parseISO for consistent date handling
     const dayHolidays = holidays.filter(holiday => 
-      isSameDay(new Date(holiday.date), date)
+      isSameDay(parseISO(holiday.date), date)
     );
 
     // Filter holidays by employee's country and region
@@ -1864,8 +1889,9 @@ const getAvailabilityStatus = (activityType: string) => {
   };
 
   const getHolidaysForDay = (date: Date) => {
+    // Use parseISO for consistent date handling across timezones
     return holidays.filter(holiday => 
-      isSameDay(new Date(holiday.date), date)
+      isSameDay(parseISO(holiday.date), date)
     );
   };
 
