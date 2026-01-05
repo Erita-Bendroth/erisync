@@ -81,6 +81,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
   const [rangeType, setRangeType] = useState<DateRangeType>('week');
   const [viewMode, setViewMode] = useState<'grid' | 'weekly' | 'monthly'>('grid');
   const [loading, setLoading] = useState(false);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
   const [applyTemplateDialogOpen, setApplyTemplateDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [screenshotMode, setScreenshotMode] = useState(false);
@@ -373,17 +374,19 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
   useEffect(() => {
     if (teamIds.length > 0) {
-      fetchTeamSections();
+      setSectionsLoading(true);
+      fetchTeamSections().finally(() => setSectionsLoading(false));
       fetchDutyAssignments();
     }
   }, [teamIds, dateStart, rangeType, holidayRefetchTrigger]);
 
-  // Fetch schedule entries after team sections are loaded (to query by user_id)
+  // Fetch schedule entries after team sections are fully loaded (to query by user_id)
+  // Wait for sectionsLoading to be false to avoid race condition with stale teamSections
   useEffect(() => {
-    if (teamSections.length > 0) {
+    if (teamSections.length > 0 && !sectionsLoading && dates.length > 0) {
       fetchScheduleEntries();
     }
-  }, [teamSections, dateStart, rangeType]);
+  }, [teamSections, sectionsLoading, dates]);
 
   const fetchTeamSections = async () => {
     setLoading(true);
