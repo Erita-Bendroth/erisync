@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ScheduleEntry, ShiftPattern } from './useSchedulerState';
 import { Database } from '@/integrations/supabase/types';
+import { getApplicableShiftTimes } from '@/lib/shiftTimeUtils';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -13,6 +14,8 @@ interface TeamMember {
   first_name: string;
   last_name: string;
   initials: string;
+  country_code?: string | null;
+  region_code?: string | null;
 }
 
 interface TeamSection {
@@ -58,26 +61,29 @@ export const useSchedulerActions = (
     if (pattern.length === 0 || targetCellIds.length === 0) return;
 
     try {
-      const newEntries: ScheduleEntry[] = [];
-      
       // Calculate date offset from first pattern item to first target
       const firstPatternDate = new Date(pattern[0].date);
       const [firstTargetUser, firstTargetDate] = targetCellIds[0].split(':');
       const targetDate = new Date(firstTargetDate);
       const dayOffset = Math.floor((targetDate.getTime() - firstPatternDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      targetCellIds.forEach(cellId => {
+      // Build entries with country-aware shift definitions
+      const newEntries: (ScheduleEntry & { shift_time_definition_id?: string | null })[] = [];
+      
+      for (const cellId of targetCellIds) {
         const [user_id, date] = cellId.split(':');
         
-        // Find which team this user belongs to
+        // Find which team this user belongs to and get member info
         const userTeam = teamSections.find(section =>
           section.members.some(m => m.user_id === user_id)
         );
         
         if (!userTeam) {
           console.warn(`User ${user_id} not found in any team section`);
-          return;
+          continue;
         }
+        
+        const member = userTeam.members.find(m => m.user_id === user_id);
         
         // Find matching pattern entry based on relative position
         const patternEntry = pattern.find(p => {
@@ -87,7 +93,29 @@ export const useSchedulerActions = (
           return pAdjusted.toISOString().split('T')[0] === date;
         });
         
-        if (patternEntry) {
+        if (patternEntry && patternEntry.shift_type) {
+          // Get country-aware shift definition
+          const dayOfWeek = new Date(date).getDay();
+          const applicableShift = await getApplicableShiftTimes({
+            teamId: userTeam.teamId,
+            regionCode: member?.region_code || undefined,
+            countryCode: member?.country_code || undefined,
+            shiftType: patternEntry.shift_type,
+            dayOfWeek,
+            date,
+          });
+          
+          newEntries.push({
+            user_id,
+            team_id: userTeam.teamId,
+            date,
+            shift_type: patternEntry.shift_type,
+            activity_type: patternEntry.activity_type,
+            availability_status: patternEntry.availability_status,
+            shift_time_definition_id: applicableShift?.id?.startsWith('default-') ? null : applicableShift?.id || null,
+            notes: `Pasted from pattern - ${applicableShift?.description || patternEntry.shift_type}`,
+          });
+        } else if (patternEntry) {
           newEntries.push({
             user_id,
             team_id: userTeam.teamId,
@@ -98,7 +126,7 @@ export const useSchedulerActions = (
             notes: 'Pasted from pattern',
           });
         }
-      });
+      }
       
       // Optimistic update
       const updatedEntries = [...scheduleEntries];
@@ -138,36 +166,53 @@ export const useSchedulerActions = (
         variant: "destructive",
       });
     }
-  }, [scheduleEntries, onUpdate, userId, toast]);
+  }, [scheduleEntries, onUpdate, userId, toast, teamSections]);
 
   const bulkAssignShift = useCallback(async (
     cellIds: string[],
     shiftType: ShiftType
   ) => {
     try {
-      const newEntries: ScheduleEntry[] = cellIds.map(cellId => {
+      // Build entries with country-aware shift definitions
+      const newEntries: (ScheduleEntry & { shift_time_definition_id?: string | null })[] = [];
+      
+      for (const cellId of cellIds) {
         const [user_id, date] = cellId.split(':');
         
-        // Find which team this user belongs to
+        // Find which team this user belongs to and get member info
         const userTeam = teamSections.find(section =>
           section.members.some(m => m.user_id === user_id)
         );
         
         if (!userTeam) {
           console.warn(`User ${user_id} not found in any team section`);
-          return null;
+          continue;
         }
         
-        return {
+        const member = userTeam.members.find(m => m.user_id === user_id);
+        
+        // Get country-aware shift definition
+        const dayOfWeek = new Date(date).getDay();
+        const applicableShift = await getApplicableShiftTimes({
+          teamId: userTeam.teamId,
+          regionCode: member?.region_code || undefined,
+          countryCode: member?.country_code || undefined,
+          shiftType: shiftType,
+          dayOfWeek,
+          date,
+        });
+        
+        newEntries.push({
           user_id,
           team_id: userTeam.teamId,
           date,
           shift_type: shiftType,
           activity_type: 'work' as ActivityType,
           availability_status: 'available' as AvailabilityStatus,
-          notes: 'Bulk assigned',
-        };
-      }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+          shift_time_definition_id: applicableShift?.id?.startsWith('default-') ? null : applicableShift?.id || null,
+          notes: `Bulk assigned - ${applicableShift?.description || shiftType}`,
+        });
+      }
       
       // Optimistic update
       const updatedEntries = [...scheduleEntries];
