@@ -9,6 +9,7 @@ import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
+import { getApplicableShiftTimes } from '@/lib/shiftTimeUtils';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -20,6 +21,7 @@ interface TeamMember {
   last_name: string;
   initials: string;
   country_code?: string | null;
+  region_code?: string | null;
 }
 
 interface SchedulerGridProps {
@@ -172,10 +174,29 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     if (!editingCellData) return;
 
     try {
+      // Find member to get country code for country-aware shift selection
+      const member = teamMembers.find(m => m.user_id === editingCellData.userId);
+      
+      // Get country-aware shift definition if shift type is set and available
+      let shiftTimeDefinitionId: string | null = null;
+      if (data.shift_type && data.availability_status === 'available') {
+        const dayOfWeek = new Date(editingCellData.date).getDay();
+        const applicableShift = await getApplicableShiftTimes({
+          teamId,
+          regionCode: member?.region_code || undefined,
+          countryCode: member?.country_code || undefined,
+          shiftType: data.shift_type,
+          dayOfWeek,
+          date: editingCellData.date,
+        });
+        shiftTimeDefinitionId = applicableShift?.id?.startsWith('default-') ? null : applicableShift?.id || null;
+      }
+      
       const entry: ScheduleEntry = {
         user_id: editingCellData.userId,
         team_id: teamId,
         date: editingCellData.date,
+        shift_time_definition_id: shiftTimeDefinitionId,
         ...data,
       };
 
