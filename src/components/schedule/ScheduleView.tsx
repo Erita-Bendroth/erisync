@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths, parseISO } from 'date-fns';
-import { groupTeamsByHierarchy, getAllTeamIdsWithChildren } from '@/lib/teamHierarchyUtils';
+
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -737,22 +737,13 @@ useEffect(() => {
         const isAllTeams = selectedTeams.includes("all");
         
         if (!isAllTeams && selectedTeams.length > 0) {
-          console.log('🎯 Selected specific teams:', selectedTeams);
+          console.log('🎯 Selected specific teams (direct members only):', selectedTeams);
           
-          // Expand selected teams to include all child teams using hierarchy
-          const { childrenMap } = groupTeamsByHierarchy(teams);
-          const expandedTeamIds: string[] = [];
-          selectedTeams.forEach(teamId => {
-            expandedTeamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
-          });
-          const uniqueExpandedTeamIds = [...new Set(expandedTeamIds)];
-          console.log('📊 Expanded team IDs (including children):', uniqueExpandedTeamIds);
-          
-          // Get members from all expanded teams
+          // NO hierarchy expansion - fetch only direct team members
           const { data: teamMembersRes, error: teamMembersError } = await supabase
             .from('team_members')
             .select('user_id')
-            .in('team_id', uniqueExpandedTeamIds)
+            .in('team_id', selectedTeams)
             .limit(10000);
 
           if (teamMembersError) {
@@ -762,7 +753,7 @@ useEffect(() => {
           }
 
           targetUserIds = [...new Set((teamMembersRes || []).map((tm: any) => tm.user_id))];
-          console.log(`📊 Viewing ${selectedTeams.length} team(s) expanded to ${uniqueExpandedTeamIds.length} with ${targetUserIds.length} users`);
+          console.log(`📊 Viewing ${selectedTeams.length} team(s) with ${targetUserIds.length} direct members`);
         } else {
           console.log('All teams view: fetching ALL team members across ALL accessible teams');
           
@@ -1137,12 +1128,8 @@ useEffect(() => {
           teamIds = accessibleTeamIds || [];
         }
       } else if (selectedTeams.length > 0) {
-        // Expand selected teams to include child teams
-        const { childrenMap } = groupTeamsByHierarchy(teams);
-        selectedTeams.forEach(teamId => {
-          teamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
-        });
-        teamIds = [...new Set(teamIds)];
+        // NO hierarchy expansion - use selected teams directly
+        teamIds = [...selectedTeams];
       }
       
       if (teamIds.length === 0) {
@@ -1307,15 +1294,21 @@ useEffect(() => {
           .lte("date", dateEnd)
           .order("date");
 
-        // Handle multiple specific teams selection - expand to include child teams
+        // Fetch schedule entries by user_id (direct team members) to capture entries saved under any team
         if (!isAllTeams && selectedTeams.length > 0) {
-          const { childrenMap } = groupTeamsByHierarchy(teams);
-          const expandedTeamIds: string[] = [];
-          selectedTeams.forEach(teamId => {
-            expandedTeamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
-          });
-          const uniqueExpandedTeamIds = [...new Set(expandedTeamIds)];
-          query = query.in("team_id", uniqueExpandedTeamIds);
+          // Get direct team members
+          const { data: directMembers } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .in('team_id', selectedTeams)
+            .limit(10000);
+          
+          const directMemberIds = [...new Set((directMembers || []).map(m => m.user_id))];
+          if (directMemberIds.length > 0) {
+            query = query.in("user_id", directMemberIds);
+          } else {
+            query = query.in("team_id", selectedTeams);
+          }
         } else if (isTeamMember()) {
           if (viewMode === "my-schedule") {
             query = query.eq("user_id", user!.id);
@@ -1365,12 +1358,8 @@ useEffect(() => {
             targetTeamIds = managerTeamsData || [];
           }
         } else {
-          // Expand selected teams to include child teams
-          const { childrenMap } = groupTeamsByHierarchy(teams);
-          selectedTeams.forEach(teamId => {
-            targetTeamIds.push(...getAllTeamIdsWithChildren(teamId, childrenMap));
-          });
-          targetTeamIds = [...new Set(targetTeamIds)];
+          // NO hierarchy expansion - use selected teams directly
+          targetTeamIds = [...selectedTeams];
         }
         
         if (targetTeamIds.length > 0) {
