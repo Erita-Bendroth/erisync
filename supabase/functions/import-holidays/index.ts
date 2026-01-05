@@ -407,15 +407,32 @@ Deno.serve(async (req) => {
 
     console.log('Prepared holiday data sample:', holidayData.slice(0, 2))
 
-    // Use upsert with ignoreDuplicates for faster operation - single DB call
-    // Note: The unique constraint is on (date, country_code, year, region_code) for public holidays
-    console.log('Upserting holidays into database...')
+    // Delete existing holidays for this country/year/region first, then insert fresh data
+    // This avoids issues with ON CONFLICT when region_code can be NULL
+    console.log('Deleting existing holidays for this country/year/region...')
+    let deleteQuery = supabaseClient
+      .from('holidays')
+      .delete()
+      .eq('country_code', country_code)
+      .eq('year', parseInt(year))
+    
+    if (region_code) {
+      deleteQuery = deleteQuery.eq('region_code', region_code)
+    } else {
+      deleteQuery = deleteQuery.is('region_code', null)
+    }
+    
+    const { error: deleteError } = await deleteQuery
+    
+    if (deleteError) {
+      console.warn('Warning: Failed to delete existing holidays:', deleteError.message)
+      // Continue anyway - inserts might still work
+    }
+
+    console.log('Inserting holidays into database...')
     const { error } = await supabaseClient
       .from('holidays')
-      .upsert(holidayData, { 
-        onConflict: 'date,country_code,year,region_code',
-        ignoreDuplicates: true
-      })
+      .insert(holidayData)
 
     if (error) {
       console.error('Database error details:', {
