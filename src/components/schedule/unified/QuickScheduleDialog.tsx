@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Database } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
 import { Calendar, User } from 'lucide-react';
 import { useShiftTypes } from '@/hooks/useShiftTypes';
-
+import { isDateWeekend } from '@/lib/shiftValidation';
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
 type AvailabilityStatus = Database['public']['Enums']['availability_status'];
@@ -166,36 +166,47 @@ export const QuickScheduleDialog: React.FC<QuickScheduleDialogProps> = ({
           </div>
 
           {/* Shift Type Selection */}
-          {availability === 'available' && (
-            <div className="space-y-3">
-              <Label className="text-base">Shift Type</Label>
-              <Select 
-                value={shiftType || ''} 
-                onValueChange={(val) => setShiftType(val as ShiftType)}
-                disabled={loadingShiftTypes}
-              >
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder={
-                    loadingShiftTypes ? "Loading shifts..." : "Select shift type"
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {shiftTypes.map((shift) => (
-                    <SelectItem key={shift.id} value={shift.type}>
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">{shift.label}</span>
-                        {shift.startTime && shift.endTime && (
-                          <span className="text-xs text-muted-foreground">
-                            {shift.startTime} - {shift.endTime}
-                          </span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {availability === 'available' && (() => {
+            // Filter out weekend shift option on weekdays
+            const isWeekend = isDateWeekend(date);
+            const filteredShiftTypes = shiftTypes.filter(shift => {
+              if (shift.type === 'weekend' && !isWeekend) {
+                return false;
+              }
+              return true;
+            });
+            
+            return (
+              <div className="space-y-3">
+                <Label className="text-base">Shift Type</Label>
+                <Select 
+                  value={shiftType || ''} 
+                  onValueChange={(val) => setShiftType(val as ShiftType)}
+                  disabled={loadingShiftTypes}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder={
+                      loadingShiftTypes ? "Loading shifts..." : "Select shift type"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredShiftTypes.map((shift) => (
+                      <SelectItem key={shift.id} value={shift.type}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{shift.label}</span>
+                          {shift.startTime && shift.endTime && (
+                            <span className="text-xs text-muted-foreground">
+                              {shift.startTime} - {shift.endTime}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })()}
 
           {/* Notes */}
           <div className="space-y-3">

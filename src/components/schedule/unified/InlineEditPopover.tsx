@@ -6,6 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Database } from '@/integrations/supabase/types';
+import { isDateWeekend } from '@/lib/shiftValidation';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -89,22 +90,27 @@ export const InlineEditPopover: React.FC<InlineEditPopoverProps> = ({
             </RadioGroup>
           </div>
 
-          {availability === 'available' && (
-            <div className="space-y-2">
-              <Label>Shift Type</Label>
-              <Select value={shiftType || ''} onValueChange={(val) => setShiftType(val as ShiftType)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select shift type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="normal">Day Shift</SelectItem>
-                  <SelectItem value="early">Early Shift</SelectItem>
-                  <SelectItem value="late">Late Shift</SelectItem>
-                  <SelectItem value="weekend">Weekend</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {availability === 'available' && (() => {
+            // Only show weekend option on actual weekends
+            const isWeekend = isDateWeekend(date);
+            
+            return (
+              <div className="space-y-2">
+                <Label>Shift Type</Label>
+                <Select value={shiftType || ''} onValueChange={(val) => setShiftType(val as ShiftType)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shift type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">Day Shift</SelectItem>
+                    <SelectItem value="early">Early Shift</SelectItem>
+                    <SelectItem value="late">Late Shift</SelectItem>
+                    {isWeekend && <SelectItem value="weekend">Weekend</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })()}
 
           <div className="space-y-2">
             <Label>Notes</Label>

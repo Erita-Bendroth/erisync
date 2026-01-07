@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ScheduleEntry, ShiftPattern } from './useSchedulerState';
 import { Database } from '@/integrations/supabase/types';
 import { getApplicableShiftTimes } from '@/lib/shiftTimeUtils';
+import { validateWeekendShift, isDateWeekend } from '@/lib/shiftValidation';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -173,10 +174,51 @@ export const useSchedulerActions = (
     shiftType: ShiftType
   ) => {
     try {
+      // For weekend shifts, filter to only valid dates (weekends/holidays)
+      let validCellIds = cellIds;
+      let skippedCount = 0;
+      
+      if (shiftType === 'weekend') {
+        validCellIds = [];
+        for (const cellId of cellIds) {
+          const [user_id, date] = cellId.split(':');
+          
+          // Quick check for weekends first
+          if (isDateWeekend(date)) {
+            validCellIds.push(cellId);
+          } else {
+            // More thorough check with holiday lookup
+            const member = teamSections.flatMap(s => s.members).find(m => m.user_id === user_id);
+            const validation = await validateWeekendShift(shiftType, date, member?.country_code);
+            if (validation.isValid) {
+              validCellIds.push(cellId);
+            } else {
+              skippedCount++;
+            }
+          }
+        }
+        
+        if (skippedCount > 0) {
+          toast({
+            title: "Some dates skipped",
+            description: `${skippedCount} weekday(s) were skipped - weekend shifts only allowed on weekends/holidays`,
+          });
+        }
+        
+        if (validCellIds.length === 0) {
+          toast({
+            title: "No valid dates",
+            description: "Weekend shifts can only be assigned on weekends or public holidays",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
       // Build entries with country-aware shift definitions
       const newEntries: (ScheduleEntry & { shift_time_definition_id?: string | null })[] = [];
       
-      for (const cellId of cellIds) {
+      for (const cellId of validCellIds) {
         const [user_id, date] = cellId.split(':');
         
         // Find which team this user belongs to and get member info
