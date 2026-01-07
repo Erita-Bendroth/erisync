@@ -802,6 +802,8 @@ export type Database = {
           shift_type: string
           start_date: string
           status: string
+          submitted_at: string | null
+          submitted_by: string | null
           updated_at: string
         }
         Insert: {
@@ -816,6 +818,8 @@ export type Database = {
           shift_type: string
           start_date: string
           status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
         }
         Update: {
@@ -830,6 +834,8 @@ export type Database = {
           shift_type?: string
           start_date?: string
           status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
         }
         Relationships: [

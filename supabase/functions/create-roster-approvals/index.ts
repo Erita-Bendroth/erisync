@@ -7,6 +7,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("create-roster-approvals: Function invoked");
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,6 +23,7 @@ serve(async (req) => {
     // Get the user from the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error("create-roster-approvals: No authorization header");
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -35,49 +38,60 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
-      console.error('User auth error:', userError);
+      console.error('create-roster-approvals: User auth error:', userError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { rosterId, teamIds } = await req.json();
+    const body = await req.json();
+    const { rosterId, teamIds } = body;
+    
+    console.log(`create-roster-approvals: Processing - rosterId: ${rosterId}, teamIds: ${JSON.stringify(teamIds)}, user: ${user.id}`);
     
     if (!rosterId || !teamIds || !Array.isArray(teamIds)) {
+      console.error("create-roster-approvals: Missing required fields");
       return new Response(JSON.stringify({ error: 'Missing rosterId or teamIds' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Creating approval records for roster ${rosterId}, teams: ${teamIds.join(', ')}`);
-    console.log(`Requesting user: ${user.id}`);
-
     // Verify user is a manager of one of the teams or is admin/planner
-    const { data: userRoles } = await supabaseAdmin
+    const { data: userRoles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
+    if (rolesError) {
+      console.error("create-roster-approvals: Error fetching roles:", rolesError);
+    }
+
     const isAdminOrPlanner = userRoles?.some(r => r.role === 'admin' || r.role === 'planner');
+    console.log(`create-roster-approvals: User isAdminOrPlanner: ${isAdminOrPlanner}`);
 
     if (!isAdminOrPlanner) {
       // Check if user is a manager of any of the teams
-      const { data: managedTeams } = await supabaseAdmin
+      const { data: managedTeams, error: managedError } = await supabaseAdmin
         .from('team_members')
         .select('team_id')
         .eq('user_id', user.id)
         .eq('is_manager', true)
         .in('team_id', teamIds);
 
+      if (managedError) {
+        console.error("create-roster-approvals: Error checking managed teams:", managedError);
+      }
+
       if (!managedTeams || managedTeams.length === 0) {
-        console.error('User is not authorized to create approval records');
+        console.error('create-roster-approvals: User not authorized - not a team manager');
         return new Response(JSON.stringify({ error: 'Not authorized - must be team manager, admin, or planner' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      console.log(`create-roster-approvals: User manages teams: ${managedTeams.map(t => t.team_id).join(', ')}`);
     }
 
     // Get managers for all teams
@@ -88,22 +102,22 @@ serve(async (req) => {
       .eq('is_manager', true);
 
     if (managersError) {
-      console.error('Error fetching team managers:', managersError);
-      return new Response(JSON.stringify({ error: 'Failed to fetch team managers' }), {
+      console.error('create-roster-approvals: Error fetching team managers:', managersError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch team managers', details: managersError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    console.log(`create-roster-approvals: Found ${teamManagers?.length || 0} managers for ${teamIds.length} teams`);
+
     if (!teamManagers || teamManagers.length === 0) {
-      console.error('No managers found for teams');
+      console.error('create-roster-approvals: No managers found for teams');
       return new Response(JSON.stringify({ error: 'No managers found for teams' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    console.log(`Found ${teamManagers.length} managers for ${teamIds.length} teams`);
 
     // Create approval records for each team-manager pair
     const approvalRecords = teamManagers.map(tm => ({
@@ -115,6 +129,9 @@ serve(async (req) => {
       comments: tm.user_id === user.id ? 'Auto-approved on submission' : null,
     }));
 
+    console.log(`create-roster-approvals: Creating ${approvalRecords.length} approval records`);
+    console.log(`create-roster-approvals: Records to insert:`, JSON.stringify(approvalRecords));
+
     // Use upsert to handle existing records
     const { data: insertedApprovals, error: insertError } = await supabaseAdmin
       .from('roster_manager_approvals')
@@ -125,24 +142,48 @@ serve(async (req) => {
       .select();
 
     if (insertError) {
-      console.error('Error creating approval records:', insertError);
+      console.error('create-roster-approvals: Error creating approval records:', insertError);
+      console.error('create-roster-approvals: Error details:', JSON.stringify(insertError));
       return new Response(JSON.stringify({ error: 'Failed to create approval records', details: insertError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Successfully created ${insertedApprovals?.length || 0} approval records`);
+    console.log(`create-roster-approvals: Successfully created ${insertedApprovals?.length || 0} approval records`);
 
-    // Update roster status to pending_approval
+    // Update roster status to pending_approval and track submitter
     const { error: rosterUpdateError } = await supabaseAdmin
       .from('partnership_rotation_rosters')
-      .update({ status: 'pending_approval', updated_at: new Date().toISOString() })
+      .update({ 
+        status: 'pending_approval', 
+        submitted_by: user.id,
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', rosterId);
 
     if (rosterUpdateError) {
-      console.error('Error updating roster status:', rosterUpdateError);
+      console.error('create-roster-approvals: Error updating roster status:', rosterUpdateError);
       // Don't fail the whole request, approvals were created
+    } else {
+      console.log('create-roster-approvals: Roster status updated to pending_approval');
+    }
+
+    // Log the submission activity
+    const { error: activityError } = await supabaseAdmin
+      .from('roster_activity_log')
+      .insert({
+        roster_id: rosterId,
+        user_id: user.id,
+        action: 'submitted',
+        details: { team_count: teamIds.length, approval_count: insertedApprovals?.length || 0 },
+      });
+
+    if (activityError) {
+      console.error('create-roster-approvals: Error logging activity:', activityError);
+    } else {
+      console.log('create-roster-approvals: Activity logged successfully');
     }
 
     return new Response(JSON.stringify({ 
@@ -154,7 +195,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('create-roster-approvals: Unexpected error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
