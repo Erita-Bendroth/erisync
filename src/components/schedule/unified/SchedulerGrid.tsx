@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 import { getApplicableShiftTimes } from '@/lib/shiftTimeUtils';
+import { validateWeekendShift } from '@/lib/shiftValidation';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -176,6 +177,24 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
     try {
       // Find member to get country code for country-aware shift selection
       const member = teamMembers.find(m => m.user_id === editingCellData.userId);
+      
+      // Validate weekend shift - can only be assigned on weekends or holidays
+      if (data.shift_type === 'weekend') {
+        const validation = await validateWeekendShift(
+          data.shift_type,
+          editingCellData.date,
+          member?.country_code
+        );
+        
+        if (!validation.isValid) {
+          toast({
+            title: "Invalid Shift Selection",
+            description: validation.errorMessage,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       
       // Get country-aware shift definition if shift type is set and available
       let shiftTimeDefinitionId: string | null = null;
