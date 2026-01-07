@@ -142,7 +142,7 @@ export function RosterWeekGrid({
     }
   }, [assignments, teamMembers, userTeamIds, onProgressChange]);
 
-  // Log activity helper
+  // Log activity helper with proper error handling
   const logActivity = useCallback(async (
     action: string,
     targetUserId: string | null,
@@ -155,9 +155,12 @@ export function RosterWeekGrid({
   ) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.warn("logActivity: No authenticated user, skipping activity log");
+        return;
+      }
 
-      await supabase.from("roster_activity_log").insert({
+      const { error } = await supabase.from("roster_activity_log").insert({
         roster_id: rosterId,
         user_id: user.id,
         action,
@@ -169,8 +172,13 @@ export function RosterWeekGrid({
         new_value: newValue,
         details,
       });
+
+      if (error) {
+        console.error("logActivity: Failed to insert activity log:", error.message, error.code);
+        // Don't show toast to user - this is a background operation
+      }
     } catch (error) {
-      console.error("Error logging activity:", error);
+      console.error("logActivity: Unexpected error:", error);
     }
   }, [rosterId]);
 

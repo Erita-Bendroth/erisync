@@ -32,6 +32,12 @@ interface MissingApproval {
   manager_email: string | null;
 }
 
+interface SubmissionInfo {
+  submittedBy: string | null;
+  submittedAt: string | null;
+  submitterName: string | null;
+}
+
 interface RosterApprovalPanelProps {
   rosterId: string;
   teams: Team[];
@@ -48,11 +54,46 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
   const [activating, setActivating] = useState(false);
   const [creatingMissing, setCreatingMissing] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [submissionInfo, setSubmissionInfo] = useState<SubmissionInfo>({ 
+    submittedBy: null, 
+    submittedAt: null, 
+    submitterName: null 
+  });
 
   useEffect(() => {
     fetchCurrentUser();
     fetchApprovals();
+    fetchSubmissionInfo();
   }, [rosterId]);
+
+  const fetchSubmissionInfo = async () => {
+    try {
+      const { data: roster, error } = await supabase
+        .from("partnership_rotation_rosters")
+        .select("submitted_by, submitted_at")
+        .eq("id", rosterId)
+        .single();
+
+      if (error || !roster) return;
+
+      if (roster.submitted_by) {
+        // Fetch submitter name
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("user_id", roster.submitted_by)
+          .single();
+
+        setSubmissionInfo({
+          submittedBy: roster.submitted_by,
+          submittedAt: roster.submitted_at,
+          submitterName: profile ? `${profile.first_name} ${profile.last_name}` : null,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching submission info:", error);
+    }
+  };
 
   const fetchCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -356,15 +397,33 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
   return (
     <div className="space-y-4">
       {/* Status Header */}
-      <div className="flex items-center gap-2 text-sm">
-        {hasMissingRecords || pendingCount > 0 ? (
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-        ) : (
-          <CheckCircle className="h-4 w-4 text-green-500" />
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-sm">
+          {hasMissingRecords || pendingCount > 0 ? (
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          ) : (
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          )}
+          <span className="font-medium">
+            Approval Status: {approvedCount} of {totalTeams} teams
+          </span>
+        </div>
+        
+        {/* Submission Info */}
+        {submissionInfo.submittedBy && (
+          <p className="text-sm text-muted-foreground">
+            Submitted by <span className="font-medium">{submissionInfo.submitterName || "Unknown"}</span>
+            {submissionInfo.submittedAt && (
+              <> on {new Date(submissionInfo.submittedAt).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</>
+            )}
+          </p>
         )}
-        <span className="font-medium">
-          Approval Status: {approvedCount} of {totalTeams} teams
-        </span>
       </div>
 
       {/* Missing Approval Records Warning */}
