@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay } from "date-fns";
-import { Phone, CheckCircle2, XCircle, Home } from "lucide-react";
+import { Phone, CheckCircle2, XCircle } from "lucide-react";
 import { formatUserName } from "@/lib/utils";
 
 interface TeamAvailabilityEntry {
@@ -312,23 +312,12 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                                   Hotline
                                 </Badge>
                               ) : isAvailable ? (
-                                <>
-                                  {entries.some(e => e.activity_type === 'working_from_home') ? (
-                                    <div className="flex items-center gap-1">
-                                      <Home className="h-4 w-4 text-blue-500" />
-                                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                    </div>
-                                  ) : (
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                  )}
-                                </>
+                                <CheckCircle2 className="h-5 w-5 text-green-500" />
                               ) : (
                                 <XCircle className="h-5 w-5 text-red-500" />
                               )}
                               <span className="text-xs text-muted-foreground">
-                                {entries.some(e => e.activity_type === 'working_from_home') 
-                                  ? "WFH" 
-                                  : isAvailable ? "Available" : "Unavailable"}
+                                {isAvailable ? "Available" : "Unavailable"}
                               </span>
                             </div>
                           ) : (
