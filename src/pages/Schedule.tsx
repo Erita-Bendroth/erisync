@@ -36,6 +36,8 @@ import { ShiftSwapRequestsList } from "@/components/schedule/swap/ShiftSwapReque
 import { ManagerSwapApprovals } from "@/components/schedule/swap/ManagerSwapApprovals";
 import { PersonalMonthlyCalendar } from "@/components/schedule/PersonalMonthlyCalendar";
 import { MyRequestsDialog } from "@/components/schedule/MyRequestsDialog";
+import { QuickSwapButton } from "@/components/schedule/swap/QuickSwapButton";
+import { SwapStatusCards } from "@/components/schedule/swap/SwapStatusCards";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -440,6 +442,12 @@ const Schedule = () => {
                     Add Entry
                   </Button>
                 </ScheduleEntryForm>
+                {user && teams.length > 0 && (
+                  <QuickSwapButton 
+                    currentUserId={user.id}
+                    teamIds={teams.map(t => t.id)}
+                  />
+                )}
                 {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && (
                   <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
                     Generate Bulk
