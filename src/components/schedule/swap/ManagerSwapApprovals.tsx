@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { validateSwapApproval } from '@/lib/swapValidation';
-import { ArrowLeftRight, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { ArrowLeftRight, CheckCircle, XCircle, Loader2, Clock, AlertTriangle, Filter } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
+import { CoverageImpactPreview } from './CoverageImpactPreview';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,8 @@ export function ManagerSwapApprovals() {
   const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
   const [bulkNotes, setBulkNotes] = useState('');
   const [directSwapDialogOpen, setDirectSwapDialogOpen] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'same-day' | 'cross-date' | 'cross-team'>('all');
+  const [sortBy, setSortBy] = useState<'created' | 'swap-date'>('swap-date');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -386,18 +390,53 @@ export function ManagerSwapApprovals() {
     );
   }
 
+  // Filter and sort logic
+  const filteredRequests = swapRequests.filter(request => {
+    if (filterType === 'all') return true;
+    const isCrossTeam = request.requesting_entry.team_id !== request.target_entry.team_id;
+    if (filterType === 'cross-team') return isCrossTeam;
+    // For same-day vs cross-date, we'd need requesting entry date which isn't in our current query
+    return true;
+  }).sort((a, b) => {
+    if (sortBy === 'swap-date') {
+      return new Date(a.swap_date).getTime() - new Date(b.swap_date).getTime();
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   return (
     <>
       <div className="space-y-4">
-        {/* Direct Swap Button */}
-        <div className="flex justify-end">
+        {/* Header with Direct Swap and Filters */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
+              <SelectTrigger className="w-[130px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Requests</SelectItem>
+                <SelectItem value="cross-team">Cross-team</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+              <SelectTrigger className="w-[140px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="swap-date">Soonest First</SelectItem>
+                <SelectItem value="created">Newest First</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button onClick={() => setDirectSwapDialogOpen(true)}>
             <ArrowLeftRight className="mr-2 h-4 w-4" />
-            Direct Swap (Manager)
+            Direct Swap
           </Button>
         </div>
 
-        {swapRequests.length === 0 ? (
+        {filteredRequests.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-8 text-center">
               <CheckCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -407,21 +446,23 @@ export function ManagerSwapApprovals() {
         ) : (
           <>
             {/* Select All Header */}
-            {swapRequests.length > 1 && (
+            {filteredRequests.length > 1 && (
               <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
                 <Checkbox
-                  checked={selectedSwapIds.size === swapRequests.length}
+                  checked={selectedSwapIds.size === filteredRequests.length}
                   onCheckedChange={toggleSelectAll}
                 />
                 <span className="text-sm font-medium">
-                  Select All ({selectedSwapIds.size}/{swapRequests.length})
+                  Select All ({selectedSwapIds.size}/{filteredRequests.length})
                 </span>
               </div>
             )}
 
-            {swapRequests.map(request => {
+            {filteredRequests.map(request => {
               const isCrossTeam = request.requesting_entry.team_id !== request.target_entry.team_id;
               const isSelected = selectedSwapIds.has(request.id);
+              const daysUntilSwap = differenceInDays(new Date(request.swap_date), new Date());
+              const isUrgent = daysUntilSwap <= 2 && daysUntilSwap >= 0;
               
               return (
               <Card key={request.id} className={isSelected ? 'border-primary' : ''}>
@@ -439,8 +480,14 @@ export function ManagerSwapApprovals() {
                         <span>{request.target_user.first_name} {request.target_user.last_name}</span>
                         <span className="text-xs text-muted-foreground">({request.target_entry.teams?.name})</span>
                         {isCrossTeam && (
-                          <Badge variant="outline" className="text-xs ml-2">
-                            Cross-team Partnership
+                          <Badge variant="outline" className="text-xs ml-2 bg-purple-500/10 text-purple-600 border-purple-200">
+                            Cross-team
+                          </Badge>
+                        )}
+                        {isUrgent && (
+                          <Badge variant="outline" className="text-xs ml-1 bg-orange-500/10 text-orange-600 border-orange-200">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {daysUntilSwap === 0 ? 'Today' : daysUntilSwap === 1 ? 'Tomorrow' : `${daysUntilSwap} days`}
                           </Badge>
                         )}
                       </CardTitle>
