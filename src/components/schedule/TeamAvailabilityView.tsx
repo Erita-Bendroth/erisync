@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay } from "date-fns";
-import { Phone, CheckCircle2, XCircle } from "lucide-react";
+import { Phone, CheckCircle2, XCircle, Home } from "lucide-react";
 import { formatUserName } from "@/lib/utils";
 
 interface TeamAvailabilityEntry {
@@ -73,21 +73,9 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
         .lte("date", endDate);
 
       if (scheduleError) throw scheduleError;
-
-      // Also fetch daily_time_entries that indicate availability (work, home_office, etc.)
-      const { data: timeEntriesData, error: timeEntriesError } = await supabase
-        .from("daily_time_entries")
-        .select("user_id, entry_date, entry_type, work_start_time, work_end_time")
-        .in("user_id", memberIds)
-        .in("entry_type", ['work', 'home_office', 'training', 'team_meeting'])
-        .gte("entry_date", startDate)
-        .lte("entry_date", endDate);
-
-      if (timeEntriesError) throw timeEntriesError;
       
-      console.log('TeamAvailabilityView - Data:', {
-        scheduleEntries: scheduleData?.length || 0,
-        timeEntries: timeEntriesData?.length || 0,
+      console.log('TeamAvailabilityView - Schedule entries:', {
+        total: scheduleData?.length || 0,
         dateRange: `${startDate} to ${endDate}`,
       });
 
@@ -100,44 +88,8 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
       // Store all team members (profiles)
       setAllTeamMembers(profiles || []);
 
-      // Create a map to merge schedule entries and time entries
-      // Key: "user_id:date"
-      const availabilityMap = new Map<string, any>();
-
-      // First add schedule entries
-      (scheduleData || []).forEach(entry => {
-        const key = `${entry.user_id}:${entry.date}`;
-        availabilityMap.set(key, entry);
-      });
-
-      // Then overlay time entries (these indicate user is available/working)
-      (timeEntriesData || []).forEach(te => {
-        const key = `${te.user_id}:${te.entry_date}`;
-        const existing = availabilityMap.get(key);
-        
-        // Time entry indicates availability - create or update entry
-        const timeNotes = te.work_start_time && te.work_end_time 
-          ? `${te.work_start_time.slice(0, 5)}-${te.work_end_time.slice(0, 5)}`
-          : null;
-        
-        // Map entry_type to activity_type
-        const activityType = te.entry_type === 'home_office' ? 'working_from_home' : 'work';
-        
-        if (!existing || existing.activity_type !== 'hotline_support') {
-          // Time entry takes priority unless there's a hotline assignment
-          availabilityMap.set(key, {
-            user_id: te.user_id,
-            date: te.entry_date,
-            availability_status: 'available',
-            activity_type: activityType,
-            notes: timeNotes,
-            shift_type: 'normal',
-          });
-        }
-      });
-
-      // Combine with profile info
-      const combined = Array.from(availabilityMap.values()).map(entry => {
+      // Combine schedule data with profile info
+      const combined = (scheduleData || []).map(entry => {
         const profile = profiles?.find(p => p.user_id === entry.user_id);
         return {
           ...entry,
@@ -360,12 +312,23 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                                   Hotline
                                 </Badge>
                               ) : isAvailable ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                <>
+                                  {entries.some(e => e.activity_type === 'working_from_home') ? (
+                                    <div className="flex items-center gap-1">
+                                      <Home className="h-4 w-4 text-blue-500" />
+                                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    </div>
+                                  ) : (
+                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  )}
+                                </>
                               ) : (
                                 <XCircle className="h-5 w-5 text-red-500" />
                               )}
                               <span className="text-xs text-muted-foreground">
-                                {isAvailable ? "Available" : "Unavailable"}
+                                {entries.some(e => e.activity_type === 'working_from_home') 
+                                  ? "WFH" 
+                                  : isAvailable ? "Available" : "Unavailable"}
                               </span>
                             </div>
                           ) : (
