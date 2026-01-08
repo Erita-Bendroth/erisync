@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addDays, startOfDay, isSameDay } from 'date-fns';
+import { format, addDays, addMonths, endOfYear, startOfDay, isSameDay } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,8 @@ const SHIFT_LABELS: Record<string, string> = {
   flex: 'Flex',
 };
 
+type DateRange = '7' | '14' | '30' | '90' | '180' | 'year';
+
 export function SwapTargetSelector({
   currentUserId,
   teamIds,
@@ -48,11 +50,24 @@ export function SwapTargetSelector({
   const [shifts, setShifts] = useState<TargetShift[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [shiftTypeFilter, setShiftTypeFilter] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<string>('14'); // days
+  const [dateRange, setDateRange] = useState<DateRange>('30');
 
   useEffect(() => {
     fetchAvailableShifts();
   }, [currentUserId, teamIds, dateRange]);
+
+  const getEndDate = () => {
+    const today = new Date();
+    switch (dateRange) {
+      case '7': return addDays(today, 7);
+      case '14': return addDays(today, 14);
+      case '30': return addDays(today, 30);
+      case '90': return addMonths(today, 3);
+      case '180': return addMonths(today, 6);
+      case 'year': return endOfYear(today);
+      default: return addDays(today, 30);
+    }
+  };
 
   const fetchAvailableShifts = async () => {
     if (!teamIds.length) {
@@ -64,7 +79,7 @@ export function SwapTargetSelector({
     setLoading(true);
     try {
       const today = startOfDay(new Date());
-      const endDate = addDays(today, parseInt(dateRange));
+      const endDate = getEndDate();
 
       // Get shifts from team members (excluding current user)
       const { data: entries, error } = await supabase
@@ -189,14 +204,17 @@ export function SwapTargetSelector({
           </SelectContent>
         </Select>
 
-        <Select value={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-[130px]">
+        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+          <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="7">Next 7 days</SelectItem>
             <SelectItem value="14">Next 14 days</SelectItem>
             <SelectItem value="30">Next 30 days</SelectItem>
+            <SelectItem value="90">Next 3 months</SelectItem>
+            <SelectItem value="180">Next 6 months</SelectItem>
+            <SelectItem value="year">Rest of year</SelectItem>
           </SelectContent>
         </Select>
       </div>

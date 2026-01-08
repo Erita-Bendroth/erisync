@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeftRight, ArrowRight, Check, ChevronLeft } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, ChevronLeft } from 'lucide-react';
+import { SwapModeSelector, SwapMode } from './SwapModeSelector';
+import { MyShiftSelector, MyShift } from './MyShiftSelector';
 import { SwapTargetSelector, TargetShift } from './SwapTargetSelector';
-import { SwapOfferSelector, OfferShift } from './SwapOfferSelector';
 import { SwapReviewStep } from './SwapReviewStep';
 
 interface ShiftSwapWizardProps {
@@ -14,12 +15,19 @@ interface ShiftSwapWizardProps {
   teamIds: string[];
 }
 
-export type WizardStep = 'select-target' | 'select-offer' | 'review';
+export type WizardStep = 'select-mode' | 'select-my-shift' | 'select-target' | 'review';
 
-const STEPS: { key: WizardStep; label: string }[] = [
-  { key: 'select-target', label: 'Select Shift to Request' },
-  { key: 'select-offer', label: 'Offer Your Shift (Optional)' },
-  { key: 'review', label: 'Review & Submit' },
+const DIRECT_STEPS: { key: WizardStep; label: string }[] = [
+  { key: 'select-mode', label: 'Choose Type' },
+  { key: 'select-my-shift', label: 'Your Shift' },
+  { key: 'select-target', label: 'Target Shift' },
+  { key: 'review', label: 'Review' },
+];
+
+const OPEN_OFFER_STEPS: { key: WizardStep; label: string }[] = [
+  { key: 'select-mode', label: 'Choose Type' },
+  { key: 'select-my-shift', label: 'Your Shift' },
+  { key: 'review', label: 'Review & Post' },
 ];
 
 export function ShiftSwapWizard({ 
@@ -28,38 +36,50 @@ export function ShiftSwapWizard({
   currentUserId,
   teamIds 
 }: ShiftSwapWizardProps) {
-  const [currentStep, setCurrentStep] = useState<WizardStep>('select-target');
+  const [currentStep, setCurrentStep] = useState<WizardStep>('select-mode');
+  const [swapMode, setSwapMode] = useState<SwapMode | null>(null);
+  const [selectedMyShift, setSelectedMyShift] = useState<MyShift | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<TargetShift | null>(null);
-  const [selectedOffer, setSelectedOffer] = useState<OfferShift | null>(null);
-  const [skipOffer, setSkipOffer] = useState(false);
 
-  const currentStepIndex = STEPS.findIndex(s => s.key === currentStep);
-  const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
+  const steps = swapMode === 'open-offer' ? OPEN_OFFER_STEPS : DIRECT_STEPS;
+  const currentStepIndex = steps.findIndex(s => s.key === currentStep);
+  const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
   const handleClose = () => {
     onOpenChange(false);
-    // Reset state after close animation
     setTimeout(() => {
-      setCurrentStep('select-target');
+      setCurrentStep('select-mode');
+      setSwapMode(null);
+      setSelectedMyShift(null);
       setSelectedTarget(null);
-      setSelectedOffer(null);
-      setSkipOffer(false);
     }, 200);
   };
 
   const handleNext = () => {
-    if (currentStep === 'select-target' && selectedTarget) {
-      setCurrentStep('select-offer');
-    } else if (currentStep === 'select-offer') {
+    if (currentStep === 'select-mode' && swapMode) {
+      setCurrentStep('select-my-shift');
+    } else if (currentStep === 'select-my-shift' && selectedMyShift) {
+      if (swapMode === 'open-offer') {
+        setCurrentStep('review');
+      } else {
+        setCurrentStep('select-target');
+      }
+    } else if (currentStep === 'select-target' && selectedTarget) {
       setCurrentStep('review');
     }
   };
 
   const handleBack = () => {
-    if (currentStep === 'select-offer') {
-      setCurrentStep('select-target');
+    if (currentStep === 'select-my-shift') {
+      setCurrentStep('select-mode');
+    } else if (currentStep === 'select-target') {
+      setCurrentStep('select-my-shift');
     } else if (currentStep === 'review') {
-      setCurrentStep('select-offer');
+      if (swapMode === 'open-offer') {
+        setCurrentStep('select-my-shift');
+      } else {
+        setCurrentStep('select-target');
+      }
     }
   };
 
@@ -68,8 +88,9 @@ export function ShiftSwapWizard({
   };
 
   const canProceed = () => {
+    if (currentStep === 'select-mode') return !!swapMode;
+    if (currentStep === 'select-my-shift') return !!selectedMyShift;
     if (currentStep === 'select-target') return !!selectedTarget;
-    if (currentStep === 'select-offer') return skipOffer || !!selectedOffer;
     return true;
   };
 
@@ -79,14 +100,14 @@ export function ShiftSwapWizard({
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <ArrowLeftRight className="h-5 w-5 text-primary" />
-            Request Shift Swap
+            {swapMode === 'open-offer' ? 'Post Open Shift Offer' : 'Request Shift Swap'}
           </DialogTitle>
           
           {/* Progress indicator */}
           <div className="mt-4 space-y-2">
             <Progress value={progress} className="h-2" />
             <div className="flex justify-between text-xs text-muted-foreground">
-              {STEPS.map((step, idx) => (
+              {steps.map((step, idx) => (
                 <span 
                   key={step.key}
                   className={idx <= currentStepIndex ? 'text-primary font-medium' : ''}
@@ -99,7 +120,23 @@ export function ShiftSwapWizard({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4 min-h-0">
-          {currentStep === 'select-target' && (
+          {currentStep === 'select-mode' && (
+            <SwapModeSelector
+              selectedMode={swapMode}
+              onSelectMode={setSwapMode}
+            />
+          )}
+
+          {currentStep === 'select-my-shift' && (
+            <MyShiftSelector
+              currentUserId={currentUserId}
+              teamIds={teamIds}
+              selectedShift={selectedMyShift}
+              onSelectShift={setSelectedMyShift}
+            />
+          )}
+
+          {currentStep === 'select-target' && selectedMyShift && (
             <SwapTargetSelector
               currentUserId={currentUserId}
               teamIds={teamIds}
@@ -108,23 +145,12 @@ export function ShiftSwapWizard({
             />
           )}
 
-          {currentStep === 'select-offer' && selectedTarget && (
-            <SwapOfferSelector
-              currentUserId={currentUserId}
-              teamIds={teamIds}
-              targetShift={selectedTarget}
-              selectedOffer={selectedOffer}
-              onSelectOffer={setSelectedOffer}
-              skipOffer={skipOffer}
-              onSkipOfferChange={setSkipOffer}
-            />
-          )}
-
-          {currentStep === 'review' && selectedTarget && (
+          {currentStep === 'review' && selectedMyShift && (
             <SwapReviewStep
               currentUserId={currentUserId}
-              targetShift={selectedTarget}
-              offerShift={skipOffer ? null : selectedOffer}
+              offerShift={selectedMyShift}
+              targetShift={swapMode === 'direct' ? selectedTarget : undefined}
+              isOpenOffer={swapMode === 'open-offer'}
               onSuccess={handleSuccess}
             />
           )}
@@ -133,9 +159,9 @@ export function ShiftSwapWizard({
         <div className="flex-shrink-0 flex justify-between pt-4 border-t">
           <Button
             variant="outline"
-            onClick={currentStep === 'select-target' ? handleClose : handleBack}
+            onClick={currentStep === 'select-mode' ? handleClose : handleBack}
           >
-            {currentStep === 'select-target' ? (
+            {currentStep === 'select-mode' ? (
               'Cancel'
             ) : (
               <>

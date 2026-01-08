@@ -1343,6 +1343,7 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          is_open_offer: boolean
           reason: string | null
           requesting_entry_id: string
           requesting_user_id: string
@@ -1351,8 +1352,8 @@ export type Database = {
           reviewed_by: string | null
           status: Database["public"]["Enums"]["shift_swap_status"]
           swap_date: string
-          target_entry_id: string
-          target_user_id: string
+          target_entry_id: string | null
+          target_user_id: string | null
           team_id: string
           updated_at: string
         }
@@ -1360,6 +1361,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          is_open_offer?: boolean
           reason?: string | null
           requesting_entry_id: string
           requesting_user_id: string
@@ -1368,8 +1370,8 @@ export type Database = {
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["shift_swap_status"]
           swap_date: string
-          target_entry_id: string
-          target_user_id: string
+          target_entry_id?: string | null
+          target_user_id?: string | null
           team_id: string
           updated_at?: string
         }
@@ -1377,6 +1379,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          is_open_offer?: boolean
           reason?: string | null
           requesting_entry_id?: string
           requesting_user_id?: string
@@ -1385,8 +1388,8 @@ export type Database = {
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["shift_swap_status"]
           swap_date?: string
-          target_entry_id?: string
-          target_user_id?: string
+          target_entry_id?: string | null
+          target_user_id?: string | null
           team_id?: string
           updated_at?: string
         }
