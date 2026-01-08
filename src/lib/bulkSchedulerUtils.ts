@@ -133,12 +133,18 @@ export const calculateBulkEntries = async (
       const userIndex = dayIndex % targetUsers.length;
       const rotationUserId = targetUsers[userIndex];
       
-      // Check if this user has a holiday
-      const userHolidayInfo = dateHolidayInfo?.get(rotationUserId);
-      if (config.skipUsersWithHolidays && userHolidayInfo?.userHasHoliday) {
-        console.log(`Skipping ${rotationUserId} on ${dateStr} - user has personal holiday`);
-        continue;
-      }
+      // Check if this user has a holiday (personal OR public)
+        const userHolidayInfo = dateHolidayInfo?.get(rotationUserId);
+        if (config.skipUsersWithHolidays) {
+          if (userHolidayInfo?.userHasHoliday) {
+            console.log(`⏭️ Skipping ${rotationUserId} on ${dateStr} - user has personal holiday`);
+            continue;
+          }
+          if (userHolidayInfo?.isPublicHoliday) {
+            console.log(`⏭️ Skipping ${rotationUserId} on ${dateStr} - public holiday: ${userHolidayInfo.holidayName}`);
+            continue;
+          }
+        }
       
       // Determine shift to use
       const shouldUseWeekendShift = 
@@ -206,11 +212,17 @@ export const calculateBulkEntries = async (
     } else {
       // Regular mode: assign to all selected users
       for (const targetUserId of targetUsers) {
-        // Check if this user has a holiday
+        // Check if this user has a holiday (personal OR public)
         const userHolidayInfo = dateHolidayInfo?.get(targetUserId);
-        if (config.skipUsersWithHolidays && userHolidayInfo?.userHasHoliday) {
-          console.log(`Skipping ${targetUserId} on ${dateStr} - user has personal holiday`);
-          continue;
+        if (config.skipUsersWithHolidays) {
+          if (userHolidayInfo?.userHasHoliday) {
+            console.log(`⏭️ Skipping ${targetUserId} on ${dateStr} - user has personal holiday`);
+            continue;
+          }
+          if (userHolidayInfo?.isPublicHoliday) {
+            console.log(`⏭️ Skipping ${targetUserId} on ${dateStr} - public holiday: ${userHolidayInfo.holidayName}`);
+            continue;
+          }
         }
         
         // Determine shift to use

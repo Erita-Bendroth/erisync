@@ -198,7 +198,27 @@ export function useTimeEntries(monthDate: Date) {
         .single();
 
       if (teamMembership?.team_id) {
-        if (isHomeOffice) {
+        const isWorkEntry = input.entry_type === 'work' && input.work_start_time && input.work_end_time;
+        const wasWorkEntry = existingEntry?.entry_type === 'work';
+        
+        if (isWorkEntry) {
+          // Sync regular work entries to schedule_entries for Team Availability visibility
+          const timeNote = `Work ${input.work_start_time?.slice(0,5)}-${input.work_end_time?.slice(0,5)}${input.comment ? ': ' + input.comment : ''}`;
+          await supabase
+            .from('schedule_entries')
+            .upsert({
+              user_id: user.id,
+              team_id: teamMembership.team_id,
+              date: input.entry_date,
+              activity_type: 'work',
+              shift_type: 'normal',
+              availability_status: 'available',
+              created_by: user.id,
+              notes: timeNote,
+            }, {
+              onConflict: 'user_id,date,team_id',
+            });
+        } else if (isHomeOffice) {
           // Sync home_office entries to schedule_entries for manager visibility
           await supabase
             .from('schedule_entries')
@@ -231,15 +251,15 @@ export function useTimeEntries(monthDate: Date) {
             }, {
               onConflict: 'user_id,date,team_id',
             });
-        } else if ((wasHomeOffice || wasUnavailableType) && !isHomeOffice && !isUnavailableType) {
-          // Entry type changed FROM home_office/unavailable to work type - remove schedule entry
+        } else if ((wasHomeOffice || wasUnavailableType || wasWorkEntry) && !isHomeOffice && !isUnavailableType && !isWorkEntry) {
+          // Entry type changed FROM synced type to non-synced type - remove schedule entry
           await supabase
             .from('schedule_entries')
             .delete()
             .eq('user_id', user.id)
             .eq('date', input.entry_date)
             .eq('team_id', teamMembership.team_id)
-            .in('activity_type', ['working_from_home', 'out_of_office']);
+            .in('activity_type', ['working_from_home', 'out_of_office', 'work']);
         }
       }
 
@@ -286,7 +306,7 @@ export function useTimeEntries(monthDate: Date) {
       if (error) throw error;
 
       // Entry types that sync to schedule_entries
-      const syncedTypes: EntryType[] = ['home_office', 'public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+      const syncedTypes: EntryType[] = ['work', 'home_office', 'public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
       
       // If entry was a synced type, remove the schedule_entry
       if (existingEntry && syncedTypes.includes(existingEntry.entry_type as EntryType)) {
@@ -305,7 +325,7 @@ export function useTimeEntries(monthDate: Date) {
             .eq('user_id', user.id)
             .eq('date', entryDate)
             .eq('team_id', teamMembership.team_id)
-            .in('activity_type', ['working_from_home', 'out_of_office']);
+            .in('activity_type', ['working_from_home', 'out_of_office', 'work']);
         }
       }
 
