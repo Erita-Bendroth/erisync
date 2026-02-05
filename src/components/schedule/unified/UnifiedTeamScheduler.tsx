@@ -230,6 +230,33 @@ export const UnifiedTeamScheduler: React.FC = () => {
 
   const { shiftTypes } = useShiftTypes(teamIds);
   const { templates } = useRotationTemplates(teamIds);
+
+  // Helper to get teamId from cellId
+  const getTeamIdFromCellId = (cellId: string): string | null => {
+    const [userId] = cellId.split(':');
+    const section = teamSections.find(s => s.members.some(m => m.user_id === userId));
+    return section?.teamId || null;
+  };
+
+  // Filter cells to only editable teams
+  const filterEditableCells = (cellIds: string[]): string[] => {
+    return cellIds.filter(cellId => {
+      const teamId = getTeamIdFromCellId(cellId);
+      return teamId ? accessControl.canEditTeam(teamId) : false;
+    });
+  };
+
+  // Wrapped double-click handler that checks edit permissions
+  const handleCellDoubleClick = (cellId: string, teamId: string) => {
+    if (!accessControl.canEditTeam(teamId)) {
+      toast({
+        title: "View Only",
+        description: "You can only view this team's schedule. Contact a planner for changes.",
+      });
+      return;
+    }
+    setEditingCell(cellId);
+  };
   
   const endDate = useMemo(() => {
     const end = new Date(dateStart);
@@ -584,8 +611,13 @@ export const UnifiedTeamScheduler: React.FC = () => {
       toast({ title: "No destination", description: "Please select target cells" });
       return;
     }
-    pastePattern(state.clipboardPattern, Array.from(state.selectedCells));
-    toast({ title: "Pasted", description: "Schedule pattern applied" });
+    const editableCells = filterEditableCells(Array.from(state.selectedCells));
+    if (editableCells.length === 0) {
+      toast({ title: "No edit access", description: "You don't have edit access to any selected cells", variant: "destructive" });
+      return;
+    }
+    pastePattern(state.clipboardPattern, editableCells);
+    toast({ title: "Pasted", description: `Schedule pattern applied to ${editableCells.length} cells` });
   };
 
   const handleQuickAssign = (shiftType: string) => {
@@ -593,8 +625,13 @@ export const UnifiedTeamScheduler: React.FC = () => {
       toast({ title: "No cells selected", description: "Please select cells to assign" });
       return;
     }
-    bulkAssignShift(Array.from(state.selectedCells), shiftType as any);
-    toast({ title: "Assigned", description: `${shiftType} shift assigned` });
+    const editableCells = filterEditableCells(Array.from(state.selectedCells));
+    if (editableCells.length === 0) {
+      toast({ title: "No edit access", description: "You don't have edit access to any selected cells", variant: "destructive" });
+      return;
+    }
+    bulkAssignShift(editableCells, shiftType as any);
+    toast({ title: "Assigned", description: `${shiftType} shift assigned to ${editableCells.length} cells` });
   };
 
   const handleClear = () => {
@@ -602,8 +639,13 @@ export const UnifiedTeamScheduler: React.FC = () => {
       toast({ title: "No cells selected", description: "Please select cells to clear" });
       return;
     }
-    clearCells(Array.from(state.selectedCells));
-    toast({ title: "Cleared", description: "Selected cells cleared" });
+    const editableCells = filterEditableCells(Array.from(state.selectedCells));
+    if (editableCells.length === 0) {
+      toast({ title: "No edit access", description: "You don't have edit access to any selected cells", variant: "destructive" });
+      return;
+    }
+    clearCells(editableCells);
+    toast({ title: "Cleared", description: `${editableCells.length} cells cleared` });
   };
 
   const handleSelectAll = () => {
@@ -1135,7 +1177,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                       cellsBeingEdited={cellsBeingEdited}
                       onUserToggle={toggleUserSelection}
                       onCellClick={toggleCellSelection}
-                      onCellDoubleClick={setEditingCell}
+                      onCellDoubleClick={(cellId) => handleCellDoubleClick(cellId, section.teamId)}
                       onCellHover={setHoveredCell}
                       onCellDragStart={startDrag}
                       onCellDragEnd={endDrag}
@@ -1143,6 +1185,7 @@ export const UnifiedTeamScheduler: React.FC = () => {
                       showHolidays={showHolidays}
                       isPartnershipView={selectionMode === 'partnership'}
                       canViewActivityDetails={accessControl.isAdmin || accessControl.isPlanner}
+                      canEdit={accessControl.canEditTeam(section.teamId)}
                     />
                   ))}
                   </div>

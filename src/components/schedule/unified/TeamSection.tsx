@@ -39,6 +39,7 @@ interface TeamSectionProps {
   showHolidays?: boolean;
   isPartnershipView?: boolean;
   canViewActivityDetails?: boolean;
+  canEdit?: boolean;
 }
 
 export const TeamSection: React.FC<TeamSectionProps> = ({
@@ -64,6 +65,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
   showHolidays = true,
   isPartnershipView = false,
   canViewActivityDetails = true,
+  canEdit = true,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
@@ -159,6 +161,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                       editingBy={cellsBeingEdited[cellId] || []}
                       isPartnershipView={isPartnershipView}
                       canViewActivityDetails={canViewActivityDetails}
+                      canEdit={canEdit}
                       hotlineAssignment={hotlineAssignment}
                     />
                   );
