@@ -1,78 +1,112 @@
 
 
-## Fix Frontend Edit Permission Checks in UnifiedTeamScheduler
+## Enable Hierarchical Team Management for Managers
 
 ### Problem
-VYMUT is a manager of "Plant Operations Central" and the database correctly grants edit access to this team plus its 3 child teams. However, the **UnifiedTeamScheduler frontend component is not using the `canEditTeam` function** from `useScheduleAccessControl` to gate the editing UI.
 
-The database functions work correctly:
-- `get_manager_editable_teams('VYMUT')` returns 4 teams
-- `has_manager_edit_access()` returns `true` for all 4 teams
+VYMUT is a manager of "Plant Operations Central" and should be able to:
+1. Add members to their team and child teams
+2. Edit users in their team and child teams  
+3. Remove members from their team and child teams
 
-The issue is on the frontend:
-- Cells are clickable regardless of permissions
-- The edit dialog opens without checking `canEditTeam`
-- No visual indication of read-only cells
-- RLS blocks the save attempt, but users see this as "no editing rights"
+Currently:
+- The "Add Member" button only shows for admin/planner (line 910: `canEditTeams()`)
+- The member actions dropdown (Edit, Remove, Password) shows for everyone but fails at RLS level
+- RLS uses `is_manager_of_team()` which does NOT cascade to child teams
 
----
+The database function `get_manager_editable_teams()` correctly returns 4 teams for VYMUT:
+- Plant Operations Central (direct)
+- Plant Support Central - North (child)
+- Plant Support Central - South (child)
+- Plant Troubleshooting Central (child)
 
-### What Needs to Change
-
-| Component | Current Behavior | Fixed Behavior |
-|-----------|------------------|----------------|
-| `UnifiedTeamScheduler` | Passes `setEditingCell` directly | Wrap handler to check `canEditTeam(teamId)` first |
-| `TeamSection` | No `canEdit` prop | Accept and use `canEdit` prop to disable interactions |
-| `SchedulerCell` | Always shows pointer cursor | Show `not-allowed` cursor for read-only cells |
-| Bulk operations | No permission check | Filter selected cells to only include editable teams |
+But the `team_members` RLS policy uses `is_manager_of_team()` which only checks direct assignment.
 
 ---
 
-### Technical Implementation
+### What Changes
 
-**File: `src/components/schedule/unified/UnifiedTeamScheduler.tsx`**
+| Component | Current | Fixed |
+|-----------|---------|-------|
+| RLS on `team_members` | Uses `is_manager_of_team()` (no hierarchy) | Use `has_manager_edit_access()` (includes hierarchy) |
+| "Add Member" button | Shows only for admin/planner | Also shows for managers of displayed teams |
+| Member actions dropdown | Shows for everyone, fails silently at RLS | Check `canManageTeamMembers(teamId)` before showing |
+| Frontend permission logic | Uses `canEditTeams()` (admin/planner only) | Add `canManageTeamMembers(teamId)` that checks hierarchy |
 
-1. Create a wrapped double-click handler that checks permissions:
+---
+
+### Database Change
+
+Update the RLS policy on `team_members` to use hierarchical access:
+
+```sql
+-- Drop and recreate the manager policy for team_members
+DROP POLICY IF EXISTS "managers_manage_own_team_members" ON public.team_members;
+
+CREATE POLICY "managers_manage_own_team_members" ON public.team_members
+FOR ALL
+TO authenticated
+USING (
+  public.has_manager_edit_access(auth.uid(), team_id)
+)
+WITH CHECK (
+  public.has_manager_edit_access(auth.uid(), team_id)
+);
+```
+
+This uses `has_manager_edit_access()` which already checks `get_manager_editable_teams()` with hierarchy support.
+
+---
+
+### Frontend Changes
+
+**File: `src/components/schedule/EnhancedTeamManagement.tsx`**
+
+1. Add state for editable teams and fetch them on mount:
 ```typescript
-const handleCellDoubleClick = (cellId: string, teamId: string) => {
-  if (!accessControl.canEditTeam(teamId)) {
-    toast({
-      title: "View Only",
-      description: "You can only view this team's schedule. Contact a planner for changes.",
-      variant: "default",
-    });
-    return;
-  }
-  setEditingCell(cellId);
+const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
+
+// In useEffect, fetch editable teams for managers
+if (isManager() && user) {
+  const { data } = await supabase.rpc('get_manager_editable_teams', { 
+    _manager_id: user.id 
+  });
+  if (data) setEditableTeams(new Set(data));
+}
+```
+
+2. Add helper function:
+```typescript
+const canManageTeamMembers = (teamId: string) => {
+  if (isAdmin() || isPlanner()) return true;
+  return editableTeams.has(teamId);
 };
 ```
 
-2. Pass `canEdit` prop to `TeamSection`:
+3. Update "Add Member" button visibility (around line 910):
 ```typescript
-<TeamSection
-  ...
-  canEdit={accessControl.canEditTeam(section.teamId)}
-  onCellDoubleClick={(cellId) => handleCellDoubleClick(cellId, section.teamId)}
-/>
+// Show for admin/planner OR if manager has editable teams
+{(canEditTeams() || editableTeams.size > 0) && (
+  <Dialog open={addMemberOpen} ...>
 ```
 
-3. Add permission checks to bulk operations (`handlePaste`, `handleQuickAssign`, `handleClear`).
+4. In the Add Member dialog, filter team dropdown to only show editable teams:
+```typescript
+{teams.filter(t => canManageTeamMembers(t.id)).map((team) => (
+  <SelectItem key={team.id} value={team.id}>
+    {team.name}
+  </SelectItem>
+))}
+```
 
----
-
-**File: `src/components/schedule/unified/TeamSection.tsx`**
-
-1. Add `canEdit?: boolean` prop
-2. Pass `canEdit` to `SchedulerCellWithTooltip`
-3. Conditionally disable event handlers when `canEdit = false`
-
----
-
-**File: `src/components/schedule/unified/SchedulerCell.tsx`**
-
-1. Add `canEdit?: boolean` prop
-2. Change cursor: `canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'`
-3. Prevent click/double-click when `canEdit = false`
+5. Gate member actions dropdown (around line 1117):
+```typescript
+{member.user_id !== user?.id && canManageTeamMembers(team.id) && (
+  <DropdownMenu>
+    ...
+  </DropdownMenu>
+)}
+```
 
 ---
 
@@ -80,18 +114,17 @@ const handleCellDoubleClick = (cellId: string, teamId: string) => {
 
 | File | Changes |
 |------|---------|
-| `src/components/schedule/unified/UnifiedTeamScheduler.tsx` | Add permission check wrapper for cell actions, pass `canEdit` to TeamSection |
-| `src/components/schedule/unified/TeamSection.tsx` | Accept and pass `canEdit` prop |
-| `src/components/schedule/unified/SchedulerCell.tsx` | Visual indication for read-only cells |
-| `src/components/schedule/unified/SchedulerCellWithTooltip.tsx` | Pass through `canEdit` prop |
+| New SQL Migration | Update RLS policy on `team_members` to use hierarchical access |
+| `src/components/schedule/EnhancedTeamManagement.tsx` | Add editable teams state, helper function, and gate UI elements |
 
 ---
 
 ### Expected Result
 
 After this fix:
-- VYMUT will see their editable teams (Plant Operations Central + 3 children) as clickable
-- Teams they can only view will show as read-only with a visual indicator
-- Double-clicking a read-only cell shows a toast explaining the limitation
-- Bulk operations only apply to cells in editable teams
+- VYMUT can add members to Plant Operations Central and its 3 child teams
+- VYMUT can edit/remove members from those same 4 teams
+- VYMUT does NOT see actions for teams outside their hierarchy
+- The Add Member button appears for managers who have at least one editable team
+- Team dropdown in Add Member dialog only shows teams the manager can edit
 
