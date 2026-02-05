@@ -1,80 +1,97 @@
 
 
-## Restore Hierarchical Edit Permissions (Downward Cascade)
+## Fix Frontend Edit Permission Checks in UnifiedTeamScheduler
 
-### Overview
-Restore the recursive behavior for `get_manager_editable_teams()` so managers can edit:
-1. Teams where they are explicitly marked as `is_manager = true`
-2. All descendant teams below those teams
+### Problem
+VYMUT is a manager of "Plant Operations Central" and the database correctly grants edit access to this team plus its 3 child teams. However, the **UnifiedTeamScheduler frontend component is not using the `canEditTeam` function** from `useScheduleAccessControl` to gate the editing UI.
+
+The database functions work correctly:
+- `get_manager_editable_teams('VYMUT')` returns 4 teams
+- `has_manager_edit_access()` returns `true` for all 4 teams
+
+The issue is on the frontend:
+- Cells are clickable regardless of permissions
+- The edit dialog opens without checking `canEditTeam`
+- No visual indication of read-only cells
+- RLS blocks the save attempt, but users see this as "no editing rights"
 
 ---
 
-### What Changes
+### What Needs to Change
 
-| Function | Current Behavior | New Behavior |
-|----------|------------------|--------------|
-| `get_manager_editable_teams()` | Returns **only** teams where `is_manager = true` | Returns teams where `is_manager = true` **plus all descendant teams** |
-
----
-
-### Expected Results
-
-| Manager | Edit Access |
-|---------|-------------|
-| **GESCH** (top-level) | Can edit all ~20 teams in hierarchy below |
-| **BJPE** (mid-level) | Can edit their team + all sub-teams (~5 teams) |
-| **HADJO** (if assigned to leaf only) | Can edit only their specific team |
+| Component | Current Behavior | Fixed Behavior |
+|-----------|------------------|----------------|
+| `UnifiedTeamScheduler` | Passes `setEditingCell` directly | Wrap handler to check `canEditTeam(teamId)` first |
+| `TeamSection` | No `canEdit` prop | Accept and use `canEdit` prop to disable interactions |
+| `SchedulerCell` | Always shows pointer cursor | Show `not-allowed` cursor for read-only cells |
+| Bulk operations | No permission check | Filter selected cells to only include editable teams |
 
 ---
 
 ### Technical Implementation
 
-**File: New SQL Migration**
+**File: `src/components/schedule/unified/UnifiedTeamScheduler.tsx`**
 
-Restore the recursive CTE in `get_manager_editable_teams()`:
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_manager_editable_teams(_manager_id uuid)
-RETURNS SETOF uuid
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  WITH RECURSIVE manager_teams AS (
-    -- Base case: teams where user is explicitly marked as manager
-    SELECT tm.team_id
-    FROM public.team_members tm
-    WHERE tm.user_id = _manager_id
-      AND tm.is_manager = true
-    
-    UNION
-    
-    -- Recursive case: include all descendant teams
-    SELECT t.id
-    FROM public.teams t
-    INNER JOIN manager_teams mt ON t.parent_team_id = mt.team_id
-  )
-  SELECT team_id FROM manager_teams;
-$$;
+1. Create a wrapped double-click handler that checks permissions:
+```typescript
+const handleCellDoubleClick = (cellId: string, teamId: string) => {
+  if (!accessControl.canEditTeam(teamId)) {
+    toast({
+      title: "View Only",
+      description: "You can only view this team's schedule. Contact a planner for changes.",
+      variant: "default",
+    });
+    return;
+  }
+  setEditingCell(cellId);
+};
 ```
 
+2. Pass `canEdit` prop to `TeamSection`:
+```typescript
+<TeamSection
+  ...
+  canEdit={accessControl.canEditTeam(section.teamId)}
+  onCellDoubleClick={(cellId) => handleCellDoubleClick(cellId, section.teamId)}
+/>
+```
+
+3. Add permission checks to bulk operations (`handlePaste`, `handleQuickAssign`, `handleClear`).
+
 ---
 
-### Data Consideration
+**File: `src/components/schedule/unified/TeamSection.tsx`**
 
-If HADJO should only edit their leaf team:
-- Ensure HADJO is marked as `is_manager = true` **only** on their leaf team
-- Remove any `is_manager = true` flags from parent/mid-level teams they belong to
-
-The hierarchy will then correctly cascade downward from each explicit manager assignment.
+1. Add `canEdit?: boolean` prop
+2. Pass `canEdit` to `SchedulerCellWithTooltip`
+3. Conditionally disable event handlers when `canEdit = false`
 
 ---
 
-### Summary
+**File: `src/components/schedule/unified/SchedulerCell.tsx`**
 
-This single database function change restores downward-cascading edit permissions:
-- Managers edit their assigned teams + all teams below
-- Viewing logic remains unchanged
-- No frontend changes needed
+1. Add `canEdit?: boolean` prop
+2. Change cursor: `canEdit ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'`
+3. Prevent click/double-click when `canEdit = false`
+
+---
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/schedule/unified/UnifiedTeamScheduler.tsx` | Add permission check wrapper for cell actions, pass `canEdit` to TeamSection |
+| `src/components/schedule/unified/TeamSection.tsx` | Accept and pass `canEdit` prop |
+| `src/components/schedule/unified/SchedulerCell.tsx` | Visual indication for read-only cells |
+| `src/components/schedule/unified/SchedulerCellWithTooltip.tsx` | Pass through `canEdit` prop |
+
+---
+
+### Expected Result
+
+After this fix:
+- VYMUT will see their editable teams (Plant Operations Central + 3 children) as clickable
+- Teams they can only view will show as read-only with a visual indicator
+- Double-clicking a read-only cell shows a toast explaining the limitation
+- Bulk operations only apply to cells in editable teams
 
