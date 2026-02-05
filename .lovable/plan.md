@@ -1,111 +1,81 @@
 
+## Fix: Child Teams Missing in Add Member Dialog
 
-## Enable Hierarchical Team Management for Managers
+### Problem Identified
 
-### Problem
+VYMUT is manager of "Plant Operations Central" (parent team only). The database correctly returns 4 editable teams via `get_manager_editable_teams()`:
+1. Plant Operations Central (direct assignment)
+2. Plant Support Central - North (child)
+3. Plant Support Central - South (child)
+4. Plant Troubleshooting Central (child)
 
-VYMUT is a manager of "Plant Operations Central" and should be able to:
-1. Add members to their team and child teams
-2. Edit users in their team and child teams  
-3. Remove members from their team and child teams
+However, in Team Management:
+- The main team list (`teams` state) only shows "Plant Operations Central" - this is **intentional** to avoid cluttering the view
+- The "Add Member" dialog team dropdown filters from `teams` state, which only has the parent team
+- Child teams exist in `editableTeams` but are never shown in the dropdown
 
-Currently:
-- The "Add Member" button only shows for admin/planner (line 910: `canEditTeams()`)
-- The member actions dropdown (Edit, Remove, Password) shows for everyone but fails at RLS level
-- RLS uses `is_manager_of_team()` which does NOT cascade to child teams
-
-The database function `get_manager_editable_teams()` correctly returns 4 teams for VYMUT:
-- Plant Operations Central (direct)
-- Plant Support Central - North (child)
-- Plant Support Central - South (child)
-- Plant Troubleshooting Central (child)
-
-But the `team_members` RLS policy uses `is_manager_of_team()` which only checks direct assignment.
+**The bug**: The Add Member dialog filters `teams.filter(t => canManageTeamMembers(t.id))` but `teams` doesn't contain child teams for managers.
 
 ---
 
-### What Changes
+### Solution
 
-| Component | Current | Fixed |
-|-----------|---------|-------|
-| RLS on `team_members` | Uses `is_manager_of_team()` (no hierarchy) | Use `has_manager_edit_access()` (includes hierarchy) |
-| "Add Member" button | Shows only for admin/planner | Also shows for managers of displayed teams |
-| Member actions dropdown | Shows for everyone, fails silently at RLS | Check `canManageTeamMembers(teamId)` before showing |
-| Frontend permission logic | Uses `canEditTeams()` (admin/planner only) | Add `canManageTeamMembers(teamId)` that checks hierarchy |
+For the Add Member dialog, fetch full team details for all teams in `editableTeams` and use those in the dropdown instead of filtering the limited `teams` state.
 
 ---
 
-### Database Change
-
-Update the RLS policy on `team_members` to use hierarchical access:
-
-```sql
--- Drop and recreate the manager policy for team_members
-DROP POLICY IF EXISTS "managers_manage_own_team_members" ON public.team_members;
-
-CREATE POLICY "managers_manage_own_team_members" ON public.team_members
-FOR ALL
-TO authenticated
-USING (
-  public.has_manager_edit_access(auth.uid(), team_id)
-)
-WITH CHECK (
-  public.has_manager_edit_access(auth.uid(), team_id)
-);
-```
-
-This uses `has_manager_edit_access()` which already checks `get_manager_editable_teams()` with hierarchy support.
-
----
-
-### Frontend Changes
+### Technical Changes
 
 **File: `src/components/schedule/EnhancedTeamManagement.tsx`**
 
-1. Add state for editable teams and fetch them on mount:
+1. **Add state for editable team details**:
 ```typescript
-const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
-
-// In useEffect, fetch editable teams for managers
-if (isManager() && user) {
-  const { data } = await supabase.rpc('get_manager_editable_teams', { 
-    _manager_id: user.id 
-  });
-  if (data) setEditableTeams(new Set(data));
-}
+const [editableTeamDetails, setEditableTeamDetails] = useState<Team[]>([]);
 ```
 
-2. Add helper function:
+2. **Enhance `fetchEditableTeams` to also fetch team details**:
 ```typescript
-const canManageTeamMembers = (teamId: string) => {
-  if (isAdmin() || isPlanner()) return true;
-  return editableTeams.has(teamId);
+const fetchEditableTeams = async () => {
+  if (!user) return;
+  
+  try {
+    const { data: teamIds, error } = await supabase.rpc('get_manager_editable_teams', {
+      _manager_id: user.id
+    });
+    
+    if (error) throw error;
+    if (teamIds && teamIds.length > 0) {
+      setEditableTeams(new Set(teamIds));
+      
+      // Fetch full team details for these IDs
+      const { data: teamDetails } = await supabase
+        .from('teams')
+        .select('id, name, description, parent_team_id')
+        .in('id', teamIds)
+        .order('name');
+      
+      setEditableTeamDetails(teamDetails || []);
+    }
+  } catch (error) {
+    console.error('Error fetching editable teams:', error);
+  }
 };
 ```
 
-3. Update "Add Member" button visibility (around line 910):
+3. **Update Add Member dialog team dropdown** (around line 982):
 ```typescript
-// Show for admin/planner OR if manager has editable teams
-{(canEditTeams() || editableTeams.size > 0) && (
-  <Dialog open={addMemberOpen} ...>
-```
+// Replace:
+{teams.filter(t => canManageTeamMembers(t.id)).map((team) => ...
 
-4. In the Add Member dialog, filter team dropdown to only show editable teams:
-```typescript
-{teams.filter(t => canManageTeamMembers(t.id)).map((team) => (
+// With:
+{(canEditTeams() 
+  ? teams  // Admins/planners see all teams
+  : editableTeamDetails  // Managers see their hierarchical editable teams
+).map((team) => (
   <SelectItem key={team.id} value={team.id}>
     {team.name}
   </SelectItem>
 ))}
-```
-
-5. Gate member actions dropdown (around line 1117):
-```typescript
-{member.user_id !== user?.id && canManageTeamMembers(team.id) && (
-  <DropdownMenu>
-    ...
-  </DropdownMenu>
-)}
 ```
 
 ---
@@ -114,17 +84,15 @@ const canManageTeamMembers = (teamId: string) => {
 
 | File | Changes |
 |------|---------|
-| New SQL Migration | Update RLS policy on `team_members` to use hierarchical access |
-| `src/components/schedule/EnhancedTeamManagement.tsx` | Add editable teams state, helper function, and gate UI elements |
+| `src/components/schedule/EnhancedTeamManagement.tsx` | Add `editableTeamDetails` state, enhance fetch function, update dropdown source |
 
 ---
 
 ### Expected Result
 
 After this fix:
-- VYMUT can add members to Plant Operations Central and its 3 child teams
-- VYMUT can edit/remove members from those same 4 teams
-- VYMUT does NOT see actions for teams outside their hierarchy
-- The Add Member button appears for managers who have at least one editable team
-- Team dropdown in Add Member dialog only shows teams the manager can edit
-
+- VYMUT opens "Add Member" dialog
+- Team dropdown shows all 4 teams: Plant Operations Central + 3 child teams
+- VYMUT can add members to any of these 4 teams
+- Admins/planners continue to see all teams as before
+- Main team list still shows only the parent team (no change to that behavior)
