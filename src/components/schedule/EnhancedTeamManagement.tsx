@@ -32,6 +32,7 @@ interface Team {
   id: string;
   name: string;
   description?: string;
+  parent_team_id?: string | null;
 }
 
 interface TeamMember {
@@ -98,6 +99,7 @@ const EnhancedTeamManagement = () => {
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [hotlineConfigOpen, setHotlineConfigOpen] = useState(false);
   const [hotlineConfigTeam, setHotlineConfigTeam] = useState<{ id: string; name: string } | null>(null);
+  const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
 
   // Get all user IDs from all teams for time stats
   const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
@@ -111,6 +113,7 @@ const EnhancedTeamManagement = () => {
 
   useEffect(() => {
     fetchUserRoles();
+    fetchEditableTeams();
   }, [user]);
 
   useEffect(() => {
@@ -143,6 +146,29 @@ const EnhancedTeamManagement = () => {
   const isTeamMember = () => userRoles.some(role => role.role === "teammember");
   const isAdmin = () => userRoles.some(role => role.role === "admin");
   const canEditTeams = () => isAdmin() || isPlanner();
+  
+  // Check if user can manage team members for a specific team (hierarchical)
+  const canManageTeamMembers = (teamId: string): boolean => {
+    if (isAdmin() || isPlanner()) return true;
+    return editableTeams.has(teamId);
+  };
+
+  const fetchEditableTeams = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('get_manager_editable_teams', {
+        _manager_id: user.id
+      });
+      
+      if (error) throw error;
+      if (data) {
+        setEditableTeams(new Set(data));
+      }
+    } catch (error) {
+      console.error('Error fetching editable teams:', error);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -907,7 +933,7 @@ const EnhancedTeamManagement = () => {
                   Delegate Access
                 </Button>
               )}
-              {canEditTeams() && (
+              {(canEditTeams() || editableTeams.size > 0) && (
                 <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -953,7 +979,7 @@ const EnhancedTeamManagement = () => {
                           <SelectValue placeholder="Select team" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teams.map((team) => (
+                          {teams.filter(t => canManageTeamMembers(t.id)).map((team) => (
                             <SelectItem key={team.id} value={team.id}>
                               {team.name}
                             </SelectItem>
@@ -1114,7 +1140,7 @@ const EnhancedTeamManagement = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  {member.user_id !== user?.id && (
+                                  {member.user_id !== user?.id && canManageTeamMembers(team.id) && (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="sm">
