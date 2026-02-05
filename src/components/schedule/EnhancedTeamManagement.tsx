@@ -292,54 +292,30 @@ const EnhancedTeamManagement = () => {
       let teamsData: Team[] = [];
       
       if (isManager() && !isPlanner() && !isAdmin()) {
-        // Managers only see their DIRECTLY managed teams (not parent teams)
-        const { data: managerTeams } = await supabase
-          .from('team_members')
-          .select('team_id, teams!inner(id, parent_team_id)')
-          .eq('user_id', user?.id)
-          .eq('is_manager', true);
+        // Managers see all teams they can manage (hierarchical - parent + children)
+        const { data: editableTeamIds, error: rpcError } = await supabase.rpc('get_manager_editable_teams', {
+          _manager_id: user.id
+        });
         
-        if (managerTeams && managerTeams.length > 0) {
-          const allManagerTeamIds = managerTeams.map((t: any) => t.team_id);
-          const directTeamIds: string[] = [];
+        if (rpcError) {
+          console.error('Error fetching editable teams via RPC:', rpcError);
+        }
+        
+        if (editableTeamIds && editableTeamIds.length > 0) {
+          // Update editable teams state for permission checks
+          setEditableTeams(new Set(editableTeamIds));
           
-          // Filter to only directly managed teams
-          for (const tm of managerTeams as any[]) {
-            const teamId = tm.team_id;
-            
-            // Check if this team has child teams
-            const { data: childTeams } = await supabase
-              .from('teams')
-              .select('id')
-              .eq('parent_team_id', teamId);
-            
-            if (childTeams && childTeams.length > 0) {
-              // This team has children - check if user manages any child
-              const childTeamIds = childTeams.map(c => c.id);
-              const managesChildTeam = allManagerTeamIds.some(id => 
-                childTeamIds.includes(id)
-              );
-              
-              // Only include parent team if user doesn't manage any child teams
-              if (!managesChildTeam) {
-                directTeamIds.push(teamId);
-              }
-            } else {
-              // No children, so this is a directly managed team
-              directTeamIds.push(teamId);
-            }
-          }
+          const { data, error } = await supabase
+            .from('teams')
+            .select('*')
+            .in('id', editableTeamIds)
+            .order('name');
           
-          if (directTeamIds.length > 0) {
-            const { data, error } = await supabase
-              .from('teams')
-              .select('*')
-              .in('id', directTeamIds)
-              .order('name');
-            
-            if (error) throw error;
-            teamsData = data || [];
-          }
+          if (error) throw error;
+          teamsData = data || [];
+          
+          // Also update editableTeamDetails for Add Member dropdown
+          setEditableTeamDetails(teamsData);
         }
       } else {
         const { data, error: teamsError } = await teamsQuery;
