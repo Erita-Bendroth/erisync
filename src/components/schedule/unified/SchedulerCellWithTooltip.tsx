@@ -32,6 +32,7 @@ interface SchedulerCellWithTooltipProps {
   enableQuickDialog?: boolean;
   canViewActivityDetails?: boolean;
   isPartnershipView?: boolean;
+  canEdit?: boolean;
   hotlineAssignment?: {
     id: string;
     notes: string | null;

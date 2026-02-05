@@ -27,6 +27,7 @@ interface SchedulerCellProps {
   enableQuickDialog?: boolean;
   canViewActivityDetails?: boolean;
   isPartnershipView?: boolean;
+  canEdit?: boolean;
   hotlineAssignment?: {
     id: string;
     notes: string | null;
@@ -67,6 +68,7 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   enableQuickDialog = false,
   canViewActivityDetails = true,
   isPartnershipView = false,
+  canEdit = true,
   hotlineAssignment,
 }) => {
   const cellId = `${userId}:${date}`;
@@ -74,13 +76,33 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
   
   // In partnership view for regular team members, hide activity details except shift type
   const shouldHideActivityDetails = isPartnershipView && !canViewActivityDetails && activityType !== 'work';
+
+  const handleClick = () => {
+    if (canEdit) {
+      onClick();
+    }
+  };
+
+  const handleDoubleClick = () => {
+    if (canEdit) {
+      onDoubleClick();
+    }
+  };
+
+  const handleMouseDown = () => {
+    if (canEdit) {
+      onMouseDown();
+    }
+  };
   
   return (
     <div
       className={cn(
         'relative h-12 border-r border-b border-border transition-colors',
         'flex items-center justify-center',
-        enableQuickDialog ? 'cursor-pointer hover:ring-2 hover:ring-primary/50' : 'cursor-pointer',
+        canEdit
+          ? (enableQuickDialog ? 'cursor-pointer hover:ring-2 hover:ring-primary/50' : 'cursor-pointer')
+          : 'cursor-not-allowed opacity-70',
         isSelected && 'bg-accent',
         isHovered && !isSelected && 'bg-muted',
         isEditing && 'ring-2 ring-ring',
@@ -95,14 +117,14 @@ export const SchedulerCell: React.FC<SchedulerCellProps> = ({
             }
           : undefined
       }
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onMouseDown={onMouseDown}
+      onMouseDown={handleMouseDown}
       onMouseUp={onMouseUp}
       data-cell-id={cellId}
-      title={enableQuickDialog ? 'Click to schedule' : undefined}
+      title={!canEdit ? 'View only - no edit access' : (enableQuickDialog ? 'Click to schedule' : undefined)}
     >
       {/* Dual block display when both shift and hotline exist */}
       {shiftType && availabilityStatus === 'available' && hotlineAssignment ? (
