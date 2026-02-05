@@ -100,6 +100,7 @@ const EnhancedTeamManagement = () => {
   const [hotlineConfigOpen, setHotlineConfigOpen] = useState(false);
   const [hotlineConfigTeam, setHotlineConfigTeam] = useState<{ id: string; name: string } | null>(null);
   const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
+  const [editableTeamDetails, setEditableTeamDetails] = useState<Team[]>([]);
 
   // Get all user IDs from all teams for time stats
   const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
@@ -157,13 +158,27 @@ const EnhancedTeamManagement = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase.rpc('get_manager_editable_teams', {
+      const { data: teamIds, error } = await supabase.rpc('get_manager_editable_teams', {
         _manager_id: user.id
       });
       
       if (error) throw error;
-      if (data) {
-        setEditableTeams(new Set(data));
+      if (teamIds && teamIds.length > 0) {
+        setEditableTeams(new Set(teamIds));
+        
+        // Fetch full team details for these IDs (for Add Member dropdown)
+        const { data: teamDetails, error: detailsError } = await supabase
+          .from('teams')
+          .select('id, name, description, parent_team_id')
+          .in('id', teamIds)
+          .order('name');
+        
+        if (!detailsError && teamDetails) {
+          setEditableTeamDetails(teamDetails);
+        }
+      } else {
+        setEditableTeams(new Set());
+        setEditableTeamDetails([]);
       }
     } catch (error) {
       console.error('Error fetching editable teams:', error);
@@ -979,7 +994,10 @@ const EnhancedTeamManagement = () => {
                           <SelectValue placeholder="Select team" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teams.filter(t => canManageTeamMembers(t.id)).map((team) => (
+                          {(canEditTeams() 
+                            ? teams  // Admins/planners see all teams
+                            : editableTeamDetails  // Managers see their hierarchical editable teams
+                          ).map((team) => (
                             <SelectItem key={team.id} value={team.id}>
                               {team.name}
                             </SelectItem>
