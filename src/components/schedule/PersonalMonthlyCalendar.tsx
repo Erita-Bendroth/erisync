@@ -150,7 +150,41 @@ export function PersonalMonthlyCalendar() {
         .order("date", { ascending: true });
 
       if (error) throw error;
-      setScheduleEntries(data || []);
+
+      // Fetch daily_time_entries for unavailable types to merge as overrides
+      const unavailableTypes = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+      const { data: unavailableTimeEntries } = await supabase
+        .from('daily_time_entries')
+        .select('id, entry_date, entry_type, comment')
+        .eq('user_id', user.id)
+        .in('entry_type', unavailableTypes)
+        .gte('entry_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('entry_date', format(endDate, 'yyyy-MM-dd'));
+
+      let mergedEntries: ScheduleEntry[] = data || [];
+      if (unavailableTimeEntries && unavailableTimeEntries.length > 0) {
+        const overrides = new Map<string, ScheduleEntry>();
+        for (const te of unavailableTimeEntries) {
+          let notes = '';
+          if (te.entry_type === 'public_holiday') notes = `Public Holiday: ${te.comment || 'Holiday'}`;
+          else if (te.entry_type === 'sick_leave') notes = `Sick Leave: ${te.comment || ''}`.trim();
+          else if (te.entry_type === 'vacation') notes = `Vacation: ${te.comment || ''}`.trim();
+          else if (te.entry_type === 'fza_withdrawal') notes = `FZA: ${te.comment || ''}`.trim();
+
+          overrides.set(te.entry_date, {
+            id: `time-entry-${te.id}`,
+            date: te.entry_date,
+            shift_type: null,
+            activity_type: 'out_of_office',
+            availability_status: 'unavailable',
+            notes,
+          });
+        }
+        mergedEntries = mergedEntries.filter(e => !overrides.has(e.date));
+        mergedEntries = [...mergedEntries, ...Array.from(overrides.values())];
+      }
+
+      setScheduleEntries(mergedEntries);
 
       // Fetch holidays for user's country
       if (profile?.country_code) {
