@@ -1,104 +1,90 @@
 
-### Goal
-Make **child teams visible and manageable** in the **Team Management** (Teams tab) UI for managers like VYMUT who are only assigned as manager on the **parent team** but have hierarchical edit access to **child teams**.
 
----
+## Fix: FZA Withdrawal Not Showing in Personal Calendar
 
-### What’s happening now (root cause)
-In `src/components/schedule/EnhancedTeamManagement.tsx`, the main “Team Management” list is intentionally restricted for managers:
+### Problem
 
-- `fetchTeamsAndMembers()` has a manager-only branch that fetches **only directly-managed teams** from `team_members` where `is_manager = true`.
-- Even though we now fetch `editableTeamDetails` (parent + children) in `fetchEditableTeams()`, that data is currently used only for the **Add Member** dialog dropdown.
-- Therefore, VYMUT sees only “Plant Operations Central” as a team card, and cannot view/edit members of the child teams because those teams are never rendered in the main list.
+User AMT recorded a FlexTime Withdrawal (FZA) of 6 hours on February 20, 2026. The time entry exists in `daily_time_entries`, but the Personal Monthly Calendar still shows "Normal shift 08:00-16:30".
 
-So the fix is: **for managers, the main `teams` list must come from the hierarchical editable teams list**, not the directly-managed list.
+**Root cause**: Two issues combine:
 
----
+1. **Database trigger cannot overwrite**: The `sync_time_entry_to_schedule` trigger tries to upsert into `schedule_entries`, but it has a safety guard: `WHERE schedule_entries.notes LIKE '%[auto-sync]%'`. Since Feb 20 already has a bulk-generated schedule entry (notes start with "Bulk generated"), the trigger's UPDATE does nothing.
 
-### Solution approach
-Update `EnhancedTeamManagement.tsx` so that:
+2. **PersonalMonthlyCalendar has no merge logic**: Unlike `ScheduleView` and `UnifiedTeamScheduler` (which both fetch `daily_time_entries` for unavailable types and merge them as overrides), the `PersonalMonthlyCalendar` component only queries `schedule_entries` directly. It never checks `daily_time_entries`, so even though the FZA entry exists, it is invisible in this view.
 
-1. **Managers see all teams they can manage members for** (the result of `get_manager_editable_teams()`), including child teams.
-2. The UI uses the **same source of truth** (editable team IDs) for:
-   - Which team cards are shown
-   - Which team members are loaded
-   - Which teams can be selected in “Add Member”
-3. Ensure loading order/race conditions are avoided by fetching editable team IDs within the same data-loading path as teams/members (not relying on a separate effect finishing “in time”).
+### Solution
 
----
+Add the same time-entry merge pattern to `PersonalMonthlyCalendar` that already exists in `ScheduleView` and `UnifiedTeamScheduler`.
 
-### Detailed implementation plan
+### What Changes
 
-#### 1) Refactor manager team fetching to use hierarchical editable teams
-**File:** `src/components/schedule/EnhancedTeamManagement.tsx`  
-**Function:** `fetchTeamsAndMembers`
+| Area | Current | Fixed |
+|------|---------|-------|
+| PersonalMonthlyCalendar data fetch | Only reads `schedule_entries` | Also reads `daily_time_entries` for unavailable types and merges them as overrides |
+| Feb 20 display for AMT | "Normal shift 08:00-16:30" | "FZA" / "Out of Office" (reflecting the withdrawal) |
 
-Replace the current manager-only logic (direct manager teams filtering) with:
+### Technical Details
 
-- Call `supabase.rpc('get_manager_editable_teams', { _manager_id: user.id })`
-- If it returns IDs, query `teams` with `.in('id', teamIds)` and set those as `teamsData`
-- Also set:
-  - `editableTeams` (Set of IDs) for permission gating
-  - `editableTeamDetails` (team rows) so the Add Member dropdown remains correct
+**File: `src/components/schedule/PersonalMonthlyCalendar.tsx`**
 
-This ensures the team cards displayed match what the manager can actually manage.
+In the `fetchScheduleData` function (around line 143), after fetching schedule entries:
 
-Notes:
-- Keep admin/planner behavior unchanged (they still see all teams).
-- Keep teammember behavior unchanged (if any logic exists later; currently managers/planners/admins use this component).
+1. Add a second query to fetch `daily_time_entries` for the same user and date range, filtered to unavailable types (`public_holiday`, `sick_leave`, `vacation`, `fza_withdrawal`).
 
-#### 2) Make data loading deterministic (avoid race between effects)
-Currently `fetchEditableTeams()` runs in one effect, and `fetchTeamsAndMembers()` runs in another effect after roles load. That can cause timing issues where `teams` is computed before editable teams are available.
+2. Build a time-entry overrides map (keyed by date), creating synthetic schedule entry objects with `activity_type: 'out_of_office'` and `availability_status: 'unavailable'`.
 
-To eliminate timing issues:
-- In the manager branch inside `fetchTeamsAndMembers()`, always fetch editable team IDs directly (as above).  
-- Keep `fetchEditableTeams()` if it’s still useful for immediate gating, but treat it as “nice to have”; the manager branch in `fetchTeamsAndMembers()` becomes authoritative.
+3. Merge: filter out any schedule entries that have a matching time entry override for the same date, then add the overrides.
 
-(Optionally, after this change, we can simplify by removing the separate `fetchEditableTeams()` call and just derive `editableTeams` from `fetchTeamsAndMembers()` for managers. But we’ll do this only if it doesn’t break other UI assumptions.)
+```
+// After fetching schedule_entries (line 152):
 
-#### 3) Ensure member loading covers child teams
-Because `fetchTeamsAndMembers()` loops `for (const team of teamsData)` to fetch `team_members` per team, once `teamsData` includes children, their member lists will load automatically.
+// Fetch daily_time_entries for unavailable types to merge
+const unavailableTypes = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
+const { data: timeEntries } = await supabase
+  .from('daily_time_entries')
+  .select('id, entry_date, entry_type, comment')
+  .eq('user_id', user.id)
+  .in('entry_type', unavailableTypes)
+  .gte('entry_date', format(startDate, 'yyyy-MM-dd'))
+  .lte('entry_date', format(endDate, 'yyyy-MM-dd'));
 
-No new queries required beyond the change in how `teamsData` is built.
+// Build overrides map
+let mergedEntries = data || [];
+if (timeEntries && timeEntries.length > 0) {
+  const overrides = new Map();
+  for (const te of timeEntries) {
+    let notes = '';
+    if (te.entry_type === 'public_holiday') notes = `Public Holiday: ${te.comment || 'Holiday'}`;
+    else if (te.entry_type === 'sick_leave') notes = `Sick Leave: ${te.comment || ''}`.trim();
+    else if (te.entry_type === 'vacation') notes = `Vacation: ${te.comment || ''}`.trim();
+    else if (te.entry_type === 'fza_withdrawal') notes = `FZA: ${te.comment || ''}`.trim();
 
-#### 4) Optional: improve hierarchy display (nice-to-have, not required for correctness)
-Once child teams appear, they may show as a flat list. If you want a clearer UX, we can:
-- Use `parent_team_id` to group teams and render parent/child indentation or nested cards.
-- There is already a helper file `src/lib/teamHierarchyUtils.ts` that can group teams by hierarchy.
+    overrides.set(te.entry_date, {
+      id: `time-entry-${te.id}`,
+      date: te.entry_date,
+      shift_type: null,
+      activity_type: 'out_of_office',
+      availability_status: 'unavailable',
+      notes,
+    });
+  }
 
-This is optional; the immediate fix is simply to show all editable teams.
+  // Remove schedule entries that have overrides, then add overrides
+  mergedEntries = mergedEntries.filter(e => !overrides.has(e.date));
+  mergedEntries = [...mergedEntries, ...Array.from(overrides.values())];
+}
 
----
+setScheduleEntries(mergedEntries);
+```
 
-### Acceptance criteria (how we’ll confirm it’s fixed)
-Using VYMUT (manager on parent only):
+### Files to Modify
 
-1. Navigate to **Schedule → Teams** (Team Management).
-2. The page shows **4 team cards/sections**:
-   - Plant Operations Central
-   - Plant Support Central - North
-   - Plant Support Central - South
-   - Plant Troubleshooting Central
-3. Expanding each team shows members; action menus (Edit/Remove/Password) appear where allowed.
-4. VYMUT can remove/add members in child teams without RLS errors.
-5. “Add Member” dialog Team dropdown still shows those 4 teams.
+| File | Change |
+|------|--------|
+| `src/components/schedule/PersonalMonthlyCalendar.tsx` | Add time entry fetch + merge logic in `fetchScheduleData` |
 
----
+### Expected Result
 
-### Files involved
-- `src/components/schedule/EnhancedTeamManagement.tsx` (primary and likely only file change)
-
----
-
-### Risks / edge cases
-- If `get_manager_editable_teams()` returns teams that the manager can edit but cannot *select* from `teams` due to RLS on `teams` table, the `.in('id', teamIds)` query could return fewer teams. If that happens, we’ll need to adjust `teams` table SELECT RLS to align with `get_manager_editable_teams()` visibility.
-- If the RPC returns IDs but the client query hits a row limit or policy issue, we’ll add logging/toasts to make failures visible.
-
----
-
-### Testing checklist
-- Log in as VYMUT.
-- Verify the Team Management screen shows child teams.
-- Expand each child team and confirm members load.
-- Try: Add member to each child team, remove member from each child team.
-- Confirm admin/planner still see the full list of teams unchanged.
+- AMT's Personal Monthly Calendar for Feb 20 shows "OOO" or "FZA" instead of "Normal shift 08:00-16:30"
+- All other unavailable types (sick leave, vacation, public holiday) also correctly override any pre-existing schedule entries
+- No changes to other views (ScheduleView and UnifiedTeamScheduler already handle this)
