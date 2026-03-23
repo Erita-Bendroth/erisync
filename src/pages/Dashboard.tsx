@@ -33,7 +33,28 @@ interface Profile {
   last_name: string;
   email: string;
   initials?: string;
+  country_code?: string | null;
 }
+
+const REQUEST_TIMEOUT_MS = 6000;
+
+const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${REQUEST_TIMEOUT_MS}ms`));
+    }, REQUEST_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
@@ -94,53 +115,84 @@ const Dashboard = () => {
   }, [user, profile, showScheduleChangeNotification]);
 
   const fetchUserData = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      // Fetch user profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, email, initials, country_code")
-        .eq("user_id", user!.id)
-        .maybeSingle();
+      const [profileResult, rolesResult, teamsResult] = await Promise.allSettled([
+        withTimeout(
+          supabase
+            .from("profiles")
+            .select("first_name, last_name, email, initials, country_code")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+          'Profile fetch'
+        ),
+        withTimeout(
+          supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id),
+          'Roles fetch'
+        ),
+        withTimeout(
+          supabase
+            .from("team_members")
+            .select(`
+              teams (
+                id,
+                name,
+                description
+              )
+            `)
+            .eq("user_id", user.id),
+          'Teams fetch'
+        ),
+      ]);
 
-      if (profileData) {
-        setProfile(profileData);
-        
-        // Check if user needs to set location (new users or default location)
-        if (!profileData.country_code || profileData.country_code === 'US') {
-          setShowLocationSetup(true);
+      if (profileResult.status === 'fulfilled') {
+        const { data: profileData, error } = profileResult.value;
+
+        if (error) {
+          console.error('Error fetching profile:', error);
+        } else if (profileData) {
+          setProfile(profileData);
+          setShowLocationSetup(!profileData.country_code || profileData.country_code === 'US');
         }
+      } else {
+        console.error('Profile fetch failed:', profileResult.reason);
       }
 
-      // Fetch user roles
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
+      if (rolesResult.status === 'fulfilled') {
+        const { data: rolesData, error } = rolesResult.value;
 
-      if (rolesData) {
-        setUserRoles(rolesData);
+        if (error) {
+          console.error('Error fetching user roles:', error);
+        } else {
+          setUserRoles(rolesData || []);
+        }
+      } else {
+        console.error('Roles fetch failed:', rolesResult.reason);
       }
 
-      // Fetch user teams
-      const { data: teamsData } = await supabase
-        .from("team_members")
-        .select(`
-          teams (
-            id,
-            name,
-            description
-          )
-        `)
-        .eq("user_id", user!.id);
+      if (teamsResult.status === 'fulfilled') {
+        const { data: teamsData, error } = teamsResult.value;
 
-      if (teamsData) {
-        const teams = teamsData.map((item: any) => item.teams).filter(Boolean);
-        setUserTeams(teams);
+        if (error) {
+          console.error('Error fetching user teams:', error);
+        } else {
+          const teams = (teamsData || []).map((item: any) => item.teams).filter(Boolean);
+          setUserTeams(teams);
+        }
+      } else {
+        console.error('Teams fetch failed:', teamsResult.reason);
       }
 
-      // Fetch today's schedule and weekly overview
-      await fetchTodaySchedule();
-      await fetchWeeklySchedule();
+      await Promise.allSettled([fetchTodaySchedule(), fetchWeeklySchedule()]);
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast({
@@ -158,21 +210,26 @@ const Dashboard = () => {
     
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { data: scheduleData, error } = await supabase
-        .from("schedule_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("date", today)
-        .order("created_at", { ascending: false });
+      const { data: scheduleData, error } = await withTimeout(
+        supabase
+          .from("schedule_entries")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("date", today)
+          .order("created_at", { ascending: false }),
+        "Today's schedule fetch"
+      );
 
       if (error) {
         console.error("Error fetching today's schedule:", error);
+        setTodaySchedule([]);
         return;
       }
 
       setTodaySchedule(scheduleData || []);
     } catch (error) {
       console.error("Error fetching today's schedule:", error);
+      setTodaySchedule([]);
     }
   };
 
@@ -181,44 +238,30 @@ const Dashboard = () => {
     
     try {
       const now = new Date();
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
       
-      console.log('Dashboard fetchWeeklySchedule:', {
-        userId: user.id,
-        weekStart: format(weekStart, 'yyyy-MM-dd'),
-        weekEnd: format(weekEnd, 'yyyy-MM-dd')
-      });
-      
-      // Dashboard should always show only the current user's own schedule
-      const { data: scheduleData, error } = await supabase
-        .from("schedule_entries")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("date", format(weekStart, 'yyyy-MM-dd'))
-        .lte("date", format(weekEnd, 'yyyy-MM-dd'))
-        .order("date", { ascending: true });
-
-      console.log('Dashboard schedule data:', {
-        totalEntries: scheduleData?.length || 0,
-        entries: scheduleData?.map(entry => ({
-          date: entry.date,
-          activity_type: entry.activity_type,
-          user_id: entry.user_id,
-          team_id: entry.team_id,
-          id: entry.id
-        })) || [],
-        fullEntries: scheduleData || []
-      });
+      const { data: scheduleData, error } = await withTimeout(
+        supabase
+          .from("schedule_entries")
+          .select("*")
+          .eq("user_id", user.id)
+          .gte("date", format(weekStart, 'yyyy-MM-dd'))
+          .lte("date", format(weekEnd, 'yyyy-MM-dd'))
+          .order("date", { ascending: true }),
+        'Weekly schedule fetch'
+      );
 
       if (error) {
         console.error("Error fetching weekly schedule:", error);
+        setWeeklySchedule([]);
         return;
       }
 
       setWeeklySchedule(scheduleData || []);
     } catch (error) {
       console.error("Error fetching weekly schedule:", error);
+      setWeeklySchedule([]);
     }
   };
 
@@ -258,7 +301,15 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) {
+  const showInitialLoading =
+    loading &&
+    !profile &&
+    userRoles.length === 0 &&
+    userTeams.length === 0 &&
+    todaySchedule.length === 0 &&
+    weeklySchedule.length === 0;
+
+  if (showInitialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -269,12 +320,15 @@ const Dashboard = () => {
     );
   }
 
+  const welcomeName =
+    profile ? formatUserName(profile.first_name, profile.last_name) : user?.email?.split('@')[0] || 'there';
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome back, {profile ? formatUserName(profile.first_name, profile.last_name) : 'Loading...'}
+          Welcome back, {welcomeName}
         </p>
       </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

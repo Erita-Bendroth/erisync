@@ -28,18 +28,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isInitialized, setIsInitialized] = useState(false);
   const initializedRef = useRef(false);
 
+  const getStoredSessionSnapshot = useCallback((): Session | null => {
+    try {
+      const authStorageKey = Object.keys(localStorage).find(
+        (key) => key.startsWith('sb-') && key.endsWith('-auth-token')
+      );
+
+      if (!authStorageKey) return null;
+
+      const rawSession = localStorage.getItem(authStorageKey);
+      if (!rawSession) return null;
+
+      const parsedSession = JSON.parse(rawSession);
+      const candidateSession =
+        parsedSession?.currentSession ?? parsedSession?.session ?? parsedSession;
+
+      if (
+        candidateSession &&
+        typeof candidateSession === 'object' &&
+        candidateSession.user &&
+        candidateSession.access_token &&
+        candidateSession.refresh_token
+      ) {
+        return candidateSession as Session;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error reading stored auth session:', error);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
-
-    // Safety timeout using ref to avoid stale closure
-    const timeout = setTimeout(() => {
-      if (mounted && !initializedRef.current) {
-        console.warn('Auth initialization timed out after 8s, proceeding');
-        setLoading(false);
-        setIsInitialized(true);
-        initializedRef.current = true;
-      }
-    }, 8000);
 
     const markInitialized = (s: Session | null) => {
       if (!mounted || initializedRef.current) return;
@@ -49,6 +71,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsInitialized(true);
       initializedRef.current = true;
     };
+
+    // Safety timeout using ref to avoid stale closure
+    const timeout = setTimeout(() => {
+      if (!mounted || initializedRef.current) return;
+
+      const storedSession = getStoredSessionSnapshot();
+      console.warn('Auth initialization timed out after 8s, proceeding', {
+        hasStoredSession: !!storedSession,
+      });
+
+      setSession(storedSession);
+      setUser(storedSession?.user ?? null);
+      setLoading(false);
+      setIsInitialized(true);
+      initializedRef.current = true;
+    }, 8000);
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -85,15 +123,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted) return;
       if (error) {
         console.error('Error getting session:', error);
-        clearAuthStorage();
-        markInitialized(null);
+        const storedSession = getStoredSessionSnapshot();
+        if (!storedSession) clearAuthStorage();
+        markInitialized(storedSession);
         return;
       }
       markInitialized(s);
     }).catch((error) => {
       console.error('Fatal error getting session:', error);
-      clearAuthStorage();
-      if (mounted) markInitialized(null);
+      const storedSession = getStoredSessionSnapshot();
+      if (!storedSession) clearAuthStorage();
+      if (mounted) markInitialized(storedSession);
     });
 
     return () => {
@@ -101,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [getStoredSessionSnapshot]);
 
   const clearAuthStorage = () => {
     Object.keys(localStorage).forEach((key) => {
