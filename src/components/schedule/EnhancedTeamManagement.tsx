@@ -1049,7 +1049,7 @@ const EnhancedTeamManagement = () => {
               const isExpanded = expandedTeams.has(team.id);
               
               // Check if current user is a manager of this specific team
-              const isCurrentUserManagerOfTeam = members.some(
+              const isCurrentUserManagerOfTeam = allMembers.some(
                 m => m.user_id === user?.id && m.is_manager
               );
               
