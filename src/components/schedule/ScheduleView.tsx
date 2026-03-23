@@ -521,7 +521,6 @@ const fetchPendingRequestsCount = async () => {
 // Fetch pending shift swap requests count for notification badge
 const fetchPendingSwapRequestsCount = async () => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     // For managers/planners, count all pending swap requests
