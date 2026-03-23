@@ -276,7 +276,7 @@ const EnhancedTeamManagement = () => {
   };
 
   const fetchTeamsAndMembers = async () => {
-    if (!user || userRoles.length === 0) {
+    if (!user) {
       setLoading(false);
       return;
     }
