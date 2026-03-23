@@ -83,16 +83,9 @@ const Schedule = () => {
 
   const fetchTeams = async () => {
     try {
-      // First check user roles
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      
-      const roles = rolesData?.map(r => r.role) || [];
-      const isAdminRole = roles.includes('admin');
-      const isPlannerRole = roles.includes('planner');
-      const isManagerRole = roles.includes('manager');
+      const isAdminRole = userRoles.includes('admin');
+      const isPlannerRole = userRoles.includes('planner');
+      const isManagerRole = userRoles.includes('manager');
       
       // Fetch all teams
       const { data: allTeams, error } = await supabase
