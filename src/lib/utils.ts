@@ -34,14 +34,16 @@ export function formatUserName(firstName: string, lastName?: string | null, init
 export function getDisplayInitials(
   firstName?: string | null,
   lastName?: string | null,
-  initials?: string | null
+  initials?: string | null,
+  email?: string | null
 ): string {
   if (initials && initials.trim() !== '') return initials.trim();
   if (firstName && firstName.trim() !== '' && lastName && lastName.trim() !== '') {
     return (firstName[0] + lastName[0]).toUpperCase();
   }
   if (firstName && firstName.trim() !== '') return firstName.trim();
-  return '??';
+  if (email && email.trim() !== '') return email[0].toUpperCase();
+  return '?';
 }
 
 /**

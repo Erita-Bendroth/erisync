@@ -42,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 8000);
 
     const markInitialized = (s: Session | null) => {
-      if (!mounted) return;
+      if (!mounted || initializedRef.current) return;
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
