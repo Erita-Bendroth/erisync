@@ -1,19 +1,13 @@
 import { useContext, useEffect } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { type ThemeProviderProps } from "next-themes/dist/types";
+import { AuthContext } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 
-// Import the context directly to avoid the throwing useAuth hook
-import { useAuth } from "@/components/auth/AuthProvider";
-
 function ThemeSync() {
-  let user = null;
-  try {
-    const authContext = useAuth();
-    user = authContext?.user;
-  } catch {
-    // AuthProvider not yet mounted, skip theme sync
-  }
+  // Use context directly to avoid the throwing useAuth hook
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user ?? null;
 
   useEffect(() => {
     const loadUserTheme = async () => {
