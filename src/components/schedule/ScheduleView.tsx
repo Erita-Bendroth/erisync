@@ -361,11 +361,20 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
   // Track if static data has been loaded
   const [staticDataLoaded, setStaticDataLoaded] = useState(false);
 
-  // PHASE 1: Initial load - fetch static data once (roles, teams, shifts)
+  // Sync roles from shared context into local UserRole[] format
   useEffect(() => {
-    if (!user) {
-      console.log('❌ No authenticated user');
-      setLoading(false);
+    if (!contextLoading) {
+      setUserRoles(contextRoles.map(r => ({ role: r })));
+    }
+  }, [contextRoles, contextLoading]);
+
+  // PHASE 1: Initial load - fetch static data once (teams, shifts — roles come from context)
+  useEffect(() => {
+    if (!user || contextLoading) {
+      if (!user) {
+        console.log('❌ No authenticated user');
+        setLoading(false);
+      }
       return;
     }
     
@@ -373,9 +382,8 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
       console.log('✅ User authenticated, loading static data...');
       setLoading(true);
       
-      // Parallel fetch of static data that doesn't change often
+      // Parallel fetch of static data (roles already provided by context)
       await Promise.all([
-        fetchUserRoles(),
         fetchUserTeams(),
         fetchTeams(),
         fetchShiftTimeDefinitions(),
@@ -385,7 +393,7 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     };
     
     loadStaticData();
-  }, [user]);
+  }, [user, contextLoading]);
 
   // PHASE 2: Once static data loaded, fetch dynamic data (don't hard-block on roles)
   useEffect(() => {
