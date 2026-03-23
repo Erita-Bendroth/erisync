@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SchedulerCellWithTooltip } from './SchedulerCellWithTooltip';
-import { cn } from '@/lib/utils';
+import { cn, getDisplayInitials } from '@/lib/utils';
 import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
 
