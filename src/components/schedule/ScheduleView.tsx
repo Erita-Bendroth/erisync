@@ -479,7 +479,6 @@ useEffect(() => {
 // Fetch pending vacation requests count for notification badge
 const fetchPendingRequestsCount = async () => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     let query = supabase
@@ -522,7 +521,6 @@ const fetchPendingRequestsCount = async () => {
 // Fetch pending shift swap requests count for notification badge
 const fetchPendingSwapRequestsCount = async () => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     // For managers/planners, count all pending swap requests
@@ -1598,10 +1596,10 @@ useEffect(() => {
             .map(id => ({
               id,
               user_id: id,
-              first_name: 'User',
+              first_name: id.substring(0, 6),
               last_name: '',
-              initials: 'U',
-              displayName: 'User'
+              initials: '??',
+              displayName: id.substring(0, 8)
             }));
 
           const allNewEmployees = [...fetchedEmployees, ...placeholderEmployees];
