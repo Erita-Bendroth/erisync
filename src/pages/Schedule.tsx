@@ -25,6 +25,7 @@ import OutlookIntegration from "@/components/integrations/OutlookIntegration";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { escapeHtml } from "@/lib/validation";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
@@ -42,11 +43,11 @@ import { SwapStatusCards } from "@/components/schedule/swap/SwapStatusCards";
 const Schedule = () => {
   const { signOut, user } = useAuth();
   const { toast } = useToast();
+  const { roles: userRoles, loading: contextLoading } = useCurrentUserContext();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'schedule';
   const teamFromUrl = searchParams.get('team') || '';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
-  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [managerCoverageWeek, setManagerCoverageWeek] = useState<Date>(new Date());
   const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
@@ -75,37 +76,16 @@ const Schedule = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    if (user) {
-      fetchUserRoles();
+    if (user && !contextLoading) {
       fetchTeams();
     }
-  }, [user]);
-
-  const fetchUserRoles = async () => {
-    try {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      
-      setUserRoles(data?.map(r => r.role) || []);
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-    }
-  };
+  }, [user, contextLoading]);
 
   const fetchTeams = async () => {
     try {
-      // First check user roles
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      
-      const roles = rolesData?.map(r => r.role) || [];
-      const isAdminRole = roles.includes('admin');
-      const isPlannerRole = roles.includes('planner');
-      const isManagerRole = roles.includes('manager');
+      const isAdminRole = userRoles.includes('admin');
+      const isPlannerRole = userRoles.includes('planner');
+      const isManagerRole = userRoles.includes('manager');
       
       // Fetch all teams
       const { data: allTeams, error } = await supabase

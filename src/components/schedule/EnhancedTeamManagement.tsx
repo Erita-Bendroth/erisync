@@ -15,6 +15,7 @@ import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shi
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { formatUserName } from "@/lib/utils";
 import { TeamCapacityConfig } from '@/components/admin/TeamCapacityConfig';
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
@@ -68,6 +69,7 @@ interface Profile {
 const EnhancedTeamManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { roles: contextRoles, loading: contextLoading } = useCurrentUserContext();
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamMembers, setTeamMembers] = useState<{ [key: string]: TeamMember[] }>({});
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
@@ -113,35 +115,29 @@ const EnhancedTeamManagement = () => {
     enabled: allUserIds.length > 0,
   });
 
+  // Sync roles from shared context into local UserRole[] format
   useEffect(() => {
-    fetchUserRoles();
+    if (!contextLoading && contextRoles.length > 0) {
+      setUserRoles(contextRoles.map(r => ({ role: r })));
+    } else if (!contextLoading && contextRoles.length === 0) {
+      // Roles loaded but empty — still unblock the loading gate
+      setUserRoles([]);
+      setLoading(false);
+    }
+  }, [contextRoles, contextLoading]);
+
+  useEffect(() => {
     fetchEditableTeams();
   }, [user]);
 
   useEffect(() => {
-    // Only fetch teams after user roles have been loaded
-    if (userRoles.length > 0) {
+    // Fetch teams once roles are loaded (or confirmed empty)
+    if (!contextLoading) {
       fetchTeamsAndMembers();
       fetchProfiles();
       fetchAllTeams();
     }
-  }, [user, userRoles]);
-
-  const fetchUserRoles = async () => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
-      
-      if (error) throw error;
-      setUserRoles(data || []);
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-    }
-  };
+  }, [user, contextLoading, contextRoles]);
 
   const isManager = () => userRoles.some(role => role.role === "manager");
   const isPlanner = () => userRoles.some(role => role.role === "planner");
@@ -280,7 +276,7 @@ const EnhancedTeamManagement = () => {
   };
 
   const fetchTeamsAndMembers = async () => {
-    if (!user || userRoles.length === 0) {
+    if (!user) {
       setLoading(false);
       return;
     }
