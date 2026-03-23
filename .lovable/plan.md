@@ -1,30 +1,49 @@
 
 
-## Add Team Member Search to Teams Tab
+## Fix: Team Page Reloads and Collapses After Removing a Member
 
-### What
-Add a search input to the Team Management UI so users can filter team members by name, initials, or email across all teams.
+### Problem
 
-### Implementation
+When removing a team member, `removeTeamMember` calls `fetchTeamsAndMembers()`, which sets `setLoading(true)` at line 289. This causes the entire teams UI to re-render with a loading spinner, collapsing all expanded `Collapsible` components. The user loses their place.
+
+### Solution
+
+Update `removeTeamMember` to do a **lightweight refresh** that only updates the member list for the affected team, without triggering a full loading state.
+
+### What Changes
 
 **File: `src/components/schedule/EnhancedTeamManagement.tsx`**
 
-1. **Add state** (around line 103):
-   ```typescript
-   const [memberSearchQuery, setMemberSearchQuery] = useState("");
-   ```
+Replace the `fetchTeamsAndMembers()` call in `removeTeamMember` with an inline member-only refresh for the specific team:
 
-2. **Add search input** in the UI header area (around line 920, after the CardDescription):
-   - Add an `Input` with a search icon, placeholder "Search members...", bound to `memberSearchQuery`
-   - Place it in the header row alongside existing buttons
+```typescript
+const removeTeamMember = async (memberId: string, teamId: string) => {
+  try {
+    const { error } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('id', memberId);
 
-3. **Filter members per team** in the render loop where team cards are displayed:
-   - For each team, filter `teamMembers[team.id]` by checking if the search query matches `first_name`, `last_name`, `initials`, or `email` (case-insensitive)
-   - If a team has zero matching members and search is active, hide that team card entirely
-   - If search is empty, show all members as before
+    if (error) throw error;
 
-### Files
+    toast({ title: "Success", description: "Team member removed successfully" });
+
+    // Instead of full reload, just remove the member from local state
+    setTeamMembers(prev => ({
+      ...prev,
+      [teamId]: (prev[teamId] || []).filter(m => m.id !== memberId)
+    }));
+  } catch (error: any) {
+    // ... existing error handling
+  }
+};
+```
+
+This optimistically removes the member from the local `teamMembers` state for that specific team, avoiding any loading state or re-fetch. The expanded team stays open, and the user stays in context.
+
+### Files to Modify
+
 | File | Change |
 |------|--------|
-| `src/components/schedule/EnhancedTeamManagement.tsx` | Add search state, search input, and member filtering logic |
+| `src/components/schedule/EnhancedTeamManagement.tsx` | Replace `fetchTeamsAndMembers()` with optimistic local state update in `removeTeamMember` |
 
