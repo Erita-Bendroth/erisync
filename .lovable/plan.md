@@ -1,36 +1,39 @@
 
 
-## Fix: Infinite Loop in useHomeOfficeCompliance (Root Cause of Remove Failure)
+## Fix: Initials Not Saved When Creating New Users
 
 ### Problem
 
-The `referenceDate` dependency on line 155 uses the raw `Date` object. Since the default parameter `new Date()` on line 34 creates a new object every render, `useCallback` recreates `fetchCompliance` on every render, which triggers the `useEffect` on every render, causing an infinite loop of Supabase requests. This floods the browser's network stack, causing all other requests (including the team member delete) to fail with `TypeError: Failed to fetch`.
-
-**This fix was planned previously but never actually applied.**
+The `create-user` edge function (line 148-158) inserts the initials value into `first_name` but **never sets the `initials` column** in the profiles table. The schedule grid and team member views read from `profiles.initials`, so newly created users appear without initials.
 
 ### Solution
 
-Stabilize the `referenceDate` dependency by converting it to a string for the dependency array.
+Add `initials: initials` to the profile insert in the edge function.
 
 ### Changes
 
-**File: `src/hooks/useHomeOfficeCompliance.ts`**
+**File: `supabase/functions/create-user/index.ts`** (line ~151-158)
 
-1. Add a stable date string derived from `referenceDate`:
-   ```typescript
-   const referenceDateStr = format(referenceDate, 'yyyy-MM-dd');
-   ```
+Update the profile insert to include the `initials` field:
 
-2. Change the `useCallback` dependency from `referenceDate` to `referenceDateStr`:
-   ```typescript
-   }, [userId, providedCountryCode, referenceDateStr]);
-   ```
+```typescript
+const { error: profileError } = await supabaseAdmin
+  .from('profiles')
+  .insert({
+    user_id: newUserData.user!.id,
+    first_name: initials,
+    last_name: '',
+    initials: initials,  // <-- ADD THIS
+    email: email,
+    country_code: countryCode || 'US',
+    requires_password_change: true
+  });
+```
 
-This ensures `fetchCompliance` is only recreated when the actual date value changes, not on every render. The infinite loop stops, network requests normalize, and the remove team member action will work reliably.
+One line addition. This ensures the `initials` column is populated at user creation time, making initials visible immediately in the schedule and team views.
 
-### Files to Modify
-
+### Files
 | File | Change |
 |------|--------|
-| `src/hooks/useHomeOfficeCompliance.ts` | Replace `referenceDate` with `referenceDateStr` in useCallback deps |
+| `supabase/functions/create-user/index.ts` | Add `initials` field to profile insert |
 
