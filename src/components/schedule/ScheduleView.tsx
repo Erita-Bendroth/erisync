@@ -479,7 +479,6 @@ useEffect(() => {
 // Fetch pending vacation requests count for notification badge
 const fetchPendingRequestsCount = async () => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     let query = supabase
