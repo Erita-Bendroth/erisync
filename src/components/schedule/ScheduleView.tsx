@@ -1596,10 +1596,10 @@ useEffect(() => {
             .map(id => ({
               id,
               user_id: id,
-              first_name: 'User',
+              first_name: id.substring(0, 6),
               last_name: '',
-              initials: 'U',
-              displayName: 'User'
+              initials: '??',
+              displayName: id.substring(0, 8)
             }));
 
           const allNewEmployees = [...fetchedEmployees, ...placeholderEmployees];

@@ -9,18 +9,32 @@ import { ThemeToggle } from "./theme/ThemeToggle";
 import { useHolidaySync } from "@/hooks/useHolidaySync";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileNavigation } from "@/components/mobile/MobileNavigation";
+import { Navigate } from "react-router-dom";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const isMobile = useIsMobile();
   useHolidaySync();
 
+  // Show loading while auth is resolving
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
+          <p className="text-muted-foreground">Getting your workspace ready</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to auth if no user after loading completes
   if (!user) {
-    return null;
+    return <Navigate to="/auth" replace />;
   }
 
   return (
