@@ -151,10 +151,11 @@ serve(async (req) => {
       .insert({
         user_id: newUserData.user!.id,
         first_name: initials,
-        last_name: '', // Empty for initials-only users
+        last_name: '',
+        initials: initials,
         email: email,
         country_code: countryCode || 'US',
-        requires_password_change: true // Always require password change for new users
+        requires_password_change: true
       });
 
     if (profileError) {
