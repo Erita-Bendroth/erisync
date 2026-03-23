@@ -28,6 +28,23 @@ export function formatUserName(firstName: string, lastName?: string | null, init
 }
 
 /**
+ * Get display initials for a user, with consistent fallback logic.
+ * Priority: initials column → derived from first+last → first_name as-is → '??'
+ */
+export function getDisplayInitials(
+  firstName?: string | null,
+  lastName?: string | null,
+  initials?: string | null
+): string {
+  if (initials && initials.trim() !== '') return initials.trim();
+  if (firstName && firstName.trim() !== '' && lastName && lastName.trim() !== '') {
+    return (firstName[0] + lastName[0]).toUpperCase();
+  }
+  if (firstName && firstName.trim() !== '') return firstName.trim();
+  return '??';
+}
+
+/**
  * Extract time from notes or use default shift times
  */
 export function getShiftTimes(

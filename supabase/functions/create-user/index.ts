@@ -182,6 +182,13 @@ serve(async (req) => {
 
     if (roleAssignmentError) {
       console.error('Role assignment error:', roleAssignmentError);
+      return new Response(
+        JSON.stringify({ error: `User created but role assignment failed: ${roleAssignmentError.message}` }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Assign to team if teamId is provided and not "no-team"
