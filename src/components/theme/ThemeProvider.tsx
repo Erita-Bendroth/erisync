@@ -1,12 +1,13 @@
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { type ThemeProviderProps } from "next-themes/dist/types";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { AuthContext } from "@/components/auth/AuthProvider";
 import { supabase } from "@/integrations/supabase/client";
 
 function ThemeSync() {
-  const authContext = useAuth();
-  const user = authContext?.user;
+  // Use context directly to avoid the throwing useAuth hook
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user ?? null;
 
   useEffect(() => {
     const loadUserTheme = async () => {
@@ -17,12 +18,11 @@ function ThemeSync() {
           .from("profiles")
           .select("theme_preference")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
 
         if (data?.theme_preference) {
-          // Apply theme from database
           const root = window.document.documentElement;
           const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
           const themeToApply = data.theme_preference === "system" ? systemTheme : data.theme_preference;
