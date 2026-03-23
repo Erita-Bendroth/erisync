@@ -69,6 +69,7 @@ interface Profile {
 const EnhancedTeamManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { roles: contextRoles, loading: contextLoading } = useCurrentUserContext();
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamMembers, setTeamMembers] = useState<{ [key: string]: TeamMember[] }>({});
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
