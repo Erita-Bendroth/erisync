@@ -100,6 +100,7 @@ interface ScheduleViewProps {
 
 const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { user } = useAuth();
+  const { roles: contextRoles, loading: contextLoading } = useCurrentUserContext();
   const { toast } = useToast();
   const { favorites } = useTeamFavorites('schedule');
   const holidayRefetchTrigger = useHolidayRefetch();
