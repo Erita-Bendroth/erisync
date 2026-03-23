@@ -25,6 +25,7 @@ import OutlookIntegration from "@/components/integrations/OutlookIntegration";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { escapeHtml } from "@/lib/validation";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { WeeklyDutyCoverageManager } from "@/components/schedule/WeeklyDutyCoverageManager";
 import { MultiTeamScheduleView } from "@/components/schedule/MultiTeamScheduleView";
 import { ManagerCoverageView } from "@/components/schedule/ManagerCoverageView";
