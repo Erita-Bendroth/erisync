@@ -37,6 +37,8 @@ export function useHomeOfficeCompliance({
   const [loading, setLoading] = useState(true);
   const [limit, setLimit] = useState<HomeOfficeLimit | null>(null);
 
+  const referenceDateStr = format(referenceDate, 'yyyy-MM-dd');
+
   const fetchCompliance = useCallback(async () => {
     if (!userId) {
       setLoading(false);
