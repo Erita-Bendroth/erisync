@@ -150,7 +150,7 @@ const Dashboard = () => {
             .eq("user_id", user.id),
           'Teams fetch'
         ),
-      ]);
+      ] as const);
 
       if (profileResult.status === 'fulfilled') {
         const { data: profileData, error } = profileResult.value;
