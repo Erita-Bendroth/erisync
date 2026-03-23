@@ -36,6 +36,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+
+    // Safety timeout - don't stay stuck on loading forever
+    const timeout = setTimeout(() => {
+      if (mounted && !isInitialized) {
+        console.warn('Auth initialization timed out, proceeding without session');
+        setLoading(false);
+        setIsInitialized(true);
+      }
+    }, 5000);
     
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -52,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Handle token refresh errors
         if (event === 'TOKEN_REFRESHED' && !session) {
           console.error('Token refresh failed, clearing invalid session');
-          // Clear invalid session data
           Object.keys(localStorage).forEach((key) => {
             if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
               localStorage.removeItem(key);
@@ -62,7 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
           setLoading(false);
           setIsInitialized(true);
-          // Redirect to login
           window.location.replace('/auth');
           return;
         }
@@ -92,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) return;
       
-      // If there's an error getting the session, clear everything
       if (error) {
         console.error('Error getting session:', error);
         Object.keys(localStorage).forEach((key) => {
@@ -114,7 +120,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsInitialized(true);
     }).catch((error) => {
       console.error('Fatal error getting session:', error);
-      // Clear everything on fatal error
       Object.keys(localStorage).forEach((key) => {
         if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
           localStorage.removeItem(key);
@@ -129,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
