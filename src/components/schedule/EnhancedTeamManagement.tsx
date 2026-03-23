@@ -1167,7 +1167,7 @@ const EnhancedTeamManagement = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  {member.user_id !== user?.id && canManageTeamMembers(team.id) && (
+                                  {canManageTeamMembers(team.id) && (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="sm">
@@ -1175,18 +1175,22 @@ const EnhancedTeamManagement = () => {
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleEditMember(member)}>
-                                          <Edit className="w-4 h-4 mr-2" />
-                                          Edit User
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => sendRandomPassword(member.user_id, member.profiles.email)}>
-                                          <Key className="w-4 h-4 mr-2" />
-                                          Generate Random Password
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleSetTempPassword(member)}>
-                                          <Lock className="w-4 h-4 mr-2" />
-                                          Set Temporary Password
-                                        </DropdownMenuItem>
+                                        {member.user_id !== user?.id && (
+                                          <>
+                                            <DropdownMenuItem onClick={() => handleEditMember(member)}>
+                                              <Edit className="w-4 h-4 mr-2" />
+                                              Edit User
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => sendRandomPassword(member.user_id, member.profiles.email)}>
+                                              <Key className="w-4 h-4 mr-2" />
+                                              Generate Random Password
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleSetTempPassword(member)}>
+                                              <Lock className="w-4 h-4 mr-2" />
+                                              Set Temporary Password
+                                            </DropdownMenuItem>
+                                          </>
+                                        )}
                                         <DropdownMenuItem
                                           onClick={() => {
                                             if (confirm(`Are you sure you want to remove ${formatUserName(member.profiles.first_name, member.profiles.last_name, member.profiles.initials)} from ${team.name}?`)) {
