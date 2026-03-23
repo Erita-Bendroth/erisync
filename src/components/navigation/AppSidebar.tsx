@@ -25,9 +25,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/components/auth/AuthProvider';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
 import { useTeamFavorites } from '@/hooks/useTeamFavorites';
 import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -36,53 +34,26 @@ import { DraggableSidebarMenuItem } from './DraggableSidebarMenuItem';
 import { useSidebarOrder } from '@/hooks/useSidebarOrder';
 import { Button } from '@/components/ui/button';
 import { usePendingRequestsCount } from '@/hooks/usePendingRequestsCount';
+import { useCurrentUserContext } from '@/hooks/useCurrentUserContext';
 
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { state } = useSidebar();
-  const { user } = useAuth();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { highestRole, isManagerOrPlanner } = useCurrentUserContext();
   const { getSortedItems, updateOrder, resetOrder } = useSidebarOrder();
   const { total: pendingRequestsTotal } = usePendingRequestsCount();
 
-  // Single state for all items (allows dragging between sections)
   const [allItems, setAllItems] = useState<any[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
+      activationConstraint: { distance: 8 },
     })
   );
 
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (data && data.length > 0) {
-        // Pick highest-priority role
-        const priority = ['admin', 'planner', 'manager', 'teammember'];
-        const best = data
-          .map(r => r.role)
-          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0];
-        setUserRole(best);
-      }
-    };
-
-    fetchUserRole();
-  }, [user]);
-
   const isCollapsed = state === 'collapsed';
   const isActive = (path: string) => location.pathname === path;
-
-  const isManagerOrPlanner = userRole === 'manager' || userRole === 'planner' || userRole === 'admin';
 
   const mainNavItems = [
     { key: 'nav-dashboard', title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -100,7 +71,6 @@ export function AppSidebar() {
     ] : []),
   ];
 
-  // Items visible to all users
   const commonNavItems = [
     { key: 'nav-requests', title: 'Requests', icon: FileCheck, path: '/schedule?tab=schedule&showRequests=true', badge: pendingRequestsTotal },
   ];
@@ -114,7 +84,6 @@ export function AppSidebar() {
     { key: 'nav-manual', title: 'Manual', icon: BookOpen, path: '/manual' },
   ];
 
-  // Merge all items into a single array
   useEffect(() => {
     const favItems = favorites.map(fav => ({
       key: `favorite-${fav.id}`,
@@ -129,7 +98,7 @@ export function AppSidebar() {
 
     const mgmtItems = isManagerOrPlanner ? [
       ...managementNavItems.map(item => ({ ...item, section: 'management' })),
-      ...(userRole === 'planner' || userRole === 'admin' ? [{
+      ...((highestRole === 'planner' || highestRole === 'admin') ? [{
         key: 'nav-admin',
         title: 'Admin Settings',
         icon: Shield,
@@ -149,11 +118,10 @@ export function AppSidebar() {
 
     setAllItems(getSortedItems(combinedItems));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [favorites, isManagerOrPlanner, userRole]);
+  }, [favorites, isManagerOrPlanner, highestRole]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (!over || active.id === over.id) return;
 
     const oldIndex = allItems.findIndex((item) => item.key === active.id);
@@ -165,8 +133,6 @@ export function AppSidebar() {
       updateOrder(newItems.map(item => item.key));
     }
   };
-
-
 
   return (
     <Sidebar collapsible="icon">

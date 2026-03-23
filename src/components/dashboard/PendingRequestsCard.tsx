@@ -6,46 +6,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Bell, CheckCircle, Calendar, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
-interface UserRole {
-  role: string;
-}
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 
 export const PendingRequestsCard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { roles, loading: contextLoading } = useCurrentUserContext();
   const [vacationCount, setVacationCount] = useState(0);
   const [swapCount, setSwapCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+
+  const isAdmin = roles.includes('admin');
+  const isPlanner = roles.includes('planner');
+  const isManager = roles.includes('manager');
 
   useEffect(() => {
-    if (user) {
-      fetchUserRoles();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user && userRoles.length > 0) {
+    if (user && !contextLoading && roles.length > 0) {
       fetchCounts();
-      setupRealtimeSubscriptions();
+      const cleanup = setupRealtimeSubscriptions();
+      return cleanup;
     }
-  }, [user, userRoles]);
-
-  const fetchUserRoles = async () => {
-    try {
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-
-      if (rolesData) {
-        setUserRoles(rolesData);
-      }
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-    }
-  };
+  }, [user, contextLoading, roles]);
 
   const fetchCounts = async () => {
     setLoading(true);
@@ -58,11 +39,6 @@ export const PendingRequestsCard = () => {
 
   const fetchVacationRequestCount = async () => {
     try {
-      const isAdmin = userRoles.some(r => r.role === 'admin');
-      const isPlanner = userRoles.some(r => r.role === 'planner');
-      const isManager = userRoles.some(r => r.role === 'manager');
-
-      // Fetch actual data to count unique requests (grouped by request_group_id)
       let query = supabase
         .from("vacation_requests")
         .select("id, request_group_id")
@@ -70,19 +46,15 @@ export const PendingRequestsCard = () => {
 
       if (!isAdmin && !isPlanner) {
         if (isManager) {
-          // Managers see requests from their teams
           const { data: managedTeams } = await supabase.rpc('get_manager_accessible_teams', {
             _manager_id: user!.id
           });
-
           if (managedTeams && managedTeams.length > 0) {
             query = query.in("team_id", managedTeams);
           } else {
-            // If no managed teams, show only own requests
             query = query.eq("user_id", user!.id);
           }
         } else {
-          // Team members see only their own requests
           query = query.eq("user_id", user!.id);
         }
       }
@@ -94,9 +66,6 @@ export const PendingRequestsCard = () => {
         return;
       }
 
-      // Count unique requests:
-      // - Requests with same request_group_id count as 1
-      // - Requests without request_group_id count as 1 each
       const uniqueGroups = new Set<string>();
       let ungroupedCount = 0;
       
@@ -117,10 +86,6 @@ export const PendingRequestsCard = () => {
 
   const fetchSwapRequestCount = async () => {
     try {
-      const isAdmin = userRoles.some(r => r.role === 'admin');
-      const isPlanner = userRoles.some(r => r.role === 'planner');
-      const isManager = userRoles.some(r => r.role === 'manager');
-
       let query = supabase
         .from("shift_swap_requests")
         .select("id", { count: 'exact', head: true })
@@ -128,19 +93,15 @@ export const PendingRequestsCard = () => {
 
       if (!isAdmin && !isPlanner) {
         if (isManager) {
-          // Managers see requests from their teams
           const { data: managedTeams } = await supabase.rpc('get_manager_accessible_teams', {
             _manager_id: user!.id
           });
-
           if (managedTeams && managedTeams.length > 0) {
             query = query.in("team_id", managedTeams);
           } else {
-            // If no managed teams, show only requests they're involved in
             query = query.or(`requesting_user_id.eq.${user!.id},target_user_id.eq.${user!.id}`);
           }
         } else {
-          // Team members see requests they're involved in
           query = query.or(`requesting_user_id.eq.${user!.id},target_user_id.eq.${user!.id}`);
         }
       }
@@ -156,32 +117,16 @@ export const PendingRequestsCard = () => {
   const setupRealtimeSubscriptions = () => {
     const vacationChannel = supabase
       .channel('vacation-requests-dashboard')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vacation_requests'
-        },
-        () => {
-          fetchVacationRequestCount();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, () => {
+        fetchVacationRequestCount();
+      })
       .subscribe();
 
     const swapChannel = supabase
       .channel('swap-requests-dashboard')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shift_swap_requests'
-        },
-        () => {
-          fetchSwapRequestCount();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_swap_requests' }, () => {
+        fetchSwapRequestCount();
+      })
       .subscribe();
 
     return () => {
@@ -228,37 +173,24 @@ export const PendingRequestsCard = () => {
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Vacation Requests</p>
-                    <p className="text-xs text-muted-foreground">
-                      {vacationCount} pending
-                    </p>
+                    <p className="text-xs text-muted-foreground">{vacationCount} pending</p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}>
                   View
                 </Button>
               </div>
             )}
-
             {swapCount > 0 && (
               <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
                 <div className="flex items-center space-x-3">
                   <RefreshCw className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Shift Swap Requests</p>
-                    <p className="text-xs text-muted-foreground">
-                      {swapCount} pending
-                    </p>
+                    <p className="text-xs text-muted-foreground">{swapCount} pending</p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}>
                   View
                 </Button>
               </div>
