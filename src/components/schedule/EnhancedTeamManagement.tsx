@@ -449,7 +449,11 @@ const EnhancedTeamManagement = () => {
         description: "Team member removed successfully",
       });
 
-      fetchTeamsAndMembers();
+      // Optimistically remove from local state instead of full reload
+      setTeamMembers(prev => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).filter(m => m.id !== memberId)
+      }));
     } catch (error: any) {
       console.error('Error removing team member:', error);
       toast({
