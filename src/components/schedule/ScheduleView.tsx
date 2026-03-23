@@ -682,18 +682,7 @@ useEffect(() => {
   };
 }, [user, userRoles]);
 
-  const fetchUserRoles = async () => {
-    try {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      
-      setUserRoles(data || []);
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-    }
-  };
+  // fetchUserRoles removed — roles now come from useCurrentUserContext
 
   const fetchTeams = async () => {
     try {
