@@ -84,8 +84,7 @@ export const UserMenu = () => {
     }
   };
 
-  const initials = profile?.initials || 
-    (profile ? `${profile.first_name[0]}${profile.last_name[0]}` : 'U');
+  const initials = getDisplayInitials(profile?.first_name, profile?.last_name, profile?.initials);
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
