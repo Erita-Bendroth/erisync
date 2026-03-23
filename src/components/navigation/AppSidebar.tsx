@@ -64,10 +64,16 @@ export function AppSidebar() {
       const { data } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
-      if (data) setUserRole(data.role);
+      if (data && data.length > 0) {
+        // Pick highest-priority role
+        const priority = ['admin', 'planner', 'manager', 'teammember'];
+        const best = data
+          .map(r => r.role)
+          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0];
+        setUserRole(best);
+      }
     };
 
     fetchUserRole();

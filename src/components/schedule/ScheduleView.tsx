@@ -385,9 +385,9 @@ const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // 
     loadStaticData();
   }, [user]);
 
-  // PHASE 2: Once static data loaded, fetch dynamic data
+  // PHASE 2: Once static data loaded, fetch dynamic data (don't hard-block on roles)
   useEffect(() => {
-    if (!user || !staticDataLoaded || userRoles.length === 0) return;
+    if (!user || !staticDataLoaded) return;
     
     const loadDynamicData = async () => {
       console.log('📊 Loading dynamic schedule data...');

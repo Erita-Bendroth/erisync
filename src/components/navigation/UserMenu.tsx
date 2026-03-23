@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, LogOut, UserCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { getDisplayInitials } from '@/lib/utils';
 
 interface Profile {
   first_name: string;
@@ -39,23 +39,29 @@ export const UserMenu = () => {
     const fetchUserData = async () => {
       if (!user) return;
 
-      // Fetch profile
+      // Fetch profile with maybeSingle to handle missing rows gracefully
       const { data: profileData } = await supabase
         .from('profiles')
         .select('first_name, last_name, email, initials')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileData) setProfile(profileData);
 
-      // Fetch role
-      const { data: roleData } = await supabase
+      // Fetch roles as array (user may have multiple roles)
+      const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
-      if (roleData) setUserRole(roleData.role);
+      if (rolesData && rolesData.length > 0) {
+        // Pick highest-priority role for display
+        const priority = ['admin', 'planner', 'manager', 'teammember'];
+        const best = rolesData
+          .map(r => r.role)
+          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0];
+        setUserRole(best);
+      }
     };
 
     fetchUserData();
@@ -78,8 +84,7 @@ export const UserMenu = () => {
     }
   };
 
-  const initials = profile?.initials || 
-    (profile ? `${profile.first_name[0]}${profile.last_name[0]}` : 'U');
+  const initials = getDisplayInitials(profile?.first_name, profile?.last_name, profile?.initials);
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
