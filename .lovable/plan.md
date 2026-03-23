@@ -1,49 +1,36 @@
 
 
-## Fix: Team Page Reloads and Collapses After Removing a Member
+## Fix: Infinite Loop in useHomeOfficeCompliance (Root Cause of Remove Failure)
 
 ### Problem
 
-When removing a team member, `removeTeamMember` calls `fetchTeamsAndMembers()`, which sets `setLoading(true)` at line 289. This causes the entire teams UI to re-render with a loading spinner, collapsing all expanded `Collapsible` components. The user loses their place.
+The `referenceDate` dependency on line 155 uses the raw `Date` object. Since the default parameter `new Date()` on line 34 creates a new object every render, `useCallback` recreates `fetchCompliance` on every render, which triggers the `useEffect` on every render, causing an infinite loop of Supabase requests. This floods the browser's network stack, causing all other requests (including the team member delete) to fail with `TypeError: Failed to fetch`.
+
+**This fix was planned previously but never actually applied.**
 
 ### Solution
 
-Update `removeTeamMember` to do a **lightweight refresh** that only updates the member list for the affected team, without triggering a full loading state.
+Stabilize the `referenceDate` dependency by converting it to a string for the dependency array.
 
-### What Changes
+### Changes
 
-**File: `src/components/schedule/EnhancedTeamManagement.tsx`**
+**File: `src/hooks/useHomeOfficeCompliance.ts`**
 
-Replace the `fetchTeamsAndMembers()` call in `removeTeamMember` with an inline member-only refresh for the specific team:
+1. Add a stable date string derived from `referenceDate`:
+   ```typescript
+   const referenceDateStr = format(referenceDate, 'yyyy-MM-dd');
+   ```
 
-```typescript
-const removeTeamMember = async (memberId: string, teamId: string) => {
-  try {
-    const { error } = await supabase
-      .from('team_members')
-      .delete()
-      .eq('id', memberId);
+2. Change the `useCallback` dependency from `referenceDate` to `referenceDateStr`:
+   ```typescript
+   }, [userId, providedCountryCode, referenceDateStr]);
+   ```
 
-    if (error) throw error;
-
-    toast({ title: "Success", description: "Team member removed successfully" });
-
-    // Instead of full reload, just remove the member from local state
-    setTeamMembers(prev => ({
-      ...prev,
-      [teamId]: (prev[teamId] || []).filter(m => m.id !== memberId)
-    }));
-  } catch (error: any) {
-    // ... existing error handling
-  }
-};
-```
-
-This optimistically removes the member from the local `teamMembers` state for that specific team, avoiding any loading state or re-fetch. The expanded team stays open, and the user stays in context.
+This ensures `fetchCompliance` is only recreated when the actual date value changes, not on every render. The infinite loop stops, network requests normalize, and the remove team member action will work reliably.
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/schedule/EnhancedTeamManagement.tsx` | Replace `fetchTeamsAndMembers()` with optimistic local state update in `removeTeamMember` |
+| `src/hooks/useHomeOfficeCompliance.ts` | Replace `referenceDate` with `referenceDateStr` in useCallback deps |
 
