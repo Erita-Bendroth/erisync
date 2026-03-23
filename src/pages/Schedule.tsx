@@ -43,11 +43,11 @@ import { SwapStatusCards } from "@/components/schedule/swap/SwapStatusCards";
 const Schedule = () => {
   const { signOut, user } = useAuth();
   const { toast } = useToast();
+  const { roles: userRoles, loading: contextLoading } = useCurrentUserContext();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'schedule';
   const teamFromUrl = searchParams.get('team') || '';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
-  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [managerCoverageWeek, setManagerCoverageWeek] = useState<Date>(new Date());
   const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
