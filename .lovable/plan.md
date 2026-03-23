@@ -1,23 +1,48 @@
 
 
-## Fix: Allow Managers/Admins to Remove Themselves from a Team
+## Fix: App Stuck on "Loading... Initializing application" on Deployed Site
 
 ### Problem
 
-Line 1170 of `EnhancedTeamManagement.tsx` has a guard `member.user_id !== user?.id` that hides the entire actions dropdown (edit, remove, etc.) for the current user's own row. This prevents managers from removing themselves from any team.
+The `AuthProvider` shows a full-screen loading overlay while `!isInitialized`. The `isInitialized` flag is only set to `true` after `supabase.auth.getSession()` resolves. If the Supabase connection stalls (e.g., during/after migration deployment), the app stays stuck forever with no recovery path.
 
 ### Solution
 
-Show a limited actions menu for the current user's own row that only includes the "Remove from Team" option (no edit/password actions on yourself). Keep the full menu for other members.
+Add a safety timeout to the AuthProvider initialization. If auth hasn't resolved within 5 seconds, force `isInitialized = true` and `loading = false` so the app renders (unauthenticated users will see the login page, authenticated users will proceed normally once the session eventually resolves).
 
 ### Change
 
-**File: `src/components/schedule/EnhancedTeamManagement.tsx`** (~line 1170-1203)
+**File: `src/components/auth/AuthProvider.tsx`**
 
-Replace the single conditional block with two blocks:
+Inside the `useEffect`, add a timeout that forces initialization after 5 seconds:
 
-1. **Other users** (existing behavior): Show full dropdown when `member.user_id !== user?.id && canManageTeamMembers(team.id)`
-2. **Self-removal**: Show a minimal dropdown with only "Remove from Team" when `member.user_id === user?.id && canManageTeamMembers(team.id)`
+```typescript
+useEffect(() => {
+  let mounted = true;
 
-This gives managers the ability to remove themselves from teams while keeping edit/password actions restricted to other users only.
+  // Safety timeout - don't stay stuck on loading forever
+  const timeout = setTimeout(() => {
+    if (mounted && !isInitialized) {
+      console.warn('Auth initialization timed out, proceeding without session');
+      setLoading(false);
+      setIsInitialized(true);
+    }
+  }, 5000);
+
+  // ... existing auth listener and getSession code ...
+
+  return () => {
+    mounted = false;
+    clearTimeout(timeout);
+    subscription.unsubscribe();
+  };
+}, []);
+```
+
+This ensures the app never gets permanently stuck on the loading screen, regardless of network conditions or migration timing.
+
+### Files
+| File | Change |
+|------|--------|
+| `src/components/auth/AuthProvider.tsx` | Add 5-second safety timeout for initialization |
 
