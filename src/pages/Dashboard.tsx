@@ -100,7 +100,7 @@ const Dashboard = () => {
         .from("profiles")
         .select("first_name, last_name, email, initials, country_code")
         .eq("user_id", user!.id)
-        .single() as any;
+        .maybeSingle();
 
       if (profileData) {
         setProfile(profileData);

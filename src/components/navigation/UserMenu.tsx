@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, LogOut, UserCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { getDisplayInitials } from '@/lib/utils';
 
 interface Profile {
   first_name: string;
