@@ -101,6 +101,7 @@ const EnhancedTeamManagement = () => {
   const [hotlineConfigTeam, setHotlineConfigTeam] = useState<{ id: string; name: string } | null>(null);
   const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
   const [editableTeamDetails, setEditableTeamDetails] = useState<Team[]>([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
 
   // Get all user IDs from all teams for time stats
   const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
