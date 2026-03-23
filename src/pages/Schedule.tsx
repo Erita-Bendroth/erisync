@@ -76,24 +76,10 @@ const Schedule = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    if (user) {
-      fetchUserRoles();
+    if (user && !contextLoading) {
       fetchTeams();
     }
-  }, [user]);
-
-  const fetchUserRoles = async () => {
-    try {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user!.id);
-      
-      setUserRoles(data?.map(r => r.role) || []);
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-    }
-  };
+  }, [user, contextLoading]);
 
   const fetchTeams = async () => {
     try {
