@@ -38,7 +38,7 @@ interface Profile {
 
 const REQUEST_TIMEOUT_MS = 6000;
 
-const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+const withTimeout = <T,>(operation: PromiseLike<T>, label: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -47,13 +47,11 @@ const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> =
     }, REQUEST_TIMEOUT_MS);
   });
 
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
+  return Promise.race([Promise.resolve(operation), timeoutPromise]).finally(() => {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-  }
+  });
 };
 
 const Dashboard = () => {
