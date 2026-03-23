@@ -5,71 +5,37 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Users, LogOut, Mail, TrendingUp, BookOpen } from "lucide-react";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
-import ScheduleEntryForm from "@/components/schedule/ScheduleEntryForm";
 import { TimeBlockDisplay } from "@/components/schedule/TimeBlockDisplay";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { formatUserName, cn } from "@/lib/utils";
 import { PendingRequestsCard } from "@/components/dashboard/PendingRequestsCard";
 import { LocationSetupModal } from "@/components/profile/LocationSetupModal";
-
-interface UserRole {
-  role: string;
-}
-
-interface Team {
-  id: string;
-  name: string;
-  description?: string;
-}
-
-interface Profile {
-  first_name: string;
-  last_name: string;
-  email: string;
-  initials?: string;
-  country_code?: string | null;
-}
-
-const REQUEST_TIMEOUT_MS = 6000;
-
-const withTimeout = <T,>(operation: PromiseLike<T>, label: string): Promise<T> => {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${REQUEST_TIMEOUT_MS}ms`));
-    }, REQUEST_TIMEOUT_MS);
-  });
-
-  return Promise.race([Promise.resolve(operation), timeoutPromise]).finally(() => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  });
-};
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { showScheduleChangeNotification } = useDesktopNotifications();
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [userTeams, setUserTeams] = useState<Team[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { profile, roles, teams, loading: contextLoading, refetch } = useCurrentUserContext();
   const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
   const [weeklySchedule, setWeeklySchedule] = useState<any[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
   const [showLocationSetup, setShowLocationSetup] = useState(false);
 
   useEffect(() => {
+    if (profile) {
+      setShowLocationSetup(!profile.country_code || profile.country_code === 'US');
+    }
+  }, [profile]);
+
+  useEffect(() => {
     if (user) {
-      fetchUserData();
+      fetchScheduleData();
     }
   }, [user]);
 
@@ -88,9 +54,6 @@ const Dashboard = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Schedule update received:', payload);
-          
-          // Show desktop notification for schedule changes
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const entry = payload.new as any;
             showScheduleChangeNotification({
@@ -99,10 +62,7 @@ const Dashboard = () => {
               changeType: payload.eventType === 'INSERT' ? 'added' : 'updated',
             });
           }
-          
-          // Refresh today's schedule and weekly overview when any changes occur
-          fetchTodaySchedule();
-          fetchWeeklySchedule();
+          fetchScheduleData();
         }
       )
       .subscribe();
@@ -112,134 +72,22 @@ const Dashboard = () => {
     };
   }, [user, profile, showScheduleChangeNotification]);
 
-  const fetchUserData = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const [profileResult, rolesResult, teamsResult] = await Promise.allSettled([
-        withTimeout(
-          supabase
-            .from("profiles")
-            .select("first_name, last_name, email, initials, country_code")
-            .eq("user_id", user.id)
-            .maybeSingle(),
-          'Profile fetch'
-        ),
-        withTimeout(
-          supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", user.id),
-          'Roles fetch'
-        ),
-        withTimeout(
-          supabase
-            .from("team_members")
-            .select(`
-              teams (
-                id,
-                name,
-                description
-              )
-            `)
-            .eq("user_id", user.id),
-          'Teams fetch'
-        ),
-      ] as const);
-
-      if (profileResult.status === 'fulfilled') {
-        const { data: profileData, error } = profileResult.value;
-
-        if (error) {
-          console.error('Error fetching profile:', error);
-        } else if (profileData) {
-          setProfile(profileData);
-          setShowLocationSetup(!profileData.country_code || profileData.country_code === 'US');
-        }
-      } else {
-        console.error('Profile fetch failed:', profileResult.reason);
-      }
-
-      if (rolesResult.status === 'fulfilled') {
-        const { data: rolesData, error } = rolesResult.value;
-
-        if (error) {
-          console.error('Error fetching user roles:', error);
-        } else {
-          setUserRoles(rolesData || []);
-        }
-      } else {
-        console.error('Roles fetch failed:', rolesResult.reason);
-      }
-
-      if (teamsResult.status === 'fulfilled') {
-        const { data: teamsData, error } = teamsResult.value;
-
-        if (error) {
-          console.error('Error fetching user teams:', error);
-        } else {
-          const teams = (teamsData || []).map((item: any) => item.teams).filter(Boolean);
-          setUserTeams(teams);
-        }
-      } else {
-        console.error('Teams fetch failed:', teamsResult.reason);
-      }
-
-      await Promise.allSettled([fetchTodaySchedule(), fetchWeeklySchedule()]);
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load user data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTodaySchedule = async () => {
+  const fetchScheduleData = async () => {
     if (!user) return;
-    
+    setScheduleLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { data: scheduleData, error } = await withTimeout(
+      const now = new Date();
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+
+      const [todayRes, weekRes] = await Promise.allSettled([
         supabase
           .from("schedule_entries")
           .select("*")
           .eq("user_id", user.id)
           .eq("date", today)
           .order("created_at", { ascending: false }),
-        "Today's schedule fetch"
-      );
-
-      if (error) {
-        console.error("Error fetching today's schedule:", error);
-        setTodaySchedule([]);
-        return;
-      }
-
-      setTodaySchedule(scheduleData || []);
-    } catch (error) {
-      console.error("Error fetching today's schedule:", error);
-      setTodaySchedule([]);
-    }
-  };
-
-  const fetchWeeklySchedule = async () => {
-    if (!user) return;
-    
-    try {
-      const now = new Date();
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      
-      const { data: scheduleData, error } = await withTimeout(
         supabase
           .from("schedule_entries")
           .select("*")
@@ -247,67 +95,44 @@ const Dashboard = () => {
           .gte("date", format(weekStart, 'yyyy-MM-dd'))
           .lte("date", format(weekEnd, 'yyyy-MM-dd'))
           .order("date", { ascending: true }),
-        'Weekly schedule fetch'
-      );
+      ]);
 
-      if (error) {
-        console.error("Error fetching weekly schedule:", error);
-        setWeeklySchedule([]);
-        return;
+      if (todayRes.status === 'fulfilled' && !todayRes.value.error) {
+        setTodaySchedule(todayRes.value.data || []);
       }
-
-      setWeeklySchedule(scheduleData || []);
+      if (weekRes.status === 'fulfilled' && !weekRes.value.error) {
+        setWeeklySchedule(weekRes.value.data || []);
+      }
     } catch (error) {
-      console.error("Error fetching weekly schedule:", error);
-      setWeeklySchedule([]);
+      console.error("Error fetching schedule data:", error);
+    } finally {
+      setScheduleLoading(false);
     }
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
   };
 
   const getActivityDisplayName = (activityType: string) => {
     switch (activityType) {
-      case 'work':
-        return 'Work';
-      case 'vacation':
-        return 'Vacation';
-      case 'other':
-        return 'Other';
-      case 'training':
-        return 'Training';
-      case 'hotline_support':
-        return 'Hotline Support';
-      case 'meeting':
-        return 'Meeting';
-      default:
-        return activityType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      case 'work': return 'Work';
+      case 'vacation': return 'Vacation';
+      case 'other': return 'Other';
+      case 'training': return 'Training';
+      case 'hotline_support': return 'Hotline Support';
+      case 'meeting': return 'Meeting';
+      default: return activityType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case "planner":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "manager":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "teammember":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+      case "planner": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+      case "manager": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+      case "teammember": return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
     }
   };
 
-  const showInitialLoading =
-    loading &&
-    !profile &&
-    userRoles.length === 0 &&
-    userTeams.length === 0 &&
-    todaySchedule.length === 0 &&
-    weeklySchedule.length === 0;
-
-  if (showInitialLoading) {
+  // Only show full-page loading if we have absolutely nothing yet
+  if (contextLoading && !profile && roles.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -320,6 +145,8 @@ const Dashboard = () => {
 
   const welcomeName =
     profile ? formatUserName(profile.first_name, profile.last_name) : user?.email?.split('@')[0] || 'there';
+
+  const userRoles = roles.map(r => ({ role: r }));
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -336,21 +163,28 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {userRoles.length > 0 ? (
-                  userRoles.map((roleObj, index) => (
-                    <Badge
-                      key={index}
-                      className={getRoleColor(roleObj.role)}
-                      variant="secondary"
-                    >
-                      {roleObj.role}
-                    </Badge>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No roles assigned</p>
-                )}
-              </div>
+              {contextLoading && roles.length === 0 ? (
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-5 w-20" />
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {roles.length > 0 ? (
+                    roles.map((role, index) => (
+                      <Badge
+                        key={index}
+                        className={getRoleColor(role)}
+                        variant="secondary"
+                      >
+                        {role}
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No roles assigned</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -360,20 +194,27 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {userTeams.length > 0 ? (
-                  userTeams.map((team) => (
-                    <div key={team.id} className="text-sm">
-                      <p className="font-medium">{team.name}</p>
-                      {team.description && (
-                        <p className="text-muted-foreground text-xs">{team.description}</p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No teams assigned</p>
-                )}
-              </div>
+              {contextLoading && teams.length === 0 ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {teams.length > 0 ? (
+                    teams.map((team) => (
+                      <div key={team.id} className="text-sm">
+                        <p className="font-medium">{team.name}</p>
+                        {team.description && (
+                          <p className="text-muted-foreground text-xs">{team.description}</p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No teams assigned</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -388,7 +229,6 @@ const Dashboard = () => {
                 {todaySchedule.length > 0 ? (
                   <div className="space-y-3">
                     {todaySchedule.map((entry, index) => {
-                      // Parse time data from entry notes
                       const timeSplitPattern = /Times:\s*(.+)/;
                       const match = entry.notes?.match(timeSplitPattern);
                       let timeBlocks = [];
@@ -397,7 +237,6 @@ const Dashboard = () => {
                         try {
                           timeBlocks = JSON.parse(match[1]);
                         } catch (e) {
-                          // Fallback to default times
                           timeBlocks = [{
                             start_time: entry.shift_type === 'early' ? '06:00' : entry.shift_type === 'late' ? '13:00' : '08:00',
                             end_time: entry.shift_type === 'early' ? '14:30' : entry.shift_type === 'late' ? '21:30' : '16:30',
@@ -405,7 +244,6 @@ const Dashboard = () => {
                           }];
                         }
                       } else {
-                        // Default time blocks
                         timeBlocks = [{
                           start_time: entry.shift_type === 'early' ? '06:00' : entry.shift_type === 'late' ? '13:00' : '08:00',
                           end_time: entry.shift_type === 'early' ? '14:30' : entry.shift_type === 'late' ? '21:30' : '16:30',
@@ -415,7 +253,6 @@ const Dashboard = () => {
 
                       return (
                         <div key={index} className="space-y-3 p-4 border rounded-lg bg-card">
-                          {/* Header with main activity type */}
                           <div className="flex items-center justify-between">
                             <Badge variant={
                               entry.activity_type === 'work' ? 'default' :
@@ -432,10 +269,8 @@ const Dashboard = () => {
                             </span>
                           </div>
 
-                          {/* Reuse shared time-block renderer to match legends */}
                           <TimeBlockDisplay entry={entry} />
 
-                          {/* Update time */}
                           {entry.updated_at && (
                             <div className="flex items-center justify-end text-xs">
                               <span className="text-muted-foreground">
@@ -473,7 +308,6 @@ const Dashboard = () => {
                     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
                     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
                     
-                    // Filter to only show today and future dates on mobile
                     const isMobile = window.innerWidth < 768;
                     const filteredDays = isMobile ? days.filter(day => day >= today) : days;
                     
@@ -591,8 +425,8 @@ const Dashboard = () => {
                 className="w-full justify-start" 
                 variant="outline"
                 onClick={() => {
-                  if (userTeams.length > 0) {
-                    navigate(`/schedule?tab=schedule&team=${userTeams[0].id}`);
+                  if (teams.length > 0) {
+                    navigate(`/schedule?tab=schedule&team=${teams[0].id}`);
                   } else {
                     navigate('/schedule?tab=schedule');
                     toast({
@@ -602,7 +436,7 @@ const Dashboard = () => {
                     });
                   }
                 }}
-                disabled={userTeams.length === 0}
+                disabled={teams.length === 0}
               >
                 <Users className="w-4 h-4 mr-2" />
                 View Team Availability
@@ -615,7 +449,7 @@ const Dashboard = () => {
         open={showLocationSetup}
         onComplete={() => {
           setShowLocationSetup(false);
-          fetchUserData(); // Refresh to update country in profile state
+          refetch();
         }}
       />
     </div>

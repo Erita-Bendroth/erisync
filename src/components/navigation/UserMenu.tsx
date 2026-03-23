@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { LogOut, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,67 +13,21 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getDisplayInitials } from '@/lib/utils';
-
-interface Profile {
-  first_name: string;
-  last_name: string;
-  email: string;
-  initials?: string;
-}
-
-interface UserRole {
-  role: string;
-}
+import { useCurrentUserContext } from '@/hooks/useCurrentUserContext';
 
 export const UserMenu = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!user) return;
-
-      // Fetch profile with maybeSingle to handle missing rows gracefully
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email, initials')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (profileData) setProfile(profileData);
-
-      // Fetch roles as array (user may have multiple roles)
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (rolesData && rolesData.length > 0) {
-        // Pick highest-priority role for display
-        const priority = ['admin', 'planner', 'manager', 'teammember'];
-        const best = rolesData
-          .map(r => r.role)
-          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0];
-        setUserRole(best);
-      }
-    };
-
-    fetchUserData();
-  }, [user]);
+  const { profile, highestRole } = useCurrentUserContext();
 
   const handleSignOut = async () => {
     try {
       await signOut();
       navigate('/auth');
-      toast({
-        title: "Signed out successfully",
-      });
+      toast({ title: "Signed out successfully" });
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
@@ -88,14 +42,10 @@ export const UserMenu = () => {
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
-      case 'admin':
-        return 'destructive';
-      case 'planner':
-        return 'default';
-      case 'manager':
-        return 'secondary';
-      default:
-        return 'outline';
+      case 'admin': return 'destructive';
+      case 'planner': return 'default';
+      case 'manager': return 'secondary';
+      default: return 'outline';
     }
   };
 
@@ -119,9 +69,9 @@ export const UserMenu = () => {
             <p className="text-xs leading-none text-muted-foreground">
               {profile?.email}
             </p>
-            {userRole && (
-              <Badge variant={getRoleBadgeVariant(userRole)} className="w-fit mt-1 capitalize">
-                {userRole}
+            {highestRole && (
+              <Badge variant={getRoleBadgeVariant(highestRole)} className="w-fit mt-1 capitalize">
+                {highestRole}
               </Badge>
             )}
           </div>
