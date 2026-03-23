@@ -148,7 +148,7 @@ serve(async (req) => {
     // Create profile - store initials in first_name, leave last_name empty
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
+      .upsert({
         user_id: newUserData.user!.id,
         first_name: initials,
         last_name: '',
@@ -156,7 +156,7 @@ serve(async (req) => {
         email: email,
         country_code: countryCode || 'US',
         requires_password_change: true
-      });
+      }, { onConflict: 'user_id' });
 
     if (profileError) {
       console.error('Profile creation error:', profileError);
