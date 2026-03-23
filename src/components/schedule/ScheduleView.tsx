@@ -17,6 +17,7 @@ import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, 
 import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useCurrentUserContext } from '@/hooks/useCurrentUserContext';
 import { useLocation } from 'react-router-dom';
 import { EditScheduleModal } from './EditScheduleModal';
 import { TimeBlockDisplay } from './TimeBlockDisplay';
