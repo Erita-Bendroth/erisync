@@ -1025,8 +1025,27 @@ const EnhancedTeamManagement = () => {
               <p className="text-muted-foreground">No teams found</p>
             </div>
           ) : (
-            teams.map((team) => {
+            teams.filter((team) => {
+              if (!memberSearchQuery.trim()) return true;
               const members = teamMembers[team.id] || [];
+              const q = memberSearchQuery.toLowerCase();
+              return members.some(m =>
+                m.profiles.first_name?.toLowerCase().includes(q) ||
+                m.profiles.last_name?.toLowerCase().includes(q) ||
+                m.profiles.initials?.toLowerCase().includes(q) ||
+                m.profiles.email?.toLowerCase().includes(q)
+              );
+            }).map((team) => {
+              const allMembers = teamMembers[team.id] || [];
+              const members = memberSearchQuery.trim()
+                ? allMembers.filter(m => {
+                    const q = memberSearchQuery.toLowerCase();
+                    return m.profiles.first_name?.toLowerCase().includes(q) ||
+                      m.profiles.last_name?.toLowerCase().includes(q) ||
+                      m.profiles.initials?.toLowerCase().includes(q) ||
+                      m.profiles.email?.toLowerCase().includes(q);
+                  })
+                : allMembers;
               const isExpanded = expandedTeams.has(team.id);
               
               // Check if current user is a manager of this specific team
