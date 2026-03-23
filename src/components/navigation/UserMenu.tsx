@@ -39,23 +39,29 @@ export const UserMenu = () => {
     const fetchUserData = async () => {
       if (!user) return;
 
-      // Fetch profile
+      // Fetch profile with maybeSingle to handle missing rows gracefully
       const { data: profileData } = await supabase
         .from('profiles')
         .select('first_name, last_name, email, initials')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileData) setProfile(profileData);
 
-      // Fetch role
-      const { data: roleData } = await supabase
+      // Fetch roles as array (user may have multiple roles)
+      const { data: rolesData } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
-      if (roleData) setUserRole(roleData.role);
+      if (rolesData && rolesData.length > 0) {
+        // Pick highest-priority role for display
+        const priority = ['admin', 'planner', 'manager', 'teammember'];
+        const best = rolesData
+          .map(r => r.role)
+          .sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0];
+        setUserRole(best);
+      }
     };
 
     fetchUserData();
