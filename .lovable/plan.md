@@ -1,79 +1,66 @@
 
+Fix: Missing initials are now a confirmed data-sync plus consistency issue, not just a single insert bug.
 
-## Fix: Initials Not Saved When Creating Users (Root Cause Found)
+What I found
+- Do I know what the issue is? Yes.
+- The broken user row still has `profiles.first_name = ''` and `profiles.initials = NULL`.
+- But the same user’s `auth.users.raw_user_meta_data.initials` already contains the correct value (`NIBAD`).
+- The previous backfill only did `initials = first_name`, so it skipped users where both fields were blank.
+- Different parts of the app render initials differently:
+  - Team overview/team members read raw `profiles` data and can show blank.
+  - Weekly schedule reads `get_team_members_safe`, which uses a different fallback path.
+- Result: one broken profile row causes inconsistent display across screens.
 
-### Problem
+Implementation plan
 
-There is a **race condition** between the `handle_new_user` trigger and the edge function:
+1. Repair existing broken users in the database
+- Add a migration that backfills missing profile initials from `auth.users.raw_user_meta_data->>'initials'`.
+- Also populate `first_name` for initials-only users when it is blank, so the existing UI patterns keep working.
+- Keep a secondary fallback of `initials = first_name` for older rows that already store initials there.
 
-1. Edge function calls `supabaseAdmin.auth.admin.createUser()` with `user_metadata: { initials: "NIBAD" }`
-2. This fires the `on_auth_user_created` trigger → `handle_new_user()` runs and creates a profile row with `first_name: ''`, `last_name: ''`, `initials: NULL` (trigger doesn't extract initials from metadata)
-3. Edge function then tries `INSERT INTO profiles(...)` with `initials: 'NIBAD'` → **fails silently** due to the `UNIQUE(user_id)` constraint — the row already exists from step 2
+2. Normalize the database read helpers
+- Update the profile-returning SQL functions so they all compute initials the same way:
+  - use `profiles.initials` if present
+  - otherwise derive from first/last name
+  - otherwise use initials-only first_name
+  - never return an empty display value if usable data exists
+- Specifically align:
+  - `get_team_members_safe`
+  - `get_all_basic_profiles`
+  - `get_basic_profile_info`
+- This removes the current mismatch between admin/team views and the weekly scheduler.
 
-Database evidence confirms this: `nibad@vestas.com` has `first_name: ''`, `initials: NULL` — the trigger created the row, and the edge function's insert was rejected.
+3. Harden the create-user flow for future users
+- In `supabase/functions/create-user/index.ts`, keep the current `upsert`, but strengthen it:
+  - normalize initials server-side (`trim().toUpperCase()`)
+  - use the normalized value in auth metadata and profile upsert
+  - stop returning success if profile/role/team writes fail
+  - if a downstream write fails, return a real error instead of silently leaving a half-created user
+- This makes new-user creation reliable instead of “success with broken profile data”.
 
-### Solution (3 changes)
+4. Make the UI use one consistent display fallback
+- Add a shared helper in `src/lib/utils.ts` for display initials/name fallback.
+- Use that helper in:
+  - `src/components/schedule/EnhancedTeamManagement.tsx`
+  - `src/components/schedule/unified/UnifiedTeamScheduler.tsx`
+  - `src/components/schedule/unified/TeamSection.tsx`
+- This ensures the team members table and weekly schedule never show a blank identifier again, even if a profile is temporarily incomplete.
 
-**1. Fix the edge function to use UPSERT instead of INSERT**
+5. Validate the exact user and the future flow
+- Re-check the currently broken user in:
+  - Team Members list
+  - Weekly scheduler under Technical Support Central
+- Then create a brand-new test user from Admin Setup and verify initials appear immediately in both places without manual repair.
 
-**File: `supabase/functions/create-user/index.ts`**
+Files/resources to update
+- `supabase/migrations/<new_migration>.sql`
+- `supabase/functions/create-user/index.ts`
+- `src/lib/utils.ts`
+- `src/components/schedule/EnhancedTeamManagement.tsx`
+- `src/components/schedule/unified/UnifiedTeamScheduler.tsx`
+- `src/components/schedule/unified/TeamSection.tsx`
 
-Change `.insert(...)` to `.upsert(...)` so it updates the trigger-created row:
-
-```typescript
-const { error: profileError } = await supabaseAdmin
-  .from('profiles')
-  .upsert({
-    user_id: newUserData.user!.id,
-    first_name: initials,
-    last_name: '',
-    initials: initials,
-    email: email,
-    country_code: countryCode || 'US',
-    requires_password_change: true
-  }, { onConflict: 'user_id' });
-```
-
-**2. Update the `handle_new_user` trigger to also extract initials from metadata**
-
-**Database migration:**
-
-```sql
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = 'public'
-AS $$
-BEGIN
-    INSERT INTO public.profiles (user_id, first_name, last_name, email, initials)
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.raw_user_meta_data ->> 'first_name', COALESCE(NEW.raw_user_meta_data ->> 'initials', '')),
-        COALESCE(NEW.raw_user_meta_data ->> 'last_name', ''),
-        NEW.email,
-        NEW.raw_user_meta_data ->> 'initials'
-    );
-    RETURN NEW;
-END;
-$$;
-```
-
-**3. Backfill existing profiles with missing initials**
-
-```sql
-UPDATE public.profiles
-SET initials = first_name
-WHERE (initials IS NULL OR initials = '')
-  AND first_name IS NOT NULL
-  AND first_name != '';
-```
-
-### Files to Modify
-
-| File / Resource | Change |
-|------|--------|
-| `supabase/functions/create-user/index.ts` | Change `.insert()` to `.upsert()` with `onConflict: 'user_id'` |
-| Database migration | Update `handle_new_user` trigger to extract initials from metadata |
-| Database migration | Backfill existing profiles with `initials = first_name` where missing |
-
+Expected outcome
+- The already-broken user gets fixed.
+- New users created from Admin Setup store initials correctly every time.
+- Team overview and weekly schedule show the same initials consistently.
