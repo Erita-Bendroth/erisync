@@ -121,16 +121,19 @@ serve(async (req) => {
       );
     }
 
+    // Normalize initials server-side
+    const normalizedInitials = initials.trim().toUpperCase();
+
     // Generate secure random temporary password
     const tempPassword = generateSecurePassword();
     
-    // Create user
+    // Create user with normalized initials in metadata
     const { data: newUserData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
-        initials: initials
+        initials: normalizedInitials
       }
     });
 
@@ -145,14 +148,14 @@ serve(async (req) => {
       );
     }
 
-    // Create profile - store initials in first_name, leave last_name empty
+    // Create/update profile using upsert to handle trigger race condition
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         user_id: newUserData.user!.id,
-        first_name: initials,
+        first_name: normalizedInitials,
         last_name: '',
-        initials: initials,
+        initials: normalizedInitials,
         email: email,
         country_code: countryCode || 'US',
         requires_password_change: true
@@ -160,6 +163,13 @@ serve(async (req) => {
 
     if (profileError) {
       console.error('Profile creation error:', profileError);
+      return new Response(
+        JSON.stringify({ error: `User created but profile failed: ${profileError.message}` }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Assign role
