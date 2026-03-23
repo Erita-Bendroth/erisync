@@ -67,7 +67,7 @@ export function RosterWeekGrid({
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [undoStack, setUndoStack] = useState<Assignment[][]>([]);
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     fetchCurrentUserTeams();
