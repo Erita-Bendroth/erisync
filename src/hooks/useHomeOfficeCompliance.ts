@@ -154,7 +154,7 @@ export function useHomeOfficeCompliance({
     } finally {
       setLoading(false);
     }
-  }, [userId, providedCountryCode, referenceDate]);
+  }, [userId, providedCountryCode, referenceDateStr]);
 
   useEffect(() => {
     fetchCompliance();
