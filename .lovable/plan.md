@@ -1,48 +1,73 @@
 
+Fix: login/profile rendering is now failing for two linked reasons, not one.
 
-## Fix: App Stuck on "Loading... Initializing application" on Deployed Site
+What I found
+- The auth timeout is firing first: console shows `Auth initialization timed out, proceeding without session`, then `SIGNED_IN`.
+- That means the app renders in a partial state before all user/profile data is ready.
+- The top-right avatar showing only `U` is because `src/components/navigation/UserMenu.tsx` fetches:
+  - `profiles ... .single()`
+  - `user_roles ... .single()`
+- That is fragile here:
+  - many users have multiple roles, so `.single()` on `user_roles` is wrong
+  - if the profile query is delayed or returns no visible row, the fallback becomes `'U'`
+- The schedule page can also get stuck because `src/components/schedule/ScheduleView.tsx` Phase 2 waits for `userRoles.length > 0` before loading employees/schedule data. If roles fail to populate promptly, the page stays on “Loading schedule…”.
+- There is also inconsistent profile fetching across the app:
+  - some places query `profiles` directly
+  - others use secure RPCs like `get_basic_profile_info`
+  - this inconsistency is why login can succeed but the visible user info is incomplete.
 
-### Problem
+Plan
+1. Stabilize auth initialization
+- Update `AuthProvider` so the timeout does not leave the app in a misleading half-ready state.
+- Keep the timeout as a fail-safe, but introduce a distinct “auth resolved vs app data loading” flow so signed-in users are not treated like anonymous users during late session resolution.
+- Ensure the initial render after timeout can recover cleanly when `SIGNED_IN` arrives.
 
-The `AuthProvider` shows a full-screen loading overlay while `!isInitialized`. The `isInitialized` flag is only set to `true` after `supabase.auth.getSession()` resolves. If the Supabase connection stalls (e.g., during/after migration deployment), the app stays stuck forever with no recovery path.
+2. Fix the user menu data source
+- Refactor `src/components/navigation/UserMenu.tsx` to stop using `.single()` on `user_roles`.
+- Fetch roles as an array and derive the highest-priority label (admin > planner > manager > teammember).
+- Fetch profile data with a safer fallback path so the menu can show:
+  - initials
+  - display name
+  - email
+  even if one field is temporarily missing.
+- Replace the current `'U'` fallback with a proper helper that uses initials, then name-derived initials, then email-derived fallback.
 
-### Solution
+3. Unblock the schedule loading flow
+- Adjust `src/components/schedule/ScheduleView.tsx` so Phase 2 does not hard-block on `userRoles.length > 0`.
+- Load schedule data once static fetches complete, and treat “no roles found yet” separately from “still loading”.
+- Add defensive completion paths so `loading` is always cleared even when one of the supporting queries returns empty data.
 
-Add a safety timeout to the AuthProvider initialization. If auth hasn't resolved within 5 seconds, force `isInitialized = true` and `loading = false` so the app renders (unauthenticated users will see the login page, authenticated users will proceed normally once the session eventually resolves).
+4. Standardize profile/role reads
+- Replace fragile direct queries in key entry points with a shared pattern:
+  - profile fetch with safe fallback
+  - roles fetch as array, never `.single()`
+- Apply this to:
+  - `UserMenu.tsx`
+  - `AppSidebar.tsx`
+  - `Dashboard.tsx`
+  - any other header/profile surfaces contributing to the broken post-login state
 
-### Change
+5. Add one shared display helper
+- Extend `src/lib/utils.ts` with a single helper for display name + initials resolution.
+- Use it in the user menu and any affected schedule/team surfaces so the same logged-in user never appears as blank in one place and complete in another.
 
-**File: `src/components/auth/AuthProvider.tsx`**
+6. Verify the exact broken flow
+- Re-test:
+  - login on deployed site
+  - top-right user menu
+  - dashboard header/profile state
+  - schedule page loading
+- Specifically confirm the current user no longer appears as just `U`, and that schedule data loads after sign-in.
 
-Inside the `useEffect`, add a timeout that forces initialization after 5 seconds:
+Files likely to update
+- `src/components/auth/AuthProvider.tsx`
+- `src/components/navigation/UserMenu.tsx`
+- `src/components/navigation/AppSidebar.tsx`
+- `src/pages/Dashboard.tsx`
+- `src/components/schedule/ScheduleView.tsx`
+- `src/lib/utils.ts`
 
-```typescript
-useEffect(() => {
-  let mounted = true;
-
-  // Safety timeout - don't stay stuck on loading forever
-  const timeout = setTimeout(() => {
-    if (mounted && !isInitialized) {
-      console.warn('Auth initialization timed out, proceeding without session');
-      setLoading(false);
-      setIsInitialized(true);
-    }
-  }, 5000);
-
-  // ... existing auth listener and getSession code ...
-
-  return () => {
-    mounted = false;
-    clearTimeout(timeout);
-    subscription.unsubscribe();
-  };
-}, []);
-```
-
-This ensures the app never gets permanently stuck on the loading screen, regardless of network conditions or migration timing.
-
-### Files
-| File | Change |
-|------|--------|
-| `src/components/auth/AuthProvider.tsx` | Add 5-second safety timeout for initialization |
-
+Expected result
+- Login completes without the app getting stranded in a partial state.
+- The current user shows proper initials/name/email instead of just `U`.
+- The schedule page no longer hangs on “Loading schedule...” because role loading is no longer a hard gate.
