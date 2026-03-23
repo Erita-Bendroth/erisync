@@ -15,6 +15,7 @@ import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shi
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { formatUserName } from "@/lib/utils";
 import { TeamCapacityConfig } from '@/components/admin/TeamCapacityConfig';
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
