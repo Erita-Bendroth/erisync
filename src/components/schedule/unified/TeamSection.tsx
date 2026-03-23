@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SchedulerCellWithTooltip } from './SchedulerCellWithTooltip';
-import { cn } from '@/lib/utils';
+import { cn, getDisplayInitials } from '@/lib/utils';
 import type { OnlineUser } from '@/hooks/useSchedulerPresence';
 import { ScheduleEntry } from '@/hooks/useSchedulerState';
 
@@ -127,7 +127,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                   className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold"
                   title={`${member.first_name} ${member.last_name}`}
                 >
-                  {member.initials}
+                  {getDisplayInitials(member.first_name, member.last_name, member.initials)}
                 </div>
               </div>
 
