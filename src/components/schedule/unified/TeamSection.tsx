@@ -127,7 +127,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({
                   className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold"
                   title={`${member.first_name} ${member.last_name}`}
                 >
-                  {member.initials}
+                  {getDisplayInitials(member.first_name, member.last_name, member.initials)}
                 </div>
               </div>
 
