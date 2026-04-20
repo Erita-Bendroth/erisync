@@ -32,7 +32,7 @@ export function generateCoverageReport(
         { shiftType, date, personCountry: country, teamId: null },
         definitions
       );
-      if (result.ok) {
+      if (result.ok === true) {
         cells.push({
           country,
           shiftType,
@@ -42,11 +42,12 @@ export function generateCoverageReport(
           matchedTier: result.matchedTier,
         });
       } else {
+        const failed = result as Extract<typeof result, { ok: false }>;
         cells.push({
           country,
           shiftType,
-          status: result.reason === "ambiguous" ? "ambiguous" : "missing",
-          candidates: result.candidates.map((c) => c.id),
+          status: failed.reason === "ambiguous" ? "ambiguous" : "missing",
+          candidates: failed.candidates.map((c) => c.id),
         });
       }
     }
