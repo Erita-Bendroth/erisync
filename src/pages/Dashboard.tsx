@@ -432,6 +432,12 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+        </TabsContent>
+
+        <TabsContent value="team-overview" className="space-y-6">
+          <UnifiedDashboardBody />
+        </TabsContent>
+      </Tabs>
 
       <LocationSetupModal
         open={showLocationSetup}
