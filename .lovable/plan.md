@@ -1,35 +1,67 @@
 
 
-## Diagnosis
+## Plan: Unify Bulk Scheduler — Drop the Wizard, Keep One Fast Form
 
-The dev server shows the **last error was at 06:58:50, but compiles have been clean since 06:59:02** — the build is currently healthy. So the blank page at `/` is a **runtime crash**, not a build error. Three likely culprits, in order of probability:
+User feedback: the multi-step wizard is confusing. Make `BulkScheduleGenerator` (single-page form) the canonical entry point, and route the other two surfaces into it.
 
-### 1. `UnifiedDashboardBody` runtime crash
-We exported a body component from `UnifiedDashboard.tsx` and mounted it inside the new "Team Overview" tab in `Dashboard.tsx`. If `UnifiedDashboardBody` was extracted incompletely (e.g. missing hooks, missing imports, refers to props the parent used to pass), the whole `Dashboard` page crashes — and since `Index.tsx` redirects authenticated users to `/dashboard`, the user lands on a blank screen.
+### Current state
+- `BulkScheduleWizard` — 7-step wizard (Mode → Team → Dates → Partner → Shifts → Options → Review). Confusing.
+- `BulkScheduleGenerator` — single-page form with sections. Faster, more familiar.
+- `QuickBulkScheduler` — minimal "this week" shortcut.
 
-### 2. `useScheduleEntries` hook regression
-The new hook is `enabled: !!user?.id` AND requires either userIds or teamIds. In `Dashboard.tsx` we pass `userIds: user?.id ? [user.id] : []` — looks fine, but a typo or a missing `enabled` short-circuit could trigger an unhandled fetch error.
+All three write to the same `schedule_entries` table via similar logic.
 
-### 3. `Index.tsx` / route flow
-If `/` redirects to `/dashboard` and `/dashboard` crashes, user sees blank. `Index.tsx` was not touched — but worth verifying.
+### Approach
+Single canonical component with **progressive disclosure** — basics visible by default, advanced collapsed.
 
-## Fix plan (one pass, surgical)
+1. **Promote `BulkScheduleGenerator` as the canonical UI.** Keep its sectioned layout (Mode • Team & People • Dates • Shifts • Advanced collapsible).
+2. **Port wizard-only features into it** so nothing is lost:
+   - Hotline mode (from `HotlineGenerationStep` + `HotlineDraftPreview`)
+   - Rotation mode with per-date shift pattern (from `ShiftPatternStep`)
+   - Partner coverage info panel (from `PartnerAvailabilityStep`) — render inline as a collapsible "Partner availability" card under Dates
+   - Fairness + recurring options (already partially in Generator's advanced panel)
+3. **Redirect the wizard**: `BulkScheduleWizard.tsx` becomes a thin shell that renders `<BulkScheduleGenerator />`. Any route/import using the wizard keeps working — no broken links.
+4. **Keep `QuickBulkScheduler`** as-is (it's the "1-click this week" preset, not confusing). Optionally have it open the Generator pre-filled instead of being its own form — your call.
+5. **Delete wizard step files** only after confirming the Generator covers every feature: `ModeSelectionStep`, `TeamPeopleStep`, `DateRangeStep`, `PartnerAvailabilityStep`, `ShiftConfigStep`, `ShiftPatternStep`, `AdvancedOptionsStep`, `ReviewStep`, `WizardProgress`. ~9 files, ~1500 lines removed.
 
-1. **Read** `src/pages/UnifiedDashboard.tsx` end-to-end to confirm `UnifiedDashboardBody`:
-   - Is exported correctly
-   - Has all hooks/imports it needs
-   - Doesn't reference variables that only existed in the original wrapper
+### UI structure of the unified Generator
+```text
+[Mode tabs: Users | Team | Rotation | Hotline]
+─────────────────────────────────────────────
+Team & People        (changes per mode)
+Date Range           + quick presets (This Week / Next / Month)
+  └ Partner availability (collapsible, auto-expanded if conflicts)
+Shifts               (single config OR per-date pattern for rotation)
+─────────────────────────────────────────────
+▸ Advanced options   (fairness, recurring, holiday skip, conflict handling)
+─────────────────────────────────────────────
+[Preview summary: X shifts across Y people]   [Cancel] [Generate]
+```
 
-2. **Read** `src/hooks/useScheduleEntries.ts` to confirm:
-   - It returns `data` (not undefined) when disabled
-   - Doesn't throw on empty `userIds`
+### Safety
+- Wizard route/import alias preserved → no broken links.
+- Hotline draft-save flow preserved (the only async step the wizard had).
+- Permission check (`admin/planner/manager`) preserved.
+- All existing memory rules respected: skip-holidays logic, overwrite mode, country shift limits, weekend validation, rotation per-date times.
 
-3. **Add an Error Boundary** around `<UnifiedDashboardBody />` in the Team Overview tab so a crash in that subtree no longer takes down the whole `/dashboard` page. This guarantees the visible Dashboard renders even if Team Overview is broken.
+### Files
+**Edit**
+- `src/components/schedule/BulkScheduleGenerator.tsx` — add Hotline mode, Rotation per-date pattern, Partner availability panel, Review summary
+- `src/components/schedule/wizard/BulkScheduleWizard.tsx` — replace body with `<BulkScheduleGenerator onScheduleGenerated={...} onCancel={...} />`
 
-4. **Fix the actual crash** in whichever of (1) or (2) is the root cause.
+**Delete (after verification)**
+- `src/components/schedule/wizard/ModeSelectionStep.tsx`
+- `src/components/schedule/wizard/TeamPeopleStep.tsx`
+- `src/components/schedule/wizard/DateRangeStep.tsx`
+- `src/components/schedule/wizard/PartnerAvailabilityStep.tsx`
+- `src/components/schedule/wizard/ShiftConfigStep.tsx`
+- `src/components/schedule/wizard/ShiftPatternStep.tsx`
+- `src/components/schedule/wizard/AdvancedOptionsStep.tsx`
+- `src/components/schedule/wizard/ReviewStep.tsx`
+- `src/components/schedule/wizard/WizardProgress.tsx`
 
-5. Verify by tailing dev-server log + opening `/dashboard` — confirm clean render.
-
-### Rollback option
-If the fix isn't immediate, the safest option is to revert the last AI message via the **History** view (restores everything to before the consolidation) and reapply changes one file at a time.
+### Out of scope
+- Touching `QuickBulkScheduler` behavior (separate small pass if you want it).
+- Edge function consolidation.
+- Removing `useBulkSchedulerState` (Generator already uses it).
 
