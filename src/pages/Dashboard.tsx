@@ -127,6 +127,23 @@ const Dashboard = () => {
           Welcome back, {welcomeName}
         </p>
       </div>
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(searchParams);
+          if (v === "team-overview") next.set("view", "team-overview");
+          else next.delete("view");
+          setSearchParams(next, { replace: true });
+        }}
+        className="space-y-6"
+      >
+        <TabsList>
+          <TabsTrigger value="my-schedule">My Schedule</TabsTrigger>
+          <TabsTrigger value="team-overview">Team Overview</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="my-schedule" className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
