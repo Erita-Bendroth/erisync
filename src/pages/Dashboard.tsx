@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock, Users, LogOut, Mail, TrendingUp, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +16,8 @@ import { PendingRequestsCard } from "@/components/dashboard/PendingRequestsCard"
 import { LocationSetupModal } from "@/components/profile/LocationSetupModal";
 import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useScheduleEntries } from "@/hooks/useScheduleEntries";
+import { UnifiedDashboardBody } from "@/pages/UnifiedDashboard";
 
 const Dashboard = () => {
   const { user } = useAuth();
