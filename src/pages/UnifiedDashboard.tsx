@@ -15,7 +15,11 @@ import { useNavigate } from "react-router-dom";
 
 import Layout from '@/components/Layout';
 
-export default function UnifiedDashboard() {
+/**
+ * Body of the unified dashboard, without the outer <Layout>.
+ * Used directly by `/dashboard` "Team Overview" tab.
+ */
+export function UnifiedDashboardBody() {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
@@ -198,8 +202,7 @@ export default function UnifiedDashboard() {
   });
 
   return (
-    <Layout>
-      <div className="space-y-6 pb-20 md:pb-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Unified Scheduling Dashboard</h1>
@@ -462,7 +465,19 @@ export default function UnifiedDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
-      </div>
+    </div>
+  );
+}
+
+/**
+ * Default export retained for backwards compat (e.g. legacy bookmarks).
+ * The route now redirects to /dashboard?view=team-overview, but this
+ * still works if mounted directly.
+ */
+export default function UnifiedDashboard() {
+  return (
+    <Layout>
+      <UnifiedDashboardBody />
     </Layout>
   );
 }
