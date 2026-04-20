@@ -176,7 +176,7 @@ export const PendingRequestsCard = () => {
                     <p className="text-xs text-muted-foreground">{vacationCount} pending</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => navigate("/schedule?tab=schedule&showRequests=true")}>
+                <Button size="sm" variant="outline" onClick={() => navigate("/schedule?tab=vacation&sub=team")}>
                   View
                 </Button>
               </div>

@@ -38,6 +38,7 @@ import { PersonalMonthlyCalendar } from "@/components/schedule/PersonalMonthlyCa
 import { MyRequestsDialog } from "@/components/schedule/MyRequestsDialog";
 import { QuickSwapButton } from "@/components/schedule/swap/QuickSwapButton";
 import { SwapStatusCards } from "@/components/schedule/swap/SwapStatusCards";
+import { VacationCenter } from "@/components/schedule/VacationCenter";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -343,6 +344,10 @@ const Schedule = () => {
                 <Calendar className="w-4 h-4 mr-1.5" />
                 <span className="text-xs">Schedule</span>
               </TabsTrigger>
+              <TabsTrigger value="vacation" className="flex items-center justify-center px-3">
+                <Calendar className="w-4 h-4 mr-1.5" />
+                <span className="text-xs">Vacation</span>
+              </TabsTrigger>
               <TabsTrigger value="teams" className="flex items-center justify-center px-3">
                 <Users className="w-4 h-4 mr-1.5" />
                 <span className="text-xs">Teams</span>
@@ -371,6 +376,10 @@ const Schedule = () => {
             <TabsTrigger value="schedule" className="flex items-center justify-center px-2">
               <Calendar className="w-4 h-4 md:mr-2" />
               <span className="hidden md:inline">Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="vacation" className="flex items-center justify-center px-2">
+              <Calendar className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Vacation</span>
             </TabsTrigger>
             <TabsTrigger value="teams" className="flex items-center justify-center px-2">
               <Users className="w-4 h-4 md:mr-2" />
@@ -595,6 +604,15 @@ const Schedule = () => {
 
           <TabsContent value="teams" className="space-y-6">
             <EnhancedTeamManagement />
+          </TabsContent>
+
+          <TabsContent value="vacation" className="space-y-6">
+            <VacationCenter
+              isAdmin={isAdmin()}
+              isPlanner={isPlanner()}
+              isManager={isManager()}
+              teams={teams.map(t => ({ id: t.id, name: t.name }))}
+            />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

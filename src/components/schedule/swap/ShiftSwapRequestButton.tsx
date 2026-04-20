@@ -1,7 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { ArrowLeftRight } from 'lucide-react';
-import { useState } from 'react';
-import { ShiftSwapRequestDialog } from './ShiftSwapRequestDialog';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { ShiftSwapWizard } from './ShiftSwapWizard';
+import type { TargetShift } from './SwapTargetSelector';
 
 interface ShiftSwapRequestButtonProps {
   targetUserId: string;
@@ -26,7 +28,8 @@ export function ShiftSwapRequestButton({
   currentUserEntryId,
   disabled = false
 }: ShiftSwapRequestButtonProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [prefilledTarget, setPrefilledTarget] = useState<TargetShift | null>(null);
 
   // Don't show button if viewing own shift
   if (currentUserId === targetUserId) {
@@ -41,27 +44,43 @@ export function ShiftSwapRequestButton({
     return null;
   }
 
+  const handleClick = async () => {
+    // Resolve team name + initials so the wizard can render the target nicely.
+    const [{ data: team }, { data: profile }] = await Promise.all([
+      supabase.from('teams').select('name').eq('id', teamId).maybeSingle(),
+      supabase.from('profiles').select('initials').eq('user_id', targetUserId).maybeSingle(),
+    ]);
+    setPrefilledTarget({
+      entryId: targetEntryId,
+      userId: targetUserId,
+      userName: targetUserName,
+      userInitials: profile?.initials || targetUserName.slice(0, 2).toUpperCase(),
+      date,
+      shiftType: shiftType || 'normal',
+      teamId,
+      teamName: team?.name || '',
+    });
+    setWizardOpen(true);
+  };
+
   return (
     <>
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => setDialogOpen(true)}
+        onClick={handleClick}
         disabled={disabled}
         className="h-6 px-2 text-xs"
       >
         <ArrowLeftRight className="h-3 w-3 mr-1" />
         Swap
       </Button>
-      <ShiftSwapRequestDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        requestingUserId={currentUserId}
-        targetUserId={targetUserId}
-        targetUserName={targetUserName}
-        targetEntryId={targetEntryId}
-        swapDate={date}
-        teamId={teamId}
+      <ShiftSwapWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        currentUserId={currentUserId}
+        teamIds={[teamId]}
+        prefilledTarget={prefilledTarget}
       />
     </>
   );

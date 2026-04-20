@@ -13,6 +13,13 @@ interface ShiftSwapWizardProps {
   onOpenChange: (open: boolean) => void;
   currentUserId: string;
   teamIds: string[];
+  /**
+   * Optional pre-filled target shift. When supplied, the wizard skips
+   * the mode + target-selection steps and jumps straight to "select my shift".
+   * Used by ShiftSwapRequestButton / ShiftSwapRequestDialog when the user
+   * clicked "Swap" on a specific colleague's shift in the schedule.
+   */
+  prefilledTarget?: TargetShift | null;
 }
 
 export type WizardStep = 'select-mode' | 'select-my-shift' | 'select-target' | 'review';
@@ -34,12 +41,26 @@ export function ShiftSwapWizard({
   open, 
   onOpenChange, 
   currentUserId,
-  teamIds 
+  teamIds,
+  prefilledTarget = null,
 }: ShiftSwapWizardProps) {
-  const [currentStep, setCurrentStep] = useState<WizardStep>('select-mode');
-  const [swapMode, setSwapMode] = useState<SwapMode | null>(null);
+  const [currentStep, setCurrentStep] = useState<WizardStep>(
+    prefilledTarget ? 'select-my-shift' : 'select-mode'
+  );
+  const [swapMode, setSwapMode] = useState<SwapMode | null>(
+    prefilledTarget ? 'direct' : null
+  );
   const [selectedMyShift, setSelectedMyShift] = useState<MyShift | null>(null);
-  const [selectedTarget, setSelectedTarget] = useState<TargetShift | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<TargetShift | null>(prefilledTarget);
+
+  // Keep wizard in sync if the prefilled target arrives after mount (e.g. dialog reopens).
+  React.useEffect(() => {
+    if (prefilledTarget) {
+      setSelectedTarget(prefilledTarget);
+      setSwapMode('direct');
+      if (currentStep === 'select-mode') setCurrentStep('select-my-shift');
+    }
+  }, [prefilledTarget]);
 
   const steps = swapMode === 'open-offer' ? OPEN_OFFER_STEPS : DIRECT_STEPS;
   const currentStepIndex = steps.findIndex(s => s.key === currentStep);
@@ -48,10 +69,10 @@ export function ShiftSwapWizard({
   const handleClose = () => {
     onOpenChange(false);
     setTimeout(() => {
-      setCurrentStep('select-mode');
-      setSwapMode(null);
+      setCurrentStep(prefilledTarget ? 'select-my-shift' : 'select-mode');
+      setSwapMode(prefilledTarget ? 'direct' : null);
       setSelectedMyShift(null);
-      setSelectedTarget(null);
+      setSelectedTarget(prefilledTarget);
     }, 200);
   };
 
@@ -60,6 +81,9 @@ export function ShiftSwapWizard({
       setCurrentStep('select-my-shift');
     } else if (currentStep === 'select-my-shift' && selectedMyShift) {
       if (swapMode === 'open-offer') {
+        setCurrentStep('review');
+      } else if (prefilledTarget) {
+        // Target was pre-filled — skip target selection.
         setCurrentStep('review');
       } else {
         setCurrentStep('select-target');
@@ -71,11 +95,18 @@ export function ShiftSwapWizard({
 
   const handleBack = () => {
     if (currentStep === 'select-my-shift') {
-      setCurrentStep('select-mode');
+      // If target was pre-filled there's no mode step to go back to — just close.
+      if (prefilledTarget) {
+        handleClose();
+      } else {
+        setCurrentStep('select-mode');
+      }
     } else if (currentStep === 'select-target') {
       setCurrentStep('select-my-shift');
     } else if (currentStep === 'review') {
       if (swapMode === 'open-offer') {
+        setCurrentStep('select-my-shift');
+      } else if (prefilledTarget) {
         setCurrentStep('select-my-shift');
       } else {
         setCurrentStep('select-target');
