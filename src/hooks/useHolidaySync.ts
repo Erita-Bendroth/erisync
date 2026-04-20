@@ -32,6 +32,7 @@ export function useHolidaySync() {
           // Also invalidate schedule queries since holidays affect schedule display
           queryClient.invalidateQueries({ queryKey: ['scheduleEntries'] });
           queryClient.invalidateQueries({ queryKey: ['schedule'] });
+          queryClient.invalidateQueries({ queryKey: ['schedule-entries'] });
           
           // Show notification
           if (payload.eventType === 'INSERT') {
