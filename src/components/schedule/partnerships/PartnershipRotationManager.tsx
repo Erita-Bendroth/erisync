@@ -509,6 +509,21 @@ export function PartnershipRotationManager({
           onConfirm={handleConfirmClone}
         />
       )}
+
+      {showWorkspace && selectedRoster && (
+        <PartnershipWorkspace
+          open={showWorkspace}
+          onOpenChange={setShowWorkspace}
+          partnershipId={partnershipId}
+          partnershipName={partnershipName}
+          rosterId={selectedRoster.id}
+          rosterName={selectedRoster.roster_name}
+          cycleLength={selectedRoster.cycle_length_weeks}
+          onSuccess={() => {
+            fetchRosters();
+          }}
+        />
+      )}
     </div>
   );
 }
