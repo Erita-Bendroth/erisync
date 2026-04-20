@@ -196,3 +196,45 @@ describe("computeRosterStatusFromApprovals", () => {
     ).toBe("activated");
   });
 });
+
+// --- Country/holiday resolution tests for the strict shift resolver ---
+import { resolveShiftDefinition, type ShiftDefinitionRow } from "./shiftResolver";
+
+const def = (overrides: Partial<ShiftDefinitionRow>): ShiftDefinitionRow => ({
+  id: "d1",
+  shift_type: "early",
+  team_id: null,
+  team_ids: null,
+  country_codes: null,
+  day_of_week: null,
+  start_time: "06:00",
+  end_time: "14:00",
+  description: null,
+  ...overrides,
+});
+
+describe("resolveShiftDefinition — country/holiday handling", () => {
+  it("GB member matches a UK-tagged definition (alias)", () => {
+    const r = resolveShiftDefinition(
+      { shiftType: "early", date: "2025-06-10", personCountry: "GB" },
+      [def({ id: "uk-early", country_codes: ["UK"] })]
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("US member with no early def returns no_match", () => {
+    const r = resolveShiftDefinition(
+      { shiftType: "early", date: "2025-06-10", personCountry: "US" },
+      [def({ id: "de-early", country_codes: ["DE"] })]
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it("Country-tagged definition does not leak across countries", () => {
+    const r = resolveShiftDefinition(
+      { shiftType: "early", date: "2025-06-10", personCountry: "FI" },
+      [def({ id: "be-early", country_codes: ["BE"] })]
+    );
+    expect(r.ok).toBe(false);
+  });
+});
