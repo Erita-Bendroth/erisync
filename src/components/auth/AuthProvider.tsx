@@ -28,15 +28,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isInitialized, setIsInitialized] = useState(false);
   const initializedRef = useRef(false);
 
+  const getSafeLocalStorage = useCallback(() => {
+    if (typeof window === "undefined") return null;
+
+    try {
+      const testKey = "__auth_storage_test__";
+      window.localStorage.setItem(testKey, "1");
+      window.localStorage.removeItem(testKey);
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const getStoredSessionSnapshot = useCallback((): Session | null => {
     try {
-      const authStorageKey = Object.keys(localStorage).find(
+      const storage = getSafeLocalStorage();
+      if (!storage) return null;
+
+      const authStorageKey = Object.keys(storage).find(
         (key) => key.startsWith('sb-') && key.endsWith('-auth-token')
       );
 
       if (!authStorageKey) return null;
 
-      const rawSession = localStorage.getItem(authStorageKey);
+      const rawSession = storage.getItem(authStorageKey);
       if (!rawSession) return null;
 
       const parsedSession = JSON.parse(rawSession);
@@ -58,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error reading stored auth session:', error);
       return null;
     }
-  }, []);
+  }, [getSafeLocalStorage]);
 
   useEffect(() => {
     let mounted = true;
@@ -144,9 +160,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [getStoredSessionSnapshot]);
 
   const clearAuthStorage = () => {
-    Object.keys(localStorage).forEach((key) => {
+    const storage = getSafeLocalStorage();
+    if (!storage) return;
+
+    Object.keys(storage).forEach((key) => {
       if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-        localStorage.removeItem(key);
+        storage.removeItem(key);
       }
     });
   };
