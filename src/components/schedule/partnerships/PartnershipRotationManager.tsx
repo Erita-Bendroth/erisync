@@ -8,6 +8,7 @@ import { Plus, Calendar, Copy, AlertCircle, CheckCircle2, Clock, Users } from "l
 import { RosterBuilderDialog } from "./RosterBuilderDialog";
 import { CloneRosterDialog } from "./CloneRosterDialog";
 import { ShiftCoveragePanel } from "./ShiftCoveragePanel";
+import { PartnershipWorkspace } from "./PartnershipWorkspace";
 import { toast } from "sonner";
 
 interface Roster {
@@ -56,6 +57,7 @@ export function PartnershipRotationManager({
   const [loading, setLoading] = useState(true);
   const [selectedRoster, setSelectedRoster] = useState<Roster | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showWorkspace, setShowWorkspace] = useState(false);
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [rosterToClone, setRosterToClone] = useState<Roster | null>(null);
   const [rosterProgress, setRosterProgress] = useState<Record<string, RosterProgress>>({});
@@ -178,7 +180,7 @@ export function PartnershipRotationManager({
 
   const handleEditRoster = (roster: Roster) => {
     setSelectedRoster(roster);
-    setShowBuilder(true);
+    setShowWorkspace(true);
   };
 
   const handleCloneRoster = (roster: Roster) => {
