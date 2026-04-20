@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { resolveShiftDefinition, type ShiftDefinitionRow, type ShiftTypeName } from "@/lib/shiftResolver";
+import { resolveShiftDefinition, type ShiftDefinitionRow, type ShiftTypeName, type ResolveResult } from "@/lib/shiftResolver";
 import { normalizeCountryCode } from "@/lib/countryCodeUtils";
 
 const SHIFT_TYPES: ShiftTypeName[] = ["normal", "early", "late", "weekend"];
@@ -73,7 +73,7 @@ export function ShiftCoveragePanel({ partnershipId }: ShiftCoveragePanelProps) {
         for (const st of SHIFT_TYPES) {
           // Sample: a Wednesday for weekday types, Saturday for weekend
           const sampleDate = st === "weekend" ? "2025-06-07" : "2025-06-04";
-          const r = resolveShiftDefinition(
+          const r: ResolveResult = resolveShiftDefinition(
             { shiftType: st, date: sampleDate, personCountry: country, teamId: teamForCountry },
             (defs ?? []) as ShiftDefinitionRow[]
           );
