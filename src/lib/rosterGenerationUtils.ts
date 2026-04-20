@@ -58,7 +58,7 @@ interface TeamMember {
 export async function generateRosterSchedules(
   rosterId: string,
   userId: string
-): Promise<{ success: boolean; entriesCreated: number; entriesDeleted?: number; error?: string }> {
+): Promise<{ success: boolean; entriesCreated: number; entriesDeleted?: number; warnings?: string[]; error?: string }> {
   try {
     // Fetch roster configuration
     const { data: roster, error: rosterError } = await supabase
@@ -140,7 +140,7 @@ export async function generateRosterSchedules(
     console.log(`🧹 Deleted ${deletedCount || 0} existing work entries`);
 
     // Generate schedule entries
-    const scheduleEntries = await generateScheduleEntries(
+    const { entries: scheduleEntries, warnings } = await generateScheduleEntries(
       roster,
       assignments,
       membersList,
@@ -185,7 +185,7 @@ export async function generateRosterSchedules(
 
     if (activateError) throw activateError;
 
-    return { success: true, entriesCreated, entriesDeleted: deletedCount || 0 };
+    return { success: true, entriesCreated, entriesDeleted: deletedCount || 0, warnings };
   } catch (error) {
     console.error("Error generating roster schedules:", error);
     return {
