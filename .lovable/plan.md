@@ -1,92 +1,81 @@
 
 
-## Plan: Correct Partnership Approval Workflow for N Teams
+## Plan: Deterministic Shift Rule Resolution + Coverage Report
 
-### Discovery summary
-- Roster lives in `partnership_rotation_rosters` with `status` (free text), `submitted_by`, `submitted_at`.
-- Per-team approvals live in `roster_manager_approvals` (`approved` boolean, `team_id`, `manager_id`, `comments`).
-- Activity log already exists in `roster_activity_log`.
-- Submission is handled by edge function `create-roster-approvals` (auto-approves submitter).
-- Activation logic lives in `src/lib/rosterGenerationUtils.ts` via `validateRosterApprovals` + `generateRosterSchedules`.
-- Editing UI: `RosterBuilderDialog`, `RosterApprovalPanel`, `PartnershipRotationManager`.
-- Current gaps:
-  - `status` is free text; no enum, no `NeedsChanges`/`PartiallyApproved`.
-  - No `roster_version` → editing after approval does not reset approvals.
-  - No reject state on `roster_manager_approvals` (only boolean approved).
-  - No DB-side guards; all rules live in TS and can be bypassed.
-  - No deterministic test harness.
+### Discovery
+- `src/lib/shiftTimeUtils.ts` already does priority-based resolution (7 tiers) but:
+  - Returns silently on no match (default fallback) — no validation error path
+  - Doesn't detect ambiguity (multiple equally-specific rules)
+  - Returns only `{startTime, endTime}` strings — no timezone-aware DateTime
+  - No country→timezone mapping
+  - No DST-aware instance builder
+- `src/lib/countryCodeUtils.ts` normalizes country codes (UK→GB) — reuse it
+- No country→IANA timezone map exists
+- No test harness for shift resolution (only `rosterWorkflow.test.ts`)
 
-### State machine (Task 1)
+### Approach
 
-Roster global states:
-- `draft` → `submitted` (trigger: submit; guard: ≥1 assignment)
-- `submitted` → `partially_approved` (trigger: first approve)
-- `submitted` / `partially_approved` → `fully_approved` (trigger: last approve; guard: all teams approved, none rejected)
-- `submitted` / `partially_approved` → `needs_changes` (trigger: any reject)
-- `needs_changes` → `draft` (trigger: edit/resubmit cycle)
-- `fully_approved` → `activated` (trigger: activate; guard: all approved + version unchanged)
-- any non-`activated` → `draft` (trigger: roster edit; side effect: bump version, reset approvals)
+**1. New `src/lib/shiftResolver.ts`** — strict resolver wrapping existing logic
+- `resolveShiftDefinition({ shiftType, date, personCountry, teamId })` returns:
+  - `{ ok: true, definition, matchedTier }` or
+  - `{ ok: false, reason: 'no_match' | 'ambiguous', candidates }`
+- Priority (simplified per task spec):
+  1. team + country (+ optional day match)
+  2. country only
+  3. global fallback (no team, no country)
+  4. error
+- Ambiguity check: within the winning tier, if >1 row has identical specificity → fail with conflict list
 
-Per-team approval states: `pending`, `approved`, `rejected` (replace boolean).
+**2. New `src/lib/timezoneUtils.ts`** — country→IANA timezone map
+- Covers all countries already in `countryCodeUtils.ts` (AT, BE, CH, DE, DK, ES, FI, FR, GB, IE, IT, NL, NO, PL, PT, SE)
+- `getTimezoneForCountry(code): string`
 
-### Task 2: Invariants (DB + code)
+**3. New `src/lib/shiftInstance.ts`** — DST-safe builder
+- `buildShiftInstance(definition, date, timezone)` using `date-fns-tz`:
+  - Parses `start_time`/`end_time` as wall-clock in `timezone`
+  - Detects midnight crossing (`end <= start` → end on next day)
+  - Returns `{ startUtc, endUtc, startLocal, endLocal, durationMinutes, timezone, crossesMidnight, dstTransition }`
+- Duration computed from UTC instants (correctly accounts for DST gaps/overlaps)
 
-Add a DB migration:
-- `partnership_rotation_rosters.version int default 1`
-- `partnership_rotation_rosters.status` constrained to enum values
-- `roster_manager_approvals.state text` (`pending|approved|rejected`) + `roster_version int` snapshot
-- Trigger `bump_roster_version_on_change` on `roster_week_assignments` insert/update/delete → increments `partnership_rotation_rosters.version`, resets all approvals for that roster to `pending`, sets status back to `draft`, writes audit row.
-- Trigger `enforce_approval_guards` on `roster_manager_approvals` → reject approve when roster status not in (`submitted`,`partially_approved`,`needs_changes`); reject when `manager_id != auth.uid()` and caller not admin/planner; reject when `team_id` not in partnership.
-- Trigger `recompute_roster_status` after approval change → set `partially_approved`, `fully_approved`, or `needs_changes`.
-- RPC `activate_roster(roster_id)` that checks all approvals = `approved` and version matches snapshot before allowing activation.
+**4. Test suite `src/lib/shiftResolver.test.ts`** (Vitest, deterministic, no DB)
+- In-memory definition fixtures mirroring UI table
+- Scenarios:
+  1. Same shiftType, NO/DE/PL → different end times resolve correctly
+  2. Team override wins over country-only rule
+  3. DST week (last Sun March / last Sun October Europe) → 8h shift stays 8h local; UTC duration shifts by 1h on transition day as expected
+  4. No matching rule → `{ ok: false, reason: 'no_match' }`
+  5. Two equally-specific rules for same country/team/day → `{ ok: false, reason: 'ambiguous', candidates: [...] }`
+  6. Calendar preview helper returns local times per member country
 
-Code guards in `src/lib/rosterWorkflow.ts` (new):
-- `canSubmit(roster, assignments)`
-- `canApprove(user, roster, team, approvals)`
-- `canReject(user, roster, team)`
-- `canActivate(roster, approvals)`
-- `canEdit(user, roster, team)`
-- `applyEditSideEffects(roster)` → bumps version, resets approvals locally for optimistic UI.
+**5. Coverage Report generator `src/lib/shiftCoverageReport.ts`**
+- `generateCoverageReport(definitions, countries, shiftTypes)` → matrix of `{ country, shiftType, rule | 'MISSING' | 'AMBIGUOUS' }`
+- Exposed via small admin-only script `scripts/shift-coverage-report.ts` that pulls live definitions from Supabase and prints markdown table
 
-### Task 3: Deterministic test harness
-
-Create `supabase/functions/test-roster-workflow/index.ts` (admin-only, dev guard) that:
-- Seeds N synthetic teams + managers in a sandbox partnership (`is_test=true`).
-- Runs scenarios 1–6 in-process against the real DB using service role:
-  1. Happy path N∈{2,3,5}
-  2. Approve-before-submit → expect guard failure
-  3. Reject path → expect `needs_changes`, activation blocked
-  4. Edit-after-approve → expect version bump + all approvals reset
-  5. Unauthorized cross-team edit → expect 403
-  6. Idempotent submit/approve → no duplicate rows, state stable
-- After each action asserts all invariants and prints `PASS/FAIL: <invariant>`.
-- Cleans up test partnership at end.
-
-Also add a lightweight Vitest unit suite for pure guard functions in `src/lib/rosterWorkflow.test.ts` so guards are testable without DB.
-
-### Audit log
-
-Extend `roster_activity_log` usage to record:
-- `submitted`, `approved`, `rejected`, `roster_changed_after_approval`, `activated`, `needs_changes_set`
-- Include `roster_version`, `team_id`, actor.
+**6. Wire resolver into one hot path (non-breaking)**
+- Update `getApplicableShiftTimes` in `shiftTimeUtils.ts` to optionally delegate to new resolver behind a `strict?: boolean` flag — default `false` to preserve current behavior
+- Add `resolveShiftDefinitionStrict` export for callers that want hard errors (roster generation, bulk scheduling preview)
 
 ### Files
 
 New
-- `supabase/migrations/<ts>_roster_workflow_state_machine.sql`
-- `src/lib/rosterWorkflow.ts`
-- `src/lib/rosterWorkflow.test.ts`
-- `supabase/functions/test-roster-workflow/index.ts`
+- `src/lib/shiftResolver.ts`
+- `src/lib/shiftResolver.test.ts`
+- `src/lib/timezoneUtils.ts`
+- `src/lib/shiftInstance.ts`
+- `src/lib/shiftInstance.test.ts`
+- `src/lib/shiftCoverageReport.ts`
+- `scripts/shift-coverage-report.ts`
 
 Edit
-- `supabase/functions/create-roster-approvals/index.ts` (use new state + version)
-- `src/lib/rosterGenerationUtils.ts` (use `activate_roster` RPC, version check)
-- `src/components/schedule/partnerships/RosterApprovalPanel.tsx` (show 3-state, reject button, NeedsChanges banner)
-- `src/components/schedule/partnerships/RosterBuilderDialog.tsx` (warn on edit-after-approval)
-- `src/components/schedule/partnerships/PartnershipRotationManager.tsx` (gate Activate on `fully_approved`)
-- `supabase/config.toml` (register `test-roster-workflow` with `verify_jwt = true`)
+- `src/lib/shiftTimeUtils.ts` (add optional strict delegation, no behavior change by default)
+- `package.json` (add `date-fns-tz` if missing; add `report:shifts` script)
 
-### Out of scope (will not change)
-- Existing schedule generation logic
-- UI redesign beyond state badges + reject button + version warning
+### Out of scope
+- UI changes to surface ambiguity warnings (follow-up)
+- Migrating existing callers to strict mode (follow-up after report shows clean coverage)
+- Storing timezone on shift definitions (current model: derive from person's country)
+
+### Deliverables on completion
+- `npm test` runs new suites with PASS/FAIL per scenario, printing expected vs actual start/end/duration on failure
+- `npm run report:shifts` prints a Shift Rule Coverage Report (country × shiftType matrix)
 
