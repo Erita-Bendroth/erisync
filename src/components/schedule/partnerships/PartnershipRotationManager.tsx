@@ -16,7 +16,13 @@ interface Roster {
   cycle_length_weeks: number;
   start_date: string;
   end_date: string | null;
-  status: "draft" | "pending_approval" | "approved" | "implemented";
+  status:
+    | "draft"
+    | "submitted"
+    | "partially_approved"
+    | "fully_approved"
+    | "needs_changes"
+    | "activated";
   default_shift_for_non_duty: string;
   created_at: string;
 }
@@ -89,9 +95,9 @@ export function PartnershipRotationManager({
       const rostersData = (data || []) as Roster[];
       setRosters(rostersData);
       
-      // Fetch progress for each non-implemented roster
+      // Fetch progress for each non-activated roster
       for (const roster of rostersData) {
-        if (roster.status !== "implemented") {
+        if (roster.status !== "activated") {
           fetchRosterProgress(roster.id);
         }
       }
@@ -157,7 +163,7 @@ export function PartnershipRotationManager({
   useEffect(() => {
     if (userTeamIds.length > 0 && rosters.length > 0) {
       for (const roster of rosters) {
-        if (roster.status !== "implemented") {
+        if (roster.status !== "activated") {
           fetchRosterProgress(roster.id);
         }
       }
@@ -255,7 +261,7 @@ export function PartnershipRotationManager({
   };
 
   const handleDeleteRoster = async (roster: Roster) => {
-    const isImplemented = roster.status === "implemented";
+    const isImplemented = roster.status === "activated";
     
     let confirmMessage = "Are you sure you want to delete this rotation roster?";
     if (isImplemented) {
@@ -289,9 +295,11 @@ export function PartnershipRotationManager({
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; label: string; className?: string }> = {
       draft: { variant: "secondary", label: "Draft" },
-      pending_approval: { variant: "default", label: "Pending Approval", className: "bg-amber-500 hover:bg-amber-600" },
-      approved: { variant: "default", label: "Approved", className: "bg-green-500 hover:bg-green-600" },
-      implemented: { variant: "default", label: "Implemented", className: "bg-blue-500 hover:bg-blue-600" },
+      submitted: { variant: "default", label: "Submitted", className: "bg-amber-500 hover:bg-amber-600" },
+      partially_approved: { variant: "default", label: "Partially Approved", className: "bg-amber-500 hover:bg-amber-600" },
+      fully_approved: { variant: "default", label: "Fully Approved", className: "bg-green-500 hover:bg-green-600" },
+      needs_changes: { variant: "destructive", label: "Needs Changes" },
+      activated: { variant: "default", label: "Activated", className: "bg-blue-500 hover:bg-blue-600" },
     };
 
     const config = variants[status] || variants.draft;
@@ -300,7 +308,7 @@ export function PartnershipRotationManager({
 
   // Separate rosters into action-needed and others
   const actionNeededRosters = rosters.filter(r => 
-    (r.status === "draft" || r.status === "pending_approval") && 
+    (r.status === "draft" || r.status === "submitted" || r.status === "partially_approved" || r.status === "needs_changes") && 
     rosterProgress[r.id]?.needsUserAction
   );
   const otherRosters = rosters.filter(r => 
@@ -313,7 +321,7 @@ export function PartnershipRotationManager({
 
   const renderRosterCard = (roster: Roster, isActionNeeded: boolean = false) => {
     const progress = rosterProgress[roster.id];
-    const isEditable = roster.status === "draft" || roster.status === "pending_approval";
+    const isEditable = roster.status !== "activated";
 
     return (
       <Card 
