@@ -80,11 +80,12 @@ export function ShiftCoveragePanel({ partnershipId }: ShiftCoveragePanelProps) {
           if (r.ok) {
             result[country][st] = { status: "ok", detail: r.matchedTier };
           } else {
+            const err = r as Extract<ResolveResult, { ok: false }>;
             result[country][st] = {
-              status: r.reason === "ambiguous" ? "ambiguous" : "missing",
-              detail: r.message,
+              status: err.reason === "ambiguous" ? "ambiguous" : "missing",
+              detail: err.message,
             };
-            if (r.reason === "no_match") anyMissing = true;
+            if (err.reason === "no_match") anyMissing = true;
           }
         }
       }
