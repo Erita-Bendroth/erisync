@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useScheduleEntries } from "@/hooks/useScheduleEntries";
 import { cn } from "@/lib/utils";
 import { TimeBlockDisplay } from "./TimeBlockDisplay";
 import { FlexTimeSummaryCard } from "./FlexTimeSummaryCard";
@@ -92,7 +93,7 @@ export function PersonalMonthlyCalendar() {
   const [dateRange, setDateRange] = useState<DateRange>("1M");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingExtras, setLoadingExtras] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<ScheduleEntry | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -120,16 +121,26 @@ export function PersonalMonthlyCalendar() {
 
   useEffect(() => {
     if (user?.id) {
-      fetchScheduleData();
+      fetchExtras();
     }
   }, [user?.id, currentMonth, dateRange]);
 
-  const fetchScheduleData = async () => {
+  // Schedule entries via shared cache
+  const monthsToFetch = getMonthsCount(dateRange);
+  const rangeStart = startOfMonth(currentMonth);
+  const rangeEnd = endOfMonth(addMonths(currentMonth, monthsToFetch - 1));
+  const { data: baseScheduleEntries = [], isLoading: scheduleLoading } = useScheduleEntries({
+    userIds: user?.id ? [user.id] : [],
+    startDate: rangeStart,
+    endDate: rangeEnd,
+    enabled: !!user?.id,
+  });
+
+  const fetchExtras = async () => {
     if (!user?.id) return;
     
     try {
-      setLoading(true);
-      const monthsToFetch = getMonthsCount(dateRange);
+      setLoadingExtras(true);
       const startDate = startOfMonth(currentMonth);
       const endDate = endOfMonth(addMonths(currentMonth, monthsToFetch - 1));
 
@@ -139,17 +150,6 @@ export function PersonalMonthlyCalendar() {
         .select("country_code, region_code")
         .eq("user_id", user.id)
         .single();
-
-      // Fetch schedule entries
-      const { data, error } = await supabase
-        .from("schedule_entries")
-        .select("id, date, shift_type, activity_type, availability_status, notes")
-        .eq("user_id", user.id)
-        .gte("date", format(startDate, "yyyy-MM-dd"))
-        .lte("date", format(endDate, "yyyy-MM-dd"))
-        .order("date", { ascending: true });
-
-      if (error) throw error;
 
       // Fetch daily_time_entries for unavailable types to merge as overrides
       const unavailableTypes = ['public_holiday', 'sick_leave', 'vacation', 'fza_withdrawal'];
@@ -161,7 +161,14 @@ export function PersonalMonthlyCalendar() {
         .gte('entry_date', format(startDate, 'yyyy-MM-dd'))
         .lte('entry_date', format(endDate, 'yyyy-MM-dd'));
 
-      let mergedEntries: ScheduleEntry[] = data || [];
+      let mergedEntries: ScheduleEntry[] = (baseScheduleEntries as any[]).map(e => ({
+        id: e.id,
+        date: e.date,
+        shift_type: e.shift_type,
+        activity_type: e.activity_type,
+        availability_status: e.availability_status,
+        notes: e.notes,
+      }));
       if (unavailableTimeEntries && unavailableTimeEntries.length > 0) {
         const overrides = new Map<string, ScheduleEntry>();
         for (const te of unavailableTimeEntries) {
@@ -211,9 +218,17 @@ export function PersonalMonthlyCalendar() {
     } catch (error) {
       console.error("Error fetching schedule:", error);
     } finally {
-      setLoading(false);
+      setLoadingExtras(false);
     }
   };
+
+  // Re-merge whenever the shared schedule cache updates
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchExtras();
+  }, [baseScheduleEntries]);
+
+  const loading = loadingExtras || scheduleLoading;
 
   const getHolidayForDate = (date: Date): Holiday | undefined => {
     const dateStr = format(date, "yyyy-MM-dd");
