@@ -22,23 +22,27 @@ export interface ResolveInput {
   isPublicHoliday?: boolean; // optional override for weekend rule
 }
 
-export type ResolveResult =
-  | {
-      ok: true;
-      definition: ShiftDefinitionRow;
-      matchedTier:
-        | "team_country_day"
-        | "team_country"
-        | "country_day"
-        | "country"
-        | "global";
-    }
-  | {
-      ok: false;
-      reason: "no_match" | "ambiguous";
-      message: string;
-      candidates: ShiftDefinitionRow[];
-    };
+export type MatchedTier =
+  | "team_country_day"
+  | "team_country"
+  | "country_day"
+  | "country"
+  | "global";
+
+export interface ResolveOk {
+  ok: true;
+  definition: ShiftDefinitionRow;
+  matchedTier: MatchedTier;
+}
+
+export interface ResolveErr {
+  ok: false;
+  reason: "no_match" | "ambiguous";
+  message: string;
+  candidates: ShiftDefinitionRow[];
+}
+
+export type ResolveResult = ResolveOk | ResolveErr;
 
 function getDayOfWeek(date: Date | string): number {
   const d = typeof date === "string" ? new Date(date) : date;
@@ -107,8 +111,7 @@ export function resolveShiftDefinition(
   const pool = definitions.filter((d) => d.shift_type === shiftType);
 
   const tiers: Array<{
-    name: ResolveResult extends { ok: true } ? never : never;
-    tier: Extract<ResolveResult, { ok: true }>["matchedTier"];
+    tier: MatchedTier;
     filter: (d: ShiftDefinitionRow) => boolean;
   }> = [
     {
@@ -117,32 +120,32 @@ export function resolveShiftDefinition(
         defMatchesTeam(d, teamId) &&
         matchesCountryCode(country, d.country_codes) &&
         defMatchesDay(d, dayOfWeek),
-    } as any,
+    },
     {
       tier: "team_country",
       filter: (d) =>
         defMatchesTeam(d, teamId) &&
         matchesCountryCode(country, d.country_codes) &&
         defHasNoDay(d),
-    } as any,
+    },
     {
       tier: "country_day",
       filter: (d) =>
         defHasNoTeam(d) &&
         matchesCountryCode(country, d.country_codes) &&
         defMatchesDay(d, dayOfWeek),
-    } as any,
+    },
     {
       tier: "country",
       filter: (d) =>
         defHasNoTeam(d) &&
         matchesCountryCode(country, d.country_codes) &&
         defHasNoDay(d),
-    } as any,
+    },
     {
       tier: "global",
       filter: (d) => defHasNoTeam(d) && defHasNoCountry(d) && defHasNoDay(d),
-    } as any,
+    },
   ];
 
   for (const t of tiers) {
