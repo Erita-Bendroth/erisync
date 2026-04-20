@@ -201,12 +201,87 @@ async function generateScheduleEntries(
   assignments: WeekAssignment[],
   teamMembers: TeamMember[],
   createdBy: string
-) {
+): Promise<{ entries: any[]; warnings: string[] }> {
   const entries: any[] = [];
+  const warnings: string[] = [];
   const startDate = new Date(roster.start_date);
   const endDate = roster.end_date
     ? new Date(roster.end_date)
     : addWeeks(startDate, 52); // Default to 1 year
+
+  // Pre-fetch holidays per unique country for the full date range
+  const startStr = format(startDate, "yyyy-MM-dd");
+  const endStr = format(endDate, "yyyy-MM-dd");
+  const uniqueCountries = Array.from(
+    new Set(teamMembers.map((m) => normalizeCountryCode(m.country_code)).filter(Boolean) as string[])
+  );
+  const holidaysByCountry = new Map<string, Set<string>>();
+  for (const c of uniqueCountries) {
+    holidaysByCountry.set(c, await fetchHolidayDateSet(c, startStr, endStr));
+  }
+
+  const isHolidayForMember = (member: TeamMember, dateStr: string) => {
+    const c = normalizeCountryCode(member.country_code);
+    if (!c) return false;
+    return holidaysByCountry.get(c)?.has(dateStr) ?? false;
+  };
+
+  const defaultNonDuty = (roster.default_shift_for_non_duty || "normal") as ShiftTypeName;
+
+  // Build & validate a single entry, applying weekend/holiday guard.
+  const buildEntry = async (
+    member: TeamMember,
+    entryDate: Date,
+    requestedShiftType: ShiftTypeName
+  ) => {
+    const dateStr = format(entryDate, "yyyy-MM-dd");
+    const dow = entryDate.getDay();
+    const isWeekendDay = dow === 0 || dow === 6;
+    const isHoliday = isHolidayForMember(member, dateStr);
+
+    let effectiveShiftType: ShiftTypeName = requestedShiftType;
+
+    // Weekend-shift validation: weekend can only land on Sat/Sun OR a public holiday for the member.
+    if (effectiveShiftType === "weekend" && !isWeekendDay && !isHoliday) {
+      warnings.push(
+        `Downgraded invalid weekend shift on ${dateStr} for user ${member.user_id} (${member.country_code ?? "??"}) → ${defaultNonDuty}`
+      );
+      effectiveShiftType = defaultNonDuty;
+    }
+
+    // On a public holiday for the member's country, flip weekday shifts to "weekend"
+    // so the correct holiday/weekend times apply.
+    if (effectiveShiftType !== "weekend" && isHoliday) {
+      effectiveShiftType = "weekend";
+    }
+
+    const shiftTimes = await getApplicableShiftTimes({
+      teamId: member.team_id,
+      countryCode: member.country_code || undefined,
+      regionCode: member.region_code || undefined,
+      shiftType: effectiveShiftType,
+      dayOfWeek: dow,
+      date: dateStr,
+    });
+
+    if (shiftTimes.id.startsWith("default-")) {
+      warnings.push(
+        `No shift definition for ${effectiveShiftType} / ${member.country_code ?? "??"} on ${dateStr} — using built-in default`
+      );
+    }
+
+    entries.push({
+      user_id: member.user_id,
+      team_id: member.team_id,
+      date: dateStr,
+      shift_type: effectiveShiftType,
+      activity_type: "work",
+      availability_status: "available",
+      shift_time_definition_id: shiftTimes.id.startsWith("default-") ? null : shiftTimes.id,
+      created_by: createdBy,
+      notes: `${shiftTimes.startTime}-${shiftTimes.endTime}`,
+    });
+  };
 
   let currentDate = startOfWeek(startDate, { weekStartsOn: 1 });
   let weekCounter = 0;
@@ -246,28 +321,8 @@ async function generateScheduleEntries(
         if (specificDayOfWeek !== null) {
           const dayOffset = specificDayOfWeek === 0 ? 6 : specificDayOfWeek - 1; // Convert ISO day to offset
           const entryDate = addDays(currentDate, dayOffset);
-          
           if (entryDate <= endDate) {
-            const shiftTimes = await getApplicableShiftTimes({
-              teamId: member.team_id,
-              countryCode: member.country_code || undefined,
-              regionCode: member.region_code || undefined,
-              shiftType: shiftType as "normal" | "early" | "late" | "weekend",
-              dayOfWeek: entryDate.getDay(),
-              date: format(entryDate, "yyyy-MM-dd"),
-            });
-
-            entries.push({
-              user_id: member.user_id,
-              team_id: member.team_id,
-              date: format(entryDate, "yyyy-MM-dd"),
-              shift_type: shiftType,
-              activity_type: "work",
-              availability_status: "available",
-              shift_time_definition_id: shiftTimes.id.startsWith("default-") ? null : shiftTimes.id,
-              created_by: createdBy,
-              notes: `${shiftTimes.startTime}-${shiftTimes.endTime}`,
-            });
+            await buildEntry(member, entryDate, shiftType as ShiftTypeName);
           }
       } else if (isCompoundShift || assignment.include_weekends) {
         // Handle compound shifts OR weekday shift with include_weekends checkbox
@@ -279,54 +334,14 @@ async function generateScheduleEntries(
         for (let dayOffset = 5; dayOffset <= 6; dayOffset++) {
           const entryDate = addDays(currentDate, dayOffset);
           if (entryDate > endDate) continue;
-
-          const shiftTimes = await getApplicableShiftTimes({
-            teamId: member.team_id,
-            countryCode: member.country_code || undefined,
-            regionCode: member.region_code || undefined,
-            shiftType: "weekend",
-            dayOfWeek: entryDate.getDay(),
-            date: format(entryDate, "yyyy-MM-dd"),
-          });
-
-          entries.push({
-            user_id: member.user_id,
-            team_id: member.team_id,
-            date: format(entryDate, "yyyy-MM-dd"),
-            shift_type: "weekend",
-            activity_type: "work",
-            availability_status: "available",
-            shift_time_definition_id: shiftTimes.id !== "default-weekend" ? shiftTimes.id : null,
-            created_by: createdBy,
-            notes: `${shiftTimes.startTime}-${shiftTimes.endTime}`,
-          });
+          await buildEntry(member, entryDate, "weekend");
         }
 
         // Generate weekday entries (Mon-Fri)
         for (let dayOffset = 0; dayOffset < 5; dayOffset++) {
           const entryDate = addDays(currentDate, dayOffset);
           if (entryDate > endDate) continue;
-
-          const shiftTimes = await getApplicableShiftTimes({
-            teamId: member.team_id,
-            countryCode: member.country_code || undefined,
-            regionCode: member.region_code || undefined,
-            shiftType: weekdayShift,
-            dayOfWeek: entryDate.getDay(),
-            date: format(entryDate, "yyyy-MM-dd"),
-          });
-
-          entries.push({
-            user_id: member.user_id,
-            team_id: member.team_id,
-            date: format(entryDate, "yyyy-MM-dd"),
-            shift_type: weekdayShift,
-            activity_type: "work",
-            availability_status: "available",
-            shift_time_definition_id: shiftTimes.id.startsWith("default-") ? null : shiftTimes.id,
-            created_by: createdBy,
-            notes: `${shiftTimes.startTime}-${shiftTimes.endTime}`,
-          });
+          await buildEntry(member, entryDate, weekdayShift);
         }
       } else {
         // Handle simple shifts (late, early, normal, weekend only)
@@ -339,27 +354,7 @@ async function generateScheduleEntries(
         for (const dayOffset of dayRange) {
           const entryDate = addDays(currentDate, dayOffset);
           if (entryDate > endDate) continue;
-
-          const shiftTimes = await getApplicableShiftTimes({
-            teamId: member.team_id,
-            countryCode: member.country_code || undefined,
-            regionCode: member.region_code || undefined,
-            shiftType: simpleShiftType,
-            dayOfWeek: entryDate.getDay(),
-            date: format(entryDate, "yyyy-MM-dd"),
-          });
-
-          entries.push({
-            user_id: member.user_id,
-            team_id: member.team_id,
-            date: format(entryDate, "yyyy-MM-dd"),
-            shift_type: simpleShiftType,
-            activity_type: "work",
-            availability_status: "available",
-            shift_time_definition_id: shiftTimes.id.startsWith("default-") ? null : shiftTimes.id,
-            created_by: createdBy,
-            notes: `${shiftTimes.startTime}-${shiftTimes.endTime}`,
-          });
+          await buildEntry(member, entryDate, simpleShiftType);
         }
         }
       }
@@ -369,7 +364,7 @@ async function generateScheduleEntries(
     weekCounter++;
   }
 
-  return entries;
+  return { entries, warnings };
 }
 
 export async function validateRosterApprovals(
