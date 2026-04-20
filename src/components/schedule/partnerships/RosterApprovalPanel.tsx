@@ -380,15 +380,29 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
       {/* Status Header */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-sm">
-          {hasMissingRecords || pendingCount > 0 ? (
+          {rejectedCount > 0 ? (
+            <XCircle className="h-4 w-4 text-destructive" />
+          ) : hasMissingRecords || pendingCount > 0 ? (
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           ) : (
             <CheckCircle className="h-4 w-4 text-green-500" />
           )}
           <span className="font-medium">
-            Approval Status: {approvedCount} of {totalTeams} teams
+            Approval Status: {approvedCount} approved
+            {rejectedCount > 0 ? `, ${rejectedCount} rejected` : ""}
+            {" "}of {totalTeams} teams
           </span>
+          <Badge variant="outline" className="ml-2 text-xs">v{rosterVersion}</Badge>
         </div>
+
+        {rosterStatus === "needs_changes" && (
+          <div className="flex items-start gap-2 p-3 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium">Needs changes.</span> One or more managers requested changes. Review the comments below, edit the roster, and re-submit for approval. Editing will reset all approvals.
+            </div>
+          </div>
+        )}
         
         {/* Submission Info */}
         {submissionInfo.submittedBy && (
@@ -480,18 +494,31 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
             <Card key={approval.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-medium">{approval.manager_name}</span>
                     <Badge variant="outline">{approval.team_name}</Badge>
-                    {approval.approved ? (
+                    {approval.state === "approved" && (
                       <Badge variant="default" className="gap-1 bg-green-600">
                         <CheckCircle className="h-3 w-3" />
-                        Approved
+                        Approved (v{approval.roster_version})
                       </Badge>
-                    ) : (
+                    )}
+                    {approval.state === "rejected" && (
+                      <Badge variant="destructive" className="gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Changes requested
+                      </Badge>
+                    )}
+                    {approval.state === "pending" && (
                       <Badge variant="secondary" className="gap-1">
                         <Clock className="h-3 w-3" />
                         Pending
+                      </Badge>
+                    )}
+                    {approval.state === "approved" && approval.roster_version < rosterVersion && (
+                      <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+                        <AlertTriangle className="h-3 w-3" />
+                        Stale (current v{rosterVersion})
                       </Badge>
                     )}
                   </div>
@@ -519,7 +546,7 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
         </Card>
       )}
 
-      {myApproval && !myApproval.approved && (
+      {myApproval && myApproval.state !== "approved" && (
         <Card className="p-4 bg-primary/5">
           <h4 className="font-medium mb-2">Your Approval</h4>
           <div className="space-y-3">
