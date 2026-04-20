@@ -805,6 +805,7 @@ export type Database = {
           submitted_at: string | null
           submitted_by: string | null
           updated_at: string
+          version: number
         }
         Insert: {
           created_at?: string
@@ -821,6 +822,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           updated_at?: string
+          version?: number
         }
         Update: {
           created_at?: string
@@ -837,6 +839,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           updated_at?: string
+          version?: number
         }
         Relationships: [
           {
@@ -1029,6 +1032,8 @@ export type Database = {
           id: string
           manager_id: string
           roster_id: string
+          roster_version: number
+          state: string
           team_id: string
           updated_at: string
         }
@@ -1040,6 +1045,8 @@ export type Database = {
           id?: string
           manager_id: string
           roster_id: string
+          roster_version?: number
+          state?: string
           team_id: string
           updated_at?: string
         }
@@ -1051,6 +1058,8 @@ export type Database = {
           id?: string
           manager_id?: string
           roster_id?: string
+          roster_version?: number
+          state?: string
           team_id?: string
           updated_at?: string
         }
@@ -2093,6 +2102,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activate_roster: { Args: { _roster_id: string }; Returns: Json }
       analyze_vacation_patterns: {
         Args: { _lookback_months?: number; _team_id: string }
         Returns: Json
