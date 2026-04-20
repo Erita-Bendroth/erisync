@@ -1,6 +1,33 @@
 import { supabase } from "@/integrations/supabase/client";
 import { addWeeks, startOfWeek, addDays, format } from "date-fns";
 import { getApplicableShiftTimes } from "./shiftTimeUtils";
+import { normalizeCountryCode } from "./countryCodeUtils";
+
+type ShiftTypeName = "normal" | "early" | "late" | "weekend";
+
+/**
+ * Returns Set<dateStr> for dates that are public holidays for the given country.
+ */
+async function fetchHolidayDateSet(
+  countryCode: string | null | undefined,
+  startDate: string,
+  endDate: string,
+): Promise<Set<string>> {
+  const normalized = normalizeCountryCode(countryCode);
+  if (!normalized) return new Set();
+  const { data } = await supabase
+    .from("holidays")
+    .select("date, country_code")
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .eq("is_public", true)
+    .is("user_id", null);
+  const set = new Set<string>();
+  (data ?? []).forEach((h: any) => {
+    if (normalizeCountryCode(h.country_code) === normalized) set.add(h.date);
+  });
+  return set;
+}
 
 interface RosterConfig {
   id: string;
