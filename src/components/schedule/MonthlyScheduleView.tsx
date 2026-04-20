@@ -8,6 +8,7 @@ import { Phone, CheckCircle2, XCircle } from "lucide-react";
 import { cn, formatUserName } from "@/lib/utils";
 import { useShiftCounts } from "@/hooks/useShiftCounts";
 import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
+import { useScheduleEntries } from "@/hooks/useScheduleEntries";
 
 interface MonthlyScheduleEntry {
   user_id: string;
@@ -28,69 +29,66 @@ interface MonthlyScheduleViewProps {
 }
 
 export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlyScheduleViewProps) {
-  const [scheduleData, setScheduleData] = useState<MonthlyScheduleEntry[]>([]);
   const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   useEffect(() => {
-    fetchMonthlySchedule();
-  }, [currentMonth, teamId, userId]);
+    fetchTeamMembers();
+  }, [teamId]);
 
-  const fetchMonthlySchedule = async () => {
+  const fetchTeamMembers = async () => {
     try {
-      setLoading(true);
-
-      // Get team members
+      setLoadingMembers(true);
       const { data: teamMembers, error: membersError } = await supabase
         .from("team_members")
         .select("user_id")
         .eq("team_id", teamId);
-
       if (membersError) throw membersError;
 
-      const memberIds = [...new Set(teamMembers?.map(m => m.user_id) || [])];
+      const ids = [...new Set(teamMembers?.map(m => m.user_id) || [])];
+      setMemberIds(ids);
 
-      // Get schedule entries for all team members for the entire month - include notes for time blocks
-      const { data: scheduleData, error: scheduleError } = await supabase
-        .from("schedule_entries")
-        .select("user_id, date, availability_status, activity_type, shift_type, notes")
-        .in("user_id", memberIds)
-        .gte("date", format(monthStart, "yyyy-MM-dd"))
-        .lte("date", format(monthEnd, "yyyy-MM-dd"));
-
-      if (scheduleError) throw scheduleError;
-
-      // Get profiles for team members
       const { data: profiles, error: profilesError } = await supabase
-        .rpc("get_multiple_basic_profile_info", { _user_ids: memberIds });
-
+        .rpc("get_multiple_basic_profile_info", { _user_ids: ids });
       if (profilesError) throw profilesError;
-
-      // Store all team members
       setAllTeamMembers(profiles || []);
-
-      // Combine schedule data with profile info
-      const combined = (scheduleData || []).map(entry => {
-        const profile = profiles?.find(p => p.user_id === entry.user_id);
-        return {
-          ...entry,
-          first_name: profile?.first_name || "Unknown",
-          last_name: profile?.last_name || "",
-          initials: profile?.initials || "?",
-        };
-      });
-
-      setScheduleData(combined);
     } catch (error) {
-      console.error("Error fetching monthly schedule:", error);
+      console.error("Error fetching team members:", error);
     } finally {
-      setLoading(false);
+      setLoadingMembers(false);
     }
   };
+
+  // Schedule entries via shared hook (shared cache w/ Dashboard etc.)
+  const { data: rawEntries = [], isLoading: scheduleLoading } = useScheduleEntries({
+    userIds: memberIds,
+    startDate: monthStart,
+    endDate: monthEnd,
+    enabled: memberIds.length > 0,
+  });
+
+  // Combine schedule entries with profile info to preserve original shape
+  const scheduleData: MonthlyScheduleEntry[] = (rawEntries as any[]).map(entry => {
+    const profile = allTeamMembers.find(p => p.user_id === entry.user_id);
+    return {
+      user_id: entry.user_id,
+      date: entry.date,
+      availability_status: entry.availability_status,
+      activity_type: entry.activity_type,
+      shift_type: entry.shift_type,
+      notes: entry.notes,
+      first_name: profile?.first_name || "Unknown",
+      last_name: profile?.last_name || "",
+      initials: profile?.initials || "?",
+    };
+  });
+
+  const loading = loadingMembers || scheduleLoading;
 
   const getEntriesForUserAndDay = (userId: string, day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
