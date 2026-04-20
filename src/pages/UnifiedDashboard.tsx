@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useScheduleEntries } from "@/hooks/useScheduleEntries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Users, TrendingUp, AlertTriangle, Clock, Activity } from "lucide-react";
@@ -77,25 +78,12 @@ export function UnifiedDashboardBody() {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
 
-  const { data: scheduleData = [] } = useQuery({
-    queryKey: ["unified-schedule", selectedTeams, weekStart, weekEnd],
-    queryFn: async () => {
-      if (selectedTeams.length === 0) return [];
-
-      const { data } = await supabase
-        .from("schedule_entries")
-        .select(`
-          *,
-          profiles:user_id (first_name, last_name, initials),
-          teams:team_id (name)
-        `)
-        .in("team_id", selectedTeams)
-        .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(weekEnd, "yyyy-MM-dd"))
-        .order("date");
-
-      return data || [];
-    },
+  const { data: scheduleData = [] } = useScheduleEntries({
+    teamIds: selectedTeams,
+    startDate: weekStart,
+    endDate: weekEnd,
+    includeProfiles: true,
+    includeTeams: true,
     enabled: selectedTeams.length > 0,
   });
 
