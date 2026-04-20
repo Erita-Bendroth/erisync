@@ -79,13 +79,13 @@ export function ShiftCoveragePanel({ partnershipId }: ShiftCoveragePanelProps) {
           );
           if (r.ok) {
             result[country][st] = { status: "ok", detail: r.matchedTier };
-            continue;
+          } else {
+            result[country][st] = {
+              status: r.reason === "ambiguous" ? "ambiguous" : "missing",
+              detail: r.message,
+            };
+            if (r.reason === "no_match") anyMissing = true;
           }
-          result[country][st] = {
-            status: r.reason === "ambiguous" ? "ambiguous" : "missing",
-            detail: r.message,
-          };
-          if (r.reason === "no_match") anyMissing = true;
         }
       }
 
