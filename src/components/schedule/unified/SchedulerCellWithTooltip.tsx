@@ -88,7 +88,7 @@ export const SchedulerCellWithTooltip: React.FC<SchedulerCellWithTooltipProps> =
             {shiftTimes.startTime} - {shiftTimes.endTime}
           </div>
           {drift && (
-            <div className="mt-1 flex items-center gap-1 text-amber-600">
+            <div className="mt-1 flex items-center gap-1 text-destructive">
               <AlertTriangle className="h-3 w-3" />
               <span>Stored shift definition differs from resolved one</span>
             </div>
