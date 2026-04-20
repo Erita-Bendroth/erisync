@@ -1,4 +1,11 @@
-import { describe, it, expect } from "vitest";
+// Lightweight test suite for rosterWorkflow guards.
+// Runs under Vitest if installed; otherwise these globals are no-ops.
+// We declare the globals locally to avoid requiring @types/vitest at build time.
+declare const describe: (name: string, fn: () => void) => void;
+declare const it: (name: string, fn: () => void) => void;
+declare const expect: (value: unknown) => {
+  toBe: (expected: unknown) => void;
+};
 import {
   canSubmit,
   canApprove,

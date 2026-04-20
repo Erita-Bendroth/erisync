@@ -151,13 +151,12 @@ export async function generateRosterSchedules(
       entriesCreated += batch.length;
     }
 
-    // Update roster status to implemented
-    const { error: updateError } = await supabase
-      .from("partnership_rotation_rosters")
-      .update({ status: "implemented" })
-      .eq("id", rosterId);
+    // Activation is gated server-side via activate_roster RPC (checks all approvals + version)
+    const { error: activateError } = await supabase.rpc("activate_roster", {
+      _roster_id: rosterId,
+    });
 
-    if (updateError) throw updateError;
+    if (activateError) throw activateError;
 
     return { success: true, entriesCreated, entriesDeleted: deletedCount || 0 };
   } catch (error) {
@@ -354,6 +353,7 @@ export async function validateRosterApprovals(
       .from("roster_manager_approvals")
       .select(`
         approved,
+        state,
         profiles!roster_manager_approvals_manager_id_fkey (
           first_name,
           last_name
@@ -364,11 +364,11 @@ export async function validateRosterApprovals(
     if (error) throw error;
 
     const pendingManagers = approvals
-      .filter((a: any) => !a.approved)
-      .map((a: any) => `${a.profiles.first_name} ${a.profiles.last_name}`);
+      .filter((a: any) => a.state !== "approved")
+      .map((a: any) => `${a.profiles?.first_name ?? ""} ${a.profiles?.last_name ?? ""}`.trim());
 
     return {
-      allApproved: pendingManagers.length === 0,
+      allApproved: approvals.length > 0 && pendingManagers.length === 0,
       pendingManagers,
     };
   } catch (error) {
