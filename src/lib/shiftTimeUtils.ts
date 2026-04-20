@@ -147,7 +147,7 @@ export async function getApplicableShiftTimes({
     const teamCountryDay = data.find(
       (def) => {
         const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
-        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const matchesCountry = matchesCountryCode(normalizedCountry, def.country_codes);
         const matchesDay = baseShiftType === 'weekend' 
           ? shouldApplyWeekendShift
           : (def.day_of_week !== null && Array.isArray(def.day_of_week) && def.day_of_week.includes(dayOfWeek));
@@ -166,11 +166,11 @@ export async function getApplicableShiftTimes({
   }
 
   // Priority 2: Team + Country (no day restriction)
-  if (teamId && countryCode) {
+  if (teamId && normalizedCountry) {
     const teamCountry = data.find(
       (def) => {
         const matchesTeam = ((def.team_ids && def.team_ids.includes(teamId)) || def.team_id === teamId);
-        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const matchesCountry = matchesCountryCode(normalizedCountry, def.country_codes);
         const noDay = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
         
         // For weekend shift type, still apply if it's weekend/holiday
@@ -203,7 +203,7 @@ export async function getApplicableShiftTimes({
         
         // Country check: definition must either have no country restriction OR match user's country
         const hasCountryCodes = def.country_codes && Array.isArray(def.country_codes) && def.country_codes.length > 0;
-        const countryOk = !hasCountryCodes || matchesCountryCode(countryCode, def.country_codes);
+        const countryOk = !hasCountryCodes || matchesCountryCode(normalizedCountry, def.country_codes);
         
         return matchesTeam && matchesDay && countryOk;
       }
@@ -232,7 +232,7 @@ export async function getApplicableShiftTimes({
         
         // Country check: definition must either have no country restriction OR match user's country
         const hasCountryCodes = def.country_codes && Array.isArray(def.country_codes) && def.country_codes.length > 0;
-        const countryOk = !hasCountryCodes || matchesCountryCode(countryCode, def.country_codes);
+        const countryOk = !hasCountryCodes || matchesCountryCode(normalizedCountry, def.country_codes);
         
         return matchesTeam && noDay && countryOk;
       }
@@ -248,10 +248,10 @@ export async function getApplicableShiftTimes({
   }
 
   // Priority 5: Country only + specific day
-  if (countryCode && dayOfWeek !== undefined) {
+  if (normalizedCountry && dayOfWeek !== undefined) {
     const countryDayOnly = data.find(
       (def) => {
-        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const matchesCountry = matchesCountryCode(normalizedCountry, def.country_codes);
         const noTeam = (def.team_id === null || def.team_ids === null || (Array.isArray(def.team_ids) && def.team_ids.length === 0));
         const matchesDay = baseShiftType === 'weekend' 
           ? shouldApplyWeekendShift
@@ -271,10 +271,10 @@ export async function getApplicableShiftTimes({
   }
 
   // Priority 6: Country only (no day restriction)
-  if (countryCode) {
+  if (normalizedCountry) {
     const countryOnly = data.find(
       (def) => {
-        const matchesCountry = matchesCountryCode(countryCode, def.country_codes);
+        const matchesCountry = matchesCountryCode(normalizedCountry, def.country_codes);
         const noTeam = (def.team_id === null || def.team_ids === null || (Array.isArray(def.team_ids) && def.team_ids.length === 0));
         const noDay = (def.day_of_week === null || (Array.isArray(def.day_of_week) && def.day_of_week.length === 0));
         
