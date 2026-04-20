@@ -1,41 +1,59 @@
 
 
-## Plan: Verify Partnership Scheduler — Country-Specific Shift Times + Holiday Auto-Detection
+## Plan: Fix Partnership Roster Generation — Country-Correct Times + Holiday Handling
 
-### What I'll verify
-1. **Country-specific shift times**: When a member from country X is assigned a shift type (e.g. "early"), the resolved start/end times match the shift definition row tagged for X — not a default/global row.
-2. **Holiday auto-detection**: Public holidays for each member's country are detected and shifts are planned accordingly (skipped, swapped to weekend shift, or flagged).
+### Root causes (from QA)
+1. **Stale `shift_time_definition_id`**: holiday flip changes `shift_type` to `weekend` but keeps the original definition ID → UI shows weekend label with early/normal times.
+2. **Country mismatch**: `rosterGenerationUtils.ts` resolves shift times using `member.country_code`, but resolver/data has `GB` vs `UK` aliasing gaps and some defs target wrong countries.
+3. **Invalid weekend assignments on weekdays**: roster generator writes `weekend` shifts to Mon–Fri without validating against `weekend-shift-validation` rule.
+4. **Coverage gaps (US)**: missing `early`/`late`/`weekend` defs → silent fallback.
+5. **UI short-circuit**: `SchedulerCellWithTooltip` trusts stored `shift_time_definition_id` first, hiding stale-data bugs.
 
-### Approach (READ-ONLY verification — no code changes)
+### Fixes
 
-**Step 1 — Data inventory (SQL via supabase--read_query)**
-- List all `shift_time_definitions` rows: `shift_type`, `team_id`, `team_ids`, `country_codes`, `day_of_week`, `start_time`, `end_time`.
-- Run the new `generateCoverageReport` logic mentally against this matrix to flag any `MISSING` or `AMBIGUOUS` (country × shiftType) cells.
-- List partnerships and their teams + members' countries to know which (country, shiftType) combos actually matter.
-- List `holidays` rows for the next 90 days for the relevant countries.
+**A. Roster generator (`src/lib/rosterGenerationUtils.ts`)**
+- Before persisting each entry, call `resolveShiftDefinition` (strict) with the member's normalized country.
+- On holiday detection for that date+country: either (a) skip the entry, or (b) re-resolve with `shift_type='weekend'` and use the **resolved** weekend definition ID — never reuse the weekday ID.
+- Validate weekend shifts only land on Sat/Sun OR a public holiday for that member's country; otherwise downgrade to `default_shift_for_non_duty` and log.
+- On `no_match` / `ambiguous` from resolver: skip entry, push to a `generation_warnings` array returned to the UI.
 
-**Step 2 — Resolver spot-checks (SQL + reading `shiftResolver.ts`)**
-- For 3 representative members in different countries on the same partnership, simulate `resolveShiftDefinition` for `early`, `late`, `normal`, `weekend` on a normal weekday and a known public-holiday date. Confirm:
-  - Each member resolves to their country's row (not a fallback).
-  - On a public holiday, the schedule entry either uses the `weekend` shift definition or is skipped per `bulk-scheduler-skip-holiday-logic` memory.
+**B. Country normalization**
+- Make `rosterGenerationUtils` and `getApplicableShiftTimes` both call `normalizeCountryCode` before resolution (UK→GB).
+- Add a one-shot SQL migration to normalize existing `shift_time_definitions.country_codes` (`UK` → `GB`).
 
-**Step 3 — Live UI walkthrough (browser tools)**
-- Navigate to `/schedule` → Partnership view (already loaded per your session).
-- Open an existing partnership roster and inspect 2–3 cells across different country members:
-  - Hover to read the tooltip times rendered by `SchedulerCellWithTooltip` (uses `getApplicableShiftTimes`).
-  - Cross-check against the SQL-resolved expected times.
-- Pick a known upcoming public holiday for one member's country and verify the cell on that date shows a holiday badge / weekend shift / skipped state.
+**C. UI cell (`SchedulerCellWithTooltip.tsx`)**
+- Stop trusting stored `shift_time_definition_id` blindly. Always re-resolve via `getApplicableShiftTimes` using `shiftType + country + team + date`. Use stored ID only as a tiebreaker when resolver returns ambiguous.
+- Show a small warning icon in the cell tooltip when stored ID ≠ resolved ID (data drift indicator for managers).
 
-**Step 4 — Report**
-- Output a **Shift Rule Coverage Report**: country × shiftType → matched rule id (or MISSING / AMBIGUOUS).
-- Output a **Per-Member Sample Trace**: for each sampled cell, expected vs actual `{start, end, shiftType, holidayHandling}`, with PASS / FAIL.
-- If any FAIL or AMBIGUOUS rows surface, list the conflicting/missing definitions so they can be fixed in admin.
+**D. Backfill bad existing data**
+- One-off SQL: for `schedule_entries` where `shift_type='weekend'` AND `shift_time_definition_id` points to a non-weekend def → set `shift_time_definition_id = NULL` so UI re-resolves correctly.
+- One-off SQL: for `schedule_entries` where `shift_type='weekend'` on a weekday that is NOT a holiday for the member's country → flag (insert into a `roster_activity_log` cleanup entry) and set `shift_type` to roster's `default_shift_for_non_duty`.
 
-### Deliverables
-- Markdown report posted in chat (no files written).
-- Clear PASS/FAIL per scenario; if FAIL, the specific rule gap or mismatch.
+**E. Coverage report surfacing**
+- Add a "Shift Rule Coverage" panel in `PartnershipRotationManager` showing the country×shiftType matrix with MISSING/AMBIGUOUS cells highlighted, so admins can fix US gaps before generating.
+- Block "Generate Schedules" button when the partnership's member countries have any MISSING cell.
+
+**F. Tests**
+- Extend `rosterWorkflow.test.ts` with cases:
+  - GB member with UK-tagged def resolves correctly (alias).
+  - Holiday on Tue for FI member → weekend def used, weekend times applied.
+  - US member with no `early` def → generation blocked with clear error.
+  - Weekend shift requested on a Wed (non-holiday) → downgraded.
+
+### Files to change
+- `src/lib/rosterGenerationUtils.ts` (resolver integration, holiday/weekend guards, warnings)
+- `src/lib/shiftTimeUtils.ts` (force normalization, expose strict path)
+- `src/components/schedule/unified/SchedulerCellWithTooltip.tsx` (re-resolve, drift indicator)
+- `src/components/schedule/partnerships/PartnershipRotationManager.tsx` (coverage panel + gate button)
+- `src/lib/rosterWorkflow.test.ts` (new cases)
+- New migration: normalize `shift_time_definitions.country_codes` UK→GB
+- New data cleanup SQL: fix stale weekend rows in `schedule_entries`
 
 ### Out of scope
-- Editing shift definitions, holidays, or any roster data.
-- Changing resolver/UI code (only invoked if a defect is found — would be a follow-up plan).
+- Adding US shift definitions (data task for admins via existing UI).
+- Redesigning shift definition admin UI.
+- Changing approval workflow.
+
+### Deliverables
+- After approval: code changes + migration + cleanup SQL run, then re-run the QA verification — all sampled cells PASS, coverage panel shows green for active partnerships.
 
