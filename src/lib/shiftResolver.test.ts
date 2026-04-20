@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { resolveShiftDefinition, type ShiftDefinitionRow } from "./shiftResolver";
+// Lightweight test suite for shiftResolver.
+// Uses local globals to avoid requiring @types/vitest at build time.
+declare const describe: (name: string, fn: () => void) => void;
+declare const it: (name: string, fn: () => void) => void;
+declare const expect: (value: unknown) => {
+  toBe: (expected: unknown) => void;
+  toEqual: (expected: unknown) => void;
+};
+import { resolveShiftDefinition, type ShiftDefinitionRow, type ResolveResult } from "./shiftResolver";
 
 const def = (overrides: Partial<ShiftDefinitionRow>): ShiftDefinitionRow => ({
   id: Math.random().toString(36).slice(2),
@@ -47,9 +54,9 @@ describe("resolveShiftDefinition", () => {
 
   it("scenario 4: no matching rule → no_match", () => {
     const defs = [def({ id: "de", country_codes: ["DE"] })];
-    const r = resolveShiftDefinition({ shiftType: "early", date: wed, personCountry: "FR" }, defs);
+    const r: ResolveResult = resolveShiftDefinition({ shiftType: "early", date: wed, personCountry: "FR" }, defs);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("no_match");
+    if (r.ok === false) expect(r.reason).toBe("no_match");
   });
 
   it("scenario 5: equally specific rules → ambiguous with candidates", () => {
@@ -57,9 +64,9 @@ describe("resolveShiftDefinition", () => {
       def({ id: "a", country_codes: ["DE"], end_time: "14:00" }),
       def({ id: "b", country_codes: ["DE"], end_time: "15:00" }),
     ];
-    const r = resolveShiftDefinition({ shiftType: "early", date: wed, personCountry: "DE" }, defs);
+    const r: ResolveResult = resolveShiftDefinition({ shiftType: "early", date: wed, personCountry: "DE" }, defs);
     expect(r.ok).toBe(false);
-    if (!r.ok) {
+    if (r.ok === false) {
       expect(r.reason).toBe("ambiguous");
       expect(r.candidates.map((c) => c.id).sort()).toEqual(["a", "b"]);
     }
