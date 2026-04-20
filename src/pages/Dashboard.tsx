@@ -25,22 +25,28 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { showScheduleChangeNotification } = useDesktopNotifications();
   const { profile, roles, teams, loading: contextLoading, refetch } = useCurrentUserContext();
-  const [todaySchedule, setTodaySchedule] = useState<any[]>([]);
-  const [weeklySchedule, setWeeklySchedule] = useState<any[]>([]);
-  const [scheduleLoading, setScheduleLoading] = useState(true);
   const [showLocationSetup, setShowLocationSetup] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("view") === "team-overview" ? "team-overview" : "my-schedule";
+
+  // Shared hook — single source of truth for schedule_entries fetching.
+  const now = new Date();
+  const today = format(now, "yyyy-MM-dd");
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  const { data: weeklySchedule = [], refetch: refetchWeekly } = useScheduleEntries({
+    userIds: user?.id ? [user.id] : [],
+    startDate: weekStart,
+    endDate: weekEnd,
+    enabled: !!user?.id,
+  });
+  const todaySchedule = (weeklySchedule as any[]).filter((e: any) => e.date === today);
 
   useEffect(() => {
     if (profile) {
       setShowLocationSetup(!profile.country_code || profile.country_code === 'US');
     }
   }, [profile]);
-
-  useEffect(() => {
-    if (user) {
-      fetchScheduleData();
-    }
-  }, [user]);
 
   // Set up real-time updates for schedule entries
   useEffect(() => {
@@ -65,7 +71,7 @@ const Dashboard = () => {
               changeType: payload.eventType === 'INSERT' ? 'added' : 'updated',
             });
           }
-          fetchScheduleData();
+          refetchWeekly();
         }
       )
       .subscribe();
@@ -73,45 +79,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, profile, showScheduleChangeNotification]);
-
-  const fetchScheduleData = async () => {
-    if (!user) return;
-    setScheduleLoading(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const now = new Date();
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-
-      const [todayRes, weekRes] = await Promise.allSettled([
-        supabase
-          .from("schedule_entries")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("date", today)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("schedule_entries")
-          .select("*")
-          .eq("user_id", user.id)
-          .gte("date", format(weekStart, 'yyyy-MM-dd'))
-          .lte("date", format(weekEnd, 'yyyy-MM-dd'))
-          .order("date", { ascending: true }),
-      ]);
-
-      if (todayRes.status === 'fulfilled' && !todayRes.value.error) {
-        setTodaySchedule(todayRes.value.data || []);
-      }
-      if (weekRes.status === 'fulfilled' && !weekRes.value.error) {
-        setWeeklySchedule(weekRes.value.data || []);
-      }
-    } catch (error) {
-      console.error("Error fetching schedule data:", error);
-    } finally {
-      setScheduleLoading(false);
-    }
-  };
+  }, [user, profile, showScheduleChangeNotification, refetchWeekly]);
 
   const getActivityDisplayName = (activityType: string) => {
     switch (activityType) {
