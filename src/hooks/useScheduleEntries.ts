@@ -75,9 +75,9 @@ export function useScheduleEntries(params: UseScheduleEntriesParams) {
         query = query.in("team_id", sortedTeamIds);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await (query as any);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as any[];
     },
     enabled:
       enabled &&
