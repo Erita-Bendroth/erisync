@@ -126,7 +126,8 @@ export function PersonalMonthlyCalendar() {
   }, [user?.id, currentMonth, dateRange]);
 
   // Schedule entries via shared cache
-  const monthsToFetch = getMonthsCount(dateRange);
+  const monthsToFetch =
+    dateRange === "1M" ? 1 : dateRange === "3M" ? 3 : dateRange === "6M" ? 6 : 12;
   const rangeStart = startOfMonth(currentMonth);
   const rangeEnd = endOfMonth(addMonths(currentMonth, monthsToFetch - 1));
   const { data: baseScheduleEntries = [], isLoading: scheduleLoading } = useScheduleEntries({
