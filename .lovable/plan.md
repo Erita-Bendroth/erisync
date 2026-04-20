@@ -1,67 +1,122 @@
 
 
-## Plan: Unify Bulk Scheduler — Drop the Wizard, Keep One Fast Form
+## Plan: B (Swap Consolidation) + C (Data Fetching) + D (Vacation Consolidation)
 
-User feedback: the multi-step wizard is confusing. Make `BulkScheduleGenerator` (single-page form) the canonical entry point, and route the other two surfaces into it.
+Three independent passes. Each is safe in isolation — pick the order, or do all three.
 
-### Current state
-- `BulkScheduleWizard` — 7-step wizard (Mode → Team → Dates → Partner → Shifts → Options → Review). Confusing.
-- `BulkScheduleGenerator` — single-page form with sections. Faster, more familiar.
-- `QuickBulkScheduler` — minimal "this week" shortcut.
+---
 
-All three write to the same `schedule_entries` table via similar logic.
+### B — Collapse Swap Dialogs into One Wizard
 
-### Approach
-Single canonical component with **progressive disclosure** — basics visible by default, advanced collapsed.
+**Problem.** 4 entry points (`ShiftSwapRequestDialog`, `ShiftSwapRequestButton`, `QuickSwapButton`, `ManagerDirectSwapDialog`) duplicate the same flow. `ShiftSwapWizard` already supports every mode.
 
-1. **Promote `BulkScheduleGenerator` as the canonical UI.** Keep its sectioned layout (Mode • Team & People • Dates • Shifts • Advanced collapsible).
-2. **Port wizard-only features into it** so nothing is lost:
-   - Hotline mode (from `HotlineGenerationStep` + `HotlineDraftPreview`)
-   - Rotation mode with per-date shift pattern (from `ShiftPatternStep`)
-   - Partner coverage info panel (from `PartnerAvailabilityStep`) — render inline as a collapsible "Partner availability" card under Dates
-   - Fairness + recurring options (already partially in Generator's advanced panel)
-3. **Redirect the wizard**: `BulkScheduleWizard.tsx` becomes a thin shell that renders `<BulkScheduleGenerator />`. Any route/import using the wizard keeps working — no broken links.
-4. **Keep `QuickBulkScheduler`** as-is (it's the "1-click this week" preset, not confusing). Optionally have it open the Generator pre-filled instead of being its own form — your call.
-5. **Delete wizard step files** only after confirming the Generator covers every feature: `ModeSelectionStep`, `TeamPeopleStep`, `DateRangeStep`, `PartnerAvailabilityStep`, `ShiftConfigStep`, `ShiftPatternStep`, `AdvancedOptionsStep`, `ReviewStep`, `WizardProgress`. ~9 files, ~1500 lines removed.
+**Plan.**
+1. `ShiftSwapRequestButton` → render `<QuickSwapButton>` (already wraps `ShiftSwapWizard`). Keep prop signature, no caller changes.
+2. `ShiftSwapRequestDialog` → thin shell that opens `ShiftSwapWizard` with the same props.
+3. `ManagerDirectSwapDialog` → add a `mode="manager-direct"` to `ShiftSwapWizard` that skips the "request" step and writes the swap immediately. The dialog becomes a shell.
+4. Delete the 3 obsolete files **after** confirming no remaining imports.
 
-### UI structure of the unified Generator
-```text
-[Mode tabs: Users | Team | Rotation | Hotline]
-─────────────────────────────────────────────
-Team & People        (changes per mode)
-Date Range           + quick presets (This Week / Next / Month)
-  └ Partner availability (collapsible, auto-expanded if conflicts)
-Shifts               (single config OR per-date pattern for rotation)
-─────────────────────────────────────────────
-▸ Advanced options   (fairness, recurring, holiday skip, conflict handling)
-─────────────────────────────────────────────
-[Preview summary: X shifts across Y people]   [Cancel] [Generate]
+**Safety.** All public component names preserved as re-exports. Manager direct-swap audit log + coverage preview wired into the new wizard step (logic lifted, not rewritten).
+
+---
+
+### C — Standardize Data Fetching (Incremental, Zero-Risk)
+
+**Concern: "How without impacting the rest of the setup?"** — Done **one component at a time**, behind the same React Query cache. Old code keeps working until each migration is verified.
+
+**The two shared hooks already exist** and are battle-tested:
+- `useScheduleEntries({ userIds, teamIds, startDate, endDate })`
+- `useHolidayQuery({ dates, userIds, teamId })`
+
+**Migration recipe (per component, ~5 min each):**
+```ts
+// BEFORE
+const [entries, setEntries] = useState([]);
+useEffect(() => {
+  supabase.from('schedule_entries').select('*')
+    .gte('date', start).lte('date', end)
+    .in('user_id', userIds)
+    .then(({ data }) => setEntries(data ?? []));
+}, [userIds, start, end]);
+
+// AFTER
+const { data: entries = [], isLoading } = useScheduleEntries({
+  userIds, startDate: start, endDate: end
+});
 ```
 
-### Safety
-- Wizard route/import alias preserved → no broken links.
-- Hotline draft-save flow preserved (the only async step the wizard had).
-- Permission check (`admin/planner/manager`) preserved.
-- All existing memory rules respected: skip-holidays logic, overwrite mode, country shift limits, weekend validation, rotation per-date times.
+**Why this is safe:**
+- Same Supabase query, same shape returned.
+- React Query **dedupes** — old ad-hoc queries don't conflict, they just become redundant until migrated.
+- Each PR is 1 file. If anything breaks, revert just that file.
+- No schema changes, no edge function changes, no RLS changes.
 
-### Files
-**Edit**
-- `src/components/schedule/BulkScheduleGenerator.tsx` — add Hotline mode, Rotation per-date pattern, Partner availability panel, Review summary
-- `src/components/schedule/wizard/BulkScheduleWizard.tsx` — replace body with `<BulkScheduleGenerator onScheduleGenerated={...} onCancel={...} />`
+**Phased rollout — pick targets by impact:**
+- **Phase 1 (high value):** `Dashboard.tsx`, `UnifiedDashboard.tsx`, `MonthlyScheduleView.tsx`, `PersonalMonthlyCalendar.tsx` — these load the same data simultaneously today.
+- **Phase 2:** `TeamAvailabilityView`, `CoverageOverview`, `ManagerCoverageView`, `ScheduleView`.
+- **Phase 3:** Analytics components.
 
-**Delete (after verification)**
-- `src/components/schedule/wizard/ModeSelectionStep.tsx`
-- `src/components/schedule/wizard/TeamPeopleStep.tsx`
-- `src/components/schedule/wizard/DateRangeStep.tsx`
-- `src/components/schedule/wizard/PartnerAvailabilityStep.tsx`
-- `src/components/schedule/wizard/ShiftConfigStep.tsx`
-- `src/components/schedule/wizard/ShiftPatternStep.tsx`
-- `src/components/schedule/wizard/AdvancedOptionsStep.tsx`
-- `src/components/schedule/wizard/ReviewStep.tsx`
-- `src/components/schedule/wizard/WizardProgress.tsx`
+**Bonus.** Once migrated, mutations (create/edit/delete shift) call `queryClient.invalidateQueries(['schedule-entries'])` and **every view refreshes automatically** — fixes the "I edited a shift but the dashboard is stale" class of bugs.
 
-### Out of scope
-- Touching `QuickBulkScheduler` behavior (separate small pass if you want it).
-- Edge function consolidation.
-- Removing `useBulkSchedulerState` (Generator already uses it).
+---
+
+### D — Vacation Planning Consolidation
+
+**Concern: "More explanation."** Today vacation lives in **6 separate surfaces**, each with its own entry button and modal:
+
+| Surface | Where it lives | What it does |
+|---|---|---|
+| `VacationRequestModal` | Schedule page button | Submit a new request |
+| `MyRequestsDialog` | Schedule page button | See *my* requests + status |
+| `VacationRequestsList` | Schedule page section | Manager view of *team* requests |
+| `PendingRequestsCard` | Dashboard widget | Manager: pending count |
+| `VacationPlanningDashboard` | `/schedule?tab=vacation` | Capacity heatmap, fairness, recommendations |
+| `VacationPipeline` | Inside planning dashboard | Approval queue |
+
+Users have to know which button to click for which task. Managers especially get lost.
+
+**Plan — one unified `/schedule?tab=vacation` view with sub-tabs:**
+```text
+Schedule page → [Schedule | Vacation | Coverage | …]
+                            │
+                            ▼
+        ┌─────────────────────────────────────────┐
+        │ Vacation                                │
+        │ ┌─────────────────────────────────────┐ │
+        │ │ [My Requests] [Team] [Planning]     │ │  ← role-aware sub-tabs
+        │ │                                     │ │
+        │ │ + "Request time off" button (top)   │ │  ← always visible
+        │ └─────────────────────────────────────┘ │
+        └─────────────────────────────────────────┘
+```
+
+**Sub-tab content (reuses existing components, no rewrites):**
+- **My Requests** — `MyRequestsDialog` body, inlined (not a modal anymore). Everyone sees this.
+- **Team** — `VacationRequestsList` + approval actions. Managers/planners only.
+- **Planning** — existing `VacationPlanningDashboard` (capacity, fairness, what-if). Managers/planners only.
+
+**Entry points consolidated:**
+- "Request time off" button stays everywhere it is now (Schedule page header, Dashboard) → all open the same `VacationRequestModal`. No change to the request flow itself.
+- `PendingRequestsCard` on Dashboard becomes a **link** ("3 pending requests →") that deep-links to `/schedule?tab=vacation&sub=team`.
+- "My Requests" button on Schedule page → deep-links to `/schedule?tab=vacation&sub=my`.
+
+**What stays the same:**
+- The actual request submission modal (`VacationRequestModal`) — unchanged.
+- Approval logic, notifications, holiday-skip behavior, coverage warnings — all unchanged.
+- Database schema — unchanged.
+- All 6 components keep existing as building blocks; we just stop having 6 separate doors.
+
+**What changes:**
+- 1 new file: `VacationCenter.tsx` — sub-tab container (~80 lines).
+- Edits: `Schedule.tsx` (mount `VacationCenter` in vacation tab), `Dashboard.tsx` (`PendingRequestsCard` becomes a link).
+- Deletions: none yet — we keep the originals as building blocks. Cleanup pass only after the new layout is confirmed.
+
+**Safety.** No data layer touched. Pure UI re-arrangement. URL params (`?sub=my|team|planning`) make every old entry point reachable.
+
+---
+
+### Suggested order
+1. **B** first — smallest, fully contained, immediate clarity win.
+2. **D** next — biggest UX simplification users will feel, no risk.
+3. **C** last, phased — performance + correctness foundation, but can be done forever in the background.
 
