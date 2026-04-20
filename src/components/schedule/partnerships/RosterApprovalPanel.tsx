@@ -18,6 +18,8 @@ interface Approval {
   manager_id: string;
   team_id: string;
   approved: boolean;
+  state: "pending" | "approved" | "rejected";
+  roster_version: number;
   approved_at: string | null;
   comments: string | null;
   manager_name: string;
@@ -59,6 +61,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
     submittedAt: null, 
     submitterName: null 
   });
+  const [rosterVersion, setRosterVersion] = useState<number>(1);
+  const [rosterStatus, setRosterStatus] = useState<string>("draft");
 
   useEffect(() => {
     fetchCurrentUser();
@@ -70,11 +74,14 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
     try {
       const { data: roster, error } = await supabase
         .from("partnership_rotation_rosters")
-        .select("submitted_by, submitted_at")
+        .select("submitted_by, submitted_at, version, status")
         .eq("id", rosterId)
         .single();
 
       if (error || !roster) return;
+
+      setRosterVersion((roster as any).version ?? 1);
+      setRosterStatus((roster as any).status ?? "draft");
 
       if (roster.submitted_by) {
         // Fetch submitter name
@@ -146,6 +153,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
           manager_id: approval.manager_id,
           team_id: approval.team_id,
           approved: approval.approved,
+          state: approval.state ?? (approval.approved ? "approved" : "pending"),
+          roster_version: approval.roster_version ?? 1,
           approved_at: approval.approved_at,
           comments: approval.comments,
           manager_name: manager 
@@ -228,6 +237,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
           team_id: m.team_id,
           manager_id: m.manager_id!,
           approved: false,
+          state: "pending" as const,
+          roster_version: rosterVersion,
         }));
 
       if (recordsToCreate.length === 0) {
@@ -265,45 +276,21 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
       const { error } = await supabase
         .from("roster_manager_approvals")
         .update({
-          approved: true,
-          approved_at: new Date().toISOString(),
+          state: "approved",
+          roster_version: rosterVersion,
           comments: comments || null,
         })
         .eq("id", myApproval.id);
 
       if (error) throw error;
 
-      // Check if all approvals are complete
-      const { data: allApprovals, error: checkError } = await supabase
-        .from("roster_manager_approvals")
-        .select("approved")
-        .eq("roster_id", rosterId);
-
-      if (checkError) throw checkError;
-
-      // Fixed: Check for non-empty array AND all approved
-      const allApproved = allApprovals.length > 0 && 
-                          allApprovals.length >= teams.length && 
-                          allApprovals.every((a) => a.approved);
-
-      if (allApproved) {
-        // Update roster status to approved
-        const { error: updateError } = await supabase
-          .from("partnership_rotation_rosters")
-          .update({ status: "approved" })
-          .eq("id", rosterId);
-
-        if (updateError) throw updateError;
-        toast.success("All approvals complete! Roster is now approved.");
-      } else {
-        toast.success("Your approval has been recorded");
-      }
-
-      fetchApprovals();
+      // Server-side trigger recomputes roster status; we just refetch.
+      await Promise.all([fetchApprovals(), fetchSubmissionInfo()]);
+      toast.success("Your approval has been recorded");
       setComments("");
     } catch (error) {
       console.error("Error approving roster:", error);
-      toast.error("Failed to approve roster");
+      toast.error(error instanceof Error ? error.message : "Failed to approve roster");
     } finally {
       setSubmitting(false);
     }
@@ -323,27 +310,21 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
       const { error } = await supabase
         .from("roster_manager_approvals")
         .update({
-          approved: false,
+          state: "rejected",
+          roster_version: rosterVersion,
           comments: comments,
         })
         .eq("id", myApproval.id);
 
       if (error) throw error;
 
-      // Update roster status back to draft
-      const { error: updateError } = await supabase
-        .from("partnership_rotation_rosters")
-        .update({ status: "draft" })
-        .eq("id", rosterId);
-
-      if (updateError) throw updateError;
-
-      toast.success("Changes requested. Roster returned to draft status.");
-      fetchApprovals();
+      // Trigger sets roster to needs_changes automatically
+      await Promise.all([fetchApprovals(), fetchSubmissionInfo()]);
+      toast.success("Changes requested. Roster moved to 'Needs Changes'.");
       setComments("");
     } catch (error) {
       console.error("Error requesting changes:", error);
-      toast.error("Failed to request changes");
+      toast.error(error instanceof Error ? error.message : "Failed to request changes");
     } finally {
       setSubmitting(false);
     }
@@ -358,13 +339,13 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
   }
 
   const myApproval = approvals.find((a) => a.manager_id === currentUserId);
-  const approvedCount = approvals.filter((a) => a.approved).length;
+  const approvedCount = approvals.filter((a) => a.state === "approved").length;
+  const rejectedCount = approvals.filter((a) => a.state === "rejected").length;
   const totalTeams = teams.length;
-  // Fixed: All approved only if we have records for all teams AND all are approved
   const allApproved = approvals.length >= totalTeams && 
                       approvals.length > 0 && 
-                      approvals.every((a) => a.approved);
-  const pendingCount = approvals.filter((a) => !a.approved).length;
+                      approvals.every((a) => a.state === "approved");
+  const pendingCount = approvals.filter((a) => a.state === "pending").length;
   const hasMissingRecords = missingApprovals.length > 0;
 
   const handleActivateFromPanel = async () => {
