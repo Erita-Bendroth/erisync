@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { matchesCountryCode } from './countryCodeUtils';
+import { matchesCountryCode, normalizeCountryCode } from './countryCodeUtils';
 import { resolveShiftDefinition, type ShiftDefinitionRow, type ResolveResult, type ShiftTypeName } from './shiftResolver';
 
 /**
@@ -27,7 +27,7 @@ export async function resolveShiftDefinitionStrict(params: {
     {
       shiftType: params.shiftType,
       date: params.date,
-      personCountry: params.personCountry ?? null,
+      personCountry: normalizeCountryCode(params.personCountry) ?? null,
       teamId: params.teamId ?? null,
     },
     (data ?? []) as ShiftDefinitionRow[],
@@ -82,16 +82,20 @@ export async function getApplicableShiftTimes({
   date?: string;
   shiftTimeDefinitionId?: string;
 }): Promise<ApplicableShiftTime> {
-  // Priority 0: If specific shift definition ID provided, return it directly
+  // Normalize country code (UK -> GB) for consistent matching
+  const normalizedCountry = normalizeCountryCode(countryCode);
+
+  // Priority 0: If specific shift definition ID provided, only trust it when it
+  // matches the requested shiftType. Stale IDs (e.g. weekday def stored on a
+  // weekend entry after a holiday flip) must not short-circuit resolution.
   if (shiftTimeDefinitionId) {
     const { data: specificShift, error } = await supabase
       .from("shift_time_definitions")
-      .select("id, start_time, end_time, description")
+      .select("id, start_time, end_time, description, shift_type")
       .eq("id", shiftTimeDefinitionId)
       .single();
-    
-    if (specificShift && !error) {
-      // Return the exact stored definition - don't re-calculate!
+
+    if (specificShift && !error && specificShift.shift_type === shiftType) {
       return {
         id: specificShift.id,
         startTime: specificShift.start_time,
@@ -99,6 +103,7 @@ export async function getApplicableShiftTimes({
         description: specificShift.description || "",
       };
     }
+    // Otherwise fall through to re-resolve based on shiftType + country + team + date.
   }
 
   // No specific ID or failed to fetch - proceed with priority matching
