@@ -119,12 +119,22 @@ serve(async (req) => {
       });
     }
 
+    // Fetch current roster version for snapshotting
+    const { data: rosterRow } = await supabaseAdmin
+      .from('partnership_rotation_rosters')
+      .select('version')
+      .eq('id', rosterId)
+      .single();
+    const currentVersion = (rosterRow as any)?.version ?? 1;
+
     // Create approval records for each team-manager pair
     const approvalRecords = teamManagers.map(tm => ({
       roster_id: rosterId,
       team_id: tm.team_id,
       manager_id: tm.user_id,
-      approved: tm.user_id === user.id, // Auto-approve for submitting user
+      approved: tm.user_id === user.id,
+      state: tm.user_id === user.id ? 'approved' : 'pending',
+      roster_version: currentVersion,
       approved_at: tm.user_id === user.id ? new Date().toISOString() : null,
       comments: tm.user_id === user.id ? 'Auto-approved on submission' : null,
     }));
@@ -156,7 +166,7 @@ serve(async (req) => {
     const { error: rosterUpdateError } = await supabaseAdmin
       .from('partnership_rotation_rosters')
       .update({ 
-        status: 'pending_approval', 
+        status: 'submitted', 
         submitted_by: user.id,
         submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString() 

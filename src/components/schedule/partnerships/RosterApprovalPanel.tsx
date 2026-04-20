@@ -18,6 +18,8 @@ interface Approval {
   manager_id: string;
   team_id: string;
   approved: boolean;
+  state: "pending" | "approved" | "rejected";
+  roster_version: number;
   approved_at: string | null;
   comments: string | null;
   manager_name: string;
@@ -59,6 +61,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
     submittedAt: null, 
     submitterName: null 
   });
+  const [rosterVersion, setRosterVersion] = useState<number>(1);
+  const [rosterStatus, setRosterStatus] = useState<string>("draft");
 
   useEffect(() => {
     fetchCurrentUser();
@@ -70,11 +74,14 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
     try {
       const { data: roster, error } = await supabase
         .from("partnership_rotation_rosters")
-        .select("submitted_by, submitted_at")
+        .select("submitted_by, submitted_at, version, status")
         .eq("id", rosterId)
         .single();
 
       if (error || !roster) return;
+
+      setRosterVersion((roster as any).version ?? 1);
+      setRosterStatus((roster as any).status ?? "draft");
 
       if (roster.submitted_by) {
         // Fetch submitter name
@@ -146,6 +153,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
           manager_id: approval.manager_id,
           team_id: approval.team_id,
           approved: approval.approved,
+          state: approval.state ?? (approval.approved ? "approved" : "pending"),
+          roster_version: approval.roster_version ?? 1,
           approved_at: approval.approved_at,
           comments: approval.comments,
           manager_name: manager 
@@ -228,6 +237,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
           team_id: m.team_id,
           manager_id: m.manager_id!,
           approved: false,
+          state: "pending" as const,
+          roster_version: rosterVersion,
         }));
 
       if (recordsToCreate.length === 0) {
@@ -265,45 +276,21 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
       const { error } = await supabase
         .from("roster_manager_approvals")
         .update({
-          approved: true,
-          approved_at: new Date().toISOString(),
+          state: "approved",
+          roster_version: rosterVersion,
           comments: comments || null,
         })
         .eq("id", myApproval.id);
 
       if (error) throw error;
 
-      // Check if all approvals are complete
-      const { data: allApprovals, error: checkError } = await supabase
-        .from("roster_manager_approvals")
-        .select("approved")
-        .eq("roster_id", rosterId);
-
-      if (checkError) throw checkError;
-
-      // Fixed: Check for non-empty array AND all approved
-      const allApproved = allApprovals.length > 0 && 
-                          allApprovals.length >= teams.length && 
-                          allApprovals.every((a) => a.approved);
-
-      if (allApproved) {
-        // Update roster status to approved
-        const { error: updateError } = await supabase
-          .from("partnership_rotation_rosters")
-          .update({ status: "approved" })
-          .eq("id", rosterId);
-
-        if (updateError) throw updateError;
-        toast.success("All approvals complete! Roster is now approved.");
-      } else {
-        toast.success("Your approval has been recorded");
-      }
-
-      fetchApprovals();
+      // Server-side trigger recomputes roster status; we just refetch.
+      await Promise.all([fetchApprovals(), fetchSubmissionInfo()]);
+      toast.success("Your approval has been recorded");
       setComments("");
     } catch (error) {
       console.error("Error approving roster:", error);
-      toast.error("Failed to approve roster");
+      toast.error(error instanceof Error ? error.message : "Failed to approve roster");
     } finally {
       setSubmitting(false);
     }
@@ -323,27 +310,21 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
       const { error } = await supabase
         .from("roster_manager_approvals")
         .update({
-          approved: false,
+          state: "rejected",
+          roster_version: rosterVersion,
           comments: comments,
         })
         .eq("id", myApproval.id);
 
       if (error) throw error;
 
-      // Update roster status back to draft
-      const { error: updateError } = await supabase
-        .from("partnership_rotation_rosters")
-        .update({ status: "draft" })
-        .eq("id", rosterId);
-
-      if (updateError) throw updateError;
-
-      toast.success("Changes requested. Roster returned to draft status.");
-      fetchApprovals();
+      // Trigger sets roster to needs_changes automatically
+      await Promise.all([fetchApprovals(), fetchSubmissionInfo()]);
+      toast.success("Changes requested. Roster moved to 'Needs Changes'.");
       setComments("");
     } catch (error) {
       console.error("Error requesting changes:", error);
-      toast.error("Failed to request changes");
+      toast.error(error instanceof Error ? error.message : "Failed to request changes");
     } finally {
       setSubmitting(false);
     }
@@ -358,13 +339,13 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
   }
 
   const myApproval = approvals.find((a) => a.manager_id === currentUserId);
-  const approvedCount = approvals.filter((a) => a.approved).length;
+  const approvedCount = approvals.filter((a) => a.state === "approved").length;
+  const rejectedCount = approvals.filter((a) => a.state === "rejected").length;
   const totalTeams = teams.length;
-  // Fixed: All approved only if we have records for all teams AND all are approved
   const allApproved = approvals.length >= totalTeams && 
                       approvals.length > 0 && 
-                      approvals.every((a) => a.approved);
-  const pendingCount = approvals.filter((a) => !a.approved).length;
+                      approvals.every((a) => a.state === "approved");
+  const pendingCount = approvals.filter((a) => a.state === "pending").length;
   const hasMissingRecords = missingApprovals.length > 0;
 
   const handleActivateFromPanel = async () => {
@@ -399,15 +380,29 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
       {/* Status Header */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-sm">
-          {hasMissingRecords || pendingCount > 0 ? (
+          {rejectedCount > 0 ? (
+            <XCircle className="h-4 w-4 text-destructive" />
+          ) : hasMissingRecords || pendingCount > 0 ? (
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           ) : (
             <CheckCircle className="h-4 w-4 text-green-500" />
           )}
           <span className="font-medium">
-            Approval Status: {approvedCount} of {totalTeams} teams
+            Approval Status: {approvedCount} approved
+            {rejectedCount > 0 ? `, ${rejectedCount} rejected` : ""}
+            {" "}of {totalTeams} teams
           </span>
+          <Badge variant="outline" className="ml-2 text-xs">v{rosterVersion}</Badge>
         </div>
+
+        {rosterStatus === "needs_changes" && (
+          <div className="flex items-start gap-2 p-3 rounded-md border border-destructive/30 bg-destructive/10 text-destructive">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium">Needs changes.</span> One or more managers requested changes. Review the comments below, edit the roster, and re-submit for approval. Editing will reset all approvals.
+            </div>
+          </div>
+        )}
         
         {/* Submission Info */}
         {submissionInfo.submittedBy && (
@@ -499,18 +494,31 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
             <Card key={approval.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-medium">{approval.manager_name}</span>
                     <Badge variant="outline">{approval.team_name}</Badge>
-                    {approval.approved ? (
+                    {approval.state === "approved" && (
                       <Badge variant="default" className="gap-1 bg-green-600">
                         <CheckCircle className="h-3 w-3" />
-                        Approved
+                        Approved (v{approval.roster_version})
                       </Badge>
-                    ) : (
+                    )}
+                    {approval.state === "rejected" && (
+                      <Badge variant="destructive" className="gap-1">
+                        <XCircle className="h-3 w-3" />
+                        Changes requested
+                      </Badge>
+                    )}
+                    {approval.state === "pending" && (
                       <Badge variant="secondary" className="gap-1">
                         <Clock className="h-3 w-3" />
                         Pending
+                      </Badge>
+                    )}
+                    {approval.state === "approved" && approval.roster_version < rosterVersion && (
+                      <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+                        <AlertTriangle className="h-3 w-3" />
+                        Stale (current v{rosterVersion})
                       </Badge>
                     )}
                   </div>
@@ -538,7 +546,7 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
         </Card>
       )}
 
-      {myApproval && !myApproval.approved && (
+      {myApproval && myApproval.state !== "approved" && (
         <Card className="p-4 bg-primary/5">
           <h4 className="font-medium mb-2">Your Approval</h4>
           <div className="space-y-3">
