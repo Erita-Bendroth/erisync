@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Plus, Calendar, Copy, AlertCircle, CheckCircle2, Clock, Users } from "lucide-react";
 import { RosterBuilderDialog } from "./RosterBuilderDialog";
 import { CloneRosterDialog } from "./CloneRosterDialog";
+import { ShiftCoveragePanel } from "./ShiftCoveragePanel";
 import { toast } from "sonner";
 
 interface Roster {
@@ -426,6 +427,9 @@ export function PartnershipRotationManager({
 
   return (
     <div className="space-y-4">
+      {/* Shift rule coverage diagnostics */}
+      <ShiftCoveragePanel partnershipId={partnershipId} />
+
       {/* Action Needed Section */}
       {actionNeededRosters.length > 0 && (
         <div className="space-y-3">
