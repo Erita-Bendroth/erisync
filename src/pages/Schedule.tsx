@@ -17,8 +17,7 @@ import AdminSetup from "@/components/admin/AdminSetup";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
-import { BulkScheduleWizard } from "@/components/schedule/wizard/BulkScheduleWizard";
-import { QuickBulkScheduler } from "@/components/schedule/QuickBulkScheduler";
+import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
 import ScheduleExport from "@/components/schedule/ScheduleExport";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
 import OutlookIntegration from "@/components/integrations/OutlookIntegration";
@@ -53,7 +52,6 @@ const Schedule = () => {
   const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
 
   const [showBulkWizard, setShowBulkWizard] = useState(false);
-  const [useLegacyWizard, setUseLegacyWizard] = useState(false);
 
   // Two-week notification state
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -575,33 +573,14 @@ const Schedule = () => {
             <Dialog open={showBulkWizard} onOpenChange={setShowBulkWizard}>
               <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <div className="flex items-center justify-between">
-                    <DialogTitle>Bulk Schedule Generator</DialogTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setUseLegacyWizard(!useLegacyWizard)}
-                    >
-                      {useLegacyWizard ? "Use Quick Mode" : "Use Step-by-Step Wizard"}
-                    </Button>
-                  </div>
+                  <DialogTitle>Bulk Schedule Generator</DialogTitle>
                 </DialogHeader>
-                {useLegacyWizard ? (
-                  <BulkScheduleWizard 
-                    onScheduleGenerated={() => {
-                      setShowBulkWizard(false);
-                      setScheduleRefreshKey(prev => prev + 1);
-                    }}
-                  />
-                ) : (
-                  <QuickBulkScheduler
-                    userId={user?.id}
-                    onScheduleGenerated={() => {
-                      setShowBulkWizard(false);
-                      setScheduleRefreshKey(prev => prev + 1);
-                    }}
-                  />
-                )}
+                <BulkScheduleGenerator
+                  onScheduleGenerated={() => {
+                    setShowBulkWizard(false);
+                    setScheduleRefreshKey(prev => prev + 1);
+                  }}
+                />
               </DialogContent>
             </Dialog>
             <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
