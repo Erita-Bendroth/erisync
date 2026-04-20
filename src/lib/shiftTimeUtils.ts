@@ -1,5 +1,38 @@
 import { supabase } from "@/integrations/supabase/client";
 import { matchesCountryCode } from './countryCodeUtils';
+import { resolveShiftDefinition, type ShiftDefinitionRow, type ResolveResult, type ShiftTypeName } from './shiftResolver';
+
+/**
+ * Strict variant of getApplicableShiftTimes that:
+ *  - Returns an explicit error when no rule or multiple equally-specific rules match
+ *  - Does not fall back to hardcoded defaults
+ *
+ * Use from roster generation / bulk preview where silent defaults would
+ * mislead the user. The legacy `getApplicableShiftTimes` is unchanged.
+ */
+export async function resolveShiftDefinitionStrict(params: {
+  shiftType: ShiftTypeName;
+  date: string | Date;
+  personCountry?: string | null;
+  teamId?: string | null;
+}): Promise<ResolveResult> {
+  const { data, error } = await supabase
+    .from('shift_time_definitions')
+    .select('id, shift_type, team_id, team_ids, country_codes, day_of_week, start_time, end_time, description')
+    .eq('shift_type', params.shiftType);
+  if (error) {
+    return { ok: false, reason: 'no_match', message: error.message, candidates: [] };
+  }
+  return resolveShiftDefinition(
+    {
+      shiftType: params.shiftType,
+      date: params.date,
+      personCountry: params.personCountry ?? null,
+      teamId: params.teamId ?? null,
+    },
+    (data ?? []) as ShiftDefinitionRow[],
+  );
+}
 
 export interface ShiftTimeDefinition {
   id: string;
