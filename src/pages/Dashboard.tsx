@@ -18,6 +18,7 @@ import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScheduleEntries } from "@/hooks/useScheduleEntries";
 import { UnifiedDashboardBody } from "@/pages/UnifiedDashboard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -435,7 +436,9 @@ const Dashboard = () => {
         </TabsContent>
 
         <TabsContent value="team-overview" className="space-y-6">
-          <UnifiedDashboardBody />
+          <ErrorBoundary>
+            <UnifiedDashboardBody />
+          </ErrorBoundary>
         </TabsContent>
       </Tabs>
 
