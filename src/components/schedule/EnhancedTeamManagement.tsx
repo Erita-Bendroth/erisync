@@ -1094,6 +1094,20 @@ const EnhancedTeamManagement = () => {
                                 <Pencil className="w-4 h-4" />
                               </Button>
                             )}
+                            {canEditTeams() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTeamTarget(team);
+                                }}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                title="Delete team"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
