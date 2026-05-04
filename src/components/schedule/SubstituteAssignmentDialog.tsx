@@ -79,17 +79,21 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
   // Load team members for picker
   useEffect(() => {
     if (!open || !teamId) return;
+    let cancelled = false;
     setLoading(true);
-    supabase
-      .rpc("get_team_members_safe", { _team_id: teamId })
-      .then(({ data, error }) => {
-        if (error) {
-          toast({ title: "Could not load team members", description: error.message, variant: "destructive" });
-        } else {
-          setMembers((data ?? []) as TeamMemberOption[]);
-        }
-      })
-      .finally(() => setLoading(false));
+    (async () => {
+      const { data, error } = await supabase.rpc("get_team_members_safe", { _team_id: teamId });
+      if (cancelled) return;
+      if (error) {
+        toast({ title: "Could not load team members", description: error.message, variant: "destructive" });
+      } else {
+        setMembers((data ?? []) as TeamMemberOption[]);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, teamId, toast]);
 
   // Existing assignments in the chosen range, so we can show overrides
