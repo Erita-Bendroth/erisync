@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { CreateTeamModal } from "@/components/schedule/CreateTeamModal";
+import { DeleteTeamDialog } from "@/components/schedule/DeleteTeamDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
@@ -78,6 +80,8 @@ const EnhancedTeamManagement = () => {
   const [editTeamOpen, setEditTeamOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [editTeamForm, setEditTeamForm] = useState({ name: "", description: "" });
+  const [createTeamOpen, setCreateTeamOpen] = useState(false);
+  const [deleteTeamTarget, setDeleteTeamTarget] = useState<Team | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [memberForm, setMemberForm] = useState({
@@ -934,6 +938,12 @@ const EnhancedTeamManagement = () => {
                   Delegate Access
                 </Button>
               )}
+              {canEditTeams() && (
+                <Button size="sm" variant="outline" onClick={() => setCreateTeamOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Team
+                </Button>
+              )}
               {(canEditTeams() || editableTeams.size > 0) && (
                 <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
                   <DialogTrigger asChild>
@@ -1082,6 +1092,20 @@ const EnhancedTeamManagement = () => {
                                 className="h-8 w-8 p-0"
                               >
                                 <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canEditTeams() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTeamTarget(team);
+                                }}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                title="Delete team"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
@@ -1312,6 +1336,29 @@ const EnhancedTeamManagement = () => {
           }}
         />
       )}
+
+      {/* Create Team Modal */}
+      <CreateTeamModal
+        open={createTeamOpen}
+        onOpenChange={setCreateTeamOpen}
+        allTeams={allTeams}
+        onTeamCreated={() => {
+          fetchTeamsAndMembers();
+        }}
+      />
+
+      {/* Delete Team Dialog */}
+      <DeleteTeamDialog
+        team={deleteTeamTarget}
+        open={!!deleteTeamTarget}
+        onOpenChange={(v) => {
+          if (!v) setDeleteTeamTarget(null);
+        }}
+        onDeleted={() => {
+          setDeleteTeamTarget(null);
+          fetchTeamsAndMembers();
+        }}
+      />
 
       {/* Download Schedule Dialog */}
       <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
