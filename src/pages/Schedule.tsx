@@ -609,6 +609,14 @@ const Schedule = () => {
             </Dialog>
             <ScheduleView initialTeamId={teamFromUrl} refreshTrigger={scheduleRefreshKey} />
 
+            {substituteTeamId && (
+              <SubstituteAssignmentDialog
+                open={substituteDialogOpen}
+                onOpenChange={setSubstituteDialogOpen}
+                teamId={substituteTeamId}
+              />
+            )}
+
             {/* Integrated Co-Planning Calendar */}
             <IntegratedPlanningCalendar 
               onScheduleUpdate={() => setScheduleRefreshKey(prev => prev + 1)}
