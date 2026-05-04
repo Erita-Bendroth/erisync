@@ -840,7 +840,8 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                 </td>
                                 {selectedTeams.map((teamId) => {
                                   const daySchedules = scheduleByDateAndTeam.get(dateStr)?.get(teamId) || [];
-                                  
+                                  const teamSubs = subsByDateTeam.get(`${dateStr}|${teamId}`) || [];
+
                                   return (
                                     <td key={teamId} className="p-3">
                                       {daySchedules.length > 0 ? (
@@ -890,9 +891,58 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
                                               </Tooltip>
                                             );
                                           })}
+                                          {teamSubs.map((s) => {
+                                            const sub = subProfileMap.get(s.substitute_user_id);
+                                            const absent = subProfileMap.get(s.absent_user_id);
+                                            return (
+                                              <SubstituteBadge
+                                                key={s.id}
+                                                substituteInitials={
+                                                  sub?.initials ||
+                                                  `${sub?.first_name?.[0] ?? "?"}${sub?.last_name?.[0] ?? ""}`
+                                                }
+                                                substituteName={
+                                                  sub ? `${sub.first_name} ${sub.last_name}` : "Substitute"
+                                                }
+                                                absentName={
+                                                  absent ? `${absent.first_name} ${absent.last_name}` : undefined
+                                                }
+                                                reason={isPrivileged ? s.reason : undefined}
+                                                notes={isPrivileged ? s.notes : undefined}
+                                                variant="covering"
+                                              />
+                                            );
+                                          })}
                                         </div>
                                       ) : (
-                                        <span className="text-muted-foreground">-</span>
+                                        teamSubs.length > 0 ? (
+                                          <div className="flex flex-wrap gap-1">
+                                            {teamSubs.map((s) => {
+                                              const sub = subProfileMap.get(s.substitute_user_id);
+                                              const absent = subProfileMap.get(s.absent_user_id);
+                                              return (
+                                                <SubstituteBadge
+                                                  key={s.id}
+                                                  substituteInitials={
+                                                    sub?.initials ||
+                                                    `${sub?.first_name?.[0] ?? "?"}${sub?.last_name?.[0] ?? ""}`
+                                                  }
+                                                  substituteName={
+                                                    sub ? `${sub.first_name} ${sub.last_name}` : "Substitute"
+                                                  }
+                                                  absentName={
+                                                    absent ? `${absent.first_name} ${absent.last_name}` : undefined
+                                                  }
+                                                  reason={isPrivileged ? s.reason : undefined}
+                                                  notes={isPrivileged ? s.notes : undefined}
+                                                  variant="covering"
+                                                />
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <span className="text-muted-foreground">-</span>
+                                        )
                                       )}
                                     </td>
                                   );
