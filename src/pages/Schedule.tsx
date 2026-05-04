@@ -17,6 +17,7 @@ import AdminSetup from "@/components/admin/AdminSetup";
 import CountrySelector from "@/components/profile/CountrySelector";
 import PasswordSettings from "@/components/settings/PasswordSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
+import { VacationCarryoverSettings } from "@/components/settings/VacationCarryoverSettings";
 import BulkScheduleGenerator from "@/components/schedule/BulkScheduleGenerator";
 import ScheduleExport from "@/components/schedule/ScheduleExport";
 import UserProfileOverview from "@/components/profile/UserProfileOverview";
@@ -645,6 +646,7 @@ const Schedule = () => {
                 canView={true}
                 showTeamContext={true}
               />
+              <VacationCarryoverSettings />
               <CountrySelector />
               <NotificationSettings />
               <PasswordSettings />
