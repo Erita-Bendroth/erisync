@@ -1956,6 +1956,7 @@ export type Database = {
           updated_at: string
           user_id: string
           vacation_days_allowance: number
+          vacation_days_carryover: number
           year: number
         }
         Insert: {
@@ -1967,6 +1968,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           vacation_days_allowance?: number
+          vacation_days_carryover?: number
           year: number
         }
         Update: {
@@ -1978,6 +1980,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vacation_days_allowance?: number
+          vacation_days_carryover?: number
           year?: number
         }
         Relationships: []

@@ -11,13 +11,19 @@ import { useToast } from '@/hooks/use-toast';
 interface Props {
   stats: UserTimeStats;
   canEdit: boolean;
+  isSelf?: boolean;
   onUpdate: (vacationDays: number, flextimeHours: number) => Promise<void>;
+  onUpdateCarryover?: (carryoverDays: number) => Promise<void>;
 }
 
-export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate }) => {
+export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, isSelf = false, onUpdate, onUpdateCarryover }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [vacationDays, setVacationDays] = useState(stats.vacation_days_allowance);
   const [flextimeHours, setFlextimeHours] = useState(stats.flextime_hours_allowance);
+  const [carryoverDays, setCarryoverDays] = useState(stats.vacation_days_carryover ?? 0);
+  const [carryoverOpen, setCarryoverOpen] = useState(false);
+  const [carryoverInput, setCarryoverInput] = useState(stats.vacation_days_carryover ?? 0);
+  const [savingCarryover, setSavingCarryover] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -25,6 +31,9 @@ export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate
     try {
       setSaving(true);
       await onUpdate(vacationDays, flextimeHours);
+      if (onUpdateCarryover && carryoverDays !== (stats.vacation_days_carryover ?? 0)) {
+        await onUpdateCarryover(carryoverDays);
+      }
       toast({
         title: "Success",
         description: "Time allowances updated successfully",
@@ -41,6 +50,22 @@ export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate
     }
   };
 
+  const handleSaveCarryover = async () => {
+    if (!onUpdateCarryover) return;
+    try {
+      setSavingCarryover(true);
+      await onUpdateCarryover(carryoverInput);
+      toast({ title: "Saved", description: "Vacation carryover updated." });
+      setCarryoverOpen(false);
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to save carryover.", variant: "destructive" });
+    } finally {
+      setSavingCarryover(false);
+    }
+  };
+
+  const totalAllowance = stats.vacation_days_allowance + (stats.vacation_days_carryover ?? 0);
+
   return (
     <div className="space-y-2 p-3 border rounded-md bg-muted/30">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -51,7 +76,7 @@ export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate
             <span className="text-xs text-muted-foreground">Vacation Days</span>
             <div className="flex items-baseline gap-1">
               <span className="text-sm font-medium">
-                {stats.vacation_days_remaining}/{stats.vacation_days_allowance}
+                {stats.vacation_days_remaining}/{totalAllowance}
               </span>
               {stats.is_override && (
                 <Badge variant="outline" className="text-[10px] px-1 py-0">
@@ -62,6 +87,23 @@ export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate
             <span className="text-xs text-muted-foreground">
               {stats.vacation_days_used} used
             </span>
+            {(stats.vacation_days_carryover ?? 0) > 0 && (
+              <span className="text-xs text-blue-600 dark:text-blue-400">
+                +{stats.vacation_days_carryover} carried over
+              </span>
+            )}
+            {(isSelf || canEdit) && onUpdateCarryover && (
+              <button
+                type="button"
+                className="text-xs text-primary underline-offset-2 hover:underline text-left"
+                onClick={() => {
+                  setCarryoverInput(stats.vacation_days_carryover ?? 0);
+                  setCarryoverOpen(true);
+                }}
+              >
+                Edit carryover
+              </button>
+            )}
           </div>
         </div>
 
@@ -147,6 +189,22 @@ export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate
                   Default: 30 days. Current used: {stats.vacation_days_used} days.
                 </p>
               </div>
+              {onUpdateCarryover && (
+                <div className="space-y-2">
+                  <Label htmlFor="carryover-days">Vacation Carryover from previous year</Label>
+                  <Input
+                    id="carryover-days"
+                    type="number"
+                    value={carryoverDays}
+                    onChange={(e) => setCarryoverDays(Math.max(0, parseInt(e.target.value) || 0))}
+                    min={0}
+                    max={60}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Days brought in from {stats.year - 1}. Added on top of the yearly allowance.
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="flextime-hours">Flextime Hours (per year)</Label>
                 <Input
@@ -168,6 +226,42 @@ export const UserTimeStatsDisplay: React.FC<Props> = ({ stats, canEdit, onUpdate
               </Button>
               <Button onClick={handleSave} disabled={saving}>
                 {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Self-edit carryover dialog (available to user themselves even without manager rights) */}
+      {onUpdateCarryover && (
+        <Dialog open={carryoverOpen} onOpenChange={setCarryoverOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Vacation Carryover for {stats.year}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="carryover-self">Days carried over from {stats.year - 1}</Label>
+                <Input
+                  id="carryover-self"
+                  type="number"
+                  value={carryoverInput}
+                  onChange={(e) => setCarryoverInput(Math.max(0, parseInt(e.target.value) || 0))}
+                  min={0}
+                  max={60}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">
+                  These days are added to your {stats.year} vacation allowance ({stats.vacation_days_allowance} days).
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCarryoverOpen(false)} disabled={savingCarryover}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveCarryover} disabled={savingCarryover}>
+                {savingCarryover ? "Saving..." : "Save"}
               </Button>
             </DialogFooter>
           </DialogContent>

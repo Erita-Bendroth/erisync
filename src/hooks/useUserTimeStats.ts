@@ -6,6 +6,7 @@ export interface UserTimeStats {
   year: number;
   vacation_days_used: number;
   vacation_days_allowance: number;
+  vacation_days_carryover: number;
   vacation_days_remaining: number;
   flextime_hours_used: number;
   flextime_hours_allowance: number;
@@ -130,5 +131,51 @@ export const useUserTimeStats = ({
     }
   };
 
-  return { stats, loading, error, updateAllowance };
+  const updateCarryover = async (userId: string, carryoverDays: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Fetch existing row (if any) to preserve allowance fields
+      const { data: existing } = await supabase
+        .from('user_time_allowances')
+        .select('vacation_days_allowance, flextime_hours_allowance, is_override, set_by')
+        .eq('user_id', userId)
+        .eq('year', year)
+        .maybeSingle();
+
+      const { error } = await supabase
+        .from('user_time_allowances')
+        .upsert({
+          user_id: userId,
+          year,
+          vacation_days_allowance: existing?.vacation_days_allowance ?? 30,
+          flextime_hours_allowance: existing?.flextime_hours_allowance ?? 0,
+          vacation_days_carryover: carryoverDays,
+          is_override: existing?.is_override ?? false,
+          set_by: existing?.set_by ?? user.id,
+        }, { onConflict: 'user_id,year' });
+
+      if (error) throw error;
+
+      const { data, error: rpcError } = await supabase.rpc(
+        'get_user_time_stats',
+        {
+          _user_id: userId,
+          _team_ids: teamIds || null,
+          _year: year,
+        }
+      );
+      if (rpcError) throw rpcError;
+      if (data) {
+        setStats(prev => new Map(prev).set(userId, data as unknown as UserTimeStats));
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Error updating carryover:', err);
+      throw err;
+    }
+  };
+
+  return { stats, loading, error, updateAllowance, updateCarryover };
 };
