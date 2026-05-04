@@ -11,6 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 import { getApplicableShiftTimes } from '@/lib/shiftTimeUtils';
 import { validateWeekendShift } from '@/lib/shiftValidation';
+import { SubstituteAssignmentDialog } from '@/components/schedule/SubstituteAssignmentDialog';
+import { useCurrentUserContext } from '@/hooks/useCurrentUserContext';
+import {
+  useSubstituteAssignments,
+  indexByAbsence,
+  indexBySubstitute,
+} from '@/hooks/useSubstituteAssignments';
+import { SubstituteBadge } from '@/components/schedule/SubstituteBadge';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -65,6 +73,30 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
   cellsBeingEdited,
 }) => {
   const { toast } = useToast();
+  const { roles } = useCurrentUserContext();
+  const canAssignSubstitute =
+    roles.includes('admin') || roles.includes('planner') || roles.includes('manager');
+
+  // Substitute assignments for this view's date range
+  const startDate = dates[0];
+  const endDate = dates[dates.length - 1];
+  const { data: substitutes = [] } = useSubstituteAssignments({
+    teamIds: teamId ? [teamId] : [],
+    startDate: startDate || new Date(),
+    endDate: endDate || new Date(),
+    enabled: !!teamId && dates.length > 0,
+  });
+  const subByAbsence = indexByAbsence(substitutes);
+  const subBySubstitute = indexBySubstitute(substitutes);
+
+  const memberLookup = React.useMemo(() => {
+    const m = new Map<string, TeamMember>();
+    teamMembers.forEach((tm) => m.set(tm.user_id, tm));
+    return m;
+  }, [teamMembers]);
+
+  const [substituteDialogOpen, setSubstituteDialogOpen] = useState(false);
+  const [substituteContext, setSubstituteContext] = useState<{ userId: string; date: string } | null>(null);
   
   // Determine if we should use quick dialog (for long date ranges)
   const isLongRange = dates.length > 14; // More than 2 weeks
