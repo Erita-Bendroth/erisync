@@ -314,6 +314,15 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                       );
                       const isHotline = entries.some(e => hasHotlineSupport(e));
                       const isToday = isSameDay(day, new Date());
+                      const dateStr = format(day, "yyyy-MM-dd");
+                      const subForAbsence = subByAbsence.get(`${dateStr}|${user.user_id}`);
+                      const subForCovering = subBySubstitute.get(`${dateStr}|${user.user_id}`);
+                      const subUser = subForAbsence
+                        ? allTeamMembers.find(p => p.user_id === subForAbsence.substitute_user_id)
+                        : null;
+                      const absentUser = subForCovering
+                        ? allTeamMembers.find(p => p.user_id === subForCovering.absent_user_id)
+                        : null;
 
                       return (
                         <TableCell
@@ -340,9 +349,36 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                               <span className="text-xs text-muted-foreground">
                                 {isAvailable ? "Available" : "Unavailable"}
                               </span>
+                              {subForAbsence && subUser && (
+                                <SubstituteBadge
+                                  substituteInitials={subUser.initials || "?"}
+                                  substituteName={`${subUser.first_name} ${subUser.last_name}`}
+                                  absentName={`${user.first_name} ${user.last_name}`}
+                                  reason={isPrivileged ? subForAbsence.reason : undefined}
+                                  notes={isPrivileged ? subForAbsence.notes : undefined}
+                                  variant="absence"
+                                />
+                              )}
+                              {subForCovering && absentUser && !subForAbsence && (
+                                <SubstituteBadge
+                                  substituteInitials={user.initials || "?"}
+                                  substituteName={`${user.first_name} ${user.last_name}`}
+                                  absentName={`${absentUser.first_name} ${absentUser.last_name}`}
+                                  variant="covering"
+                                />
+                              )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+                            subForCovering && absentUser ? (
+                              <SubstituteBadge
+                                substituteInitials={user.initials || "?"}
+                                substituteName={`${user.first_name} ${user.last_name}`}
+                                absentName={`${absentUser.first_name} ${absentUser.last_name}`}
+                                variant="covering"
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )
                           )}
                         </TableCell>
                       );
