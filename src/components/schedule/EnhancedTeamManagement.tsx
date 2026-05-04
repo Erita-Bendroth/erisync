@@ -1337,6 +1337,29 @@ const EnhancedTeamManagement = () => {
         />
       )}
 
+      {/* Create Team Modal */}
+      <CreateTeamModal
+        open={createTeamOpen}
+        onOpenChange={setCreateTeamOpen}
+        allTeams={allTeams}
+        onTeamCreated={() => {
+          fetchTeamsAndMembers();
+        }}
+      />
+
+      {/* Delete Team Dialog */}
+      <DeleteTeamDialog
+        team={deleteTeamTarget}
+        open={!!deleteTeamTarget}
+        onOpenChange={(v) => {
+          if (!v) setDeleteTeamTarget(null);
+        }}
+        onDeleted={() => {
+          setDeleteTeamTarget(null);
+          fetchTeamsAndMembers();
+        }}
+      />
+
       {/* Download Schedule Dialog */}
       <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
         <DialogContent className="max-w-md">
