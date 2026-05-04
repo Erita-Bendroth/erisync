@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download, ArrowLeftRight } from "lucide-react";
+import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download, ArrowLeftRight, UserCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import ScheduleView from "@/components/schedule/ScheduleView";
@@ -39,6 +39,7 @@ import { MyRequestsDialog } from "@/components/schedule/MyRequestsDialog";
 import { QuickSwapButton } from "@/components/schedule/swap/QuickSwapButton";
 import { SwapStatusCards } from "@/components/schedule/swap/SwapStatusCards";
 import { VacationCenter } from "@/components/schedule/VacationCenter";
+import { SubstituteAssignmentDialog } from "@/components/schedule/SubstituteAssignmentDialog";
 
 const Schedule = () => {
   const { signOut, user } = useAuth();
@@ -53,6 +54,8 @@ const Schedule = () => {
   const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
 
   const [showBulkWizard, setShowBulkWizard] = useState(false);
+  const [substituteDialogOpen, setSubstituteDialogOpen] = useState(false);
+  const [substituteTeamId, setSubstituteTeamId] = useState<string>("");
 
   // Two-week notification state
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -438,6 +441,18 @@ const Schedule = () => {
                 {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && (
                   <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
                     Generate Bulk
+                  </Button>
+                )}
+                {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && teams.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSubstituteTeamId(teams[0].id);
+                      setSubstituteDialogOpen(true);
+                    }}
+                  >
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    Assign Substitute
                   </Button>
                 )}
                     <Button variant="outline" onClick={() => setActiveTab('settings')}>
