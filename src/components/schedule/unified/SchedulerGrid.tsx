@@ -11,6 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 import { getApplicableShiftTimes } from '@/lib/shiftTimeUtils';
 import { validateWeekendShift } from '@/lib/shiftValidation';
+import { SubstituteAssignmentDialog } from '@/components/schedule/SubstituteAssignmentDialog';
+import { useCurrentUserContext } from '@/hooks/useCurrentUserContext';
+import {
+  useSubstituteAssignments,
+  indexByAbsence,
+  indexBySubstitute,
+} from '@/hooks/useSubstituteAssignments';
+import { SubstituteBadge } from '@/components/schedule/SubstituteBadge';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -65,6 +73,30 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
   cellsBeingEdited,
 }) => {
   const { toast } = useToast();
+  const { roles } = useCurrentUserContext();
+  const canAssignSubstitute =
+    roles.includes('admin') || roles.includes('planner') || roles.includes('manager');
+
+  // Substitute assignments for this view's date range
+  const startDate = dates[0];
+  const endDate = dates[dates.length - 1];
+  const { data: substitutes = [] } = useSubstituteAssignments({
+    teamIds: teamId ? [teamId] : [],
+    startDate: startDate || new Date(),
+    endDate: endDate || new Date(),
+    enabled: !!teamId && dates.length > 0,
+  });
+  const subByAbsence = indexByAbsence(substitutes);
+  const subBySubstitute = indexBySubstitute(substitutes);
+
+  const memberLookup = React.useMemo(() => {
+    const m = new Map<string, TeamMember>();
+    teamMembers.forEach((tm) => m.set(tm.user_id, tm));
+    return m;
+  }, [teamMembers]);
+
+  const [substituteDialogOpen, setSubstituteDialogOpen] = useState(false);
+  const [substituteContext, setSubstituteContext] = useState<{ userId: string; date: string } | null>(null);
   
   // Determine if we should use quick dialog (for long date ranges)
   const isLongRange = dates.length > 14; // More than 2 weeks
@@ -302,9 +334,14 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
             {dates.map((date) => {
               const entry = getEntry(member.user_id, date);
               const cellId = `${member.user_id}:${date}`;
-              
+              const subForAbsence = subByAbsence.get(`${date}|${member.user_id}`);
+              const subForCovering = subBySubstitute.get(`${date}|${member.user_id}`);
+              const subUser = subForAbsence ? memberLookup.get(subForAbsence.substitute_user_id) : undefined;
+              const absentUser = subForCovering ? memberLookup.get(subForCovering.absent_user_id) : undefined;
+
               return (
-                <SchedulerCellWithTooltip
+                <div key={cellId} className="relative">
+                  <SchedulerCellWithTooltip
                   key={cellId}
                   userId={member.user_id}
                   date={date}
@@ -325,7 +362,30 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
                   onMouseUp={() => handleCellMouseUp()}
                   editingBy={cellsBeingEdited[cellId] || []}
                   enableQuickDialog={isLongRange}
-                />
+                  />
+                  {subForAbsence && subUser && (
+                    <div className="absolute bottom-0.5 right-0.5 z-10 pointer-events-auto">
+                      <SubstituteBadge
+                        substituteInitials={subUser.initials || `${subUser.first_name.charAt(0)}${subUser.last_name.charAt(0)}`}
+                        substituteName={`${subUser.first_name} ${subUser.last_name}`}
+                        absentName={`${member.first_name} ${member.last_name}`}
+                        reason={canAssignSubstitute ? subForAbsence.reason : undefined}
+                        notes={canAssignSubstitute ? subForAbsence.notes : undefined}
+                        variant="absence"
+                      />
+                    </div>
+                  )}
+                  {subForCovering && absentUser && !subForAbsence && (
+                    <div className="absolute top-0.5 right-0.5 z-10 pointer-events-auto">
+                      <SubstituteBadge
+                        substituteInitials={member.initials || `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`}
+                        substituteName={`${member.first_name} ${member.last_name}`}
+                        absentName={`${absentUser.first_name} ${absentUser.last_name}`}
+                        variant="covering"
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -352,9 +412,29 @@ export const SchedulerGrid: React.FC<SchedulerGridProps> = ({
           currentAvailabilityStatus={getEntry(editingCellData.userId, editingCellData.date)?.availability_status || 'available'}
           currentNotes={getEntry(editingCellData.userId, editingCellData.date)?.notes}
           onSave={handleSaveEdit}
+          canAssignSubstitute={canAssignSubstitute}
+          onAssignSubstitute={() => {
+            setSubstituteContext({ userId: editingCellData.userId, date: editingCellData.date });
+            setSubstituteDialogOpen(true);
+          }}
         >
           <div />
         </InlineEditPopover>
+      )}
+
+      {/* Substitute assignment dialog */}
+      {substituteContext && (
+        <SubstituteAssignmentDialog
+          open={substituteDialogOpen}
+          onOpenChange={(o) => {
+            setSubstituteDialogOpen(o);
+            if (!o) setSubstituteContext(null);
+          }}
+          teamId={teamId}
+          absentUserId={substituteContext.userId}
+          startDate={substituteContext.date}
+          endDate={substituteContext.date}
+        />
       )}
       
       {/* Quick Dialog (for long ranges) */}

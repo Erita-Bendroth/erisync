@@ -1533,6 +1533,63 @@ export type Database = {
         }
         Relationships: []
       }
+      substitute_assignments: {
+        Row: {
+          absence_entry_id: string | null
+          absent_user_id: string
+          created_at: string
+          created_by: string
+          date: string
+          id: string
+          notes: string | null
+          reason: string | null
+          substitute_user_id: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          absence_entry_id?: string | null
+          absent_user_id: string
+          created_at?: string
+          created_by: string
+          date: string
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          substitute_user_id: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          absence_entry_id?: string | null
+          absent_user_id?: string
+          created_at?: string
+          created_by?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          reason?: string | null
+          substitute_user_id?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "substitute_assignments_absence_entry_id_fkey"
+            columns: ["absence_entry_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "substitute_assignments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_audit_log: {
         Row: {
           action: string
@@ -2099,7 +2156,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      substitute_assignments_public: {
+        Row: {
+          absence_entry_id: string | null
+          absent_user_id: string | null
+          created_at: string | null
+          date: string | null
+          id: string | null
+          substitute_user_id: string | null
+          team_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          absence_entry_id?: string | null
+          absent_user_id?: string | null
+          created_at?: string | null
+          date?: string | null
+          id?: string | null
+          substitute_user_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          absence_entry_id?: string | null
+          absent_user_id?: string | null
+          created_at?: string | null
+          date?: string | null
+          id?: string | null
+          substitute_user_id?: string | null
+          team_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "substitute_assignments_absence_entry_id_fkey"
+            columns: ["absence_entry_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "substitute_assignments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       activate_roster: { Args: { _roster_id: string }; Returns: Json }
