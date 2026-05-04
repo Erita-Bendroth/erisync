@@ -28,6 +28,12 @@ import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 import { useScheduleAccessControl } from "@/hooks/useScheduleAccessControl";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  useSubstituteAssignments,
+  indexByAbsence,
+} from "@/hooks/useSubstituteAssignments";
+import { SubstituteBadge } from "./SubstituteBadge";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 
 interface TeamMember {
   user_id: string;
@@ -136,6 +142,41 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
   const weekNumber = getWeek(currentDate, { weekStartsOn: 1 });
   const year = getYear(currentDate);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+  // Substitute assignments across all selected teams for the visible range
+  const { roles } = useCurrentUserContext();
+  const isPrivileged =
+    roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
+  const { data: substitutes = [] } = useSubstituteAssignments({
+    teamIds: selectedTeams,
+    startDate: weekStart,
+    endDate: weekEnd,
+    enabled: selectedTeams.length > 0,
+  });
+  // Index by `${date}|${team_id}` -> list of assignments
+  const subsByDateTeam = useMemo(() => {
+    const m = new Map<string, typeof substitutes>();
+    substitutes.forEach((s) => {
+      const key = `${s.date}|${s.team_id}`;
+      const arr = m.get(key) ?? [];
+      arr.push(s);
+      m.set(key, arr);
+    });
+    return m;
+  }, [substitutes]);
+
+  // Profile lookup for substitute/absent users
+  const subProfileMap = useMemo(() => {
+    const m = new Map<string, { first_name: string; last_name: string; initials: string | null }>();
+    scheduleData.forEach((e) => {
+      m.set(e.user_id, {
+        first_name: e.first_name,
+        last_name: e.last_name,
+        initials: e.initials,
+      });
+    });
+    return m;
+  }, [scheduleData]);
 
   // Coverage analysis hook - pass pre-fetched data to avoid duplicate queries
   const coverageAnalysis = useCoverageAnalysis({
