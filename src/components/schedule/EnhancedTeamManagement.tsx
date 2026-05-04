@@ -109,7 +109,7 @@ const EnhancedTeamManagement = () => {
   const allUserIds = Object.values(teamMembers).flat().map(m => m.user_id);
   
   // Fetch time stats for all team members
-  const { stats: timeStats, loading: statsLoading, updateAllowance } = useUserTimeStats({
+  const { stats: timeStats, loading: statsLoading, updateAllowance, updateCarryover } = useUserTimeStats({
     userIds: allUserIds,
     year: new Date().getFullYear(),
     enabled: allUserIds.length > 0,
@@ -1230,8 +1230,12 @@ const EnhancedTeamManagement = () => {
                                       <UserTimeStatsDisplay
                                         stats={memberStats}
                                         canEdit={canEditTeams() || isCurrentUserManagerOfTeam}
+                                        isSelf={user?.id === member.user_id}
                                         onUpdate={async (vacationDays, flextimeHours) => {
                                           await updateAllowance(member.user_id, vacationDays, flextimeHours);
+                                        }}
+                                        onUpdateCarryover={async (carryoverDays) => {
+                                          await updateCarryover(member.user_id, carryoverDays);
                                         }}
                                       />
                                     )}
