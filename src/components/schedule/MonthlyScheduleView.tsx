@@ -9,6 +9,13 @@ import { cn, formatUserName } from "@/lib/utils";
 import { useShiftCounts } from "@/hooks/useShiftCounts";
 import { ShiftCountsDisplay } from "./ShiftCountsDisplay";
 import { useScheduleEntries } from "@/hooks/useScheduleEntries";
+import {
+  useSubstituteAssignments,
+  indexByAbsence,
+  indexBySubstitute,
+} from "@/hooks/useSubstituteAssignments";
+import { SubstituteBadge } from "./SubstituteBadge";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 
 interface MonthlyScheduleEntry {
   user_id: string;
@@ -32,6 +39,9 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
   const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const { roles } = useCurrentUserContext();
+  const isPrivileged =
+    roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -71,6 +81,16 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
     endDate: monthEnd,
     enabled: memberIds.length > 0,
   });
+
+  // Substitute assignments for this team & month
+  const { data: substitutes = [] } = useSubstituteAssignments({
+    teamIds: teamId ? [teamId] : [],
+    startDate: monthStart,
+    endDate: monthEnd,
+    enabled: !!teamId,
+  });
+  const subByAbsence = indexByAbsence(substitutes);
+  const subBySubstitute = indexBySubstitute(substitutes);
 
   // Combine schedule entries with profile info to preserve original shape
   const scheduleData: MonthlyScheduleEntry[] = (rawEntries as any[]).map(entry => {
@@ -328,6 +348,15 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                         const isHotline = entries.some(e => hasHotlineSupport(e));
                         const isToday = isSameDay(day, new Date());
                         const isWeekendDay = isWeekend(day);
+                        const dateStr = format(day, "yyyy-MM-dd");
+                        const subForAbsence = subByAbsence.get(`${dateStr}|${user.user_id}`);
+                        const subForCovering = subBySubstitute.get(`${dateStr}|${user.user_id}`);
+                        const subUser = subForAbsence
+                          ? allTeamMembers.find(p => p.user_id === subForAbsence.substitute_user_id)
+                          : null;
+                        const absentUser = subForCovering
+                          ? allTeamMembers.find(p => p.user_id === subForCovering.absent_user_id)
+                          : null;
 
                         return (
                           <TableCell
@@ -348,9 +377,36 @@ export function MonthlyScheduleView({ currentMonth, teamId, userId }: MonthlySch
                               ) : (
                                 <XCircle className="h-4 w-4 text-red-500" />
                               )}
+                              {subForAbsence && subUser && (
+                                <SubstituteBadge
+                                  substituteInitials={subUser.initials || "?"}
+                                  substituteName={`${subUser.first_name} ${subUser.last_name}`}
+                                  absentName={`${user.first_name} ${user.last_name}`}
+                                  reason={isPrivileged ? subForAbsence.reason : undefined}
+                                  notes={isPrivileged ? subForAbsence.notes : undefined}
+                                  variant="absence"
+                                />
+                              )}
+                              {subForCovering && absentUser && !subForAbsence && (
+                                <SubstituteBadge
+                                  substituteInitials={user.initials || "?"}
+                                  substituteName={`${user.first_name} ${user.last_name}`}
+                                  absentName={`${absentUser.first_name} ${absentUser.last_name}`}
+                                  variant="covering"
+                                />
+                              )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+                            subForCovering && absentUser ? (
+                              <SubstituteBadge
+                                substituteInitials={user.initials || "?"}
+                                substituteName={`${user.first_name} ${user.last_name}`}
+                                absentName={`${absentUser.first_name} ${absentUser.last_name}`}
+                                variant="covering"
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )
                           )}
                           </TableCell>
                         );
