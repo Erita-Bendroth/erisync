@@ -6,6 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay } from "date-fns";
 import { Phone, CheckCircle2, XCircle } from "lucide-react";
 import { formatUserName } from "@/lib/utils";
+import {
+  useSubstituteAssignments,
+  indexByAbsence,
+  indexBySubstitute,
+} from "@/hooks/useSubstituteAssignments";
+import { SubstituteBadge } from "./SubstituteBadge";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 
 interface TeamAvailabilityEntry {
   user_id: string;
@@ -28,6 +35,19 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
   const [availabilityData, setAvailabilityData] = useState<TeamAvailabilityEntry[]>([]);
   const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [teamIds, setTeamIds] = useState<string[]>([]);
+  const { roles } = useCurrentUserContext();
+  const isPrivileged =
+    roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
+
+  const { data: substitutes = [] } = useSubstituteAssignments({
+    teamIds,
+    startDate: workDays[0] || new Date(),
+    endDate: workDays[workDays.length - 1] || new Date(),
+    enabled: teamIds.length > 0 && workDays.length > 0,
+  });
+  const subByAbsence = indexByAbsence(substitutes);
+  const subBySubstitute = indexBySubstitute(substitutes);
 
   useEffect(() => {
     fetchTeamAvailability();
@@ -51,6 +71,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
       }
 
       const teamIds = userTeams.map(t => t.team_id);
+      setTeamIds(teamIds);
       const startDate = format(workDays[0], "yyyy-MM-dd");
       const endDate = format(workDays[workDays.length - 1], "yyyy-MM-dd");
 
