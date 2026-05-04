@@ -938,6 +938,12 @@ const EnhancedTeamManagement = () => {
                   Delegate Access
                 </Button>
               )}
+              {canEditTeams() && (
+                <Button size="sm" variant="outline" onClick={() => setCreateTeamOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Team
+                </Button>
+              )}
               {(canEditTeams() || editableTeams.size > 0) && (
                 <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
                   <DialogTrigger asChild>
