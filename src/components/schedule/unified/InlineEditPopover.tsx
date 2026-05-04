@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Database } from '@/integrations/supabase/types';
 import { isDateWeekend } from '@/lib/shiftValidation';
+import { UserCheck } from 'lucide-react';
 
 type ShiftType = Database['public']['Enums']['shift_type'];
 type ActivityType = Database['public']['Enums']['activity_type'];
@@ -28,6 +29,10 @@ interface InlineEditPopoverProps {
     availability_status: AvailabilityStatus;
     notes?: string;
   }) => void;
+  /** Optional: opens the substitute assignment dialog for this cell */
+  onAssignSubstitute?: () => void;
+  /** Whether the viewer can assign substitutes (manager+) */
+  canAssignSubstitute?: boolean;
   children: React.ReactNode;
 }
 
@@ -42,6 +47,8 @@ export const InlineEditPopover: React.FC<InlineEditPopoverProps> = ({
   currentAvailabilityStatus,
   currentNotes,
   onSave,
+  onAssignSubstitute,
+  canAssignSubstitute,
   children,
 }) => {
   const [availability, setAvailability] = useState<AvailabilityStatus>(currentAvailabilityStatus);
@@ -130,6 +137,23 @@ export const InlineEditPopover: React.FC<InlineEditPopoverProps> = ({
               Save
             </Button>
           </div>
+
+          {canAssignSubstitute && onAssignSubstitute && (
+            <div className="pt-2 border-t">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs"
+                onClick={() => {
+                  onOpenChange(false);
+                  onAssignSubstitute();
+                }}
+              >
+                <UserCheck className="h-3 w-3 mr-2" />
+                Assign substitute for this day
+              </Button>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
