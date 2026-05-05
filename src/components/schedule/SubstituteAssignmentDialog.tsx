@@ -60,7 +60,9 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
   const [reasonOther, setReasonOther] = useState("");
   const [notes, setNotes] = useState("");
   const [members, setMembers] = useState<TeamMemberOption[]>([]);
+  const [candidates, setCandidates] = useState<TeamMemberOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
 
   // Reset when reopened
   useEffect(() => {
@@ -96,6 +98,32 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
     };
   }, [open, teamId, toast]);
 
+  // Load substitute candidates (union of all teams the absent person belongs to)
+  useEffect(() => {
+    if (!open || !absentUserId) {
+      setCandidates([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCandidates(true);
+    (async () => {
+      const { data, error } = await supabase.rpc("get_substitute_candidates", {
+        _absent_user_id: absentUserId,
+      });
+      if (cancelled) return;
+      if (error) {
+        toast({ title: "Could not load substitute candidates", description: error.message, variant: "destructive" });
+        setCandidates([]);
+      } else {
+        setCandidates((data ?? []) as TeamMemberOption[]);
+      }
+      setLoadingCandidates(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, absentUserId, toast]);
+
   // Existing assignments in the chosen range, so we can show overrides
   const { data: existing = [] } = useSubstituteAssignments({
     teamIds: teamId ? [teamId] : [],
@@ -113,7 +141,7 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
     return Array.from({ length: diff + 1 }, (_, i) => format(addDays(s, i), "yyyy-MM-dd"));
   }, [startDate, endDate]);
 
-  const candidateMembers = members.filter((m) => m.user_id !== absentUserId);
+  const candidateMembers = candidates.filter((m) => m.user_id !== absentUserId);
 
   const handleSave = async () => {
     if (!teamId || !absentUserId || !substituteUserId) {
@@ -257,7 +285,7 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
 
           <div className="space-y-2">
             <Label>Substitute</Label>
-            <Select value={substituteUserId} onValueChange={setSubstituteUserId} disabled={!absentUserId || loading}>
+            <Select value={substituteUserId} onValueChange={setSubstituteUserId} disabled={!absentUserId || loadingCandidates}>
               <SelectTrigger><SelectValue placeholder="Select substitute" /></SelectTrigger>
               <SelectContent>
                 {candidateMembers.map((m) => (
@@ -267,11 +295,15 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
                 ))}
               </SelectContent>
             </Select>
-            {loading && (
+            {loadingCandidates ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Loading members…
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading candidates…
               </div>
-            )}
+            ) : absentUserId ? (
+              <p className="text-xs text-muted-foreground">
+                Showing {candidateMembers.length} candidate{candidateMembers.length === 1 ? "" : "s"} across the absentee's teams.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">

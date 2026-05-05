@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, ShieldCheck, ShieldOff, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateTeamModal } from "@/components/schedule/CreateTeamModal";
 import { DeleteTeamDialog } from "@/components/schedule/DeleteTeamDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -461,6 +462,29 @@ const EnhancedTeamManagement = () => {
         description: error.message || "Failed to remove team member",
         variant: "destructive",
       });
+    }
+  };
+
+  const setManagerStatus = async (memberId: string, teamId: string, makeManager: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ is_manager: makeManager })
+        .eq('id', memberId);
+      if (error) throw error;
+      toast({
+        title: makeManager ? "Promoted to manager" : "Removed manager mandate",
+        description: makeManager
+          ? "This member now shares full manager mandate on this team."
+          : "This member no longer has manager mandate on this team.",
+      });
+      setTeamMembers(prev => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).map(m => m.id === memberId ? { ...m, is_manager: makeManager } : m),
+      }));
+    } catch (error: any) {
+      console.error('Error updating manager status:', error);
+      toast({ title: "Error", description: error.message || "Failed to update manager status", variant: "destructive" });
     }
   };
 
@@ -1114,6 +1138,28 @@ const EnhancedTeamManagement = () => {
                           <Badge variant="secondary">
                             {members.length} member{members.length !== 1 ? 's' : ''}
                           </Badge>
+                          {(() => {
+                            const managers = members.filter((m) => m.is_manager);
+                            if (managers.length <= 1) return null;
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 gap-1">
+                                      <ShieldCheck className="w-3 h-3" />
+                                      {managers.length} co-managers
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {managers
+                                      .map((m) => m.profiles.initials || m.profiles.first_name)
+                                      .join(", ")}
+                                    {" "}share equal manager mandate on this team.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })()}
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -1195,6 +1241,21 @@ const EnhancedTeamManagement = () => {
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                          onClick={() => setManagerStatus(member.id, team.id, !member.is_manager)}
+                                        >
+                                          {member.is_manager ? (
+                                            <>
+                                              <ShieldOff className="w-4 h-4 mr-2" />
+                                              Remove manager mandate
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ShieldCheck className="w-4 h-4 mr-2" />
+                                              Promote to manager
+                                            </>
+                                          )}
+                                        </DropdownMenuItem>
                                         {member.user_id !== user?.id && (
                                           <>
                                             <DropdownMenuItem onClick={() => handleEditMember(member)}>
