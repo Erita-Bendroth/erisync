@@ -651,6 +651,7 @@ const Schedule = () => {
                 open={substituteDialogOpen}
                 onOpenChange={setSubstituteDialogOpen}
                 teamId={substituteTeamId}
+                teams={teams.map(t => ({ id: t.id, name: t.name }))}
               />
             )}
 
