@@ -414,6 +414,58 @@ export function useTimeEntries(monthDate: Date) {
     }
   }, [user?.id, monthDate]);
 
+  const recalculateAllMonthlySummaries = useCallback(async (newInitialBalance: number) => {
+    if (!user?.id) return;
+
+    try {
+      const { data: summaries, error: summariesError } = await supabase
+        .from('monthly_flextime_summary')
+        .select('id, year, month')
+        .eq('user_id', user.id)
+        .order('year', { ascending: true })
+        .order('month', { ascending: true });
+
+      if (summariesError) throw summariesError;
+      if (!summaries || summaries.length === 0) return;
+
+      let runningBalance = newInitialBalance;
+
+      for (const s of summaries) {
+        const monthStart = format(startOfMonth(new Date(s.year, s.month - 1, 1)), 'yyyy-MM-dd');
+        const monthEnd = format(endOfMonth(new Date(s.year, s.month - 1, 1)), 'yyyy-MM-dd');
+
+        const { data: monthEntries } = await supabase
+          .from('daily_time_entries')
+          .select('flextime_delta')
+          .eq('user_id', user.id)
+          .gte('entry_date', monthStart)
+          .lte('entry_date', monthEnd);
+
+        const monthDelta = (monthEntries || []).reduce(
+          (sum, e) => sum + (e.flextime_delta || 0),
+          0
+        );
+        const startingBalance = runningBalance;
+        const endingBalance = startingBalance + monthDelta;
+
+        await supabase
+          .from('monthly_flextime_summary')
+          .upsert({
+            user_id: user.id,
+            year: s.year,
+            month: s.month,
+            starting_balance: startingBalance,
+            month_delta: monthDelta,
+            ending_balance: endingBalance,
+          }, { onConflict: 'user_id,year,month' });
+
+        runningBalance = endingBalance;
+      }
+    } catch (error) {
+      console.error('Error recalculating monthly summaries:', error);
+    }
+  }, [user?.id]);
+
   const saveFlexTimeSettings = useCallback(async (newLimit: number, newInitialBalance: number): Promise<boolean> => {
     if (!user?.id) return false;
 
@@ -431,8 +483,8 @@ export function useTimeEntries(monthDate: Date) {
       setCarryoverLimit(newLimit);
       setInitialBalance(newInitialBalance);
       
-      // Recalculate monthly summary with new initial balance
-      await updateMonthlySummary();
+      // Recalculate the entire chain of monthly summaries with the new initial balance
+      await recalculateAllMonthlySummaries(newInitialBalance);
       await fetchEntries();
 
       toast({
