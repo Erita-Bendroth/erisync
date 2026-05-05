@@ -337,6 +337,37 @@ export const PlannerManual = () => {
       <section id="team-management">
         <h2 className="text-2xl font-bold mb-4">3. Team Management</h2>
         
+
+        <h3 className="text-xl font-semibold mb-3">Co-Managers per Team</h3>
+        <p className="mb-4">
+          Teams support <strong>multiple managers</strong>. Manager rights are scoped per team — a manager of Team A has no rights in Team B unless they are also marked as a manager there. Toggle the <em>manager</em> checkbox on the membership row to grant or revoke rights for that team.
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Co-managers share full rights for that team: schedule edits, vacation approvals, partnership approvals, substitute assignment</li>
+          <li>Works the same for any future team you create</li>
+          <li>Admins and planners always retain global access regardless of these flags</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Substitute Coverage</h3>
+        <p className="mb-4">
+          Managers (and planners/admins) can assign a substitute to cover for any absence type — vacation, sick, training, OOO, public holiday, FZA — independently of any vacation request.
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Opened from the Schedule page header (More actions), Team Scheduler cells, or the Vacation Center</li>
+          <li>Reason and notes are <strong>private to managers/planners/admins</strong>. Substitutes and teammates only see <em>"Covered by &lt;name&gt;"</em>; notifications never include the reason</li>
+          <li>Substitute pool = members of any team the absent person belongs to</li>
+          <li>Badges render across Team Scheduler, Monthly Schedule, Multi-Team Schedule, and Team Availability views</li>
+          <li>Substitute counts as effective coverage for coverage analysis</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Vacation Carryover</h3>
+        <p className="mb-4">
+          Each employee can record their own carryover days from the previous year via <strong>Settings → Vacation Carryover</strong> (0–60 days). Managers and planners can also adjust it on a member's behalf via <strong>Edit Allowances</strong> in Team Management.
+        </p>
+        <p className="mb-4">
+          The vacation balance display becomes <strong>remaining / (allowance + carryover)</strong>. Carryover does not roll forward automatically — it is set fresh each year by the employee.
+        </p>
+
         <h3 className="text-xl font-semibold mb-3">Creating Teams</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Schedule → Team Management</strong></li>
@@ -444,6 +475,15 @@ export const PlannerManual = () => {
 
       <section id="schedule-management">
         <h2 className="text-2xl font-bold mb-4">4. Schedule Management</h2>
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold mb-2">Schedule Overview Toolbar</h3>
+          <p className="text-sm mb-2">The top toolbar is consolidated:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            <li><strong>Add Entry</strong> and <strong>Request Swap</strong> remain visible</li>
+            <li><strong>More actions ▾</strong> dropdown groups: Generate Bulk, Assign Substitute, Export, Send 2-week Summary, Send Weekly Duty Coverage, Manage Partnerships</li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-2">Each item is permission-gated — only the actions your role allows will appear.</p>
+        </div>
         
         <h3 className="text-xl font-semibold mb-3">Creating Schedule Entries</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
