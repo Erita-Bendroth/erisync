@@ -7,29 +7,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const secureRandomInt = (max: number): number => {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % max;
+};
 const generateRandomPassword = (): string => {
   const length = 12;
-  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-  let password = "";
-  
-  // Ensure at least one character from each type
   const lowercase = "abcdefghijklmnopqrstuvwxyz";
   const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const numbers = "0123456789";
   const symbols = "!@#$%^&*";
-  
-  password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
-  password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
-  password += numbers.charAt(Math.floor(Math.random() * numbers.length));
-  password += symbols.charAt(Math.floor(Math.random() * symbols.length));
-  
-  // Fill the rest randomly
+  const charset = lowercase + uppercase + numbers + symbols;
+
+  const chars: string[] = [
+    lowercase.charAt(secureRandomInt(lowercase.length)),
+    uppercase.charAt(secureRandomInt(uppercase.length)),
+    numbers.charAt(secureRandomInt(numbers.length)),
+    symbols.charAt(secureRandomInt(symbols.length)),
+  ];
   for (let i = 4; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
+    chars.push(charset.charAt(secureRandomInt(charset.length)));
   }
-  
-  // Shuffle the password
-  return password.split('').sort(() => 0.5 - Math.random()).join('');
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
 };
 
 serve(async (req) => {

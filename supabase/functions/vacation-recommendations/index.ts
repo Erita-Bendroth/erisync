@@ -232,9 +232,8 @@ For each recommendation, provide:
     });
     
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Internal server error',
-        details: error.stack
+      JSON.stringify({
+        error: 'An unexpected error occurred'
       }),
       {
         status: 500,
