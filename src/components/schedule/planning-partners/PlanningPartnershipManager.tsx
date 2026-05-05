@@ -92,8 +92,8 @@ export function PlanningPartnershipManager() {
       return;
     }
 
-    if (selectedTeamIds.length < 2) {
-      toast.error('Please select at least 2 teams');
+    if (selectedTeamIds.length < 1) {
+      toast.error('Please select at least 1 team');
       return;
     }
 
@@ -194,7 +194,7 @@ export function PlanningPartnershipManager() {
                 />
               </div>
               <div>
-                <Label>Select Teams (minimum 2)</Label>
+                <Label>Select Teams (minimum 1)</Label>
                 <MultiSelectTeams
                   teams={teams}
                   selectedTeamIds={selectedTeamIds}
