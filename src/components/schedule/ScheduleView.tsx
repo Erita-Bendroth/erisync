@@ -1533,6 +1533,14 @@ useEffect(() => {
       
       const profilesMap = new Map((profilesResult.data || []).map(p => [p.user_id, p]));
       const teamsMap = new Map((teamsResult.data || []).map(t => [t.id, t]));
+
+      // Resolve creator display names that aren't visible via team-scoped profile RLS
+      const missingCreatorIds = creatorIds.filter(id => id && !profilesMap.has(id));
+      const creatorNameMap = new Map<string, string>();
+      if (missingCreatorIds.length > 0) {
+        const { data: nameRows } = await supabase.rpc('get_user_display_names', { _user_ids: missingCreatorIds });
+        (nameRows || []).forEach((r: any) => creatorNameMap.set(r.user_id, r.display_name));
+      }
       
         const transformedData = data?.map(item => {
           const profile = profilesMap.get(item.user_id) || { first_name: 'Unknown', last_name: 'User' };
@@ -1544,7 +1552,9 @@ useEffect(() => {
             profiles: profile,
             teams: team,
             created_by: item.created_by,
-            creator_name: creatorProfile?.first_name || item.created_by || 'Unknown'
+            creator_name: creatorProfile?.first_name
+              || (item.created_by ? creatorNameMap.get(item.created_by) : null)
+              || 'System'
           };
         }) || [];
       
