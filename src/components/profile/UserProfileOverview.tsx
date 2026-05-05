@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { formatUserName, cn } from "@/lib/utils";
 import { ShiftLimitTracker } from "@/components/schedule/ShiftLimitTracker";
 import { useHomeOfficeCompliance } from "@/hooks/useHomeOfficeCompliance";
+import { FlexTimeExportDialog } from "@/components/schedule/FlexTimeExportDialog";
 interface UserProfileOverviewProps {
   userId: string;
   canView: boolean; // Only planners and managers can view
@@ -406,6 +407,16 @@ const UserProfileOverview: React.FC<UserProfileOverviewProps> = ({ userId, canVi
                 </div>
               )}
             </CardDescription>
+          <div className="mt-3">
+            <FlexTimeExportDialog
+              currentMonthDate={new Date()}
+              userName={formatUserName(profile.first_name, profile.last_name, profile.initials)}
+              carryoverLimit={40}
+              targetUserId={userId}
+              triggerLabel="FlexTime report"
+              variant="full"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
