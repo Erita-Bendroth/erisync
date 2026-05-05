@@ -48,6 +48,22 @@ export const ManagerManual = () => {
 
       <section id="schedule-management">
         <h2 className="text-2xl font-bold mb-4">3. Schedule Management</h2>
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6">
+          <h3 className="text-lg font-semibold mb-2">Schedule Overview Toolbar</h3>
+          <p className="text-sm mb-2">The top toolbar has been streamlined to reduce clutter:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            <li><strong>Add Entry</strong> — primary action, always visible</li>
+            <li><strong>Request Swap</strong> — frequent daily action</li>
+            <li><strong>More actions ▾</strong> — dropdown grouping less-frequent actions:
+              <ul className="list-disc list-inside ml-6 mt-1">
+                <li>Bulk &amp; assignments: <em>Generate Bulk</em>, <em>Assign Substitute</em></li>
+                <li>Communication: <em>Export Schedule</em>, <em>Send 2-week Summary</em>, <em>Send Weekly Duty Coverage</em></li>
+                <li>Admin: <em>Manage Partnerships</em> (admins only)</li>
+              </ul>
+            </li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-2">Permission gating is unchanged — items only appear in the dropdown if your role allows them.</p>
+        </div>
         
         <h3 className="text-xl font-semibold mb-3">Viewing Team Schedules</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
@@ -214,6 +230,64 @@ export const ManagerManual = () => {
       <section id="team-management">
         <h2 className="text-2xl font-bold mb-4">4. Team Management</h2>
         
+
+        <h3 className="text-xl font-semibold mb-3">Co-Managers per Team</h3>
+        <p className="mb-4">
+          A team can have <strong>multiple managers</strong> at the same time (e.g. HEKOT and TOSTU on the same team). Manager rights are scoped <strong>per team</strong>: being a manager of Team A does not give you any rights in Team B.
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Any team member with the <em>is_manager</em> flag set on their team membership becomes a manager of that team</li>
+          <li>Works for any current or future team — just toggle the flag on the membership row</li>
+          <li>Co-managers share the same rights: schedule edits, vacation approvals, partnership approvals, substitute assignment</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Substitute Coverage</h3>
+        <p className="mb-4">
+          You can assign a substitute to cover for <strong>any absence</strong> — vacation, sick leave, training, out of office, public holiday, FZA withdrawal — independently of any vacation request.
+        </p>
+        <h4 className="font-semibold mb-2">Where to Open the Dialog</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Schedule page header</strong> → <em>More actions ▾ → Assign Substitute</em></li>
+          <li><strong>Team Scheduler grid</strong> → click an absence cell → <em>Assign substitute for this day</em></li>
+          <li><strong>Vacation Center</strong> → on an approved request</li>
+        </ul>
+        <h4 className="font-semibold mb-2">In the Dialog</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Team selector</strong> appears when you manage more than one team — switching it refreshes the absent-person list</li>
+          <li>Pick the absent person (only members of the selected team)</li>
+          <li>Pick the substitute from the eligible pool (members of <em>any</em> team the absent person belongs to)</li>
+          <li>Choose date or date range</li>
+          <li>Reason picker: Vacation, Sick, Training, Out of office, Public holiday, Other</li>
+          <li>Optional notes (manager-only — see Privacy below)</li>
+        </ul>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Privacy Rule</AlertTitle>
+          <AlertDescription>
+            <strong>Reason and notes are private.</strong> Substitutes and other team members never see why someone is absent — they only see <em>"Covered by &lt;name&gt;"</em>. Notifications also omit the reason. Only managers, planners and admins see the full details in tooltips.
+          </AlertDescription>
+        </Alert>
+        <h4 className="font-semibold mb-2 mt-4">Where Badges Appear</h4>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li>Team Scheduler: arrow on the absent person's cell + arrow on the substitute's cell</li>
+          <li>Monthly Schedule View, Multi-Team Schedule View, Team Availability View</li>
+          <li>Substitute counts as effective coverage in coverage calculations</li>
+        </ul>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Vacation Carryover (for Team Members)</h3>
+        <p className="mb-4">
+          Each employee can record their own carryover from previous years via <strong>Schedule → Settings → Vacation Carryover</strong>. As a manager you can also adjust it on their behalf:
+        </p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Go to <strong>Team Management</strong> and find the member</li>
+          <li>Click <strong>Edit Allowances</strong></li>
+          <li>Set the <strong>Vacation Carryover</strong> field (0–60 days)</li>
+          <li>Save</li>
+        </ol>
+        <p className="mb-4">
+          The vacation balance display becomes <strong>remaining / (allowance + carryover)</strong>.
+        </p>
+
         <h3 className="text-xl font-semibold mb-3">Viewing Your Team Members</h3>
         <ol className="list-decimal list-inside space-y-2 mb-4">
           <li>Navigate to <strong>Schedule → Team Management</strong></li>
