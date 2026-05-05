@@ -183,8 +183,8 @@ export function TimeEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
             Time Entry
@@ -197,7 +197,7 @@ export function TimeEntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 px-6 py-2">
           {/* Entry Type */}
           <div className="space-y-2">
             <Label>Entry Type</Label>
@@ -379,9 +379,9 @@ export function TimeEntryDialog({
 
           {/* Validation Warnings */}
           {requiresTime && !breakValidation.valid && (
-            <Alert variant="destructive">
+            <Alert className="border-amber-500/50 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-600">
               <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{breakValidation.message}</AlertDescription>
+              <AlertDescription>{breakValidation.message} You can still save this entry.</AlertDescription>
             </Alert>
           )}
           
@@ -405,7 +405,7 @@ export function TimeEntryDialog({
           </div>
         </div>
 
-        <DialogFooter className="flex justify-between sm:justify-between">
+        <DialogFooter className="flex justify-between sm:justify-between px-6 py-4 border-t bg-background">
           {existingEntry && onDelete ? (
             <Button
               variant="destructive"
