@@ -1138,6 +1138,28 @@ const EnhancedTeamManagement = () => {
                           <Badge variant="secondary">
                             {members.length} member{members.length !== 1 ? 's' : ''}
                           </Badge>
+                          {(() => {
+                            const managers = members.filter((m) => m.is_manager);
+                            if (managers.length <= 1) return null;
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 gap-1">
+                                      <ShieldCheck className="w-3 h-3" />
+                                      {managers.length} co-managers
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {managers
+                                      .map((m) => m.profiles.initials || m.profiles.first_name)
+                                      .join(", ")}
+                                    {" "}share equal manager mandate on this team.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })()}
                           <Button 
                             variant="outline" 
                             size="sm" 
