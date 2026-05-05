@@ -191,7 +191,9 @@ export function calculateFlexTime(
   return {
     targetHours,
     actualHours,
-    flexDelta,
+    // Only FZA withdrawals can produce a negative balance change.
+    // Short workdays (actual < target) yield 0, never negative.
+    flexDelta: Math.max(0, flexDelta),
     grossHours,
   };
 }
