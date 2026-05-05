@@ -1241,6 +1241,21 @@ const EnhancedTeamManagement = () => {
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                          onClick={() => setManagerStatus(member.id, team.id, !member.is_manager)}
+                                        >
+                                          {member.is_manager ? (
+                                            <>
+                                              <ShieldOff className="w-4 h-4 mr-2" />
+                                              Remove manager mandate
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ShieldCheck className="w-4 h-4 mr-2" />
+                                              Promote to manager
+                                            </>
+                                          )}
+                                        </DropdownMenuItem>
                                         {member.user_id !== user?.id && (
                                           <>
                                             <DropdownMenuItem onClick={() => handleEditMember(member)}>
