@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import * as XLSX from "xlsx";
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { de } from "date-fns/locale";
 import { ENTRY_TYPE_LABELS, formatFlexHours } from "@/lib/flexTimeUtils";
 import type { DailyTimeEntry, MonthlyFlexSummary } from "@/hooks/useTimeEntries";
@@ -30,6 +30,12 @@ interface FlexTimeExportDialogProps {
   currentMonthDate: Date;
   userName: string;
   carryoverLimit: number;
+  /** Override user id when admin/planner exports another user's report */
+  targetUserId?: string;
+  /** Optional custom trigger label (e.g. "Flextime report") */
+  triggerLabel?: string;
+  /** Render as full-width button instead of icon-sized */
+  variant?: "compact" | "full";
 }
 
 const MONTHS = [
@@ -51,9 +57,13 @@ export function FlexTimeExportDialog({
   currentMonthDate,
   userName,
   carryoverLimit,
+  targetUserId,
+  triggerLabel = "Export",
+  variant = "compact",
 }: FlexTimeExportDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [periodMode, setPeriodMode] = useState<"month" | "year">("month");
   const [selectedMonth, setSelectedMonth] = useState(String(currentMonthDate.getMonth() + 1));
   const [selectedYear, setSelectedYear] = useState(String(currentMonthDate.getFullYear()));
   const [loading, setLoading] = useState(false);
@@ -65,6 +75,8 @@ export function FlexTimeExportDialog({
     currentBalance: number;
   } | null>(null);
 
+  const effectiveUserId = targetUserId || user?.id;
+
   // Generate year options (current year and 2 previous)
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(y => ({
@@ -74,40 +86,43 @@ export function FlexTimeExportDialog({
 
   // Fetch preview data when month/year changes
   useEffect(() => {
-    if (!open || !user?.id) return;
+    if (!open || !effectiveUserId) return;
     
     const fetchPreviewData = async () => {
       setLoading(true);
       try {
-        const month = parseInt(selectedMonth);
         const year = parseInt(selectedYear);
-        const monthDate = new Date(year, month - 1, 1);
-        const startDate = format(startOfMonth(monthDate), 'yyyy-MM-dd');
-        const endDate = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+        const month = parseInt(selectedMonth);
+        const isYear = periodMode === "year";
+        const periodStart = isYear ? startOfYear(new Date(year, 0, 1)) : startOfMonth(new Date(year, month - 1, 1));
+        const periodEnd = isYear ? endOfYear(new Date(year, 0, 1)) : endOfMonth(new Date(year, month - 1, 1));
+        const startDate = format(periodStart, 'yyyy-MM-dd');
+        const endDate = format(periodEnd, 'yyyy-MM-dd');
 
         // Fetch entries
         const { data: entriesData } = await supabase
           .from('daily_time_entries')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId)
           .gte('entry_date', startDate)
           .lte('entry_date', endDate)
           .order('entry_date', { ascending: true });
 
-        // Fetch previous month balance
-        const prevMonth = month === 1 ? 12 : month - 1;
-        const prevYear = month === 1 ? year - 1 : year;
-        
-        const { data: prevSummary } = await supabase
-          .from('monthly_flextime_summary')
-          .select('ending_balance')
-          .eq('user_id', user.id)
-          .eq('year', prevYear)
-          .eq('month', prevMonth)
+        // Compute starting balance = initial profile balance + sum of all deltas before period
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('initial_flextime_balance')
+          .eq('user_id', effectiveUserId)
           .maybeSingle();
+        const { data: priorEntries } = await supabase
+          .from('daily_time_entries')
+          .select('flextime_delta')
+          .eq('user_id', effectiveUserId)
+          .lt('entry_date', startDate);
+        const priorDelta = (priorEntries || []).reduce((s: number, e: any) => s + (Number(e.flextime_delta) || 0), 0);
+        const previousBalance = Number(profileRow?.initial_flextime_balance || 0) + priorDelta;
 
         const entries = (entriesData || []) as DailyTimeEntry[];
-        const previousBalance = prevSummary?.ending_balance || 0;
         const monthDelta = entries.reduce((sum, e) => sum + (e.flextime_delta || 0), 0);
         const currentBalance = previousBalance + monthDelta;
 
@@ -120,7 +135,7 @@ export function FlexTimeExportDialog({
     };
 
     fetchPreviewData();
-  }, [open, selectedMonth, selectedYear, user?.id]);
+  }, [open, periodMode, selectedMonth, selectedYear, effectiveUserId]);
 
   const handleExport = async () => {
     if (!preview) return;
@@ -130,6 +145,7 @@ export function FlexTimeExportDialog({
       const month = parseInt(selectedMonth);
       const year = parseInt(selectedYear);
       const monthDate = new Date(year, month - 1, 1);
+      const isYear = periodMode === "year";
       const { entries, previousBalance, monthDelta, currentBalance } = preview;
 
       const workbook = XLSX.utils.book_new();
@@ -181,8 +197,10 @@ export function FlexTimeExportDialog({
       ];
       XLSX.utils.book_append_sheet(workbook, entriesSheet, "Time Entries");
 
-      // Sheet 2: Monthly Summary
-      const monthName = format(monthDate, "MMMM yyyy", { locale: de });
+      // Sheet 2: Period Summary
+      const periodLabel = isYear
+        ? `Year ${year}`
+        : format(monthDate, "MMMM yyyy", { locale: de });
       const fzaTotalHours = entries
         .filter(e => e.entry_type === 'fza_withdrawal')
         .reduce((sum, e) => sum + (e.fza_hours || 0), 0);
@@ -191,12 +209,12 @@ export function FlexTimeExportDialog({
         .reduce((sum, e) => sum + (e.flextime_delta || 0), 0);
 
       const summaryData = [
-        { "Metric": "Month", "Value": monthName },
+        { "Metric": "Period", "Value": periodLabel },
         { "Metric": "Starting Balance", "Value": formatFlexHours(previousBalance) },
         { "Metric": "", "Value": "" },
         { "Metric": "FLEX Earned", "Value": formatFlexHours(pureFlexDelta) },
         { "Metric": "FZA Taken", "Value": fzaTotalHours > 0 ? `-${fzaTotalHours.toFixed(2)}h` : "0.00h" },
-        { "Metric": "Net Month Delta", "Value": formatFlexHours(monthDelta) },
+        { "Metric": "Net Period Delta", "Value": formatFlexHours(monthDelta) },
         { "Metric": "", "Value": "" },
         { "Metric": "Ending Balance", "Value": formatFlexHours(currentBalance) },
         { "Metric": "", "Value": "" },
@@ -209,12 +227,12 @@ export function FlexTimeExportDialog({
 
       const summarySheet = XLSX.utils.json_to_sheet(summaryData);
       summarySheet["!cols"] = [{ wch: 20 }, { wch: 20 }];
-      XLSX.utils.book_append_sheet(workbook, summarySheet, "Monthly Summary");
+      XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
 
       // Sheet 3: Employee Info
       const infoData = [
         { "Field": "Employee Name", "Value": userName },
-        { "Field": "Report Period", "Value": monthName },
+        { "Field": "Report Period", "Value": periodLabel },
         { "Field": "Generated On", "Value": format(new Date(), "dd.MM.yyyy HH:mm") },
         { "Field": "", "Value": "" },
         { "Field": "Total Entries", "Value": entries.length.toString() },
@@ -226,7 +244,8 @@ export function FlexTimeExportDialog({
       infoSheet["!cols"] = [{ wch: 25 }, { wch: 30 }];
       XLSX.utils.book_append_sheet(workbook, infoSheet, "Employee Info");
 
-      const fileName = `FlexTime_${userName.replace(/\s+/g, "_")}_${format(monthDate, "yyyy-MM")}.xlsx`;
+      const periodSuffix = isYear ? `${year}` : format(monthDate, "yyyy-MM");
+      const fileName = `FlexTime_${userName.replace(/\s+/g, "_")}_${periodSuffix}.xlsx`;
       XLSX.writeFile(workbook, fileName);
       
       setOpen(false);
@@ -240,24 +259,37 @@ export function FlexTimeExportDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
+        <Button variant="outline" size={variant === "full" ? "default" : "sm"} className="gap-1.5">
           <Download className="w-4 h-4" />
-          Export
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5" />
-            Export FlexTime Data
+            FlexTime Report — {userName}
           </DialogTitle>
           <DialogDescription>
-            Select the month to export your FlexTime data to Excel.
+            Choose a period to download the FlexTime report (Excel).
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Period</Label>
+            <Select value={periodMode} onValueChange={(v: "month" | "year") => setPeriodMode(v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Specific month</SelectItem>
+                <SelectItem value="year">Whole year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-2 gap-4">
+            {periodMode === "month" && (
             <div className="space-y-2">
               <Label>Month</Label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -273,6 +305,7 @@ export function FlexTimeExportDialog({
                 </SelectContent>
               </Select>
             </div>
+            )}
             <div className="space-y-2">
               <Label>Year</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>

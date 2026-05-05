@@ -2430,6 +2430,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_user_display_names: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          display_name: string
+          user_id: string
+        }[]
+      }
       get_user_shift_counts: {
         Args: {
           _end_date?: string
