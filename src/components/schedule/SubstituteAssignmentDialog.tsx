@@ -30,8 +30,10 @@ interface TeamMemberOption {
 export interface SubstituteAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Pre-fill team. Required (the dialog needs a team to scope candidates). */
-  teamId: string;
+  /** Pre-fill team. If omitted and `teams` is provided, the user picks. */
+  teamId?: string;
+  /** Teams the manager can assign substitutes for. Enables in-dialog team picker. */
+  teams?: { id: string; name: string }[];
   /** Pre-fill the absent person. If omitted, manager picks. */
   absentUserId?: string;
   /** Pre-fill date(s). If a range, the same substitute is applied per day. */
@@ -42,7 +44,8 @@ export interface SubstituteAssignmentDialogProps {
 export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProps> = ({
   open,
   onOpenChange,
-  teamId,
+  teamId: initialTeamId,
+  teams = [],
   absentUserId: initialAbsentUserId,
   startDate: initialStart,
   endDate: initialEnd,
@@ -52,6 +55,7 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
   const remove = useDeleteSubstituteAssignment();
 
   const today = format(new Date(), "yyyy-MM-dd");
+  const [teamId, setTeamId] = useState<string>(initialTeamId ?? (teams[0]?.id ?? ""));
   const [absentUserId, setAbsentUserId] = useState(initialAbsentUserId ?? "");
   const [substituteUserId, setSubstituteUserId] = useState("");
   const [startDate, setStartDate] = useState<string>(initialStart ?? today);
@@ -67,6 +71,7 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
   // Reset when reopened
   useEffect(() => {
     if (open) {
+      setTeamId(initialTeamId ?? (teams[0]?.id ?? ""));
       setAbsentUserId(initialAbsentUserId ?? "");
       setSubstituteUserId("");
       setStartDate(initialStart ?? today);
@@ -76,7 +81,7 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
       setNotes("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialAbsentUserId, initialStart, initialEnd]);
+  }, [open, initialTeamId, initialAbsentUserId, initialStart, initialEnd]);
 
   // Load team members for picker
   useEffect(() => {
@@ -206,10 +211,31 @@ export const SubstituteAssignmentDialog: React.FC<SubstituteAssignmentDialogProp
         </DialogHeader>
 
         <div className="space-y-4">
+          {teams.length > 1 && (
+            <div className="space-y-2">
+              <Label>Team</Label>
+              <Select
+                value={teamId}
+                onValueChange={(v) => {
+                  setTeamId(v);
+                  setAbsentUserId("");
+                  setSubstituteUserId("");
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Select team" /></SelectTrigger>
+                <SelectContent>
+                  {teams.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Absent person</Label>
-            <Select value={absentUserId} onValueChange={setAbsentUserId} disabled={loading}>
-              <SelectTrigger><SelectValue placeholder="Select team member" /></SelectTrigger>
+            <Select value={absentUserId} onValueChange={setAbsentUserId} disabled={loading || !teamId}>
+              <SelectTrigger><SelectValue placeholder={teamId ? "Select team member" : "Pick a team first"} /></SelectTrigger>
               <SelectContent>
                 {members.map((m) => (
                   <SelectItem key={m.user_id} value={m.user_id}>
