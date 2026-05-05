@@ -136,7 +136,17 @@ Deno.serve(async (req) => {
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
-    
+
+    // Require admin or planner role
+    const { data: userRoles } = await supabaseAuth
+      .from('user_roles').select('role').eq('user_id', user.id);
+    if (!userRoles?.some(r => r.role === 'admin' || r.role === 'planner')) {
+      return new Response(
+        JSON.stringify({ error: 'Admin or planner access required' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+
     // Create Supabase client with proper auth
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
