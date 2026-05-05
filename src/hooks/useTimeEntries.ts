@@ -431,8 +431,8 @@ export function useTimeEntries(monthDate: Date) {
       setCarryoverLimit(newLimit);
       setInitialBalance(newInitialBalance);
       
-      // Recalculate monthly summary with new initial balance
-      await updateMonthlySummary();
+      // Recalculate the entire chain of monthly summaries with the new initial balance
+      await recalculateAllMonthlySummaries(newInitialBalance);
       await fetchEntries();
 
       toast({
