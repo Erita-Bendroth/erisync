@@ -2386,6 +2386,15 @@ export type Database = {
         Args: { _end_date: string; _start_date: string; _team_ids: string[] }
         Returns: Json
       }
+      get_substitute_candidates: {
+        Args: { _absent_user_id: string }
+        Returns: {
+          first_name: string
+          initials: string
+          last_name: string
+          user_id: string
+        }[]
+      }
       get_team_capacity_metrics: {
         Args: { _end_date: string; _start_date: string; _team_id: string }
         Returns: Json
