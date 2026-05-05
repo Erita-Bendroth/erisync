@@ -23,12 +23,47 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+    // Authenticate caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      supabaseUrl,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { type, requesting_user_id, target_user_id, swap_date, swap_date_b, team_id, review_notes, manager_name }: NotificationRequest = await req.json();
+
+    // Authorize: caller must be one of the involved users, or have admin/planner/manager role
+    const callerId = userData.user.id;
+    if (callerId !== requesting_user_id && callerId !== target_user_id) {
+      const { data: roles } = await userClient
+        .from('user_roles').select('role').eq('user_id', callerId);
+      const privileged = roles?.some(r => ['admin','planner','manager'].includes(r.role));
+      if (!privileged) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     console.log('Sending swap notification:', { type, requesting_user_id, target_user_id, swap_date });
 

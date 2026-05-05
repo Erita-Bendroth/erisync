@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -25,7 +26,41 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Authenticate caller
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
+    }
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: userData, error: userErr } = await userClient.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
+    }
+    const { data: roles } = await userClient
+      .from("user_roles").select("role").eq("user_id", userData.user.id);
+    const allowed = roles?.some(r => ["admin","planner","manager"].includes(r.role));
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
+    }
+
     const { action, delegateEmail, delegateName, managerEmail, managerName, startDate, endDate }: DelegationNotificationRequest = await req.json();
+    if (action !== "created" && action !== "cancelled") {
+      return new Response(JSON.stringify({ error: "Invalid action" }), {
+        status: 400, headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
+    }
 
     console.log(`Sending delegation ${action} notification`);
 
