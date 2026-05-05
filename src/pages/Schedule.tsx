@@ -7,7 +7,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download, ArrowLeftRight, UserCheck } from "lucide-react";
+import { Calendar, Users, Settings, LogOut, Plus, Shield, Mail, Download, ArrowLeftRight, UserCheck, MoreHorizontal, Sparkles } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import ScheduleView from "@/components/schedule/ScheduleView";
@@ -414,19 +422,6 @@ const Schedule = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {isAdmin() && (
-                  <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline">
-                        <Users className="w-4 h-4 mr-2" />
-                        Manage Partnerships
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                      <PlanningPartnershipManager />
-                    </DialogContent>
-                  </Dialog>
-                )}
                 <ScheduleEntryForm onSuccess={() => setScheduleRefreshKey(prev => prev + 1)}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
@@ -439,37 +434,85 @@ const Schedule = () => {
                     teamIds={teams.map(t => t.id)}
                   />
                 )}
-                {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && (
-                  <Button variant="outline" onClick={() => setShowBulkWizard(true)}>
-                    Generate Bulk
-                  </Button>
-                )}
-                {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && teams.length > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSubstituteTeamId(teams[0].id);
-                      setSubstituteDialogOpen(true);
-                    }}
-                  >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    Assign Substitute
-                  </Button>
-                )}
-                    <Button variant="outline" onClick={() => setActiveTab('settings')}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <MoreHorizontal className="w-4 h-4 mr-2" />
+                      More actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-60 bg-popover z-50">
+                    {(userRoles.includes('admin') || userRoles.includes('planner') || userRoles.includes('manager')) && (
+                      <>
+                        <DropdownMenuLabel>Bulk & assignments</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => setShowBulkWizard(true)}>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Generate Bulk
+                        </DropdownMenuItem>
+                        {teams.length > 0 && (
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setSubstituteTeamId(teams[0].id);
+                              setSubstituteDialogOpen(true);
+                            }}
+                          >
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Assign Substitute
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuLabel>Communication</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => setActiveTab('settings')}>
                       <Download className="w-4 h-4 mr-2" />
                       Export Schedule
-                    </Button>
+                    </DropdownMenuItem>
                     {(isPlanner() || isManager()) && (
                       <>
-                        <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" onClick={openNotify}>
-                              <Mail className="w-4 h-4 mr-2" />
-                              2-week Summary
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            openNotify();
+                            setNotifyOpen(true);
+                          }}
+                        >
+                          <Mail className="w-4 h-4 mr-2" />
+                          Send 2-week Summary
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setShowDutyCoverageModal(true)}>
+                          <Mail className="w-4 h-4 mr-2" />
+                          Send Weekly Duty Coverage
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {isAdmin() && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => setPartnershipDialogOpen(true)}>
+                          <Users className="w-4 h-4 mr-2" />
+                          Manage Partnerships
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {/* Partnership Manager Dialog */}
+            {isAdmin() && (
+              <Dialog open={partnershipDialogOpen} onOpenChange={setPartnershipDialogOpen}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <PlanningPartnershipManager />
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {/* 2-week Summary Dialog */}
+            {(isPlanner() || isManager()) && (
+              <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+                <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
                             <DialogHeader className="flex-shrink-0">
                               <DialogTitle className="flex items-center gap-2">
                                 <Mail className="w-5 h-5" />
@@ -585,14 +628,7 @@ const Schedule = () => {
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
-                        <Button variant="outline" onClick={() => setShowDutyCoverageModal(true)}>
-                          <Mail className="w-4 h-4 mr-2" />
-                          Weekly Duty Coverage
-                        </Button>
-                      </>
-                    )}
-              </div>
-            </div>
+            )}
 
             {/* Bulk Schedule Generator Modal */}
             <Dialog open={showBulkWizard} onOpenChange={setShowBulkWizard}>
