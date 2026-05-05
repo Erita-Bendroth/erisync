@@ -8,30 +8,35 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-// Generate secure random password with complexity requirements
+// Generate secure random password using crypto.getRandomValues
+function secureRandomInt(max: number): number {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % max;
+}
 function generateSecurePassword(): string {
   const length = 16;
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lowercase = 'abcdefghijklmnopqrstuvwxyz';
   const numbers = '0123456789';
   const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-  
-  let password = '';
-  
-  // Ensure at least one character from each category
-  password += uppercase[Math.floor(Math.random() * uppercase.length)];
-  password += lowercase[Math.floor(Math.random() * lowercase.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  password += symbols[Math.floor(Math.random() * symbols.length)];
-  
-  // Fill the rest randomly
   const allChars = uppercase + lowercase + numbers + symbols;
+
+  const chars: string[] = [
+    uppercase[secureRandomInt(uppercase.length)],
+    lowercase[secureRandomInt(lowercase.length)],
+    numbers[secureRandomInt(numbers.length)],
+    symbols[secureRandomInt(symbols.length)],
+  ];
   for (let i = 4; i < length; i++) {
-    password += allChars[Math.floor(Math.random() * allChars.length)];
+    chars.push(allChars[secureRandomInt(allChars.length)]);
   }
-  
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  // Fisher-Yates shuffle with secure randomness
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
 }
 
 serve(async (req) => {
