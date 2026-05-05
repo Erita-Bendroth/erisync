@@ -551,6 +551,42 @@ export const TeamMemberManual = () => {
           </li>
           <li>Theme changes immediately</li>
         </ol>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">Vacation Carryover from Previous Years</h3>
+        <p className="mb-4">
+          If you have unused vacation days from a previous year that your organization allows you to carry over, you can record them yourself — they will be added to this year's allowance.
+        </p>
+        <ol className="list-decimal list-inside space-y-2 mb-4">
+          <li>Go to <strong>Schedule → Settings</strong></li>
+          <li>Find the <strong>Vacation Carryover</strong> card</li>
+          <li>Click <strong>"Edit carryover"</strong></li>
+          <li>Enter the number of days carried over (0–60)</li>
+          <li>Click <strong>Save</strong></li>
+        </ol>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>How it is calculated</AlertTitle>
+          <AlertDescription>
+            Your vacation balance shows <strong>remaining / (yearly allowance + carryover)</strong>. Example: 30 allowance + 5 carryover − 7 used = 28 remaining. Your manager can also adjust your carryover.
+          </AlertDescription>
+        </Alert>
+
+        <h3 className="text-xl font-semibold mb-3 mt-6">FlexTime Settings &amp; Starting Balance</h3>
+        <p className="mb-4">
+          Open <strong>FlexTime Settings</strong> from the gear icon next to your Current Balance card. You can set your already-accumulated flex hours as a one-time starting balance and configure your carryover limit.
+        </p>
+        <ul className="list-disc list-inside space-y-2 mb-4">
+          <li><strong>Hours and minutes are separate fields</strong> — never use decimals (e.g. 10h 15m, not 10.25)</li>
+          <li>Use a negative sign on the hours field if you owe time</li>
+          <li>24-hour format only — no AM/PM anywhere in the app</li>
+        </ul>
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Balance updates immediately</AlertTitle>
+          <AlertDescription>
+            When you change your Starting Balance, the system recomputes every monthly summary so your Current Balance card reflects the new value right away — no need to re-enter past months.
+          </AlertDescription>
+        </Alert>
       </section>
 
       <Separator />
