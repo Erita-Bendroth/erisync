@@ -1,44 +1,65 @@
-# Fix: Initial FlexTime Balance not propagating
+## Goal
 
-## Root cause
+Clear the 4 remaining warning-level findings from the Supabase linter while preserving every existing feature, RLS policy, and user-visible behavior. All errors from the previous sweep are already fixed.
 
-In `src/hooks/useTimeEntries.ts`, the profile field `initial_flextime_balance` is **only used when there is no previous monthly summary** (see line 121 and lines 386–395). It seeds month N's starting balance from month N-1's `ending_balance`, falling back to `initial_flextime_balance` only if the previous summary doesn't exist.
+## Remaining findings
 
-User AMT already has `monthly_flextime_summary` rows going back to 2025-12. When he set his initial balance to 15:15, the DB column updated correctly (verified: `initial_flextime_balance = 15.25`), but every existing monthly summary still chains off the old starting point. The currently displayed +8:00 comes from May 2026's stored `ending_balance`, not the new initial balance, so the UI appears unchanged.
+1. `SUPA_anon_security_definer_function_executable` — anon role can EXECUTE SECURITY DEFINER functions in `public`.
+2. `SUPA_authenticated_security_definer_function_executable` — authenticated role can EXECUTE SECURITY DEFINER functions in `public`.
+3. `SUPA_pg_graphql_anon_table_exposed` — anon can see tables in the GraphQL schema.
+4. `SUPA_pg_graphql_authenticated_table_exposed` — authenticated can see tables in the GraphQL schema.
 
-`updateMonthlySummary()` only recomputes the current month, so it can't fix this either.
+## Guiding principle
 
-## Fix
+The app is fully authenticated — there is no pre-login data flow. Every RPC call and table read happens after sign-in via the `authenticated` role. Therefore:
 
-When `saveFlexTimeSettings` updates `initial_flextime_balance`, recompute the entire chain of monthly summaries from the earliest summary forward, using the new initial balance as the very first month's `starting_balance`.
+- We CAN safely revoke from `anon` without breaking anything (no anonymous flows exist).
+- We CANNOT broadly revoke from `authenticated` — that would break the entire app.
 
-### Changes in `src/hooks/useTimeEntries.ts`
+So findings 1 and 3 will be fixed by revoking anon. Findings 2 and 4 will be marked as accepted risks in the security memory, with rationale, because the app's design requires authenticated users to call RPCs and read tables they have RLS access to.
 
-1. Add a new helper `recalculateAllMonthlySummaries(newInitialBalance)`:
-   - Fetch all `monthly_flextime_summary` rows for the user, ordered by `(year, month)` ascending.
-   - If none exist, do nothing (the existing fallback path will pick up the new initial balance for the current month).
-   - For each month in order:
-     - For the first month, `starting_balance = newInitialBalance`.
-     - For subsequent months, `starting_balance = previous month's recomputed ending_balance`.
-     - Recompute `month_delta` by summing `flextime_delta` from `daily_time_entries` for that month (don't trust the stored value — it may be stale if entries changed).
-     - `ending_balance = starting_balance + month_delta`.
-     - Upsert the row.
+## Plan
 
-2. In `saveFlexTimeSettings` (around line 417), after the profile update succeeds:
-   - Call `await recalculateAllMonthlySummaries(newInitialBalance)` instead of the current single-month `updateMonthlySummary()`.
-   - Then `await fetchEntries()` so the UI re-reads fresh values.
+### Step 1 — Migration: revoke anon access
 
-3. Keep existing behavior for users who have no summaries yet (current fallback in lines 121 and 386–395 already handles this correctly).
+Single migration that:
 
-## Files touched
+- Iterates every SECURITY DEFINER function in `public` and runs `REVOKE EXECUTE ... FROM anon`.
+- Iterates every table in `public` and runs `REVOKE SELECT, INSERT, UPDATE, DELETE ON ... FROM anon`.
+- Re-grants `EXECUTE` to `authenticated` and `service_role` on every SECURITY DEFINER function (defensive — preserves current behavior).
+- Re-grants `SELECT, INSERT, UPDATE, DELETE` to `authenticated` and `service_role` on every table (defensive — RLS still gates rows).
 
-- `src/hooks/useTimeEntries.ts` — add helper, wire it into `saveFlexTimeSettings`.
+Implementation will use a `DO $$ ... $$` block looping over `pg_proc` / `pg_tables` so no function or table is missed and none are individually named (safe against future additions).
 
-No DB migrations or schema changes. No UI changes — the dialog already passes the correct decimal value.
+This closes findings 1 and 3 without changing any RLS policy, function body, or app code.
 
-## Verification
+### Step 2 — Mark findings 2 and 4 as accepted
 
-After the fix, AMT setting 15h 15m should:
-- Update profile `initial_flextime_balance` to 15.25 (already works).
-- Recompute Dec 2025 starting from 15.25, then cascade through Jan, Feb, Mar, Apr, May, Jul, Aug 2026.
-- The "Current Balance" card reflects the new May/current ending balance.
+For `SUPA_authenticated_security_definer_function_executable` and `SUPA_pg_graphql_authenticated_table_exposed`:
+
+- Mark as `ignore` via the security tool with rationale: "App is fully authenticated. All RPCs and tables are intentionally callable/visible to the `authenticated` role; row-level access is gated by RLS policies and SECURITY DEFINER functions enforce role checks internally (e.g. `has_role`, `is_planner`, `is_manager_for_team`). Removing authenticated access would break every feature."
+
+### Step 3 — Update security memory
+
+Append a section documenting:
+
+- Anon role has no access to `public` (functions or tables).
+- Authenticated role intentionally retains broad EXECUTE/SELECT; access is enforced by RLS + role checks inside SECURITY DEFINER functions.
+- Future scans should not reflag findings 2 and 4 unless a function/table is added that exposes data outside the existing role-check pattern.
+
+### Step 4 — Mark findings as fixed / acknowledged
+
+After the migration runs, call the security tool to mark findings 1 and 3 as fixed and 2/4 as ignored.
+
+## What will NOT change
+
+- No RLS policy is modified.
+- No SECURITY DEFINER function body is modified.
+- No table schema is modified.
+- No edge function is modified.
+- No frontend code is modified.
+- All existing manager/planner/admin permissions, vacation flows, roster flows, profile visibility rules remain exactly as they are.
+
+## Risk
+
+Very low. Revoking anon is safe because the project has no anonymous code paths (Supabase auth is required throughout). The defensive re-grants to `authenticated` keep current behavior identical.
