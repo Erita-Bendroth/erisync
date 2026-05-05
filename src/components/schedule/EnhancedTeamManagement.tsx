@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, ShieldCheck, ShieldOff, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateTeamModal } from "@/components/schedule/CreateTeamModal";
 import { DeleteTeamDialog } from "@/components/schedule/DeleteTeamDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -461,6 +462,29 @@ const EnhancedTeamManagement = () => {
         description: error.message || "Failed to remove team member",
         variant: "destructive",
       });
+    }
+  };
+
+  const setManagerStatus = async (memberId: string, teamId: string, makeManager: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ is_manager: makeManager })
+        .eq('id', memberId);
+      if (error) throw error;
+      toast({
+        title: makeManager ? "Promoted to manager" : "Removed manager mandate",
+        description: makeManager
+          ? "This member now shares full manager mandate on this team."
+          : "This member no longer has manager mandate on this team.",
+      });
+      setTeamMembers(prev => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).map(m => m.id === memberId ? { ...m, is_manager: makeManager } : m),
+      }));
+    } catch (error: any) {
+      console.error('Error updating manager status:', error);
+      toast({ title: "Error", description: error.message || "Failed to update manager status", variant: "destructive" });
     }
   };
 
