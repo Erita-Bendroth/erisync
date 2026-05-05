@@ -105,20 +105,20 @@ export function useTimeEntries(monthDate: Date) {
         setUserName(`${profileData.first_name} ${profileData.last_name}`);
       }
 
-      // Fetch previous month's ending balance
-      const prevMonth = month === 1 ? 12 : month - 1;
-      const prevYear = month === 1 ? year - 1 : year;
-      
-      const { data: prevSummary } = await supabase
-        .from('monthly_flextime_summary')
-        .select('ending_balance')
+      // Compute previous balance directly from source of truth:
+      // initial_flextime_balance + sum of all daily flextime_delta strictly before this month.
+      // Robust to gaps in monthly_flextime_summary (months with zero entries).
+      const { data: priorEntries } = await supabase
+        .from('daily_time_entries')
+        .select('flextime_delta')
         .eq('user_id', user.id)
-        .eq('year', prevYear)
-        .eq('month', prevMonth)
-        .maybeSingle();
+        .lt('entry_date', startDate);
 
-      // Use initial_flextime_balance if no previous month summary exists
-      const prevBalance = prevSummary?.ending_balance ?? (profileData?.initial_flextime_balance ?? 0);
+      const priorDelta = (priorEntries || []).reduce(
+        (sum, e) => sum + (e.flextime_delta || 0),
+        0
+      );
+      const prevBalance = (profileData?.initial_flextime_balance ?? 0) + priorDelta;
       setPreviousBalance(prevBalance);
 
     } catch (error) {
@@ -371,28 +371,26 @@ export function useTimeEntries(monthDate: Date) {
         0
       );
 
-      // Get previous month's ending balance
-      const prevMonth = month === 1 ? 12 : month - 1;
-      const prevYear = month === 1 ? year - 1 : year;
-      
-      const { data: prevSummary } = await supabase
-        .from('monthly_flextime_summary')
-        .select('ending_balance')
+      // Compute starting balance directly from source of truth:
+      // initial_flextime_balance + sum of all daily deltas strictly before this month.
+      // Robust to gaps in monthly_flextime_summary.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('initial_flextime_balance')
         .eq('user_id', user.id)
-        .eq('year', prevYear)
-        .eq('month', prevMonth)
-        .maybeSingle();
+        .single();
 
-      // If no previous summary, use initial balance from profile
-      let startingBalance = prevSummary?.ending_balance ?? 0;
-      if (!prevSummary) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('initial_flextime_balance')
-          .eq('user_id', user.id)
-          .single();
-        startingBalance = profile?.initial_flextime_balance ?? 0;
-      }
+      const { data: priorEntries } = await supabase
+        .from('daily_time_entries')
+        .select('flextime_delta')
+        .eq('user_id', user.id)
+        .lt('entry_date', startDate);
+
+      const priorDelta = (priorEntries || []).reduce(
+        (sum, e) => sum + (e.flextime_delta || 0),
+        0
+      );
+      const startingBalance = (profile?.initial_flextime_balance ?? 0) + priorDelta;
       const endingBalance = startingBalance + monthDelta;
 
       // Upsert the monthly summary
