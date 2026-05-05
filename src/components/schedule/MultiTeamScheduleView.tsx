@@ -418,6 +418,14 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
         teams.map(t => [t.id, t.name])
       );
 
+      // Resolve creator display names not visible via team-scoped profile RLS
+      const missingCreatorIds = Array.from(allUserIds).filter(id => !profileMap.has(id));
+      const creatorNameMap = new Map<string, string>();
+      if (missingCreatorIds.length > 0) {
+        const { data: nameRows } = await supabase.rpc('get_user_display_names', { _user_ids: missingCreatorIds });
+        (nameRows || []).forEach((r: any) => creatorNameMap.set(r.user_id, r.display_name));
+      }
+
       // Process schedule data with profile info
       const enrichedSchedules: ScheduleEntry[] = schedules?.map((entry: any) => {
         const profile = profileMap.get(entry.user_id);
@@ -433,7 +441,9 @@ export function MultiTeamScheduleView({ teams: teamsFromProps }: MultiTeamSchedu
           last_name: profile?.last_name || '',
           initials: profile?.initials || null,
           created_by: entry.created_by,
-          creator_name: creatorProfile?.first_name || entry.created_by || 'Unknown',
+          creator_name: creatorProfile?.first_name
+            || (entry.created_by ? creatorNameMap.get(entry.created_by) : null)
+            || 'System',
           notes: entry.notes,
         };
       }) || [];
