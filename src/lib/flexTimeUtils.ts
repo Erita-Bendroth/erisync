@@ -191,9 +191,10 @@ export function calculateFlexTime(
   return {
     targetHours,
     actualHours,
-    // Only FZA withdrawals can produce a negative balance change.
-    // Short workdays (actual < target) yield 0, never negative.
-    flexDelta: Math.max(0, flexDelta),
+    // Honest delta: short workdays (actual < target) reduce the balance,
+    // overtime (actual > target) increases it. FZA withdrawals use a
+    // separate negative path above.
+    flexDelta,
     grossHours,
   };
 }
