@@ -105,6 +105,12 @@ const EnhancedTeamManagement = () => {
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
   const [tempPasswordMember, setTempPasswordMember] = useState<any>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  // Manager-mode flextime override
+  const [flexOverrideMember, setFlexOverrideMember] = useState<{
+    user_id: string;
+    name: string;
+    country_code?: string | null;
+  } | null>(null);
   const [hotlineConfigOpen, setHotlineConfigOpen] = useState(false);
   const [hotlineConfigTeam, setHotlineConfigTeam] = useState<{ id: string; name: string } | null>(null);
   const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
