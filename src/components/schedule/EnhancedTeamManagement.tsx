@@ -1572,6 +1572,17 @@ const EnhancedTeamManagement = () => {
         />
       )}
 
+      {/* Manager FlexTime Override Dialog */}
+      <ManagerFlexTimeOverrideDialog
+        open={!!flexOverrideMember}
+        onOpenChange={(o) => {
+          if (!o) setFlexOverrideMember(null);
+        }}
+        targetUserId={flexOverrideMember?.user_id ?? null}
+        targetUserName={flexOverrideMember?.name}
+        targetUserCountryCode={flexOverrideMember?.country_code ?? null}
+      />
+
       {/* Hotline Configuration Modal */}
       {hotlineConfigTeam && (
         <HotlineTeamConfig
