@@ -515,6 +515,13 @@ const UserManagement = () => {
                               <Lock className="mr-2 h-4 w-4" />
                               Set Temporary Password
                             </DropdownMenuItem>
+                             <DropdownMenuItem
+                               onClick={() => setFlexOverrideUser(userData)}
+                               className="cursor-pointer"
+                             >
+                               <Clock className="mr-2 h-4 w-4" />
+                               Edit FlexTime Settings
+                             </DropdownMenuItem>
                           {userData.user_id !== user?.id && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
