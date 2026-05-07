@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, ShieldCheck, ShieldOff, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, ShieldCheck, ShieldOff, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateTeamModal } from "@/components/schedule/CreateTeamModal";
 import { DeleteTeamDialog } from "@/components/schedule/DeleteTeamDialog";
@@ -30,6 +30,7 @@ import { format as formatDate, startOfYear, endOfYear } from "date-fns";
 import { useUserTimeStats } from "@/hooks/useUserTimeStats";
 import { UserTimeStatsDisplay } from "./UserTimeStatsDisplay";
 import EditUserModal from "@/components/admin/EditUserModal";
+import { ManagerFlexTimeOverrideDialog } from "./ManagerFlexTimeOverrideDialog";
 import SetTempPasswordModal from "@/components/admin/SetTempPasswordModal";
 
 interface Team {
