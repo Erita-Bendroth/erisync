@@ -182,7 +182,7 @@ export function FlexTimeSettingsDialog({
               placeholder="40"
             />
             <p className="text-xs text-muted-foreground">
-              Maximum flextime hours you can carry over to the next month. Default is 40 hours based on German regulations.
+              Maximum flextime hours you can carry over to the next month. Please check local agreements.
             </p>
           </div>
 
