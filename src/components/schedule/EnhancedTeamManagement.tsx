@@ -1277,6 +1277,22 @@ const EnhancedTeamManagement = () => {
                                               <Lock className="w-4 h-4 mr-2" />
                                               Set Temporary Password
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onClick={() =>
+                                                setFlexOverrideMember({
+                                                  user_id: member.user_id,
+                                                  name: formatUserName(
+                                                    member.profiles.first_name,
+                                                    member.profiles.last_name,
+                                                    member.profiles.initials
+                                                  ),
+                                                  country_code: (member.profiles as any).country_code,
+                                                })
+                                              }
+                                            >
+                                              <Clock className="w-4 h-4 mr-2" />
+                                              Edit FlexTime Settings
+                                            </DropdownMenuItem>
                                           </>
                                         )}
                                         <DropdownMenuItem
