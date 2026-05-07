@@ -585,6 +585,18 @@ const UserManagement = () => {
           onSuccess={fetchUsers}
         />
       )}
+
+      <ManagerFlexTimeOverrideDialog
+        open={!!flexOverrideUser}
+        onOpenChange={(o) => {
+          if (!o) setFlexOverrideUser(null);
+        }}
+        targetUserId={flexOverrideUser?.user_id ?? null}
+        targetUserName={flexOverrideUser
+          ? formatUserName(flexOverrideUser.first_name, flexOverrideUser.last_name, flexOverrideUser.initials)
+          : undefined}
+        targetUserCountryCode={flexOverrideUser?.country_code ?? null}
+      />
     </div>
   );
 };
