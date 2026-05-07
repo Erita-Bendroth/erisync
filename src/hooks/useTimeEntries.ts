@@ -54,6 +54,7 @@ export function useTimeEntries(monthDate: Date) {
   const [previousBalance, setPreviousBalance] = useState<number>(0);
   const [carryoverLimit, setCarryoverLimit] = useState<number>(40);
   const [initialBalance, setInitialBalance] = useState<number>(0);
+  const [initialBalanceLocked, setInitialBalanceLocked] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -95,13 +96,14 @@ export function useTimeEntries(monthDate: Date) {
       // Fetch user profile for carryover limit, initial balance, and name
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('first_name, last_name, flextime_carryover_limit, initial_flextime_balance')
+        .select('first_name, last_name, flextime_carryover_limit, initial_flextime_balance, initial_flextime_balance_set_at')
         .eq('user_id', user.id)
         .single();
 
       if (profileData) {
         setCarryoverLimit(profileData.flextime_carryover_limit ?? 40);
         setInitialBalance(profileData.initial_flextime_balance ?? 0);
+        setInitialBalanceLocked(Boolean((profileData as any).initial_flextime_balance_set_at));
         setUserName(`${profileData.first_name} ${profileData.last_name}`);
       }
 
@@ -468,21 +470,30 @@ export function useTimeEntries(monthDate: Date) {
     if (!user?.id) return false;
 
     try {
+      // Starting balance is a one-time setting for the user.
+      // If already locked, never overwrite from the user-mode dialog.
+      const updatePayload: Record<string, unknown> = {
+        flextime_carryover_limit: newLimit,
+      };
+      if (!initialBalanceLocked) {
+        updatePayload.initial_flextime_balance = newInitialBalance;
+        updatePayload.initial_flextime_balance_set_at = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({ 
-          flextime_carryover_limit: newLimit,
-          initial_flextime_balance: newInitialBalance,
-        })
+        .update(updatePayload)
         .eq('user_id', user.id);
 
       if (error) throw error;
 
       setCarryoverLimit(newLimit);
-      setInitialBalance(newInitialBalance);
-      
-      // Recalculate the entire chain of monthly summaries with the new initial balance
-      await recalculateAllMonthlySummaries(newInitialBalance);
+      if (!initialBalanceLocked) {
+        setInitialBalance(newInitialBalance);
+        setInitialBalanceLocked(true);
+        // Recalculate the entire chain of monthly summaries with the new initial balance
+        await recalculateAllMonthlySummaries(newInitialBalance);
+      }
       await fetchEntries();
 
       toast({
@@ -500,7 +511,7 @@ export function useTimeEntries(monthDate: Date) {
       });
       return false;
     }
-  }, [user?.id, toast, updateMonthlySummary, fetchEntries]);
+  }, [user?.id, toast, fetchEntries, initialBalanceLocked, recalculateAllMonthlySummaries]);
 
   const getEntryForDate = useCallback((dateStr: string): DailyTimeEntry | undefined => {
     return entries.find(e => e.entry_date === dateStr);
@@ -522,6 +533,7 @@ export function useTimeEntries(monthDate: Date) {
     currentBalance,
     carryoverLimit,
     initialBalance,
+    initialBalanceLocked,
     userName,
     loading,
     saveEntry,

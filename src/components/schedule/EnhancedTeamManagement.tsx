@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, ShieldCheck, ShieldOff, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Users, Trash2, MoreHorizontal, Shield, ShieldCheck, ShieldOff, Pencil, Settings, Plus, BarChart3, UserCheck, CalendarIcon, Edit, Key, Lock, Phone, Search, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateTeamModal } from "@/components/schedule/CreateTeamModal";
 import { DeleteTeamDialog } from "@/components/schedule/DeleteTeamDialog";
@@ -30,6 +30,7 @@ import { format as formatDate, startOfYear, endOfYear } from "date-fns";
 import { useUserTimeStats } from "@/hooks/useUserTimeStats";
 import { UserTimeStatsDisplay } from "./UserTimeStatsDisplay";
 import EditUserModal from "@/components/admin/EditUserModal";
+import { ManagerFlexTimeOverrideDialog } from "./ManagerFlexTimeOverrideDialog";
 import SetTempPasswordModal from "@/components/admin/SetTempPasswordModal";
 
 interface Team {
@@ -104,6 +105,12 @@ const EnhancedTeamManagement = () => {
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
   const [tempPasswordMember, setTempPasswordMember] = useState<any>(null);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
+  // Manager-mode flextime override
+  const [flexOverrideMember, setFlexOverrideMember] = useState<{
+    user_id: string;
+    name: string;
+    country_code?: string | null;
+  } | null>(null);
   const [hotlineConfigOpen, setHotlineConfigOpen] = useState(false);
   const [hotlineConfigTeam, setHotlineConfigTeam] = useState<{ id: string; name: string } | null>(null);
   const [editableTeams, setEditableTeams] = useState<Set<string>>(new Set());
@@ -1270,6 +1277,22 @@ const EnhancedTeamManagement = () => {
                                               <Lock className="w-4 h-4 mr-2" />
                                               Set Temporary Password
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onClick={() =>
+                                                setFlexOverrideMember({
+                                                  user_id: member.user_id,
+                                                  name: formatUserName(
+                                                    member.profiles.first_name,
+                                                    member.profiles.last_name,
+                                                    member.profiles.initials
+                                                  ),
+                                                  country_code: (member.profiles as any).country_code,
+                                                })
+                                              }
+                                            >
+                                              <Clock className="w-4 h-4 mr-2" />
+                                              Edit FlexTime Settings
+                                            </DropdownMenuItem>
                                           </>
                                         )}
                                         <DropdownMenuItem
@@ -1548,6 +1571,17 @@ const EnhancedTeamManagement = () => {
           onSuccess={refreshMemberData}
         />
       )}
+
+      {/* Manager FlexTime Override Dialog */}
+      <ManagerFlexTimeOverrideDialog
+        open={!!flexOverrideMember}
+        onOpenChange={(o) => {
+          if (!o) setFlexOverrideMember(null);
+        }}
+        targetUserId={flexOverrideMember?.user_id ?? null}
+        targetUserName={flexOverrideMember?.name}
+        targetUserCountryCode={flexOverrideMember?.country_code ?? null}
+      />
 
       {/* Hotline Configuration Modal */}
       {hotlineConfigTeam && (

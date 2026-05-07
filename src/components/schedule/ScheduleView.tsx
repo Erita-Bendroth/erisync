@@ -100,7 +100,7 @@ interface ScheduleViewProps {
 
 const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { user } = useAuth();
-  const { roles: contextRoles, loading: contextLoading } = useCurrentUserContext();
+  const { roles: contextRoles, loading: contextLoading, profile: currentUserProfile } = useCurrentUserContext();
   const { toast } = useToast();
   const { favorites } = useTeamFavorites('schedule');
   const holidayRefetchTrigger = useHolidayRefetch();
@@ -168,6 +168,7 @@ const [managedUsersSet, setManagedUsersSet] = useState<Set<string>>(new Set());
     currentBalance,
     carryoverLimit,
     initialBalance,
+    initialBalanceLocked,
     userName,
     loading: timeEntriesLoading,
     saveEntry: saveTimeEntry,
@@ -2447,6 +2448,8 @@ const getActivityColor = (entry: ScheduleEntry) => {
           currentBalance={currentBalance}
           carryoverLimit={carryoverLimit}
           initialBalance={initialBalance}
+          initialBalanceLocked={initialBalanceLocked}
+          countryCode={currentUserProfile?.country_code ?? null}
           entries={timeEntries}
           monthlySummary={monthlySummary}
           monthDate={currentWeek}

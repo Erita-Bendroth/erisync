@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
 import { useScheduleEntries } from "@/hooks/useScheduleEntries";
 import { cn } from "@/lib/utils";
 import { TimeBlockDisplay } from "./TimeBlockDisplay";
@@ -89,6 +90,7 @@ const getShiftLabel = (shiftType: string | null, activityType: string): string =
 
 export function PersonalMonthlyCalendar() {
   const { user } = useAuth();
+  const { profile: currentUserProfile } = useCurrentUserContext();
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [dateRange, setDateRange] = useState<DateRange>("1M");
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -112,6 +114,7 @@ export function PersonalMonthlyCalendar() {
     userName,
     monthlySummary,
     initialBalance,
+    initialBalanceLocked,
     loading: timeEntriesLoading,
     saveEntry,
     deleteEntry,
@@ -435,6 +438,8 @@ export function PersonalMonthlyCalendar() {
         currentBalance={currentBalance}
         carryoverLimit={carryoverLimit}
         initialBalance={initialBalance}
+        initialBalanceLocked={initialBalanceLocked}
+        countryCode={currentUserProfile?.country_code ?? null}
         entries={timeEntries}
         monthlySummary={monthlySummary}
         monthDate={currentMonth}
