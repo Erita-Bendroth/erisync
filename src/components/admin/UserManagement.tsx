@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Trash2, MoreHorizontal, Edit, Shield, Key, Lock } from "lucide-react";
+import { Users, Trash2, MoreHorizontal, Edit, Shield, Key, Lock, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
 import EditUserModal from "./EditUserModal";
 import RoleManagement from "./RoleManagement";
 import SetTempPasswordModal from "./SetTempPasswordModal";
+import { ManagerFlexTimeOverrideDialog } from "@/components/schedule/ManagerFlexTimeOverrideDialog";
 import { formatUserName } from "@/lib/utils";
 
 export interface Team {
@@ -45,6 +46,7 @@ const UserManagement = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
   const [tempPasswordUser, setTempPasswordUser] = useState<User | null>(null);
+  const [flexOverrideUser, setFlexOverrideUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (user) {
