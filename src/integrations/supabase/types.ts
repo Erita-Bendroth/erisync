@@ -928,6 +928,7 @@ export type Database = {
           flextime_carryover_limit: number | null
           id: string
           initial_flextime_balance: number | null
+          initial_flextime_balance_set_at: string | null
           initials: string | null
           last_name: string
           region_code: string | null
@@ -944,6 +945,7 @@ export type Database = {
           flextime_carryover_limit?: number | null
           id?: string
           initial_flextime_balance?: number | null
+          initial_flextime_balance_set_at?: string | null
           initials?: string | null
           last_name: string
           region_code?: string | null
@@ -960,6 +962,7 @@ export type Database = {
           flextime_carryover_limit?: number | null
           id?: string
           initial_flextime_balance?: number | null
+          initial_flextime_balance_set_at?: string | null
           initials?: string | null
           last_name?: string
           region_code?: string | null

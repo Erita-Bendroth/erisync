@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS initial_flextime_balance_set_at timestamptz;
+UPDATE public.profiles SET initial_flextime_balance_set_at = now() WHERE initial_flextime_balance IS NOT NULL AND initial_flextime_balance <> 0 AND initial_flextime_balance_set_at IS NULL;
