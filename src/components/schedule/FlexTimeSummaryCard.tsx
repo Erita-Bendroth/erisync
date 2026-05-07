@@ -23,6 +23,8 @@ interface FlexTimeSummaryCardProps {
   currentBalance: number;
   carryoverLimit: number;
   initialBalance: number;
+  initialBalanceLocked?: boolean;
+  countryCode?: string | null;
   entries: DailyTimeEntry[];
   monthlySummary: MonthlyFlexSummary | null;
   monthDate: Date;
@@ -37,6 +39,8 @@ export function FlexTimeSummaryCard({
   currentBalance,
   carryoverLimit,
   initialBalance,
+  initialBalanceLocked = false,
+  countryCode,
   entries,
   monthlySummary,
   monthDate,
@@ -284,6 +288,9 @@ export function FlexTimeSummaryCard({
         currentLimit={carryoverLimit}
         currentInitialBalance={initialBalance}
         onSave={onSaveFlexTimeSettings}
+        countryCode={countryCode}
+        initialBalanceLocked={initialBalanceLocked}
+        mode="user"
       />
     </>
   );
