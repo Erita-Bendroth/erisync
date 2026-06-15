@@ -463,7 +463,7 @@ export function RosterBuilderDialog({
                   <div className="text-sm">
                     <div className="font-medium text-cyan-800 dark:text-cyan-200">Offshore shift pattern is enabled</div>
                     <div className="text-cyan-700 dark:text-cyan-300">
-                      This partnership uses E / L / N / WO shift codes. Single E or L shifts do not create WO automatically; WO is only auto-filled for codes with explicit recovery rules.
+                      This partnership uses E / L / N / WO shift codes. A single Early or Late shift does not create a WO. WO days are auto-filled only when more than 5 consecutive shifts of the same code are assigned (1 WO before and 1 after for E/L blocks; 1 WO before and 2 after for N blocks). A single Night shift still gets 1 WO after.
                     </div>
                   </div>
                 </div>
