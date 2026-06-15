@@ -1,52 +1,77 @@
-## Findings
 
-**1. "German FlexTime Regulations" text** — In `FlexTimeSettingsDialog.tsx`, the Alert at the bottom is hardcoded and shown to every user regardless of their country.
+## Goal
 
-**2. "One-time setting" claim** — The dialog *labels* the Starting Balance as "(one-time setting)", but the underlying logic in `useTimeEntries.ts` → `saveFlexTimeSettings` simply runs an `UPDATE` on `profiles.initial_flextime_balance` every time. **There is no enforcement** — a user can re-edit it as often as they want. The label is misleading rather than restrictive.
+Support an offshore-style continuous shift pattern (E / L / N / Day / WO) in partnership rotation rosters, where each shift code carries its own mandatory recovery rule (e.g. Night = 1 work + 2 WO, Early = 1 work + 1 WO). The roster builder auto-generates WO days from the rule, and partnerships can opt in/out of this mode.
 
-So today: any user can change their starting balance repeatedly, and changing it triggers a full recalculation of all monthly summaries (`recalculateAllMonthlySummaries`). This is risky because users could retroactively inflate their balance.
+## Approach overview
 
-## Plan
+Introduce a "Shift Pattern Library" scoped per partnership. Each shift code defines:
+- Letter / label / color
+- Working or non-working (WO = non-working)
+- Recovery rule: how many WO days must follow one shift of this type
 
-### A. Country-gate the German regulations text
-- Read the current user's `country_code` (already available via `useCurrentUserContext`).
-- Pass it into `FlexTimeSettingsDialog` as a prop (`countryCode`).
-- Only render the "German FlexTime Regulations" Alert when `countryCode === 'DE'`.
-- For other countries, show a generic short note ("Check your local work agreement for carryover and balance rules.").
+Partnerships gain an `offshore_mode` toggle. When ON, the roster builder switches from week-grid input to a day-by-day continuous planner that:
+1. Accepts a starting anchor shift per person (e.g. AAMPO starts Night on 15/Mar)
+2. Auto-fills the following days with WO recovery based on the shift's rule
+3. Optionally repeats the micro-cycle for the roster horizon
+4. Allows manual overrides per day with validation against the recovery rule
 
-### B. Make Starting Balance a true one-time setting (with manager override)
+## Data model (new tables / columns)
 
-**Logic change (frontend gating, no schema change required):**
-- Treat the starting balance as "locked" once it has ever been set by the user. We detect this by checking whether `initial_flextime_balance` is non-null on the profile (today it defaults to 0, so we need a small distinction — see Technical section).
-- In `FlexTimeSettingsDialog`:
-  - If locked **and** the viewer is the profile owner (not a manager-edit context): disable the Hours/Minutes inputs, show a clear warning banner: *"Your starting balance has already been set and can no longer be changed. Contact your manager if a correction is needed."*
-  - The Carryover Limit field remains editable by the user.
-- The Save handler will only send `initial_flextime_balance` when the field is editable, so accidental resaves can't overwrite it.
+```text
+partnership_shift_codes
+  id, partnership_id, code (E|L|N|D|WO|custom),
+  label, color, is_working (bool),
+  recovery_days_after (int default 0),
+  default_shift_time_definition_id (nullable -> existing per-country times),
+  sort_order
 
-**Manager override:**
-- Add a new "Edit FlexTime Settings" action available to managers/planners/admins on each team-member's profile/row in the team management view (where managers already edit user data).
-- Reuse `FlexTimeSettingsDialog` with a new `mode="manager"` prop:
-  - Inputs are always editable (overrides the lock).
-  - Warning banner shown: *"Manager override — changes will recalculate this user's full flextime history."*
-  - Save path writes to the target user's `profiles.initial_flextime_balance` and `flextime_carryover_limit`, then triggers the same recalculation for that user.
-- Permission check: only roles that already pass the existing manager hierarchy check (admin, planner, manager of that user's team) can open this dialog and call the save path. Reuse existing helpers from `teamHierarchyUtils` / role checks.
+partnership_rotation_rosters
+  + offshore_mode (bool default false)
+  + cycle_length_days (int nullable) -- optional repeat length
 
-### C. UX warning copy (always visible to user-mode dialog)
-Add a short note under "Starting Balance" in the user-mode dialog: *"This is a one-time setting. Once saved, only a manager can adjust it."*
+roster_day_assignments  (NEW, day-grain alternative to week grid)
+  id, roster_id, user_id, work_date,
+  shift_code_id (nullable -> WO if null & flagged),
+  is_recovery (bool), is_anchor (bool),
+  generated_by (manual|auto-recovery|cycle-repeat)
+```
 
-## Technical notes
+Keep existing `roster_week_assignments` for non-offshore rosters; offshore rosters use `roster_day_assignments` instead. Activation writes both modes into `schedule_entries` (WO = non-working entry / unavailability marker, configurable).
 
-- **Detecting "already set"**: `initial_flextime_balance` defaults to `0`, so we can't distinguish "never set" from "set to 0". Two options:
-  1. Add a boolean `initial_flextime_balance_set` column to `profiles` (set to `true` on first user save), OR
-  2. Add a `initial_flextime_balance_set_at timestamptz` column (nullable; set on first user save). Preferred — also useful for audit.
-  Manager overrides do **not** clear or block this flag; they just write through.
-- Files touched (frontend only, plus one tiny migration):
-  - `src/components/schedule/FlexTimeSettingsDialog.tsx` — add `countryCode`, `mode` ('user' | 'manager'), `locked` props; gate Alert; disable inputs when locked in user mode; add warning copy.
-  - `src/components/schedule/FlexTimeSummaryCard.tsx` — pass `countryCode`, `locked` derived from profile.
-  - `src/hooks/useTimeEntries.ts` — expose `initialBalanceLocked` (based on the new flag); on first save set `initial_flextime_balance_set_at = now()`; refuse to update `initial_flextime_balance` when locked unless `manager: true` is passed.
-  - New: a small entry point in the team-member management UI (e.g. `UserManagement.tsx` or `EditUserModal.tsx`) to open the dialog in manager mode for a chosen user, plus a manager-mode save path that targets that user's profile.
-- One Supabase migration: add `initial_flextime_balance_set_at timestamptz` to `profiles`; backfill `now()` for any user whose `initial_flextime_balance` is non-zero so existing non-zero values are treated as locked.
+## UI changes
+
+- **Partnership settings**: new "Shift Pattern" tab to define codes + recovery rules. Seed with offshore preset (E/L/N/D/WO with rules from the screenshot).
+- **Roster builder** (`RosterBuilderDialog`): if `offshore_mode`, swap `RosterWeekGrid` for a new `RosterDayPatternGrid`:
+  - Rows = members, columns = dates across the roster window
+  - Click a cell to assign a shift code; auto-paints following WO cells per recovery rule
+  - Color-coded chips matching the screenshot (E green, L yellow, N blue, WO red)
+  - "Repeat cycle" button to project the micro-pattern across remaining dates
+- **Validation panel**: enforce recovery rule (warn if next N days aren't WO), enforce min staffing per working shift, flag consecutive work-day overruns.
+- **Calendar preview**: render the offshore codes inline.
+
+## Activation / enforcement
+
+- On activation: insert `schedule_entries` for working days using the linked shift time definition (country priority rules still apply); WO days written as a non-working entry tagged "Recovery (WO)" so the existing Leave Precedence + display standards treat them as unavailability.
+- WO days block work assignment elsewhere (hard block via existing schedule write paths).
 
 ## Out of scope
-- No change to balance calculation math.
-- No change to `flextime_carryover_limit` editability — users can still adjust it.
+
+- Crew rotation optimization / auto-balancing across multiple people
+- Payroll/flextime impact of WO days (reuse existing flextime rules)
+- Migration of historical rosters to the new model
+
+## Technical details
+
+- Migration adds the two tables + columns with GRANTs for `authenticated` (RLS scoped to partnership membership via existing helper) + `service_role`, plus an enum-free `code` text column with per-partnership uniqueness.
+- New hook `usePartnershipShiftCodes(partnershipId)` for CRUD + caching.
+- New hook `useOffshoreRosterBuilder` encapsulating recovery-rule auto-fill and cycle repetition.
+- Extend `useRosterValidation` with `validateRecoveryRule(assignments, codes)`.
+- Extend roster activation edge logic to branch on `offshore_mode` and write day-level entries.
+- Reuse `shiftResolver` to pick the country-specific time for E/L/N/D.
+
+## Open questions to confirm before build
+
+1. Should WO days appear in the schedule as "Recovery Day" unavailability, or just as empty (no entry)? Recommendation: explicit "Recovery (WO)" entry so it blocks swaps and shows in coverage views.
+2. Recovery rule semantics — fixed count (Night → exactly 2 WO) or minimum (Night → ≥2 WO)? Recommendation: minimum, with a warning if exceeded by > X.
+3. Should the offshore preset be seeded automatically for every new partnership, or only when the toggle is flipped on? Recommendation: seed on toggle-on.
