@@ -97,26 +97,105 @@ export function OffshoreRosterDayGrid({
     return map;
   }, [assignments]);
 
-  const handleCellClick = async (userId: string, date: string) => {
+  const paintDates = async (userId: string, dateList: string[]) => {
     if (!selectedCodeId) {
       toast({ title: "Select a shift code first" });
       return;
     }
     const shift = codes.find((c) => c.id === selectedCodeId);
-    if (!shift) return;
-    const existing = Array.from(byUser.get(userId)?.values() || []);
-    const next = applyShiftWithRecovery(rosterId, userId, date, shift, codes, existing);
-    // Widen the save range so any auto-painted WO that lands just outside the
-    // visible window (e.g. clicking on the last visible day) still gets saved.
-    const allDates = next.map((a) => a.work_date);
+    if (!shift || dateList.length === 0) return;
+    let working = Array.from(byUser.get(userId)?.values() || []);
+    for (const d of dateList) {
+      working = applyShiftWithRecovery(rosterId, userId, d, shift, codes, working);
+    }
+    const allDates = working.map((a) => a.work_date);
     const minDate = allDates.reduce((m, d) => (d < m ? d : m), startDate);
     const maxDate = allDates.reduce((m, d) => (d > m ? d : m), endDate);
-    await replaceUserRange(userId, minDate, maxDate, next);
+    await replaceUserRange(userId, minDate, maxDate, working);
+  };
+
+  useEffect(() => {
+    const onUp = () => {
+      const { userId, dates: dset } = dragStateRef.current;
+      if (userId && dset.size > 0) {
+        const sorted = Array.from(dset).sort();
+        void paintDates(userId, sorted);
+      }
+      dragStateRef.current = { userId: null, dates: new Set() };
+      setDragUserId(null);
+      setDragDates(new Set());
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCodeId, codes, assignments]);
+
+  const startDrag = (userId: string, date: string, e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (!selectedCodeId) {
+      toast({ title: "Select a shift code first" });
+      return;
+    }
+    e.preventDefault();
+    const set = new Set<string>([date]);
+    dragStateRef.current = { userId, dates: set };
+    setDragUserId(userId);
+    setDragDates(new Set(set));
+  };
+
+  const extendDrag = (userId: string, date: string) => {
+    if (!dragStateRef.current.userId || dragStateRef.current.userId !== userId) return;
+    if (dragStateRef.current.dates.has(date)) return;
+    dragStateRef.current.dates.add(date);
+    setDragDates(new Set(dragStateRef.current.dates));
   };
 
   const clearCell = async (userId: string, date: string) => {
     const existing = Array.from(byUser.get(userId)?.values() || []).filter((a) => a.work_date !== date);
     await replaceUserRange(userId, startDate, endDate, existing);
+  };
+
+  const handleSaveAndClose = async () => {
+    setIsSaving(true);
+    try {
+      const dayCode = codes.find((c) => c.code.toUpperCase() === "D");
+      if (!dayCode) {
+        toast({
+          title: "No Day code in palette — blank days were not filled",
+          variant: "destructive",
+        });
+      } else {
+        await Promise.all(
+          members.map(async (m) => {
+            const existing = Array.from(byUser.get(m.id)?.values() || []);
+            const filled = new Set(existing.map((a) => a.work_date));
+            const additions: DayAssignment[] = [];
+            for (const d of dates) {
+              if (!filled.has(d)) {
+                additions.push({
+                  roster_id: rosterId,
+                  user_id: m.id,
+                  work_date: d,
+                  shift_code_id: dayCode.id,
+                  is_recovery: false,
+                  is_anchor: true,
+                  generated_by: "manual",
+                });
+              }
+            }
+            if (additions.length === 0) return;
+            await replaceUserRange(m.id, startDate, endDate, [...existing, ...additions]);
+          }),
+        );
+      }
+      toast({ title: "Roster saved" });
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Failed to save roster", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const warnings = useMemo(() => {
