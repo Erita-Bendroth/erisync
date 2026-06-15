@@ -83,7 +83,7 @@ export function RosterBuilderDialog({
   useEffect(() => {
     // Detect offshore mode from: (1) roster flag, (2) any sibling roster flag,
     // (3) team names containing "Offshore". This guarantees the day-by-day
-    // grid (with auto WO recovery) is shown for offshore partnerships even
+      // grid is shown for offshore partnerships even
     // for brand-new rosters where the flag hasn't been persisted yet.
     let cancelled = false;
     (async () => {
@@ -463,7 +463,7 @@ export function RosterBuilderDialog({
                   <div className="text-sm">
                     <div className="font-medium text-cyan-800 dark:text-cyan-200">Offshore shift pattern is enabled</div>
                     <div className="text-cyan-700 dark:text-cyan-300">
-                      This partnership uses E / L / N / WO shift codes. Click a cell to assign a code — recovery (WO) days are auto-filled per each code's rule (e.g. 1 WO after a single E).
+                      This partnership uses E / L / N / WO shift codes. Single E or L shifts do not create WO automatically; WO is only auto-filled for codes with explicit recovery rules.
                     </div>
                   </div>
                 </div>

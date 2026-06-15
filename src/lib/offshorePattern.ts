@@ -53,8 +53,8 @@ export interface DayAssignment {
 
 /**
  * Default offshore preset, mirroring the turbine-troubleshooting roster:
- *   E  – Early   (1 WO after)
- *   L  – Late    (1 WO after)
+ *   E  – Early   (no automatic WO for a standalone shift)
+ *   L  – Late    (no automatic WO for a standalone shift)
  *   N  – Night   (1 WO before, 1 WO after; 2 WO after if block >= 5)
  *   D  – Day     (no mandatory recovery)
  *   WO – Recovery / Weekend Off (non-working)
@@ -68,7 +68,7 @@ export const OFFSHORE_PRESET: Array<
     color: "#22c55e",
     is_working: true,
     shift_type: "early",
-    recovery_rule: { after: 1 },
+    recovery_rule: {},
     sort_order: 1,
   },
   {
@@ -77,7 +77,7 @@ export const OFFSHORE_PRESET: Array<
     color: "#eab308",
     is_working: true,
     shift_type: "late",
-    recovery_rule: { after: 1 },
+    recovery_rule: {},
     sort_order: 2,
   },
   {
@@ -122,6 +122,19 @@ function dateKey(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
+function effectiveRecoveryRule(shift: ShiftCode): RecoveryRule {
+  const rule = shift.recovery_rule || {};
+  const code = shift.code.trim().toUpperCase();
+  const isEarlyOrLate = code === "E" || code === "L";
+  const hasOnlyLegacySingleWoAfter =
+    (rule.after ?? 0) === 1 &&
+    (rule.before ?? 0) === 0 &&
+    (rule.longBlockAfter ?? 0) === 0 &&
+    (rule.longBlockThreshold ?? 0) === 0;
+
+  return isEarlyOrLate && hasOnlyLegacySingleWoAfter ? {} : rule;
+}
+
 /**
  * Apply a shift assignment for a single user on a given date and
  * auto-paint surrounding WO recovery days per the shift's recovery rule.
@@ -152,62 +165,68 @@ export function applyShiftWithRecovery(
     generated_by: "manual",
   });
 
-  if (!shift.is_working) return Array.from(map.values());
-
   const wo = findWoCode(allCodes);
   if (!wo) return Array.from(map.values());
 
-  const rule = shift.recovery_rule || {};
-  const anchor = parseISO(date);
+  Array.from(map.entries()).forEach(([key, assignment]) => {
+    if (assignment.generated_by === "auto-recovery") map.delete(key);
+  });
 
-  // BEFORE
-  const beforeCount = rule.before ?? 0;
-  for (let i = 1; i <= beforeCount; i++) {
-    const d = dateKey(addDays(anchor, -i));
-    const existing = map.get(d);
-    // Don't overwrite manual shifts placed by the user before today's anchor
-    if (existing?.is_anchor) continue;
-    map.set(d, {
-      roster_id: rosterId,
-      user_id: userId,
-      work_date: d,
-      shift_code_id: wo.id,
-      is_recovery: true,
-      is_anchor: false,
-      generated_by: "auto-recovery",
-    });
-  }
+  const anchors = Array.from(map.values())
+    .filter((a) => a.is_anchor)
+    .sort((a, b) => (a.work_date < b.work_date ? -1 : 1));
 
-  // Determine block length (consecutive same-shift starting at anchor, walking forward)
-  let blockLen = 1;
-  for (let i = 1; i < 30; i++) {
-    const d = dateKey(addDays(anchor, i));
-    const next = map.get(d);
-    if (next?.shift_code_id === shift.id && next.is_anchor) blockLen++;
-    else break;
-  }
+  anchors.forEach((anchorAssignment) => {
+    const anchorShift = allCodes.find((c) => c.id === anchorAssignment.shift_code_id);
+    if (!anchorShift?.is_working) return;
 
-  const afterCount =
-    rule.longBlockThreshold && blockLen >= rule.longBlockThreshold
-      ? rule.longBlockAfter ?? rule.after ?? 0
-      : rule.after ?? 0;
+    const rule = effectiveRecoveryRule(anchorShift);
+    const anchor = parseISO(anchorAssignment.work_date);
 
-  // AFTER — start after the working block
-  const afterStart = blockLen;
-  for (let i = 0; i < afterCount; i++) {
-    const d = dateKey(addDays(anchor, afterStart + i));
-    const existing = map.get(d);
-    if (existing?.is_anchor) continue;
-    map.set(d, {
-      roster_id: rosterId,
-      user_id: userId,
-      work_date: d,
-      shift_code_id: wo.id,
-      is_recovery: true,
-      is_anchor: false,
-      generated_by: "auto-recovery",
-    });
-  }
+    const beforeCount = rule.before ?? 0;
+    for (let i = 1; i <= beforeCount; i++) {
+      const d = dateKey(addDays(anchor, -i));
+      const existing = map.get(d);
+      if (existing?.is_anchor || existing?.generated_by === "manual") continue;
+      map.set(d, {
+        roster_id: rosterId,
+        user_id: userId,
+        work_date: d,
+        shift_code_id: wo.id,
+        is_recovery: true,
+        is_anchor: false,
+        generated_by: "auto-recovery",
+      });
+    }
+
+    let blockLen = 1;
+    for (let i = 1; i < 30; i++) {
+      const d = dateKey(addDays(anchor, i));
+      const next = map.get(d);
+      if (next?.shift_code_id === anchorShift.id && next.is_anchor) blockLen++;
+      else break;
+    }
+
+    const afterCount =
+      rule.longBlockThreshold && blockLen >= rule.longBlockThreshold
+        ? rule.longBlockAfter ?? rule.after ?? 0
+        : rule.after ?? 0;
+
+    for (let i = 0; i < afterCount; i++) {
+      const d = dateKey(addDays(anchor, blockLen + i));
+      const existing = map.get(d);
+      if (existing?.is_anchor || existing?.generated_by === "manual") continue;
+      map.set(d, {
+        roster_id: rosterId,
+        user_id: userId,
+        work_date: d,
+        shift_code_id: wo.id,
+        is_recovery: true,
+        is_anchor: false,
+        generated_by: "auto-recovery",
+      });
+    }
+  });
 
   return Array.from(map.values()).sort((a, b) =>
     a.work_date < b.work_date ? -1 : 1,
@@ -234,7 +253,7 @@ export function validateRecovery(
     if (!a.is_anchor) continue;
     const code = codes.find((c) => c.id === a.shift_code_id);
     if (!code || !code.is_working) continue;
-    const rule = code.recovery_rule || {};
+    const rule = effectiveRecoveryRule(code);
     const anchor = parseISO(a.work_date);
 
     const beforeCount = rule.before ?? 0;
