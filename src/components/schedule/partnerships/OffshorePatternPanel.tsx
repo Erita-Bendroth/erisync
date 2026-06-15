@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Sparkles } from "lucide-react";
 import { usePartnershipShiftCodes } from "@/hooks/usePartnershipShiftCodes";
-import { ShiftCode, isOffshoreByTeamNames } from "@/lib/offshorePattern";
+import { ShiftCode, isOffshoreByTeamNames, describeRecoveryRule } from "@/lib/offshorePattern";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {
