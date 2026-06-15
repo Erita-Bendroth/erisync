@@ -264,76 +264,69 @@ export function OffshoreRosterDayGrid({
       </Card>
 
       <Card>
-        <CardContent className="p-0 overflow-hidden max-h-[60vh]">
-          <div className="flex text-xs select-none overflow-y-auto max-h-[60vh]">
-            {/* Left rail — member names, stays in place during horizontal scroll */}
-            <div className="shrink-0 border-r bg-background sticky left-0 z-10">
-              <div className="h-12 flex items-center px-2 font-medium border-b w-40">
-                Member
-              </div>
-              {members.map((m) => (
-                <div
-                  key={m.id}
-                  className="h-9 flex items-center px-2 border-b font-medium truncate w-40"
-                  title={m.display_name}
-                >
-                  {m.display_name}
+        <CardContent className="p-0">
+          {/* Single scroll viewport — both axes scroll here. Member cells use
+              position:sticky left:0 so they stay visible during horizontal scroll. */}
+          <div className="text-xs select-none overflow-auto max-h-[60vh] w-full">
+            <div style={{ width: `${160 + dates.length * 40}px` }}>
+              {/* Header row */}
+              <div className="flex h-12 border-b sticky top-0 z-20 bg-background">
+                <div className="w-40 shrink-0 sticky left-0 z-30 bg-background border-r flex items-center px-2 font-medium">
+                  Member
                 </div>
-              ))}
-            </div>
-            {/* Right pane — horizontally scrollable date cells */}
-            <div className="overflow-x-auto flex-1 min-w-0">
-              <div style={{ minWidth: `${dates.length * 40}px` }}>
-                {/* Date header */}
-                <div className="flex h-12 border-b">
+                {dates.map((d) => {
+                  const dt = parseISO(d);
+                  const dow = dt.getDay();
+                  const weekend = dow === 0 || dow === 6;
+                  return (
+                    <div
+                      key={d}
+                      className={`w-10 shrink-0 border-r text-center flex flex-col justify-center ${weekend ? "bg-muted" : "bg-background"}`}
+                    >
+                      <div className="font-normal text-muted-foreground leading-tight">
+                        {format(dt, "EEE")[0]}
+                      </div>
+                      <div className="font-semibold leading-tight">{format(dt, "d")}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Member rows */}
+              {members.map((m) => (
+                <div key={m.id} className="flex h-9 border-b">
+                  <div
+                    className="w-40 shrink-0 sticky left-0 z-10 bg-background border-r flex items-center px-2 font-medium truncate"
+                    title={m.display_name}
+                  >
+                    {m.display_name}
+                  </div>
                   {dates.map((d) => {
-                    const dt = parseISO(d);
-                    const dow = dt.getDay();
-                    const weekend = dow === 0 || dow === 6;
+                    const a = byUser.get(m.id)?.get(d);
+                    const c = a ? codes.find((x) => x.id === a.shift_code_id) : null;
+                    const isDragHighlighted = dragUserId === m.id && dragDates.has(d);
                     return (
                       <div
                         key={d}
-                        className={`w-10 shrink-0 border-r text-center flex flex-col justify-center ${weekend ? "bg-muted" : "bg-background"}`}
+                        className={`w-10 shrink-0 border-r text-center cursor-cell hover:opacity-80 flex items-center justify-center ${
+                          isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
+                        }`}
+                        style={c ? { backgroundColor: c.color } : {}}
+                        onMouseDown={(e) => startDrag(m.id, d, e)}
+                        onMouseEnter={() => extendDrag(m.id, d)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          clearCell(m.id, d);
+                        }}
+                        title={c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign"}
                       >
-                        <div className="font-normal text-muted-foreground leading-tight">
-                          {format(dt, "EEE")[0]}
-                        </div>
-                        <div className="font-semibold leading-tight">{format(dt, "d")}</div>
+                        <span className={c ? "text-white font-semibold" : ""}>
+                          {c?.code ?? ""}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-                {/* Member rows */}
-                {members.map((m) => (
-                  <div key={m.id} className="flex h-9 border-b">
-                    {dates.map((d) => {
-                      const a = byUser.get(m.id)?.get(d);
-                      const c = a ? codes.find((x) => x.id === a.shift_code_id) : null;
-                      const isDragHighlighted = dragUserId === m.id && dragDates.has(d);
-                      return (
-                        <div
-                          key={d}
-                          className={`w-10 shrink-0 border-r text-center cursor-cell hover:opacity-80 flex items-center justify-center ${
-                            isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
-                          }`}
-                          style={c ? { backgroundColor: c.color } : {}}
-                          onMouseDown={(e) => startDrag(m.id, d, e)}
-                          onMouseEnter={() => extendDrag(m.id, d)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            clearCell(m.id, d);
-                          }}
-                          title={c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign"}
-                        >
-                          <span className={c ? "text-white font-semibold" : ""}>
-                            {c?.code ?? ""}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </CardContent>
