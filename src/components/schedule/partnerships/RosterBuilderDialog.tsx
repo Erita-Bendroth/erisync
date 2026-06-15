@@ -36,7 +36,8 @@ import { Rocket, Key, AlertTriangle, Users, HelpCircle, Calendar, History } from
 import { Waves } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
-import { addWeeks, format } from "date-fns";
+import { addWeeks, addDays, format } from "date-fns";
+import { OffshoreRosterDayGrid } from "./OffshoreRosterDayGrid";
 
 interface Team {
   id: string;
@@ -421,7 +422,9 @@ export function RosterBuilderDialog({
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="build">Weekly Assignments</TabsTrigger>
+              <TabsTrigger value="build">
+                {offshoreMode ? "Day-by-day Assignments" : "Weekly Assignments"}
+              </TabsTrigger>
               <TabsTrigger value="calendar" className="gap-1">
                 <Calendar className="h-4 w-4" />
                 Calendar Preview
@@ -440,7 +443,7 @@ export function RosterBuilderDialog({
                   <div className="text-sm">
                     <div className="font-medium text-cyan-800 dark:text-cyan-200">Offshore shift pattern is enabled</div>
                     <div className="text-cyan-700 dark:text-cyan-300">
-                      This partnership uses E / L / N / WO shift codes. After saving this roster draft, open it from the partnership list to access the day-by-day grid with auto-generated WO (recovery) days.
+                      This partnership uses E / L / N / WO shift codes. Click a cell to assign a code — recovery (WO) days are auto-filled per each code's rule (e.g. 1 WO after a single E).
                     </div>
                   </div>
                 </div>
@@ -453,13 +456,25 @@ export function RosterBuilderDialog({
                 />
               )}
               {rosterId ? (
-                <RosterWeekGrid
-                  rosterId={rosterId}
-                  partnershipId={partnershipId}
-                  cycleLength={cycleLength}
-                  isReadOnly={isReadOnly}
-                  onProgressChange={handleProgressChange}
-                />
+                offshoreMode ? (
+                  <OffshoreRosterDayGrid
+                    partnershipId={partnershipId}
+                    rosterId={rosterId}
+                    startDate={startDate}
+                    endDate={format(
+                      addDays(addWeeks(new Date(startDate), cycleLength), -1),
+                      "yyyy-MM-dd",
+                    )}
+                  />
+                ) : (
+                  <RosterWeekGrid
+                    rosterId={rosterId}
+                    partnershipId={partnershipId}
+                    cycleLength={cycleLength}
+                    isReadOnly={isReadOnly}
+                    onProgressChange={handleProgressChange}
+                  />
+                )
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   Please save the roster draft first to build assignments

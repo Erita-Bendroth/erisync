@@ -1,18 +1,14 @@
-## Changes
+## Root cause
 
-### 1. Per-shift staffing requirements match offshore shifts
-In `ShiftRequirements.tsx`, detect whether the partnership is offshore (team name contains "Offshore", reusing `isOffshoreByTeamNames`). When offshore, render four shift cards instead of the current three:
+The Rotation Schedule builder always renders the **weekly** grid (`RosterWeekGrid`), even when offshore mode is on. Weekly cells assign one shift per whole week, so a "single E" is actually 7 days of E and there's no slot for a WO recovery day. The day-by-day offshore grid (`OffshoreRosterDayGrid`) with the auto-WO recovery logic exists, but it is not wired into the builder — the offshore banner just tells the user to "open the day-by-day grid" with no link.
 
-- Early Shift — Morning coverage
-- Late Shift — Afternoon coverage
-- Night Shift — Overnight coverage
-- Normal Day — Standard working day
+## Fix
 
-Non-offshore partnerships keep today's list (Late / Early / Weekend).
+In `src/components/schedule/partnerships/RosterBuilderDialog.tsx`, the **Weekly Assignments** tab will switch automatically based on partnership type:
 
-The underlying `partnership_shift_requirements` table already keys by `shift_type`, so the offshore values (`early`, `late`, `night`, `normal`) save/load with no schema change.
+- **Offshore partnership** (e.g. Turbine Troubleshooting Offshore): render `OffshoreRosterDayGrid` for the date range `startDate` → `startDate + cycleLength weeks - 1 day`. Each cell is one day; clicking a single `E` now correctly inserts the `WO` the next day per the shift code's `1 WO after` rule (which already works in `applyShiftWithRecovery`).
+- **Non-offshore partnership**: keep the existing `RosterWeekGrid` exactly as today.
 
-### 2. Remove "Shift Pattern" button from Team Scheduler toolbar
-In `src/components/schedule/unified/PartnershipSelector.tsx`, remove the cyan **Shift Pattern** button (and its dialog mount) shown next to the ⚙️ gear in the screenshot. The Offshore badge and the gear button stay. Shift-pattern configuration remains reachable from the Rotation Rosters tab inside Partnership Settings.
+The tab will also be renamed to **Day-by-day Assignments** when in offshore mode, and the banner text updated to reflect that the grid is shown inline (instead of "open it from the partnership list").
 
-No DB migration required.
+No DB changes. No changes to the recovery-rule logic itself — it is already correct; it just wasn't being reached.
