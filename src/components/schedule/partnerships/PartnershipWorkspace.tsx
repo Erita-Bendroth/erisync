@@ -99,14 +99,14 @@ export function PartnershipWorkspace({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto min-w-0">
+      <DialogContent className="max-w-6xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden min-w-0">
         <DialogHeader>
           <DialogTitle>
             {rosterName ?? "Roster"} — {partnershipName}
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="build" className="w-full">
+        <Tabs defaultValue="build" className="w-full min-w-0 overflow-hidden">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="build">
               <Hammer className="w-4 h-4 mr-2" /> Build
@@ -125,7 +125,7 @@ export function PartnershipWorkspace({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="build" className="mt-4">
+          <TabsContent value="build" className="mt-4 min-w-0 overflow-hidden">
             {roster?.offshore_mode && roster?.start_date ? (
               <OffshoreRosterDayGrid
                 partnershipId={partnershipId}
