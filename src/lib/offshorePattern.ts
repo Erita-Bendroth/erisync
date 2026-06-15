@@ -24,6 +24,7 @@ export function isOffshoreByTeamNames(teamNames: Array<string | null | undefined
 export interface RecoveryRule {
   before?: number;
   after?: number;
+  longBlockBefore?: number;
   longBlockAfter?: number;
   longBlockThreshold?: number;
 }
@@ -68,7 +69,11 @@ export const OFFSHORE_PRESET: Array<
     color: "#22c55e",
     is_working: true,
     shift_type: "early",
-    recovery_rule: {},
+    recovery_rule: {
+      longBlockBefore: 1,
+      longBlockAfter: 1,
+      longBlockThreshold: 6,
+    },
     sort_order: 1,
   },
   {
@@ -77,7 +82,11 @@ export const OFFSHORE_PRESET: Array<
     color: "#eab308",
     is_working: true,
     shift_type: "late",
-    recovery_rule: {},
+    recovery_rule: {
+      longBlockBefore: 1,
+      longBlockAfter: 1,
+      longBlockThreshold: 6,
+    },
     sort_order: 2,
   },
   {
@@ -87,10 +96,11 @@ export const OFFSHORE_PRESET: Array<
     is_working: true,
     shift_type: "night",
     recovery_rule: {
-      before: 1,
+      before: 0,
       after: 1,
+      longBlockBefore: 1,
       longBlockAfter: 2,
-      longBlockThreshold: 5,
+      longBlockThreshold: 6,
     },
     sort_order: 3,
   },
@@ -123,16 +133,29 @@ function dateKey(d: Date): string {
 }
 
 function effectiveRecoveryRule(shift: ShiftCode): RecoveryRule {
-  const rule = shift.recovery_rule || {};
+  // Canonical offshore rules. We override stored values for the well-known
+  // E/L/N codes so that legacy rosters seeded with older presets behave
+  // correctly without requiring a data migration.
   const code = shift.code.trim().toUpperCase();
-  const isEarlyOrLate = code === "E" || code === "L";
-  const hasOnlyLegacySingleWoAfter =
-    (rule.after ?? 0) === 1 &&
-    (rule.before ?? 0) === 0 &&
-    (rule.longBlockAfter ?? 0) === 0 &&
-    (rule.longBlockThreshold ?? 0) === 0;
-
-  return isEarlyOrLate && hasOnlyLegacySingleWoAfter ? {} : rule;
+  if (code === "E" || code === "L") {
+    return {
+      before: 0,
+      after: 0,
+      longBlockBefore: 1,
+      longBlockAfter: 1,
+      longBlockThreshold: 6,
+    };
+  }
+  if (code === "N") {
+    return {
+      before: 0,
+      after: 1,
+      longBlockBefore: 1,
+      longBlockAfter: 2,
+      longBlockThreshold: 6,
+    };
+  }
+  return shift.recovery_rule || {};
 }
 
 /**
@@ -176,55 +199,55 @@ export function applyShiftWithRecovery(
     .filter((a) => a.is_anchor)
     .sort((a, b) => (a.work_date < b.work_date ? -1 : 1));
 
-  anchors.forEach((anchorAssignment) => {
-    const anchorShift = allCodes.find((c) => c.id === anchorAssignment.shift_code_id);
-    if (!anchorShift?.is_working) return;
+  // Group consecutive anchors of the same shift code (no date gaps) into blocks
+  // and paint recovery only at block boundaries.
+  const blocks: Array<{ shift: ShiftCode; start: Date; len: number }> = [];
+  for (const a of anchors) {
+    const shift = allCodes.find((c) => c.id === a.shift_code_id);
+    if (!shift?.is_working) continue;
+    const d = parseISO(a.work_date);
+    const last = blocks[blocks.length - 1];
+    if (
+      last &&
+      last.shift.id === shift.id &&
+      dateKey(addDays(last.start, last.len)) === a.work_date
+    ) {
+      last.len++;
+    } else {
+      blocks.push({ shift, start: d, len: 1 });
+    }
+  }
 
-    const rule = effectiveRecoveryRule(anchorShift);
-    const anchor = parseISO(anchorAssignment.work_date);
+  const paintWo = (d: string) => {
+    const existing = map.get(d);
+    if (existing?.is_anchor || existing?.generated_by === "manual") return;
+    map.set(d, {
+      roster_id: rosterId,
+      user_id: userId,
+      work_date: d,
+      shift_code_id: wo.id,
+      is_recovery: true,
+      is_anchor: false,
+      generated_by: "auto-recovery",
+    });
+  };
 
-    const beforeCount = rule.before ?? 0;
+  blocks.forEach(({ shift, start, len }) => {
+    const rule = effectiveRecoveryRule(shift);
+    const isLong =
+      !!rule.longBlockThreshold && len >= rule.longBlockThreshold;
+    const beforeCount = isLong
+      ? rule.longBlockBefore ?? rule.before ?? 0
+      : rule.before ?? 0;
+    const afterCount = isLong
+      ? rule.longBlockAfter ?? rule.after ?? 0
+      : rule.after ?? 0;
+
     for (let i = 1; i <= beforeCount; i++) {
-      const d = dateKey(addDays(anchor, -i));
-      const existing = map.get(d);
-      if (existing?.is_anchor || existing?.generated_by === "manual") continue;
-      map.set(d, {
-        roster_id: rosterId,
-        user_id: userId,
-        work_date: d,
-        shift_code_id: wo.id,
-        is_recovery: true,
-        is_anchor: false,
-        generated_by: "auto-recovery",
-      });
+      paintWo(dateKey(addDays(start, -i)));
     }
-
-    let blockLen = 1;
-    for (let i = 1; i < 30; i++) {
-      const d = dateKey(addDays(anchor, i));
-      const next = map.get(d);
-      if (next?.shift_code_id === anchorShift.id && next.is_anchor) blockLen++;
-      else break;
-    }
-
-    const afterCount =
-      rule.longBlockThreshold && blockLen >= rule.longBlockThreshold
-        ? rule.longBlockAfter ?? rule.after ?? 0
-        : rule.after ?? 0;
-
     for (let i = 0; i < afterCount; i++) {
-      const d = dateKey(addDays(anchor, blockLen + i));
-      const existing = map.get(d);
-      if (existing?.is_anchor || existing?.generated_by === "manual") continue;
-      map.set(d, {
-        roster_id: rosterId,
-        user_id: userId,
-        work_date: d,
-        shift_code_id: wo.id,
-        is_recovery: true,
-        is_anchor: false,
-        generated_by: "auto-recovery",
-      });
+      paintWo(dateKey(addDays(start, len + i)));
     }
   });
 
@@ -249,42 +272,51 @@ export function validateRecovery(
   );
   const byDate = new Map(sorted.map((a) => [a.work_date, a]));
 
-  for (const a of sorted) {
-    if (!a.is_anchor) continue;
+  // Build consecutive same-shift blocks across anchors.
+  const anchors = sorted.filter((a) => a.is_anchor);
+  const blocks: Array<{ code: ShiftCode; start: Date; len: number; startDate: string }> = [];
+  for (const a of anchors) {
     const code = codes.find((c) => c.id === a.shift_code_id);
     if (!code || !code.is_working) continue;
-    const rule = effectiveRecoveryRule(code);
-    const anchor = parseISO(a.work_date);
+    const d = parseISO(a.work_date);
+    const last = blocks[blocks.length - 1];
+    if (
+      last &&
+      last.code.id === code.id &&
+      dateKey(addDays(last.start, last.len)) === a.work_date
+    ) {
+      last.len++;
+    } else {
+      blocks.push({ code, start: d, len: 1, startDate: a.work_date });
+    }
+  }
 
-    const beforeCount = rule.before ?? 0;
+  for (const { code, start, len, startDate } of blocks) {
+    const rule = effectiveRecoveryRule(code);
+    const isLong = !!rule.longBlockThreshold && len >= rule.longBlockThreshold;
+    const beforeCount = isLong
+      ? rule.longBlockBefore ?? rule.before ?? 0
+      : rule.before ?? 0;
+    const afterCount = isLong
+      ? rule.longBlockAfter ?? rule.after ?? 0
+      : rule.after ?? 0;
+
     for (let i = 1; i <= beforeCount; i++) {
-      const d = dateKey(addDays(anchor, -i));
+      const d = dateKey(addDays(start, -i));
       const x = byDate.get(d);
       if (!x || x.shift_code_id !== wo.id) {
         warnings.push(
-          `${a.work_date}: ${code.label} requires ${beforeCount} WO day(s) before`,
+          `${startDate}: ${code.label} block of ${len} requires ${beforeCount} WO day(s) before`,
         );
         break;
       }
     }
-
-    let blockLen = 1;
-    for (let i = 1; i < 30; i++) {
-      const d = dateKey(addDays(anchor, i));
-      const next = byDate.get(d);
-      if (next?.shift_code_id === code.id && next.is_anchor) blockLen++;
-      else break;
-    }
-    const afterCount =
-      rule.longBlockThreshold && blockLen >= rule.longBlockThreshold
-        ? rule.longBlockAfter ?? rule.after ?? 0
-        : rule.after ?? 0;
     for (let i = 0; i < afterCount; i++) {
-      const d = dateKey(addDays(anchor, blockLen + i));
+      const d = dateKey(addDays(start, len + i));
       const x = byDate.get(d);
       if (!x || x.shift_code_id !== wo.id) {
         warnings.push(
-          `${a.work_date}: ${code.label} requires ${afterCount} WO day(s) after`,
+          `${startDate}: ${code.label} block of ${len} requires ${afterCount} WO day(s) after`,
         );
         break;
       }

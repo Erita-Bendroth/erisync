@@ -138,7 +138,7 @@ export function OffshoreRosterDayGrid({
         <CardHeader>
           <CardTitle className="text-base">Shift palette</CardTitle>
           <CardDescription>
-            Pick a code, then click cells to assign. WO days only auto-fill for codes that explicitly require recovery.
+            Pick a code, then click cells to assign. WO days only auto-fill around long blocks (more than 5 consecutive shifts); a single Early or Late shift does not produce a WO.
           </CardDescription>
         </CardHeader>
         <CardContent>

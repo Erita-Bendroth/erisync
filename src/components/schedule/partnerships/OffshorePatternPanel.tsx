@@ -163,6 +163,11 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
                       {c.is_working ? <Badge variant="outline">Working</Badge> : <Badge variant="secondary">Non-working</Badge>}
                       {c.recovery_rule?.before ? <span>{c.recovery_rule.before} WO before</span> : null}
                       {c.recovery_rule?.after ? <span>{c.recovery_rule.after} WO after</span> : null}
+                      {c.recovery_rule?.longBlockBefore && c.recovery_rule?.longBlockThreshold ? (
+                        <span>
+                          {c.recovery_rule.longBlockBefore} WO before if block ≥ {c.recovery_rule.longBlockThreshold}
+                        </span>
+                      ) : null}
                       {c.recovery_rule?.longBlockAfter && c.recovery_rule?.longBlockThreshold ? (
                         <span>
                           {c.recovery_rule.longBlockAfter} WO after if block ≥ {c.recovery_rule.longBlockThreshold}
@@ -248,6 +253,15 @@ function ShiftCodeEditor({
                 min={0}
                 value={r.after ?? 0}
                 onChange={(e) => setV({ ...v, recovery_rule: { ...r, after: +e.target.value || 0 } })}
+              />
+            </div>
+            <div>
+              <Label>WO before (long block)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={r.longBlockBefore ?? 0}
+                onChange={(e) => setV({ ...v, recovery_rule: { ...r, longBlockBefore: +e.target.value || 0 } })}
               />
             </div>
             <div>
