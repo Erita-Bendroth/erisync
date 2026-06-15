@@ -161,18 +161,9 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
                     <div className="text-sm font-medium">{c.label}</div>
                     <div className="text-xs text-muted-foreground flex gap-2 items-center flex-wrap">
                       {c.is_working ? <Badge variant="outline">Working</Badge> : <Badge variant="secondary">Non-working</Badge>}
-                      {c.recovery_rule?.before ? <span>{c.recovery_rule.before} WO before</span> : null}
-                      {c.recovery_rule?.after ? <span>{c.recovery_rule.after} WO after</span> : null}
-                      {c.recovery_rule?.longBlockBefore && c.recovery_rule?.longBlockThreshold ? (
-                        <span>
-                          {c.recovery_rule.longBlockBefore} WO before if block ≥ {c.recovery_rule.longBlockThreshold}
-                        </span>
-                      ) : null}
-                      {c.recovery_rule?.longBlockAfter && c.recovery_rule?.longBlockThreshold ? (
-                        <span>
-                          {c.recovery_rule.longBlockAfter} WO after if block ≥ {c.recovery_rule.longBlockThreshold}
-                        </span>
-                      ) : null}
+                      {describeRecoveryRule(c).map((line, idx) => (
+                        <span key={idx}>{idx > 0 ? "· " : ""}{line}</span>
+                      ))}
                     </div>
                   </div>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(c)}>Edit</Button>
