@@ -335,7 +335,7 @@ export function RosterBuilderDialog({
     <TooltipProvider>
       <>
         <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto min-w-0">
             <DialogHeader>
               <DialogTitle>
                 {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}

@@ -99,7 +99,7 @@ export function PartnershipWorkspace({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto min-w-0">
         <DialogHeader>
           <DialogTitle>
             {rosterName ?? "Roster"} — {partnershipName}
