@@ -264,11 +264,11 @@ export function OffshoreRosterDayGrid({
       </Card>
 
       <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="border-collapse text-xs select-none">
+        <CardContent className="p-0 overflow-auto max-h-[60vh]">
+          <table className="border-separate border-spacing-0 text-xs select-none">
             <thead>
               <tr>
-                <th className="sticky left-0 bg-background p-2 border text-left min-w-32">Member</th>
+                <th className="sticky left-0 top-0 z-30 bg-background p-2 border-b border-r text-left min-w-32">Member</th>
                 {dates.map((d) => {
                   const dt = parseISO(d);
                   const dow = dt.getDay();
@@ -276,7 +276,7 @@ export function OffshoreRosterDayGrid({
                   return (
                     <th
                       key={d}
-                      className={`p-1 border text-center min-w-10 ${weekend ? "bg-muted" : ""}`}
+                      className={`sticky top-0 z-10 p-1 border-b border-r text-center min-w-10 ${weekend ? "bg-muted" : "bg-background"}`}
                     >
                       <div className="font-normal text-muted-foreground">{format(dt, "EEE")[0]}</div>
                       <div className="font-semibold">{format(dt, "d")}</div>
@@ -288,7 +288,7 @@ export function OffshoreRosterDayGrid({
             <tbody>
               {members.map((m) => (
                 <tr key={m.id}>
-                  <td className="sticky left-0 bg-background p-2 border text-left font-medium">
+                  <td className="sticky left-0 z-20 bg-background p-2 border-b border-r text-left font-medium">
                     {m.display_name}
                   </td>
                   {dates.map((d) => {
@@ -298,7 +298,7 @@ export function OffshoreRosterDayGrid({
                     return (
                       <td
                         key={d}
-                        className={`p-0 border text-center cursor-cell hover:opacity-80 ${
+                        className={`p-0 border-b border-r text-center cursor-cell hover:opacity-80 ${
                           isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
                         }`}
                         style={c ? { backgroundColor: c.color } : {}}

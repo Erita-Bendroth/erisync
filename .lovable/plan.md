@@ -1,39 +1,22 @@
-## Stop the roster grid from "reloading" and dropping input
+## Keep the Member column visible while scrolling the roster grid
 
-### Root cause
+### Issue
+On wide rosters the table scrolls horizontally inside the dialog, but the left-hand `Member` column scrolls off with the rest. The column is already marked `sticky left-0`, so two things are breaking it:
 
-`OffshoreRosterDayGrid` saves through `useRosterDayAssignments.replaceUserRange`, which:
+1. **`border-collapse` on the table** — Chromium/Safari don't reliably honour `position: sticky` on `<th>`/`<td>` when the table uses `border-collapse: collapse`. Cells with background colours (the painted E/L/N/WO cells) end up rendering on top.
+2. **No `z-index`** on the sticky cells — even when sticky works, sibling coloured cells paint over the member name as they scroll under it.
 
-1. `DELETE` all of the user's rows in the visible date range
-2. `INSERT` the new rows
-3. `await load()` — refetch every assignment in the roster and `setAssignments(...)`
+### Fix (scoped to `OffshoreRosterDayGrid.tsx`)
 
-That refetch (~hundreds of ms) is what the user is seeing as the "page reloading" flash. Worse, every paint reads `byUser` from React state, and React state only updates after `load()` finishes. So when two paints happen close together (drag commit + a second click, or two quick cells), the second paint uses a **stale** `existing` list, then `replaceUserRange` deletes the range and re-inserts only the stale-plus-new rows — wiping the first paint. That is "the input I have done disappears."
-
-### Fix
-
-Make local state the source of truth between saves, and stop the destructive refetch on every save.
-
-1. **Optimistic local state in `useRosterDayAssignments.ts`**
-   - In `replaceUserRange`, before hitting the DB:
-     - Compute `optimisticNext = [...assignments.filter(a => !(a.user_id === userId && a.work_date >= fromDate && a.work_date <= toDate)), ...next.filter(in range)]`
-     - `setAssignments(optimisticNext)` immediately.
-   - Then run the DELETE + INSERT in the background. On error, revert to the previous snapshot and toast.
-   - **Remove the `await load()` at the end.** It causes the visible flash and the stale-snapshot race. Keep `reload` exported for explicit refresh (initial mount only).
-
-2. **Serialize saves per user with a small in-flight queue**
-   - Add a `pendingByUser = useRef<Map<string, Promise<void>>>()`. `replaceUserRange` chains its work onto `pendingByUser.get(userId) ?? Promise.resolve()` and stores the new tail. This guarantees the second click for a user always sees the first click's committed state and prevents the DELETE-then-stale-INSERT wipe even if React state hasn't propagated yet.
-
-3. **Grid uses fresh assignments via a ref**
-   - In `OffshoreRosterDayGrid.tsx`, keep an `assignmentsRef = useRef(assignments)` updated in a `useEffect`. Both `paintDates` (drag commit) and `handleSaveAndClose` read existing rows from `assignmentsRef.current` instead of the closure'd `byUser`, so they always operate on the latest optimistic state regardless of render timing.
-
-4. **No more full-grid flicker**
-   - With (1) the grid only re-renders for the rows that actually changed, and there's no DB round-trip between the click and the UI updating. The dialog stays open; nothing remounts.
+- Switch the table to `border-separate border-spacing-0` (visually identical, sticky-safe).
+- Add `z-20` to the sticky member-name `<td>` and `<th>` so they paint above the scrolling cells.
+- Make the date header row sticky vertically too (`sticky top-0 z-10`, bg `bg-background`) so headers don't disappear when the dialog itself scrolls — and give the top-left `Member` header `z-30` so it stays above both axes.
+- Keep `bg-background` on sticky cells, and add `border-r` / `border-b` utility classes so removing `border-collapse` doesn't change the visual borders.
+- Ensure the scroll container is `<CardContent className="p-0 overflow-auto max-h-[60vh]">` so vertical scrolling is contained within the grid (rather than the outer dialog), which makes the sticky header reliably anchor to the grid.
 
 ### Out of scope
-- No DB schema changes, no migration.
-- Drag-paint, Save & Close, and the "fill blanks with D" behaviour are unchanged — only the save plumbing.
+- No changes to drag/save logic, palette, or data fetching.
+- No DB changes.
 
 ### Files touched
-- `src/hooks/useRosterDayAssignments.ts` — optimistic update, drop `await load()` after writes, per-user save queue, error rollback.
-- `src/components/schedule/partnerships/OffshoreRosterDayGrid.tsx` — read existing rows from a ref so consecutive paints don't lose data.
+- `src/components/schedule/partnerships/OffshoreRosterDayGrid.tsx`
