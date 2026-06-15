@@ -342,6 +342,12 @@ export function PartnershipRotationManager({
               <div className="flex items-center gap-2 mb-2">
                 <h4 className="font-medium">{roster.roster_name}</h4>
                 {getStatusBadge(roster.status)}
+                {roster.offshore_mode && (
+                  <Badge variant="outline" className="border-cyan-500 text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/30">
+                    <Waves className="h-3 w-3 mr-1" />
+                    Offshore
+                  </Badge>
+                )}
                 {isActionNeeded && (
                   <Badge variant="outline" className="border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/50">
                     <AlertCircle className="h-3 w-3 mr-1" />
