@@ -434,6 +434,17 @@ export function RosterBuilderDialog({
             </TabsList>
 
             <TabsContent value="build" className="space-y-4">
+              {offshoreMode && (
+                <div className="rounded-md border border-cyan-300 bg-cyan-50 dark:bg-cyan-950/30 dark:border-cyan-800 p-3 flex items-start gap-2">
+                  <Waves className="h-4 w-4 mt-0.5 text-cyan-600 shrink-0" />
+                  <div className="text-sm">
+                    <div className="font-medium text-cyan-800 dark:text-cyan-200">Offshore shift pattern is enabled</div>
+                    <div className="text-cyan-700 dark:text-cyan-300">
+                      This partnership uses E / L / N / WO shift codes. After saving this roster draft, open it from the partnership list to access the day-by-day grid with auto-generated WO (recovery) days.
+                    </div>
+                  </div>
+                </div>
+              )}
               {rosterId && (
                 <RosterValidationPanel
                   rosterId={rosterId}
