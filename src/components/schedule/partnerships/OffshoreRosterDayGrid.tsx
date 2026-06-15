@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Save } from "lucide-react";
 import { usePartnershipShiftCodes } from "@/hooks/usePartnershipShiftCodes";
 import { useRosterDayAssignments } from "@/hooks/useRosterDayAssignments";
 import {
@@ -20,6 +20,7 @@ interface Props {
   rosterId: string;
   startDate: string; // yyyy-MM-dd
   endDate: string;
+  onClose?: () => void;
 }
 
 interface Member {
@@ -36,12 +37,20 @@ export function OffshoreRosterDayGrid({
   rosterId,
   startDate,
   endDate,
+  onClose,
 }: Props) {
   const { codes } = usePartnershipShiftCodes(partnershipId);
   const { assignments, replaceUserRange } = useRosterDayAssignments(rosterId);
   const { toast } = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedCodeId, setSelectedCodeId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [dragUserId, setDragUserId] = useState<string | null>(null);
+  const [dragDates, setDragDates] = useState<Set<string>>(new Set());
+  const dragStateRef = useRef<{ userId: string | null; dates: Set<string> }>({
+    userId: null,
+    dates: new Set(),
+  });
 
   useEffect(() => {
     (async () => {
