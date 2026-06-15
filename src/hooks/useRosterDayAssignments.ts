@@ -49,7 +49,10 @@ export function useRosterDayAssignments(rosterId: string | null) {
         .lte("work_date", toDate);
       const toInsert = next
         .filter((a) => a.work_date >= fromDate && a.work_date <= toDate)
-        .map(({ id: _id, ...rest }) => rest);
+        .map(({ id: _id, created_at: _createdAt, updated_at: _updatedAt, ...rest }: DayAssignment & {
+          created_at?: string | null;
+          updated_at?: string | null;
+        }) => rest);
       if (toInsert.length) {
         const { error } = await supabase
           .from("roster_day_assignments")
