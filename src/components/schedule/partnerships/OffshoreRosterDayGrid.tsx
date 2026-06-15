@@ -245,7 +245,7 @@ export function OffshoreRosterDayGrid({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0 overflow-hidden">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
@@ -278,7 +278,7 @@ export function OffshoreRosterDayGrid({
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden min-w-0">
         <CardContent className="p-0 min-w-0">
           <div className="flex w-full min-w-0 text-xs select-none">
             <div

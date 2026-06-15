@@ -143,7 +143,7 @@ export const PartnershipCapacityConfig: React.FC<PartnershipCapacityConfigProps>
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden min-w-0">
         <DialogHeader>
           <DialogTitle>Partnership Settings - {partnershipName}</DialogTitle>
           <DialogDescription>
@@ -151,7 +151,7 @@ export const PartnershipCapacityConfig: React.FC<PartnershipCapacityConfigProps>
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0 overflow-hidden">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="capacity">General</TabsTrigger>
             <TabsTrigger value="shifts">Shift Requirements</TabsTrigger>
@@ -195,7 +195,7 @@ export const PartnershipCapacityConfig: React.FC<PartnershipCapacityConfigProps>
             <ShiftRequirements partnershipId={partnershipId} />
           </TabsContent>
 
-          <TabsContent value="rotations">
+          <TabsContent value="rotations" className="min-w-0 overflow-hidden">
             <PartnershipRotationManager
               partnershipId={partnershipId}
               partnershipName={partnershipName}

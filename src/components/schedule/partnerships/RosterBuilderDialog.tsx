@@ -335,7 +335,7 @@ export function RosterBuilderDialog({
     <TooltipProvider>
       <>
         <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto min-w-0">
+          <DialogContent className="max-w-6xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden min-w-0">
             <DialogHeader>
               <DialogTitle>
                 {roster ? "Edit" : "Create"} Rotation Schedule - {partnershipName}
@@ -384,7 +384,7 @@ export function RosterBuilderDialog({
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0 overflow-hidden">
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rosterName">Roster Name</Label>
@@ -440,7 +440,7 @@ export function RosterBuilderDialog({
                 </div>
               </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0 overflow-hidden">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="build">
                 {offshoreMode ? "Day-by-day Assignments" : "Weekly Assignments"}
@@ -456,7 +456,7 @@ export function RosterBuilderDialog({
               <TabsTrigger value="approvals">Manager Approvals</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="build" className="space-y-4">
+            <TabsContent value="build" className="space-y-4 min-w-0 overflow-hidden">
               {offshoreMode && (
                 <div className="rounded-md border border-cyan-300 bg-cyan-50 dark:bg-cyan-950/30 dark:border-cyan-800 p-3 flex items-start gap-2">
                   <Waves className="h-4 w-4 mt-0.5 text-cyan-600 shrink-0" />
