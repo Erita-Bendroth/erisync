@@ -159,6 +159,42 @@ function effectiveRecoveryRule(shift: ShiftCode): RecoveryRule {
 }
 
 /**
+ * Human-readable description of the effective recovery rule for a code.
+ * Returns an array of short lines suitable for the Shift code library UI.
+ */
+export function describeRecoveryRule(shift: ShiftCode): string[] {
+  if (!shift.is_working) return [];
+  const rule = effectiveRecoveryRule(shift);
+  const lines: string[] = [];
+
+  const before = rule.before ?? 0;
+  const after = rule.after ?? 0;
+  const lbBefore = rule.longBlockBefore ?? 0;
+  const lbAfter = rule.longBlockAfter ?? 0;
+  const threshold = rule.longBlockThreshold ?? 0;
+
+  // Single-shift line
+  const singleParts: string[] = [];
+  if (before > 0) singleParts.push(`${before} WO before`);
+  if (after > 0) singleParts.push(`${after} WO after`);
+  if (singleParts.length === 0) {
+    lines.push("No WO for a single shift");
+  } else {
+    lines.push(`${singleParts.join(" & ")} a single shift`);
+  }
+
+  // Long-block line
+  if (threshold > 0 && (lbBefore > 0 || lbAfter > 0)) {
+    const lbParts: string[] = [];
+    if (lbBefore > 0) lbParts.push(`${lbBefore} WO before`);
+    if (lbAfter > 0) lbParts.push(`${lbAfter} WO after`);
+    lines.push(`${lbParts.join(" & ")} if block > ${threshold - 1}`);
+  }
+
+  return lines;
+}
+
+/**
  * Apply a shift assignment for a single user on a given date and
  * auto-paint surrounding WO recovery days per the shift's recovery rule.
  * Returns the updated day-assignment list for that user.
