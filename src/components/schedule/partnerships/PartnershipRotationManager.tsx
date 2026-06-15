@@ -9,6 +9,9 @@ import { RosterBuilderDialog } from "./RosterBuilderDialog";
 import { CloneRosterDialog } from "./CloneRosterDialog";
 import { ShiftCoveragePanel } from "./ShiftCoveragePanel";
 import { PartnershipWorkspace } from "./PartnershipWorkspace";
+import { OffshorePatternPanel } from "./OffshorePatternPanel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Waves } from "lucide-react";
 import { toast } from "sonner";
 
 interface Roster {
@@ -27,6 +30,7 @@ interface Roster {
     | "activated";
   default_shift_for_non_duty: string;
   created_at: string;
+  offshore_mode?: boolean;
 }
 
 interface TeamProgress {
@@ -63,6 +67,7 @@ export function PartnershipRotationManager({
   const [rosterProgress, setRosterProgress] = useState<Record<string, RosterProgress>>({});
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+  const [showPatternDialog, setShowPatternDialog] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -337,6 +342,12 @@ export function PartnershipRotationManager({
               <div className="flex items-center gap-2 mb-2">
                 <h4 className="font-medium">{roster.roster_name}</h4>
                 {getStatusBadge(roster.status)}
+                {roster.offshore_mode && (
+                  <Badge variant="outline" className="border-cyan-500 text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/30">
+                    <Waves className="h-3 w-3 mr-1" />
+                    Offshore
+                  </Badge>
+                )}
                 {isActionNeeded && (
                   <Badge variant="outline" className="border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/50">
                     <AlertCircle className="h-3 w-3 mr-1" />
@@ -465,6 +476,14 @@ export function PartnershipRotationManager({
             <Plus className="h-4 w-4 mr-2" />
             Create New Schedule
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowPatternDialog(true)}
+            className="ml-2"
+          >
+            <Waves className="h-4 w-4 mr-2" />
+            Shift Pattern
+          </Button>
         </div>
 
         {otherRosters.length === 0 && actionNeededRosters.length === 0 ? (
@@ -478,6 +497,9 @@ export function PartnershipRotationManager({
               <Plus className="h-4 w-4 mr-2" />
               Create Schedule
             </Button>
+            <p className="text-xs text-muted-foreground mt-4">
+              Tip: For offshore teams, configure your shift codes (E / L / N / WO) first via <strong>Shift Pattern</strong> above.
+            </p>
           </Card>
         ) : otherRosters.length > 0 ? (
           <div className="grid gap-4">
@@ -523,6 +545,23 @@ export function PartnershipRotationManager({
             fetchRosters();
           }}
         />
+      )}
+
+      {showPatternDialog && (
+        <Dialog open={showPatternDialog} onOpenChange={setShowPatternDialog}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Waves className="h-5 w-5 text-cyan-600" />
+                Shift Pattern — {partnershipName}
+              </DialogTitle>
+              <DialogDescription>
+                Configure offshore shift codes (E / L / N / WO) and recovery rules used by all rosters in this partnership.
+              </DialogDescription>
+            </DialogHeader>
+            <OffshorePatternPanel partnershipId={partnershipId} />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

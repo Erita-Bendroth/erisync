@@ -20,6 +20,25 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
   const { toast } = useToast();
   const [offshore, setOffshore] = useState<boolean>(false);
   const [editing, setEditing] = useState<Partial<ShiftCode> | null>(null);
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: p } = await supabase
+        .from("team_planning_partners")
+        .select("team_ids")
+        .eq("id", partnershipId)
+        .single();
+      if (!p?.team_ids?.length) return;
+      const { data: t } = await supabase
+        .from("teams")
+        .select("id, name")
+        .in("id", p.team_ids);
+      if (!cancelled) setTeams(t ?? []);
+    })();
+    return () => { cancelled = true; };
+  }, [partnershipId]);
 
   // Load offshore mode flag from the most recent draft roster (or default false)
   useEffect(() => {
@@ -52,6 +71,14 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
 
   return (
     <div className="space-y-4">
+      {teams.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap text-sm">
+          <span className="text-muted-foreground">Teams in partnership:</span>
+          {teams.map((t) => (
+            <Badge key={t.id} variant="secondary">{t.name}</Badge>
+          ))}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Offshore shift pattern</CardTitle>

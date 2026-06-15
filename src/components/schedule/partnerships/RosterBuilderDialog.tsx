@@ -33,6 +33,7 @@ import { RosterCalendarView } from "./RosterCalendarView";
 import { RosterActivityLog } from "./RosterActivityLog";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
 import { Rocket, Key, AlertTriangle, Users, HelpCircle, Calendar, History } from "lucide-react";
+import { Waves } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, format } from "date-fns";
@@ -75,6 +76,27 @@ export function RosterBuilderDialog({
   const [activationMode, setActivationMode] = useState<"normal" | "admin">("normal");
   const [myTeamProgress, setMyTeamProgress] = useState({ completed: 0, total: 0 });
   const [allTeamsProgress, setAllTeamsProgress] = useState({ completed: 0, total: 0 });
+  const [offshoreMode, setOffshoreMode] = useState<boolean>(!!roster?.offshore_mode);
+
+  useEffect(() => {
+    // Detect partnership-level offshore mode by checking any existing roster
+    let cancelled = false;
+    (async () => {
+      if (roster?.offshore_mode !== undefined) {
+        setOffshoreMode(!!roster.offshore_mode);
+        return;
+      }
+      const { data } = await supabase
+        .from("partnership_rotation_rosters")
+        .select("offshore_mode")
+        .eq("partnership_id", partnershipId)
+        .eq("offshore_mode", true)
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setOffshoreMode(!!data?.offshore_mode);
+    })();
+    return () => { cancelled = true; };
+  }, [partnershipId, roster?.offshore_mode]);
 
   // Track progress updates from RosterWeekGrid
   const handleProgressChange = useCallback((completed: number, total: number) => {
@@ -412,6 +434,17 @@ export function RosterBuilderDialog({
             </TabsList>
 
             <TabsContent value="build" className="space-y-4">
+              {offshoreMode && (
+                <div className="rounded-md border border-cyan-300 bg-cyan-50 dark:bg-cyan-950/30 dark:border-cyan-800 p-3 flex items-start gap-2">
+                  <Waves className="h-4 w-4 mt-0.5 text-cyan-600 shrink-0" />
+                  <div className="text-sm">
+                    <div className="font-medium text-cyan-800 dark:text-cyan-200">Offshore shift pattern is enabled</div>
+                    <div className="text-cyan-700 dark:text-cyan-300">
+                      This partnership uses E / L / N / WO shift codes. After saving this roster draft, open it from the partnership list to access the day-by-day grid with auto-generated WO (recovery) days.
+                    </div>
+                  </div>
+                </div>
+              )}
               {rosterId && (
                 <RosterValidationPanel
                   rosterId={rosterId}
