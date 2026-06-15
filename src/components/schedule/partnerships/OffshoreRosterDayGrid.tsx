@@ -98,7 +98,12 @@ export function OffshoreRosterDayGrid({
     if (!shift) return;
     const existing = Array.from(byUser.get(userId)?.values() || []);
     const next = applyShiftWithRecovery(rosterId, userId, date, shift, codes, existing);
-    await replaceUserRange(userId, startDate, endDate, next);
+    // Widen the save range so any auto-painted WO that lands just outside the
+    // visible window (e.g. clicking on the last visible day) still gets saved.
+    const allDates = next.map((a) => a.work_date);
+    const minDate = allDates.reduce((m, d) => (d < m ? d : m), startDate);
+    const maxDate = allDates.reduce((m, d) => (d > m ? d : m), endDate);
+    await replaceUserRange(userId, minDate, maxDate, next);
   };
 
   const clearCell = async (userId: string, date: string) => {

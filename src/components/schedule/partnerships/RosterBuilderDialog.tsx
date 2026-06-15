@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, addDays, format } from "date-fns";
 import { OffshoreRosterDayGrid } from "./OffshoreRosterDayGrid";
+import { isOffshoreByTeamNames } from "@/lib/offshorePattern";
 
 interface Team {
   id: string;
@@ -80,21 +81,39 @@ export function RosterBuilderDialog({
   const [offshoreMode, setOffshoreMode] = useState<boolean>(!!roster?.offshore_mode);
 
   useEffect(() => {
-    // Detect partnership-level offshore mode by checking any existing roster
+    // Detect offshore mode from: (1) roster flag, (2) any sibling roster flag,
+    // (3) team names containing "Offshore". This guarantees the day-by-day
+    // grid (with auto WO recovery) is shown for offshore partnerships even
+    // for brand-new rosters where the flag hasn't been persisted yet.
     let cancelled = false;
     (async () => {
-      if (roster?.offshore_mode !== undefined) {
-        setOffshoreMode(!!roster.offshore_mode);
+      if (roster?.offshore_mode) {
+        setOffshoreMode(true);
         return;
       }
-      const { data } = await supabase
+      const { data: sibling } = await supabase
         .from("partnership_rotation_rosters")
         .select("offshore_mode")
         .eq("partnership_id", partnershipId)
         .eq("offshore_mode", true)
         .limit(1)
         .maybeSingle();
-      if (!cancelled) setOffshoreMode(!!data?.offshore_mode);
+      if (sibling?.offshore_mode) {
+        if (!cancelled) setOffshoreMode(true);
+        return;
+      }
+      const { data: p } = await supabase
+        .from("team_planning_partners")
+        .select("team_ids")
+        .eq("id", partnershipId)
+        .maybeSingle();
+      if (!p?.team_ids?.length) return;
+      const { data: t } = await supabase
+        .from("teams")
+        .select("name")
+        .in("id", p.team_ids);
+      const off = isOffshoreByTeamNames((t || []).map((x: any) => x.name));
+      if (!cancelled) setOffshoreMode(off);
     })();
     return () => { cancelled = true; };
   }, [partnershipId, roster?.offshore_mode]);
@@ -205,6 +224,7 @@ export function RosterBuilderDialog({
         end_date: null,
         default_shift_for_non_duty: "normal",
         status: "draft",
+        offshore_mode: offshoreMode,
       };
 
       if (rosterId) {
