@@ -33,6 +33,7 @@ import { RosterCalendarView } from "./RosterCalendarView";
 import { RosterActivityLog } from "./RosterActivityLog";
 import { generateRosterSchedules } from "@/lib/rosterGenerationUtils";
 import { Rocket, Key, AlertTriangle, Users, HelpCircle, Calendar, History } from "lucide-react";
+import { Waves } from "lucide-react";
 import { toast } from "sonner";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { addWeeks, format } from "date-fns";
