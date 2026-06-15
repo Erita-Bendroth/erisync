@@ -272,42 +272,51 @@ export function validateRecovery(
   );
   const byDate = new Map(sorted.map((a) => [a.work_date, a]));
 
-  for (const a of sorted) {
-    if (!a.is_anchor) continue;
+  // Build consecutive same-shift blocks across anchors.
+  const anchors = sorted.filter((a) => a.is_anchor);
+  const blocks: Array<{ code: ShiftCode; start: Date; len: number; startDate: string }> = [];
+  for (const a of anchors) {
     const code = codes.find((c) => c.id === a.shift_code_id);
     if (!code || !code.is_working) continue;
-    const rule = effectiveRecoveryRule(code);
-    const anchor = parseISO(a.work_date);
+    const d = parseISO(a.work_date);
+    const last = blocks[blocks.length - 1];
+    if (
+      last &&
+      last.code.id === code.id &&
+      dateKey(addDays(last.start, last.len)) === a.work_date
+    ) {
+      last.len++;
+    } else {
+      blocks.push({ code, start: d, len: 1, startDate: a.work_date });
+    }
+  }
 
-    const beforeCount = rule.before ?? 0;
+  for (const { code, start, len, startDate } of blocks) {
+    const rule = effectiveRecoveryRule(code);
+    const isLong = !!rule.longBlockThreshold && len >= rule.longBlockThreshold;
+    const beforeCount = isLong
+      ? rule.longBlockBefore ?? rule.before ?? 0
+      : rule.before ?? 0;
+    const afterCount = isLong
+      ? rule.longBlockAfter ?? rule.after ?? 0
+      : rule.after ?? 0;
+
     for (let i = 1; i <= beforeCount; i++) {
-      const d = dateKey(addDays(anchor, -i));
+      const d = dateKey(addDays(start, -i));
       const x = byDate.get(d);
       if (!x || x.shift_code_id !== wo.id) {
         warnings.push(
-          `${a.work_date}: ${code.label} requires ${beforeCount} WO day(s) before`,
+          `${startDate}: ${code.label} block of ${len} requires ${beforeCount} WO day(s) before`,
         );
         break;
       }
     }
-
-    let blockLen = 1;
-    for (let i = 1; i < 30; i++) {
-      const d = dateKey(addDays(anchor, i));
-      const next = byDate.get(d);
-      if (next?.shift_code_id === code.id && next.is_anchor) blockLen++;
-      else break;
-    }
-    const afterCount =
-      rule.longBlockThreshold && blockLen >= rule.longBlockThreshold
-        ? rule.longBlockAfter ?? rule.after ?? 0
-        : rule.after ?? 0;
     for (let i = 0; i < afterCount; i++) {
-      const d = dateKey(addDays(anchor, blockLen + i));
+      const d = dateKey(addDays(start, len + i));
       const x = byDate.get(d);
       if (!x || x.shift_code_id !== wo.id) {
         warnings.push(
-          `${a.work_date}: ${code.label} requires ${afterCount} WO day(s) after`,
+          `${startDate}: ${code.label} block of ${len} requires ${afterCount} WO day(s) after`,
         );
         break;
       }
