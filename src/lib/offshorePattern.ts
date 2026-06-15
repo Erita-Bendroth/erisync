@@ -24,6 +24,7 @@ export function isOffshoreByTeamNames(teamNames: Array<string | null | undefined
 export interface RecoveryRule {
   before?: number;
   after?: number;
+  longBlockBefore?: number;
   longBlockAfter?: number;
   longBlockThreshold?: number;
 }
@@ -68,7 +69,11 @@ export const OFFSHORE_PRESET: Array<
     color: "#22c55e",
     is_working: true,
     shift_type: "early",
-    recovery_rule: {},
+    recovery_rule: {
+      longBlockBefore: 1,
+      longBlockAfter: 1,
+      longBlockThreshold: 6,
+    },
     sort_order: 1,
   },
   {
@@ -77,7 +82,11 @@ export const OFFSHORE_PRESET: Array<
     color: "#eab308",
     is_working: true,
     shift_type: "late",
-    recovery_rule: {},
+    recovery_rule: {
+      longBlockBefore: 1,
+      longBlockAfter: 1,
+      longBlockThreshold: 6,
+    },
     sort_order: 2,
   },
   {
@@ -87,10 +96,11 @@ export const OFFSHORE_PRESET: Array<
     is_working: true,
     shift_type: "night",
     recovery_rule: {
-      before: 1,
+      before: 0,
       after: 1,
+      longBlockBefore: 1,
       longBlockAfter: 2,
-      longBlockThreshold: 5,
+      longBlockThreshold: 6,
     },
     sort_order: 3,
   },
@@ -123,16 +133,29 @@ function dateKey(d: Date): string {
 }
 
 function effectiveRecoveryRule(shift: ShiftCode): RecoveryRule {
-  const rule = shift.recovery_rule || {};
+  // Canonical offshore rules. We override stored values for the well-known
+  // E/L/N codes so that legacy rosters seeded with older presets behave
+  // correctly without requiring a data migration.
   const code = shift.code.trim().toUpperCase();
-  const isEarlyOrLate = code === "E" || code === "L";
-  const hasOnlyLegacySingleWoAfter =
-    (rule.after ?? 0) === 1 &&
-    (rule.before ?? 0) === 0 &&
-    (rule.longBlockAfter ?? 0) === 0 &&
-    (rule.longBlockThreshold ?? 0) === 0;
-
-  return isEarlyOrLate && hasOnlyLegacySingleWoAfter ? {} : rule;
+  if (code === "E" || code === "L") {
+    return {
+      before: 0,
+      after: 0,
+      longBlockBefore: 1,
+      longBlockAfter: 1,
+      longBlockThreshold: 6,
+    };
+  }
+  if (code === "N") {
+    return {
+      before: 0,
+      after: 1,
+      longBlockBefore: 1,
+      longBlockAfter: 2,
+      longBlockThreshold: 6,
+    };
+  }
+  return shift.recovery_rule || {};
 }
 
 /**
