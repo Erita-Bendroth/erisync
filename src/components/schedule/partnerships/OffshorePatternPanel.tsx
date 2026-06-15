@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Sparkles } from "lucide-react";
 import { usePartnershipShiftCodes } from "@/hooks/usePartnershipShiftCodes";
-import { ShiftCode } from "@/lib/offshorePattern";
+import { ShiftCode, isOffshoreByTeamNames } from "@/lib/offshorePattern";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {
@@ -21,6 +21,7 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
   const [offshore, setOffshore] = useState<boolean>(false);
   const [editing, setEditing] = useState<Partial<ShiftCode> | null>(null);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const isOffshoreTeam = isOffshoreByTeamNames(teams.map((t) => t.name));
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +54,24 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
       setOffshore(!!data?.offshore_mode);
     })();
   }, [partnershipId]);
+
+  // Auto-enable offshore mode + seed preset when partnership contains an Offshore team
+  useEffect(() => {
+    if (!isOffshoreTeam) return;
+    if (!offshore) {
+      setOffshore(true);
+      supabase
+        .from("partnership_rotation_rosters")
+        .update({ offshore_mode: true })
+        .eq("partnership_id", partnershipId)
+        .in("status", ["draft", "pending_approval"])
+        .then(() => {});
+    }
+    if (codes.length === 0) {
+      seedPreset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOffshoreTeam, codes.length]);
 
   const toggleOffshore = async (next: boolean) => {
     setOffshore(next);
@@ -97,8 +116,18 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
                 Switches the roster builder from week-grid to a day-by-day pattern with auto-generated WO days.
               </p>
             </div>
-            <Switch id="offshore-toggle" checked={offshore} onCheckedChange={toggleOffshore} />
+            <Switch
+              id="offshore-toggle"
+              checked={offshore || isOffshoreTeam}
+              onCheckedChange={toggleOffshore}
+              disabled={isOffshoreTeam}
+            />
           </div>
+          {isOffshoreTeam && (
+            <p className="text-xs text-cyan-700 dark:text-cyan-300">
+              This partnership contains an Offshore team — offshore mode is enabled automatically.
+            </p>
+          )}
 
           {codes.length === 0 && (
             <Button variant="outline" size="sm" onClick={seedPreset}>
