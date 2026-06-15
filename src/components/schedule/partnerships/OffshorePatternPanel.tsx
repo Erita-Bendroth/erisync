@@ -102,8 +102,8 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
         <CardHeader>
           <CardTitle className="text-base">Offshore shift pattern</CardTitle>
           <CardDescription>
-            Enable continuous day-by-day rosters with mandatory recovery (WO) days.
-            Each shift code defines how many WO days are required before/after.
+            Enable continuous day-by-day rosters with optional recovery (WO) rules.
+            Standalone E and L shifts do not require automatic WO by default.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -113,7 +113,7 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
                 Offshore mode
               </Label>
               <p className="text-xs text-muted-foreground">
-                Switches the roster builder from week-grid to a day-by-day pattern with auto-generated WO days.
+                Switches the roster builder from week-grid to a day-by-day pattern with configurable WO rules.
               </p>
             </div>
             <Switch

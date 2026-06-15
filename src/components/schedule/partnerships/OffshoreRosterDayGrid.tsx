@@ -29,7 +29,7 @@ interface Member {
 
 /**
  * Day-by-day grid editor for offshore rosters.
- * Click a cell → cycles through shift codes → auto-paints WO recovery days.
+ * Click a cell to assign a shift code and repaint any configured recovery days.
  */
 export function OffshoreRosterDayGrid({
   partnershipId,
@@ -138,7 +138,7 @@ export function OffshoreRosterDayGrid({
         <CardHeader>
           <CardTitle className="text-base">Shift palette</CardTitle>
           <CardDescription>
-            Pick a code, then click cells to assign. Recovery (WO) days auto-fill per the code's rule.
+            Pick a code, then click cells to assign. WO days only auto-fill for codes that explicitly require recovery.
           </CardDescription>
         </CardHeader>
         <CardContent>
