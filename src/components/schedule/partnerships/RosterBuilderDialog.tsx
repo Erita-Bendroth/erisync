@@ -224,6 +224,7 @@ export function RosterBuilderDialog({
         end_date: null,
         default_shift_for_non_duty: "normal",
         status: "draft",
+        offshore_mode: offshoreMode,
       };
 
       if (rosterId) {
