@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Users, Settings, Waves } from 'lucide-react';
 import { PartnershipCapacityConfig } from '../PartnershipCapacityConfig';
 import { OffshorePatternPanel } from '../partnerships/OffshorePatternPanel';
+import { isOffshoreByTeamNames } from '@/lib/offshorePattern';
 
 interface Partnership {
   id: string;
@@ -45,6 +46,20 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
         .eq('offshore_mode', true);
       const map: Record<string, boolean> = {};
       (data ?? []).forEach((r: any) => { map[r.partnership_id] = true; });
+
+      // Also auto-mark partnerships whose teams include an "Offshore" team
+      const allTeamIds = Array.from(new Set(partnerships.flatMap(p => p.team_ids)));
+      if (allTeamIds.length > 0) {
+        const { data: teams } = await supabase
+          .from('teams')
+          .select('id, name')
+          .in('id', allTeamIds);
+        const nameById = new Map((teams ?? []).map((t: any) => [t.id, t.name as string]));
+        partnerships.forEach((p) => {
+          const names = p.team_ids.map((id) => nameById.get(id) ?? '');
+          if (isOffshoreByTeamNames(names)) map[p.id] = true;
+        });
+      }
       setOffshoreByPartnership(map);
     })();
   }, [partnerships]);
