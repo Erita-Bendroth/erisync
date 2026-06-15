@@ -546,6 +546,23 @@ export function PartnershipRotationManager({
           }}
         />
       )}
+
+      {showPatternDialog && (
+        <Dialog open={showPatternDialog} onOpenChange={setShowPatternDialog}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Waves className="h-5 w-5 text-cyan-600" />
+                Shift Pattern — {partnershipName}
+              </DialogTitle>
+              <DialogDescription>
+                Configure offshore shift codes (E / L / N / WO) and recovery rules used by all rosters in this partnership.
+              </DialogDescription>
+            </DialogHeader>
+            <OffshorePatternPanel partnershipId={partnershipId} />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
