@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export function OffshoreRosterDayGrid({
     memberScrollerRef.current.scrollTop = dateScrollerRef.current.scrollTop;
   };
 
-  const handleMemberWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  const handleMemberWheel = (e: WheelEvent<HTMLDivElement>) => {
     const dateScroller = dateScrollerRef.current;
     if (!dateScroller) return;
     e.preventDefault();
