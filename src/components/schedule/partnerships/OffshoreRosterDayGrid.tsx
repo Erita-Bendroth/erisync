@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Save } from "lucide-react";
 import { usePartnershipShiftCodes } from "@/hooks/usePartnershipShiftCodes";
 import { useRosterDayAssignments } from "@/hooks/useRosterDayAssignments";
 import {
@@ -20,6 +20,7 @@ interface Props {
   rosterId: string;
   startDate: string; // yyyy-MM-dd
   endDate: string;
+  onClose?: () => void;
 }
 
 interface Member {
@@ -36,12 +37,20 @@ export function OffshoreRosterDayGrid({
   rosterId,
   startDate,
   endDate,
+  onClose,
 }: Props) {
   const { codes } = usePartnershipShiftCodes(partnershipId);
   const { assignments, replaceUserRange } = useRosterDayAssignments(rosterId);
   const { toast } = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedCodeId, setSelectedCodeId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [dragUserId, setDragUserId] = useState<string | null>(null);
+  const [dragDates, setDragDates] = useState<Set<string>>(new Set());
+  const dragStateRef = useRef<{ userId: string | null; dates: Set<string> }>({
+    userId: null,
+    dates: new Set(),
+  });
 
   useEffect(() => {
     (async () => {
@@ -88,26 +97,105 @@ export function OffshoreRosterDayGrid({
     return map;
   }, [assignments]);
 
-  const handleCellClick = async (userId: string, date: string) => {
+  const paintDates = async (userId: string, dateList: string[]) => {
     if (!selectedCodeId) {
       toast({ title: "Select a shift code first" });
       return;
     }
     const shift = codes.find((c) => c.id === selectedCodeId);
-    if (!shift) return;
-    const existing = Array.from(byUser.get(userId)?.values() || []);
-    const next = applyShiftWithRecovery(rosterId, userId, date, shift, codes, existing);
-    // Widen the save range so any auto-painted WO that lands just outside the
-    // visible window (e.g. clicking on the last visible day) still gets saved.
-    const allDates = next.map((a) => a.work_date);
+    if (!shift || dateList.length === 0) return;
+    let working = Array.from(byUser.get(userId)?.values() || []);
+    for (const d of dateList) {
+      working = applyShiftWithRecovery(rosterId, userId, d, shift, codes, working);
+    }
+    const allDates = working.map((a) => a.work_date);
     const minDate = allDates.reduce((m, d) => (d < m ? d : m), startDate);
     const maxDate = allDates.reduce((m, d) => (d > m ? d : m), endDate);
-    await replaceUserRange(userId, minDate, maxDate, next);
+    await replaceUserRange(userId, minDate, maxDate, working);
+  };
+
+  useEffect(() => {
+    const onUp = () => {
+      const { userId, dates: dset } = dragStateRef.current;
+      if (userId && dset.size > 0) {
+        const sorted = Array.from(dset).sort();
+        void paintDates(userId, sorted);
+      }
+      dragStateRef.current = { userId: null, dates: new Set() };
+      setDragUserId(null);
+      setDragDates(new Set());
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCodeId, codes, assignments]);
+
+  const startDrag = (userId: string, date: string, e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (!selectedCodeId) {
+      toast({ title: "Select a shift code first" });
+      return;
+    }
+    e.preventDefault();
+    const set = new Set<string>([date]);
+    dragStateRef.current = { userId, dates: set };
+    setDragUserId(userId);
+    setDragDates(new Set(set));
+  };
+
+  const extendDrag = (userId: string, date: string) => {
+    if (!dragStateRef.current.userId || dragStateRef.current.userId !== userId) return;
+    if (dragStateRef.current.dates.has(date)) return;
+    dragStateRef.current.dates.add(date);
+    setDragDates(new Set(dragStateRef.current.dates));
   };
 
   const clearCell = async (userId: string, date: string) => {
     const existing = Array.from(byUser.get(userId)?.values() || []).filter((a) => a.work_date !== date);
     await replaceUserRange(userId, startDate, endDate, existing);
+  };
+
+  const handleSaveAndClose = async () => {
+    setIsSaving(true);
+    try {
+      const dayCode = codes.find((c) => c.code.toUpperCase() === "D");
+      if (!dayCode) {
+        toast({
+          title: "No Day code in palette — blank days were not filled",
+          variant: "destructive",
+        });
+      } else {
+        await Promise.all(
+          members.map(async (m) => {
+            const existing = Array.from(byUser.get(m.id)?.values() || []);
+            const filled = new Set(existing.map((a) => a.work_date));
+            const additions: DayAssignment[] = [];
+            for (const d of dates) {
+              if (!filled.has(d)) {
+                additions.push({
+                  roster_id: rosterId,
+                  user_id: m.id,
+                  work_date: d,
+                  shift_code_id: dayCode.id,
+                  is_recovery: false,
+                  is_anchor: true,
+                  generated_by: "manual",
+                });
+              }
+            }
+            if (additions.length === 0) return;
+            await replaceUserRange(m.id, startDate, endDate, [...existing, ...additions]);
+          }),
+        );
+      }
+      toast({ title: "Roster saved" });
+      onClose?.();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Failed to save roster", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const warnings = useMemo(() => {
@@ -135,9 +223,15 @@ export function OffshoreRosterDayGrid({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Shift palette</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Shift palette</CardTitle>
+            <Button size="sm" onClick={handleSaveAndClose} disabled={isSaving}>
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? "Saving…" : "Save & Close"}
+            </Button>
+          </div>
           <CardDescription>
-            Pick a code, then click cells to assign. WO days only auto-fill around long blocks (more than 5 consecutive shifts); a single Early or Late shift does not produce a WO.
+            Pick a code, then click or drag across cells to assign. WO days only auto-fill around long blocks (more than 5 consecutive shifts); a single Early or Late shift does not produce a WO. Save & Close fills any remaining blank days with D — Day.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,7 +255,7 @@ export function OffshoreRosterDayGrid({
 
       <Card>
         <CardContent className="p-0 overflow-x-auto">
-          <table className="border-collapse text-xs">
+          <table className="border-collapse text-xs select-none">
             <thead>
               <tr>
                 <th className="sticky left-0 bg-background p-2 border text-left min-w-32">Member</th>
@@ -190,12 +284,16 @@ export function OffshoreRosterDayGrid({
                   {dates.map((d) => {
                     const a = byUser.get(m.id)?.get(d);
                     const c = a ? codes.find((x) => x.id === a.shift_code_id) : null;
+                    const isDragHighlighted = dragUserId === m.id && dragDates.has(d);
                     return (
                       <td
                         key={d}
-                        className="p-0 border text-center cursor-pointer hover:opacity-80"
+                        className={`p-0 border text-center cursor-cell hover:opacity-80 ${
+                          isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
+                        }`}
                         style={c ? { backgroundColor: c.color } : {}}
-                        onClick={() => handleCellClick(m.id, d)}
+                        onMouseDown={(e) => startDrag(m.id, d, e)}
+                        onMouseEnter={() => extendDrag(m.id, d)}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           clearCell(m.id, d);
@@ -216,7 +314,7 @@ export function OffshoreRosterDayGrid({
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Left-click = assign selected code · Right-click = clear cell
+        Left-click or drag = assign selected code · Right-click = clear cell
       </p>
 
       {warnings.length > 0 && (

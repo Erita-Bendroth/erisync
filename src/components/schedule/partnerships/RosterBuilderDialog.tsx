@@ -485,6 +485,7 @@ export function RosterBuilderDialog({
                       addDays(addWeeks(new Date(startDate), cycleLength), -1),
                       "yyyy-MM-dd",
                     )}
+                    onClose={() => onOpenChange(false)}
                   />
                 ) : (
                   <RosterWeekGrid
