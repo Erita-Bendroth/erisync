@@ -476,6 +476,14 @@ export function PartnershipRotationManager({
             <Plus className="h-4 w-4 mr-2" />
             Create New Schedule
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowPatternDialog(true)}
+            className="ml-2"
+          >
+            <Waves className="h-4 w-4 mr-2" />
+            Shift Pattern
+          </Button>
         </div>
 
         {otherRosters.length === 0 && actionNeededRosters.length === 0 ? (
@@ -489,6 +497,9 @@ export function PartnershipRotationManager({
               <Plus className="h-4 w-4 mr-2" />
               Create Schedule
             </Button>
+            <p className="text-xs text-muted-foreground mt-4">
+              Tip: For offshore teams, configure your shift codes (E / L / N / WO) first via <strong>Shift Pattern</strong> above.
+            </p>
           </Card>
         ) : otherRosters.length > 0 ? (
           <div className="grid gap-4">
