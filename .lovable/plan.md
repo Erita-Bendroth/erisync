@@ -1,34 +1,42 @@
-## Problem
+## What I will change
 
-I added the **Shift Pattern** entry point inside *Partnership Rotation Rosters* (Schedule → Team Scheduler → Partnership Rotation tab → roster list). But you're working on the **Team Scheduler** screen itself (the one in your screenshot with Partnership dropdown, coverage warnings, and the weekly grid) — and the pattern controls aren't reachable from there. That's why it feels missing.
+You are right: **Turbine Troubleshooting Offshore should not be added inside Troubleshooting Central**. It should be its own selectable partnership/team in the same **Team Scheduler → Partnership → Partnership Settings** configuration area shown in your screenshot.
 
-## Goal
+## Implementation plan
 
-Put **Shift Pattern** one click away from the Partnership dropdown on the Team Scheduler — exactly where the ⚙️ capacity gear already lives.
+1. **Create/use its own partnership**
+   - Check whether a `Turbine Troubleshooting Offshore` planning partnership already exists.
+   - If it does not exist, add one in `team_planning_partners` with only the existing `Turbine Troubleshooting Offshore` team.
+   - This will make it appear in the **Partnership** dropdown in Team Scheduler, separate from `Troubleshooting Central`.
 
-## Changes
+2. **Make offshore automatic for that partnership**
+   - Detect partnerships whose team name contains `Offshore`.
+   - Show the **Offshore** badge automatically for `Turbine Troubleshooting Offshore`.
+   - Treat offshore mode as enabled by default for that partnership, instead of requiring you to manually switch it on.
 
-### 1. `PartnershipSelector.tsx` (Team Scheduler header)
-Add a second small icon button next to the existing ⚙️ gear:
-- Icon: `Waves` (cyan)
-- Label/tooltip: *"Configure offshore shift pattern (E / L / N / WO)"*
-- Opens a dialog that hosts `OffshorePatternPanel` for the currently selected partnership
-- Shows a small "Offshore" badge inline next to the partnership name when offshore mode is on for that partnership, so you can see at a glance which partnerships use it
+3. **Add it to the exact configuration dialog in the screenshot**
+   - When `Turbine Troubleshooting Offshore` is selected from the Partnership dropdown and the settings gear is opened, the same dialog will show:
+     - General
+     - Shift Requirements
+     - Rotation Rosters
+     - Shift Pattern
+   - The Rotation Rosters tab will use the offshore E / L / N / D / WO pattern workflow.
 
-### 2. Dialog wrapper (inline in `PartnershipSelector.tsx`)
-Reuses the existing `OffshorePatternPanel` (toggle offshore mode, seed E/L/N/D/WO preset, edit codes, recovery rules, teams list).
-No new component file needed.
+4. **Seed the offshore shift pattern if missing**
+   - When the offshore partnership is opened, ensure the offshore shift code preset exists:
+     - E = Early
+     - L = Late
+     - N = Night
+     - D = Day
+     - WO = Weekend Off / Recovery
 
-### 3. Keep the Partnership Rotation entry too
-The "Shift Pattern" button I already added to `PartnershipRotationManager.tsx` stays — same dialog reachable from two natural locations.
+5. **Keep Central unchanged**
+   - `Troubleshooting Central` remains its own partnership.
+   - `Turbine Troubleshooting Offshore` remains its own team/partnership and is configured from the same Team Scheduler partnership settings location.
 
-## Files to change
+## Technical notes
 
-- `src/components/schedule/unified/PartnershipSelector.tsx` — add Waves button, offshore badge, dialog mount
-- (no DB changes, no new components)
-
-## Why not a new tab on the Team Scheduler
-
-The Team Scheduler page is already busy (mode tabs, view selector, coverage panels, grid). A single icon next to the gear matches the existing pattern (capacity config is also a one-icon entry point) and keeps the toolbar quiet.
-
-Ready to implement on approval.
+- Existing team found: `Turbine Troubleshooting Offshore`.
+- Existing partnership found: `Troubleshooting Central`, currently linked only to `Turbine Troubleshooting Central - North, West, East, South`.
+- No new database tables are needed.
+- This requires one data change to `team_planning_partners` plus small UI/business-logic changes around offshore partnership detection and the configuration dialog.
