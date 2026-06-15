@@ -1,6 +1,14 @@
 import { addDays, format, parseISO } from "date-fns";
 
 /**
+ * Detects whether a partnership should be treated as an offshore partnership
+ * based on the names of its teams (any team containing "Offshore").
+ */
+export function isOffshoreByTeamNames(teamNames: Array<string | null | undefined>): boolean {
+  return teamNames.some((n) => !!n && /offshore/i.test(n));
+}
+
+/**
  * Offshore shift pattern utilities.
  *
  * Each shift code has a recovery rule describing mandatory WO days
