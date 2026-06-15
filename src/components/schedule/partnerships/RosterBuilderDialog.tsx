@@ -76,6 +76,27 @@ export function RosterBuilderDialog({
   const [activationMode, setActivationMode] = useState<"normal" | "admin">("normal");
   const [myTeamProgress, setMyTeamProgress] = useState({ completed: 0, total: 0 });
   const [allTeamsProgress, setAllTeamsProgress] = useState({ completed: 0, total: 0 });
+  const [offshoreMode, setOffshoreMode] = useState<boolean>(!!roster?.offshore_mode);
+
+  useEffect(() => {
+    // Detect partnership-level offshore mode by checking any existing roster
+    let cancelled = false;
+    (async () => {
+      if (roster?.offshore_mode !== undefined) {
+        setOffshoreMode(!!roster.offshore_mode);
+        return;
+      }
+      const { data } = await supabase
+        .from("partnership_rotation_rosters")
+        .select("offshore_mode")
+        .eq("partnership_id", partnershipId)
+        .eq("offshore_mode", true)
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setOffshoreMode(!!data?.offshore_mode);
+    })();
+    return () => { cancelled = true; };
+  }, [partnershipId, roster?.offshore_mode]);
 
   // Track progress updates from RosterWeekGrid
   const handleProgressChange = useCallback((completed: number, total: number) => {
