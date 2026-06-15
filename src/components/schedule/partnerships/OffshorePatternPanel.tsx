@@ -71,6 +71,14 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
 
   return (
     <div className="space-y-4">
+      {teams.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap text-sm">
+          <span className="text-muted-foreground">Teams in partnership:</span>
+          {teams.map((t) => (
+            <Badge key={t.id} variant="secondary">{t.name}</Badge>
+          ))}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Offshore shift pattern</CardTitle>
