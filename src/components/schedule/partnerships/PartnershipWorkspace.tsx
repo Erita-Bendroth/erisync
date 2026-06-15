@@ -126,12 +126,20 @@ export function PartnershipWorkspace({
           </TabsList>
 
           <TabsContent value="build" className="mt-4">
-            {roster?.offshore_mode && roster?.start_date && roster?.end_date ? (
+            {roster?.offshore_mode && roster?.start_date ? (
               <OffshoreRosterDayGrid
                 partnershipId={partnershipId}
                 rosterId={rosterId}
                 startDate={roster.start_date}
-                endDate={roster.end_date}
+                endDate={
+                  roster.end_date ??
+                  (() => {
+                    const d = new Date(roster.start_date);
+                    const weeks = roster.cycle_length_weeks ?? 4;
+                    d.setDate(d.getDate() + weeks * 7 - 1);
+                    return d.toISOString().split("T")[0];
+                  })()
+                }
               />
             ) : (
               <>
