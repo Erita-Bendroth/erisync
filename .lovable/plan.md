@@ -1,77 +1,51 @@
+## Problem
+
+The offshore shift-pattern system I built earlier is implemented but nearly invisible:
+
+- **Pattern tab** lives inside `PartnershipWorkspace`, which only opens when a user clicks **Edit** on an *already-saved* roster.
+- **Creating a new roster** goes through `RosterBuilderDialog`, which has no offshore toggle, no shift-code editor, and no day-grain grid.
+- There is no entry point at the **partnership level** to define E / L / N / WO codes before any roster exists.
+- The teams list and shift codes therefore appear "missing" even though the data layer is wired up.
 
 ## Goal
 
-Support an offshore-style continuous shift pattern (E / L / N / Day / WO) in partnership rotation rosters, where each shift code carries its own mandatory recovery rule (e.g. Night = 1 work + 2 WO, Early = 1 work + 1 WO). The roster builder auto-generates WO days from the rule, and partnerships can opt in/out of this mode.
+Make the offshore pattern reachable from the natural places a planner already looks: the partnership card itself, and the new-roster flow.
 
-## Approach overview
+## Changes
 
-Introduce a "Shift Pattern Library" scoped per partnership. Each shift code defines:
-- Letter / label / color
-- Working or non-working (WO = non-working)
-- Recovery rule: how many WO days must follow one shift of this type
+### 1. Partnership-level "Shift Pattern" button
+In `PartnershipRotationManager.tsx`, add a **Shift Pattern** button on each partnership header (next to "+ New Roster"). It opens a lightweight dialog hosting `OffshorePatternPanel` for that partnership — no roster required. This is where the planner:
+- toggles **Offshore mode** on/off for the partnership
+- sees the seeded E / L / N / D / WO codes
+- edits colours, labels, and recovery rules
+- sees the list of member teams in the partnership (currently the panel shows codes only — add a small "Teams in this partnership" header so the user can confirm scope)
 
-Partnerships gain an `offshore_mode` toggle. When ON, the roster builder switches from week-grid input to a day-by-day continuous planner that:
-1. Accepts a starting anchor shift per person (e.g. AAMPO starts Night on 15/Mar)
-2. Auto-fills the following days with WO recovery based on the shift's rule
-3. Optionally repeats the micro-cycle for the roster horizon
-4. Allows manual overrides per day with validation against the recovery rule
+### 2. Offshore awareness in the new-roster flow
+In `RosterBuilderDialog`, when the partnership has `offshore_mode = true`:
+- Show a banner: *"This partnership uses offshore shift patterns (E/L/N/WO). The day-grain grid will be used after the roster is created."*
+- Hide / disable the legacy weekly grid so planners don't double-enter data.
+- On save, jump straight into `PartnershipWorkspace` on the **Build** tab so the day grid is immediately editable.
 
-## Data model (new tables / columns)
+### 3. Edit menu surfacing
+On each roster row in `PartnershipRotationManager`, rename the existing **Edit** action's tab default:
+- if the roster is offshore → workspace opens on **Build** (day grid) as today
+- always make **Pattern** the second tab (already is) and add a small "Offshore" badge on the roster card when `offshore_mode` is on, so users can see at a glance which rosters are governed by E/L/N rules.
 
-```text
-partnership_shift_codes
-  id, partnership_id, code (E|L|N|D|WO|custom),
-  label, color, is_working (bool),
-  recovery_days_after (int default 0),
-  default_shift_time_definition_id (nullable -> existing per-country times),
-  sort_order
+### 4. Empty-state hint
+When the partnership has no rosters yet, show a one-line hint under the empty state:
+*"Tip: configure your shift codes first via **Shift Pattern** ↑"*
 
-partnership_rotation_rosters
-  + offshore_mode (bool default false)
-  + cycle_length_days (int nullable) -- optional repeat length
+## Files to change
 
-roster_day_assignments  (NEW, day-grain alternative to week grid)
-  id, roster_id, user_id, work_date,
-  shift_code_id (nullable -> WO if null & flagged),
-  is_recovery (bool), is_anchor (bool),
-  generated_by (manual|auto-recovery|cycle-repeat)
-```
+- `src/components/schedule/partnerships/PartnershipRotationManager.tsx` — add Shift Pattern button + dialog, offshore badge on rows, empty-state hint
+- `src/components/schedule/partnerships/RosterBuilderDialog.tsx` — read partnership offshore flag, show banner, suppress weekly grid when offshore
+- `src/components/schedule/partnerships/OffshorePatternPanel.tsx` — add "Teams in this partnership" header section
+- (no DB migration; schema from the previous step is sufficient)
 
-Keep existing `roster_week_assignments` for non-offshore rosters; offshore rosters use `roster_day_assignments` instead. Activation writes both modes into `schedule_entries` (WO = non-working entry / unavailability marker, configurable).
+## Out of scope (still pending from earlier)
 
-## UI changes
+- Writing day assignments into `schedule_entries` on activation
+- "Repeat cycle" projection button
+- Country-specific E/L/N → actual time mapping
 
-- **Partnership settings**: new "Shift Pattern" tab to define codes + recovery rules. Seed with offshore preset (E/L/N/D/WO with rules from the screenshot).
-- **Roster builder** (`RosterBuilderDialog`): if `offshore_mode`, swap `RosterWeekGrid` for a new `RosterDayPatternGrid`:
-  - Rows = members, columns = dates across the roster window
-  - Click a cell to assign a shift code; auto-paints following WO cells per recovery rule
-  - Color-coded chips matching the screenshot (E green, L yellow, N blue, WO red)
-  - "Repeat cycle" button to project the micro-pattern across remaining dates
-- **Validation panel**: enforce recovery rule (warn if next N days aren't WO), enforce min staffing per working shift, flag consecutive work-day overruns.
-- **Calendar preview**: render the offshore codes inline.
-
-## Activation / enforcement
-
-- On activation: insert `schedule_entries` for working days using the linked shift time definition (country priority rules still apply); WO days written as a non-working entry tagged "Recovery (WO)" so the existing Leave Precedence + display standards treat them as unavailability.
-- WO days block work assignment elsewhere (hard block via existing schedule write paths).
-
-## Out of scope
-
-- Crew rotation optimization / auto-balancing across multiple people
-- Payroll/flextime impact of WO days (reuse existing flextime rules)
-- Migration of historical rosters to the new model
-
-## Technical details
-
-- Migration adds the two tables + columns with GRANTs for `authenticated` (RLS scoped to partnership membership via existing helper) + `service_role`, plus an enum-free `code` text column with per-partnership uniqueness.
-- New hook `usePartnershipShiftCodes(partnershipId)` for CRUD + caching.
-- New hook `useOffshoreRosterBuilder` encapsulating recovery-rule auto-fill and cycle repetition.
-- Extend `useRosterValidation` with `validateRecoveryRule(assignments, codes)`.
-- Extend roster activation edge logic to branch on `offshore_mode` and write day-level entries.
-- Reuse `shiftResolver` to pick the country-specific time for E/L/N/D.
-
-## Open questions to confirm before build
-
-1. Should WO days appear in the schedule as "Recovery Day" unavailability, or just as empty (no entry)? Recommendation: explicit "Recovery (WO)" entry so it blocks swaps and shows in coverage views.
-2. Recovery rule semantics — fixed count (Night → exactly 2 WO) or minimum (Night → ≥2 WO)? Recommendation: minimum, with a warning if exceeded by > X.
-3. Should the offshore preset be seeded automatically for every new partnership, or only when the toggle is flipped on? Recommendation: seed on toggle-on.
+Let me know if you want any of those bundled in, or I can ship the visibility fixes first and tackle activation next.
