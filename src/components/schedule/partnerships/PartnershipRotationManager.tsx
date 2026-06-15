@@ -9,6 +9,9 @@ import { RosterBuilderDialog } from "./RosterBuilderDialog";
 import { CloneRosterDialog } from "./CloneRosterDialog";
 import { ShiftCoveragePanel } from "./ShiftCoveragePanel";
 import { PartnershipWorkspace } from "./PartnershipWorkspace";
+import { OffshorePatternPanel } from "./OffshorePatternPanel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Waves } from "lucide-react";
 import { toast } from "sonner";
 
 interface Roster {
@@ -27,6 +30,7 @@ interface Roster {
     | "activated";
   default_shift_for_non_duty: string;
   created_at: string;
+  offshore_mode?: boolean;
 }
 
 interface TeamProgress {
@@ -63,6 +67,7 @@ export function PartnershipRotationManager({
   const [rosterProgress, setRosterProgress] = useState<Record<string, RosterProgress>>({});
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+  const [showPatternDialog, setShowPatternDialog] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser();
