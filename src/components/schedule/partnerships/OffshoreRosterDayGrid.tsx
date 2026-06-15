@@ -223,9 +223,15 @@ export function OffshoreRosterDayGrid({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Shift palette</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Shift palette</CardTitle>
+            <Button size="sm" onClick={handleSaveAndClose} disabled={isSaving}>
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? "Saving…" : "Save & Close"}
+            </Button>
+          </div>
           <CardDescription>
-            Pick a code, then click cells to assign. WO days only auto-fill around long blocks (more than 5 consecutive shifts); a single Early or Late shift does not produce a WO.
+            Pick a code, then click or drag across cells to assign. WO days only auto-fill around long blocks (more than 5 consecutive shifts); a single Early or Late shift does not produce a WO. Save & Close fills any remaining blank days with D — Day.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -249,7 +255,7 @@ export function OffshoreRosterDayGrid({
 
       <Card>
         <CardContent className="p-0 overflow-x-auto">
-          <table className="border-collapse text-xs">
+          <table className="border-collapse text-xs select-none">
             <thead>
               <tr>
                 <th className="sticky left-0 bg-background p-2 border text-left min-w-32">Member</th>
@@ -278,12 +284,16 @@ export function OffshoreRosterDayGrid({
                   {dates.map((d) => {
                     const a = byUser.get(m.id)?.get(d);
                     const c = a ? codes.find((x) => x.id === a.shift_code_id) : null;
+                    const isDragHighlighted = dragUserId === m.id && dragDates.has(d);
                     return (
                       <td
                         key={d}
-                        className="p-0 border text-center cursor-pointer hover:opacity-80"
+                        className={`p-0 border text-center cursor-cell hover:opacity-80 ${
+                          isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
+                        }`}
                         style={c ? { backgroundColor: c.color } : {}}
-                        onClick={() => handleCellClick(m.id, d)}
+                        onMouseDown={(e) => startDrag(m.id, d, e)}
+                        onMouseEnter={() => extendDrag(m.id, d)}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           clearCell(m.id, d);
@@ -304,7 +314,7 @@ export function OffshoreRosterDayGrid({
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Left-click = assign selected code · Right-click = clear cell
+        Left-click or drag = assign selected code · Right-click = clear cell
       </p>
 
       {warnings.length > 0 && (
