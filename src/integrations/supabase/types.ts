@@ -793,10 +793,12 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          cycle_length_days: number | null
           cycle_length_weeks: number
           default_shift_for_non_duty: string | null
           end_date: string | null
           id: string
+          offshore_mode: boolean
           partnership_id: string
           roster_name: string
           shift_type: string
@@ -810,10 +812,12 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          cycle_length_days?: number | null
           cycle_length_weeks?: number
           default_shift_for_non_duty?: string | null
           end_date?: string | null
           id?: string
+          offshore_mode?: boolean
           partnership_id: string
           roster_name: string
           shift_type: string
@@ -827,10 +831,12 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          cycle_length_days?: number | null
           cycle_length_weeks?: number
           default_shift_for_non_duty?: string | null
           end_date?: string | null
           id?: string
+          offshore_mode?: boolean
           partnership_id?: string
           roster_name?: string
           shift_type?: string
@@ -844,6 +850,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "partnership_rotation_rosters_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "team_planning_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partnership_shift_codes: {
+        Row: {
+          code: string
+          color: string
+          created_at: string
+          id: string
+          is_working: boolean
+          label: string
+          partnership_id: string
+          recovery_rule: Json
+          shift_type: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_working?: boolean
+          label: string
+          partnership_id: string
+          recovery_rule?: Json
+          shift_type?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_working?: boolean
+          label?: string
+          partnership_id?: string
+          recovery_rule?: Json
+          shift_type?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_shift_codes_partnership_id_fkey"
             columns: ["partnership_id"]
             isOneToOne: false
             referencedRelation: "team_planning_partners"
@@ -1022,6 +1078,63 @@ export type Database = {
             columns: ["roster_id"]
             isOneToOne: false
             referencedRelation: "partnership_rotation_rosters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_day_assignments: {
+        Row: {
+          created_at: string
+          generated_by: string
+          id: string
+          is_anchor: boolean
+          is_recovery: boolean
+          notes: string | null
+          roster_id: string
+          shift_code_id: string | null
+          updated_at: string
+          user_id: string
+          work_date: string
+        }
+        Insert: {
+          created_at?: string
+          generated_by?: string
+          id?: string
+          is_anchor?: boolean
+          is_recovery?: boolean
+          notes?: string | null
+          roster_id: string
+          shift_code_id?: string | null
+          updated_at?: string
+          user_id: string
+          work_date: string
+        }
+        Update: {
+          created_at?: string
+          generated_by?: string
+          id?: string
+          is_anchor?: boolean
+          is_recovery?: boolean
+          notes?: string | null
+          roster_id?: string
+          shift_code_id?: string | null
+          updated_at?: string
+          user_id?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_day_assignments_roster_id_fkey"
+            columns: ["roster_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_rotation_rosters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_day_assignments_shift_code_id_fkey"
+            columns: ["shift_code_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_shift_codes"
             referencedColumns: ["id"]
           },
         ]

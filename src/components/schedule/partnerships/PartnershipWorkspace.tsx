@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Hammer, ShieldCheck, CheckSquare, History } from "lucide-react";
+import { Hammer, ShieldCheck, CheckSquare, History, Waves } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { RosterBuilderDialog } from "./RosterBuilderDialog";
 import { RosterValidationPanel } from "./RosterValidationPanel";
 import { RosterApprovalPanel } from "./RosterApprovalPanel";
 import { RosterActivityLog } from "./RosterActivityLog";
+import { OffshorePatternPanel } from "./OffshorePatternPanel";
+import { OffshoreRosterDayGrid } from "./OffshoreRosterDayGrid";
 
 interface PartnershipWorkspaceProps {
   open: boolean;
@@ -37,6 +39,22 @@ export function PartnershipWorkspace({
   onSuccess,
 }: PartnershipWorkspaceProps) {
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const [roster, setRoster] = useState<any>(null);
+
+  useEffect(() => {
+    if (!rosterId) {
+      setRoster(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("partnership_rotation_rosters")
+        .select("*")
+        .eq("id", rosterId)
+        .single();
+      setRoster(data);
+    })();
+  }, [rosterId, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,9 +107,12 @@ export function PartnershipWorkspace({
         </DialogHeader>
 
         <Tabs defaultValue="build" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="build">
               <Hammer className="w-4 h-4 mr-2" /> Build
+            </TabsTrigger>
+            <TabsTrigger value="pattern">
+              <Waves className="w-4 h-4 mr-2" /> Pattern
             </TabsTrigger>
             <TabsTrigger value="validate">
               <ShieldCheck className="w-4 h-4 mr-2" /> Validate
@@ -105,15 +126,38 @@ export function PartnershipWorkspace({
           </TabsList>
 
           <TabsContent value="build" className="mt-4">
-            <p className="text-sm text-muted-foreground mb-3">
-              Open the full roster builder to edit week assignments.
-            </p>
-            <BuildLauncher
-              partnershipId={partnershipId}
-              partnershipName={partnershipName}
-              rosterId={rosterId}
-              onSuccess={onSuccess}
-            />
+            {roster?.offshore_mode && roster?.start_date ? (
+              <OffshoreRosterDayGrid
+                partnershipId={partnershipId}
+                rosterId={rosterId}
+                startDate={roster.start_date}
+                endDate={
+                  roster.end_date ??
+                  (() => {
+                    const d = new Date(roster.start_date);
+                    const weeks = roster.cycle_length_weeks ?? 4;
+                    d.setDate(d.getDate() + weeks * 7 - 1);
+                    return d.toISOString().split("T")[0];
+                  })()
+                }
+              />
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Open the full roster builder to edit week assignments.
+                </p>
+                <BuildLauncher
+                  partnershipId={partnershipId}
+                  partnershipName={partnershipName}
+                  rosterId={rosterId}
+                  onSuccess={onSuccess}
+                />
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="pattern" className="mt-4">
+            <OffshorePatternPanel partnershipId={partnershipId} />
           </TabsContent>
 
           <TabsContent value="validate" className="mt-4">
