@@ -3,11 +3,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, Settings, Waves } from 'lucide-react';
 import { PartnershipCapacityConfig } from '../PartnershipCapacityConfig';
-import { OffshorePatternPanel } from '../partnerships/OffshorePatternPanel';
 import { isOffshoreByTeamNames } from '@/lib/offshorePattern';
 
 interface Partnership {
@@ -28,7 +26,6 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
   const [loading, setLoading] = useState(true);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
-  const [patternDialogOpen, setPatternDialogOpen] = useState(false);
   const [offshoreByPartnership, setOffshoreByPartnership] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -133,16 +130,6 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
             >
               <Settings className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPatternDialogOpen(true)}
-              title="Configure offshore shift pattern (E / L / N / WO)"
-              className="gap-1"
-            >
-              <Waves className="h-4 w-4 text-cyan-600" />
-              <span className="hidden sm:inline text-xs">Shift Pattern</span>
-            </Button>
             {offshoreByPartnership[value] && (
               <Badge variant="outline" className="border-cyan-500 text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/30 gap-1">
                 <Waves className="h-3 w-3" /> Offshore
@@ -161,24 +148,6 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
           open={configDialogOpen}
           onOpenChange={setConfigDialogOpen}
         />
-      )}
-
-      {/* Shift Pattern Dialog */}
-      {selectedPartnership && patternDialogOpen && (
-        <Dialog open={patternDialogOpen} onOpenChange={setPatternDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Waves className="h-5 w-5 text-cyan-600" />
-                Shift Pattern — {selectedPartnership.partnership_name}
-              </DialogTitle>
-              <DialogDescription>
-                Enable offshore mode and configure shift codes (E / L / N / WO) with recovery-day rules for this partnership.
-              </DialogDescription>
-            </DialogHeader>
-            <OffshorePatternPanel partnershipId={selectedPartnership.id} />
-          </DialogContent>
-        </Dialog>
       )}
     </>
   );
