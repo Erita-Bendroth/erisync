@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
+import { isOffshoreByTeamNames } from "@/lib/offshorePattern";
 
 interface ShiftRequirement {
   shift_type: string;
@@ -17,20 +18,45 @@ interface ShiftRequirementsProps {
   partnershipId: string;
 }
 
-const SHIFT_TYPES = [
+const DEFAULT_SHIFT_TYPES = [
   { value: "late", label: "🌙 Late Shift", description: "Evening and night coverage" },
   { value: "early", label: "☀️ Early Shift", description: "Morning coverage" },
   { value: "weekend", label: "📅 Weekend", description: "Saturday and Sunday" },
+];
+
+const OFFSHORE_SHIFT_TYPES = [
+  { value: "early", label: "☀️ Early Shift", description: "Morning coverage" },
+  { value: "late", label: "🌆 Late Shift", description: "Afternoon coverage" },
+  { value: "night", label: "🌙 Night Shift", description: "Overnight coverage" },
+  { value: "normal", label: "🛠️ Normal Day", description: "Standard working day" },
 ];
 
 export function ShiftRequirements({ partnershipId }: ShiftRequirementsProps) {
   const [requirements, setRequirements] = useState<Record<string, ShiftRequirement>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isOffshore, setIsOffshore] = useState(false);
+
+  const SHIFT_TYPES = isOffshore ? OFFSHORE_SHIFT_TYPES : DEFAULT_SHIFT_TYPES;
 
   useEffect(() => {
     fetchRequirements();
+    detectOffshore();
   }, [partnershipId]);
+
+  const detectOffshore = async () => {
+    const { data: p } = await supabase
+      .from("team_planning_partners")
+      .select("team_ids")
+      .eq("id", partnershipId)
+      .single();
+    if (!p?.team_ids?.length) return;
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("name")
+      .in("id", p.team_ids);
+    setIsOffshore(isOffshoreByTeamNames((teams ?? []).map((t: any) => t.name)));
+  };
 
   const fetchRequirements = async () => {
     try {
@@ -50,17 +76,6 @@ export function ShiftRequirements({ partnershipId }: ShiftRequirementsProps) {
         };
       });
 
-      // Initialize missing shift types with defaults
-      SHIFT_TYPES.forEach((type) => {
-        if (!reqMap[type.value]) {
-          reqMap[type.value] = {
-            shift_type: type.value,
-            staff_required: 1,
-            notes: "",
-          };
-        }
-      });
-
       setRequirements(reqMap);
     } catch (error) {
       console.error("Error fetching shift requirements:", error);
@@ -70,16 +85,33 @@ export function ShiftRequirements({ partnershipId }: ShiftRequirementsProps) {
     }
   };
 
+  // Ensure defaults exist for the currently-displayed shift type list
+  useEffect(() => {
+    setRequirements((prev) => {
+      const next = { ...prev };
+      SHIFT_TYPES.forEach((type) => {
+        if (!next[type.value]) {
+          next[type.value] = { shift_type: type.value, staff_required: 1, notes: "" };
+        }
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOffshore, loading]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Upsert all shift requirements
-      const upsertData = Object.values(requirements).map((req) => ({
-        partnership_id: partnershipId,
-        shift_type: req.shift_type,
-        staff_required: req.staff_required,
-        notes: req.notes || null,
-      }));
+      // Only save the shift types currently displayed for this partnership
+      const upsertData = SHIFT_TYPES.map((type) => {
+        const req = requirements[type.value];
+        return {
+          partnership_id: partnershipId,
+          shift_type: type.value,
+          staff_required: req?.staff_required ?? 1,
+          notes: req?.notes || null,
+        };
+      });
 
       const { error } = await supabase
         .from("partnership_shift_requirements")

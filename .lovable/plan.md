@@ -1,42 +1,18 @@
-## What I will change
+## Changes
 
-You are right: **Turbine Troubleshooting Offshore should not be added inside Troubleshooting Central**. It should be its own selectable partnership/team in the same **Team Scheduler → Partnership → Partnership Settings** configuration area shown in your screenshot.
+### 1. Per-shift staffing requirements match offshore shifts
+In `ShiftRequirements.tsx`, detect whether the partnership is offshore (team name contains "Offshore", reusing `isOffshoreByTeamNames`). When offshore, render four shift cards instead of the current three:
 
-## Implementation plan
+- Early Shift — Morning coverage
+- Late Shift — Afternoon coverage
+- Night Shift — Overnight coverage
+- Normal Day — Standard working day
 
-1. **Create/use its own partnership**
-   - Check whether a `Turbine Troubleshooting Offshore` planning partnership already exists.
-   - If it does not exist, add one in `team_planning_partners` with only the existing `Turbine Troubleshooting Offshore` team.
-   - This will make it appear in the **Partnership** dropdown in Team Scheduler, separate from `Troubleshooting Central`.
+Non-offshore partnerships keep today's list (Late / Early / Weekend).
 
-2. **Make offshore automatic for that partnership**
-   - Detect partnerships whose team name contains `Offshore`.
-   - Show the **Offshore** badge automatically for `Turbine Troubleshooting Offshore`.
-   - Treat offshore mode as enabled by default for that partnership, instead of requiring you to manually switch it on.
+The underlying `partnership_shift_requirements` table already keys by `shift_type`, so the offshore values (`early`, `late`, `night`, `normal`) save/load with no schema change.
 
-3. **Add it to the exact configuration dialog in the screenshot**
-   - When `Turbine Troubleshooting Offshore` is selected from the Partnership dropdown and the settings gear is opened, the same dialog will show:
-     - General
-     - Shift Requirements
-     - Rotation Rosters
-     - Shift Pattern
-   - The Rotation Rosters tab will use the offshore E / L / N / D / WO pattern workflow.
+### 2. Remove "Shift Pattern" button from Team Scheduler toolbar
+In `src/components/schedule/unified/PartnershipSelector.tsx`, remove the cyan **Shift Pattern** button (and its dialog mount) shown next to the ⚙️ gear in the screenshot. The Offshore badge and the gear button stay. Shift-pattern configuration remains reachable from the Rotation Rosters tab inside Partnership Settings.
 
-4. **Seed the offshore shift pattern if missing**
-   - When the offshore partnership is opened, ensure the offshore shift code preset exists:
-     - E = Early
-     - L = Late
-     - N = Night
-     - D = Day
-     - WO = Weekend Off / Recovery
-
-5. **Keep Central unchanged**
-   - `Troubleshooting Central` remains its own partnership.
-   - `Turbine Troubleshooting Offshore` remains its own team/partnership and is configured from the same Team Scheduler partnership settings location.
-
-## Technical notes
-
-- Existing team found: `Turbine Troubleshooting Offshore`.
-- Existing partnership found: `Troubleshooting Central`, currently linked only to `Turbine Troubleshooting Central - North, West, East, South`.
-- No new database tables are needed.
-- This requires one data change to `team_planning_partners` plus small UI/business-logic changes around offshore partnership detection and the configuration dialog.
+No DB migration required.
