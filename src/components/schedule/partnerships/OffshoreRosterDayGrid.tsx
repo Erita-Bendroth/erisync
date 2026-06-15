@@ -51,6 +51,7 @@ export function OffshoreRosterDayGrid({
     userId: null,
     dates: new Set(),
   });
+  const assignmentsRef = useRef<DayAssignment[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -97,6 +98,15 @@ export function OffshoreRosterDayGrid({
     return map;
   }, [assignments]);
 
+  // Keep a live ref to assignments so paint handlers always see the latest
+  // optimistic state, even when fired in quick succession.
+  useEffect(() => {
+    assignmentsRef.current = assignments;
+  }, [assignments]);
+
+  const currentUserRows = (userId: string) =>
+    assignmentsRef.current.filter((a) => a.user_id === userId);
+
   const paintDates = async (userId: string, dateList: string[]) => {
     if (!selectedCodeId) {
       toast({ title: "Select a shift code first" });
@@ -104,7 +114,7 @@ export function OffshoreRosterDayGrid({
     }
     const shift = codes.find((c) => c.id === selectedCodeId);
     if (!shift || dateList.length === 0) return;
-    let working = Array.from(byUser.get(userId)?.values() || []);
+    let working = currentUserRows(userId);
     for (const d of dateList) {
       working = applyShiftWithRecovery(rosterId, userId, d, shift, codes, working);
     }
@@ -151,7 +161,7 @@ export function OffshoreRosterDayGrid({
   };
 
   const clearCell = async (userId: string, date: string) => {
-    const existing = Array.from(byUser.get(userId)?.values() || []).filter((a) => a.work_date !== date);
+    const existing = currentUserRows(userId).filter((a) => a.work_date !== date);
     await replaceUserRange(userId, startDate, endDate, existing);
   };
 
@@ -167,7 +177,7 @@ export function OffshoreRosterDayGrid({
       } else {
         await Promise.all(
           members.map(async (m) => {
-            const existing = Array.from(byUser.get(m.id)?.values() || []);
+            const existing = currentUserRows(m.id);
             const filled = new Set(existing.map((a) => a.work_date));
             const additions: DayAssignment[] = [];
             for (const d of dates) {
