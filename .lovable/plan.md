@@ -1,14 +1,27 @@
-## Root cause
+## Goal
+Make offshore day assignments behave exactly as configured: if a person is assigned **one E shift**, the next day must automatically become **WO** because E has `WO days after = 1`.
 
-The Rotation Schedule builder always renders the **weekly** grid (`RosterWeekGrid`), even when offshore mode is on. Weekly cells assign one shift per whole week, so a "single E" is actually 7 days of E and there's no slot for a WO recovery day. The day-by-day offshore grid (`OffshoreRosterDayGrid`) with the auto-WO recovery logic exists, but it is not wired into the builder — the offshore banner just tells the user to "open the day-by-day grid" with no link.
+## What I will change
+1. **Fix the recovery calculation to handle single-day blocks reliably**
+   - Update the offshore recovery helper so it always treats one assigned E/L/N shift as a complete block and writes the configured WO day(s) immediately after it.
+   - Keep the long-block logic for N shifts intact.
 
-## Fix
+2. **Prevent auto-WO from being lost at the visible range edge**
+   - The current save path filters assignments to the displayed start/end range. If the E is on the last visible day, the generated WO after it can be dropped.
+   - Extend the save range enough to include recovery days after the selected shift.
 
-In `src/components/schedule/partnerships/RosterBuilderDialog.tsx`, the **Weekly Assignments** tab will switch automatically based on partnership type:
+3. **Make WO apply when assigning from either direction**
+   - If a user assigns E after an existing E, recovery should move to after the full consecutive E block.
+   - If a user assigns a standalone E, the very next day should become WO immediately.
 
-- **Offshore partnership** (e.g. Turbine Troubleshooting Offshore): render `OffshoreRosterDayGrid` for the date range `startDate` → `startDate + cycleLength weeks - 1 day`. Each cell is one day; clicking a single `E` now correctly inserts the `WO` the next day per the shift code's `1 WO after` rule (which already works in `applyShiftWithRecovery`).
-- **Non-offshore partnership**: keep the existing `RosterWeekGrid` exactly as today.
+4. **Verify with the exact scenario**
+   - Test the helper behavior for: assign one E on a day → next day is WO.
+   - Also verify two adjacent E shifts still put WO after the block, not between the E shifts.
 
-The tab will also be renamed to **Day-by-day Assignments** when in offshore mode, and the banner text updated to reflect that the grid is shown inline (instead of "open it from the partnership list").
-
-No DB changes. No changes to the recovery-rule logic itself — it is already correct; it just wasn't being reached.
+## Technical details
+- Main files involved:
+  - `src/lib/offshorePattern.ts`
+  - `src/components/schedule/partnerships/OffshoreRosterDayGrid.tsx`
+  - possibly `src/hooks/useRosterDayAssignments.ts`
+- No database schema changes planned.
+- No change to the E configuration itself; your screenshot is correct: `after: 1` should already mean one WO after one E.
