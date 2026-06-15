@@ -1,51 +1,34 @@
 ## Problem
 
-The offshore shift-pattern system I built earlier is implemented but nearly invisible:
-
-- **Pattern tab** lives inside `PartnershipWorkspace`, which only opens when a user clicks **Edit** on an *already-saved* roster.
-- **Creating a new roster** goes through `RosterBuilderDialog`, which has no offshore toggle, no shift-code editor, and no day-grain grid.
-- There is no entry point at the **partnership level** to define E / L / N / WO codes before any roster exists.
-- The teams list and shift codes therefore appear "missing" even though the data layer is wired up.
+I added the **Shift Pattern** entry point inside *Partnership Rotation Rosters* (Schedule → Team Scheduler → Partnership Rotation tab → roster list). But you're working on the **Team Scheduler** screen itself (the one in your screenshot with Partnership dropdown, coverage warnings, and the weekly grid) — and the pattern controls aren't reachable from there. That's why it feels missing.
 
 ## Goal
 
-Make the offshore pattern reachable from the natural places a planner already looks: the partnership card itself, and the new-roster flow.
+Put **Shift Pattern** one click away from the Partnership dropdown on the Team Scheduler — exactly where the ⚙️ capacity gear already lives.
 
 ## Changes
 
-### 1. Partnership-level "Shift Pattern" button
-In `PartnershipRotationManager.tsx`, add a **Shift Pattern** button on each partnership header (next to "+ New Roster"). It opens a lightweight dialog hosting `OffshorePatternPanel` for that partnership — no roster required. This is where the planner:
-- toggles **Offshore mode** on/off for the partnership
-- sees the seeded E / L / N / D / WO codes
-- edits colours, labels, and recovery rules
-- sees the list of member teams in the partnership (currently the panel shows codes only — add a small "Teams in this partnership" header so the user can confirm scope)
+### 1. `PartnershipSelector.tsx` (Team Scheduler header)
+Add a second small icon button next to the existing ⚙️ gear:
+- Icon: `Waves` (cyan)
+- Label/tooltip: *"Configure offshore shift pattern (E / L / N / WO)"*
+- Opens a dialog that hosts `OffshorePatternPanel` for the currently selected partnership
+- Shows a small "Offshore" badge inline next to the partnership name when offshore mode is on for that partnership, so you can see at a glance which partnerships use it
 
-### 2. Offshore awareness in the new-roster flow
-In `RosterBuilderDialog`, when the partnership has `offshore_mode = true`:
-- Show a banner: *"This partnership uses offshore shift patterns (E/L/N/WO). The day-grain grid will be used after the roster is created."*
-- Hide / disable the legacy weekly grid so planners don't double-enter data.
-- On save, jump straight into `PartnershipWorkspace` on the **Build** tab so the day grid is immediately editable.
+### 2. Dialog wrapper (inline in `PartnershipSelector.tsx`)
+Reuses the existing `OffshorePatternPanel` (toggle offshore mode, seed E/L/N/D/WO preset, edit codes, recovery rules, teams list).
+No new component file needed.
 
-### 3. Edit menu surfacing
-On each roster row in `PartnershipRotationManager`, rename the existing **Edit** action's tab default:
-- if the roster is offshore → workspace opens on **Build** (day grid) as today
-- always make **Pattern** the second tab (already is) and add a small "Offshore" badge on the roster card when `offshore_mode` is on, so users can see at a glance which rosters are governed by E/L/N rules.
-
-### 4. Empty-state hint
-When the partnership has no rosters yet, show a one-line hint under the empty state:
-*"Tip: configure your shift codes first via **Shift Pattern** ↑"*
+### 3. Keep the Partnership Rotation entry too
+The "Shift Pattern" button I already added to `PartnershipRotationManager.tsx` stays — same dialog reachable from two natural locations.
 
 ## Files to change
 
-- `src/components/schedule/partnerships/PartnershipRotationManager.tsx` — add Shift Pattern button + dialog, offshore badge on rows, empty-state hint
-- `src/components/schedule/partnerships/RosterBuilderDialog.tsx` — read partnership offshore flag, show banner, suppress weekly grid when offshore
-- `src/components/schedule/partnerships/OffshorePatternPanel.tsx` — add "Teams in this partnership" header section
-- (no DB migration; schema from the previous step is sufficient)
+- `src/components/schedule/unified/PartnershipSelector.tsx` — add Waves button, offshore badge, dialog mount
+- (no DB changes, no new components)
 
-## Out of scope (still pending from earlier)
+## Why not a new tab on the Team Scheduler
 
-- Writing day assignments into `schedule_entries` on activation
-- "Repeat cycle" projection button
-- Country-specific E/L/N → actual time mapping
+The Team Scheduler page is already busy (mode tabs, view selector, coverage panels, grid). A single icon next to the gear matches the existing pattern (capacity config is also a one-icon entry point) and keeps the toolbar quiet.
 
-Let me know if you want any of those bundled in, or I can ship the visibility fixes first and tackle activation next.
+Ready to implement on approval.
