@@ -199,55 +199,55 @@ export function applyShiftWithRecovery(
     .filter((a) => a.is_anchor)
     .sort((a, b) => (a.work_date < b.work_date ? -1 : 1));
 
-  anchors.forEach((anchorAssignment) => {
-    const anchorShift = allCodes.find((c) => c.id === anchorAssignment.shift_code_id);
-    if (!anchorShift?.is_working) return;
+  // Group consecutive anchors of the same shift code (no date gaps) into blocks
+  // and paint recovery only at block boundaries.
+  const blocks: Array<{ shift: ShiftCode; start: Date; len: number }> = [];
+  for (const a of anchors) {
+    const shift = allCodes.find((c) => c.id === a.shift_code_id);
+    if (!shift?.is_working) continue;
+    const d = parseISO(a.work_date);
+    const last = blocks[blocks.length - 1];
+    if (
+      last &&
+      last.shift.id === shift.id &&
+      dateKey(addDays(last.start, last.len)) === a.work_date
+    ) {
+      last.len++;
+    } else {
+      blocks.push({ shift, start: d, len: 1 });
+    }
+  }
 
-    const rule = effectiveRecoveryRule(anchorShift);
-    const anchor = parseISO(anchorAssignment.work_date);
+  const paintWo = (d: string) => {
+    const existing = map.get(d);
+    if (existing?.is_anchor || existing?.generated_by === "manual") return;
+    map.set(d, {
+      roster_id: rosterId,
+      user_id: userId,
+      work_date: d,
+      shift_code_id: wo.id,
+      is_recovery: true,
+      is_anchor: false,
+      generated_by: "auto-recovery",
+    });
+  };
 
-    const beforeCount = rule.before ?? 0;
+  blocks.forEach(({ shift, start, len }) => {
+    const rule = effectiveRecoveryRule(shift);
+    const isLong =
+      !!rule.longBlockThreshold && len >= rule.longBlockThreshold;
+    const beforeCount = isLong
+      ? rule.longBlockBefore ?? rule.before ?? 0
+      : rule.before ?? 0;
+    const afterCount = isLong
+      ? rule.longBlockAfter ?? rule.after ?? 0
+      : rule.after ?? 0;
+
     for (let i = 1; i <= beforeCount; i++) {
-      const d = dateKey(addDays(anchor, -i));
-      const existing = map.get(d);
-      if (existing?.is_anchor || existing?.generated_by === "manual") continue;
-      map.set(d, {
-        roster_id: rosterId,
-        user_id: userId,
-        work_date: d,
-        shift_code_id: wo.id,
-        is_recovery: true,
-        is_anchor: false,
-        generated_by: "auto-recovery",
-      });
+      paintWo(dateKey(addDays(start, -i)));
     }
-
-    let blockLen = 1;
-    for (let i = 1; i < 30; i++) {
-      const d = dateKey(addDays(anchor, i));
-      const next = map.get(d);
-      if (next?.shift_code_id === anchorShift.id && next.is_anchor) blockLen++;
-      else break;
-    }
-
-    const afterCount =
-      rule.longBlockThreshold && blockLen >= rule.longBlockThreshold
-        ? rule.longBlockAfter ?? rule.after ?? 0
-        : rule.after ?? 0;
-
     for (let i = 0; i < afterCount; i++) {
-      const d = dateKey(addDays(anchor, blockLen + i));
-      const existing = map.get(d);
-      if (existing?.is_anchor || existing?.generated_by === "manual") continue;
-      map.set(d, {
-        roster_id: rosterId,
-        user_id: userId,
-        work_date: d,
-        shift_code_id: wo.id,
-        is_recovery: true,
-        is_anchor: false,
-        generated_by: "auto-recovery",
-      });
+      paintWo(dateKey(addDays(start, len + i)));
     }
   });
 
