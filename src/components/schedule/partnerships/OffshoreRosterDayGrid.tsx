@@ -45,30 +45,29 @@ export function OffshoreRosterDayGrid({
 
   useEffect(() => {
     (async () => {
-      const { data: partnership } = await supabase
-        .from("team_planning_partners")
-        .select("team_ids")
-        .eq("id", partnershipId)
-        .single();
-      if (!partnership?.team_ids?.length) return;
-      const { data: tm } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .in("team_id", partnership.team_ids);
-      const userIds = Array.from(new Set((tm || []).map((r: any) => r.user_id)));
-      if (!userIds.length) return;
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, display_name, full_name")
-        .in("id", userIds);
-      setMembers(
-        (profs || []).map((p: any) => ({
-          id: p.id,
-          display_name: p.display_name || p.full_name || "User",
-        })),
-      );
+      const { data, error } = await supabase.rpc("get_partnership_team_members", {
+        p_partnership_id: partnershipId,
+      });
+
+      if (error) {
+        console.error("Error fetching offshore roster members:", error);
+        toast({ title: "Failed to load roster members", variant: "destructive" });
+        setMembers([]);
+        return;
+      }
+
+      const uniqueMembers = new Map<string, Member>();
+      (data || []).forEach((row) => {
+        const displayName = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
+        uniqueMembers.set(row.user_id, {
+          id: row.user_id,
+          display_name: displayName || row.initials || "User",
+        });
+      });
+
+      setMembers(Array.from(uniqueMembers.values()).sort((a, b) => a.display_name.localeCompare(b.display_name)));
     })();
-  }, [partnershipId]);
+  }, [partnershipId, toast]);
 
   const dates = useMemo(() => {
     const out: string[] = [];
