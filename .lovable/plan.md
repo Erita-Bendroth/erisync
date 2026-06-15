@@ -1,31 +1,22 @@
-Do I know what the issue is? Yes.
+I understand the exact issue now: in Partnership Settings → Rotation Rosters → Build, the horizontal scrollbar is still scrolling the whole roster grid/dialog, so the member column moves off-screen.
 
-The current fix still depends on `position: sticky` inside a horizontally scrolling `<table>` inside a scrollable modal. In this layout, the browser can still treat the table/ancestor scrolling context in a way that lets the Member column scroll away. More `z-index` will not reliably solve it.
+The likely cause is that the date grid is inside a flex row but the horizontally scrollable pane is missing `min-w-0`. Because of that, the wide date strip forces the parent/dialog to become horizontally scrollable instead of only the date pane. When you use the bottom scrollbar, the entire grid shifts left, including the member names.
 
 Plan:
-1. Replace the offshore roster table layout with a split grid layout:
-   - Left rail: Member names, outside the horizontal scroll area.
-   - Right pane: date cells, horizontally scrollable.
-   - Both panes stay vertically aligned in the same vertical scrolling area.
-2. Keep the current roster assignment behavior unchanged:
-   - Click/drag to assign selected code.
-   - Right-click to clear.
-   - Existing auto-save and Save & Close behavior unchanged.
-3. Keep headers usable:
-   - Member header remains visible.
-   - Date header remains at the top of the grid while vertical scrolling.
-4. Apply the same modal scroll containment in both places that render this grid, so the dialog itself does not compete with the roster grid scrolling.
-5. Verify in the running preview by horizontally scrolling the roster grid and confirming the Member column remains visible.
 
-Files to update:
-- `src/components/schedule/partnerships/OffshoreRosterDayGrid.tsx`
-- `src/components/schedule/partnerships/RosterBuilderDialog.tsx`
-- `src/components/schedule/partnerships/PartnershipWorkspace.tsx`
+1. Fix `OffshoreRosterDayGrid.tsx`
+   - Keep the member list as a fixed left rail.
+   - Force the date pane to be the only horizontal scroll area with `min-w-0 overflow-x-auto`.
+   - Prevent the outer card/dialog content from becoming horizontally scrollable with `overflow-hidden` on the grid frame.
+   - Keep vertical scrolling shared between member rows and date rows so names stay aligned with cells.
+   - Preserve all existing roster editing behavior: click, drag, right-click clear, recovery auto-fill, and Save & Close.
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
+2. Tighten the roster dialog containers
+   - Update the Rotation Roster dialog surfaces that host this grid so they do not create a second horizontal scrollbar.
+   - Keep the dialog vertically scrollable where needed, but stop horizontal overflow from moving the fixed member rail.
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+3. Verify the exact scenario
+   - Open the Partnership Settings → Rotation Rosters → Build surface.
+   - Horizontally scroll across the date columns.
+   - Confirm member names remain visible while dates/cells move.
+   - Confirm vertical scrolling still keeps member names aligned with their rows.

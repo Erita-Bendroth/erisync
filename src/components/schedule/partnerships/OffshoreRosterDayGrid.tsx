@@ -264,10 +264,10 @@ export function OffshoreRosterDayGrid({
       </Card>
 
       <Card>
-        <CardContent className="p-0 overflow-y-auto max-h-[60vh]">
-          <div className="flex text-xs select-none">
+        <CardContent className="p-0 overflow-hidden max-h-[60vh]">
+          <div className="flex text-xs select-none overflow-y-auto max-h-[60vh]">
             {/* Left rail — member names, stays in place during horizontal scroll */}
-            <div className="shrink-0 border-r bg-background">
+            <div className="shrink-0 border-r bg-background sticky left-0 z-10">
               <div className="h-12 flex items-center px-2 font-medium border-b w-40">
                 Member
               </div>
@@ -282,7 +282,7 @@ export function OffshoreRosterDayGrid({
               ))}
             </div>
             {/* Right pane — horizontally scrollable date cells */}
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-x-auto flex-1 min-w-0">
               <div style={{ minWidth: `${dates.length * 40}px` }}>
                 {/* Date header */}
                 <div className="flex h-12 border-b">
