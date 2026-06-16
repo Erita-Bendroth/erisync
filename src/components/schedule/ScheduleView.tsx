@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { rlog, newInstanceId } from '@/lib/remountDebug';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -101,6 +102,12 @@ interface ScheduleViewProps {
 const ScheduleView = ({ initialTeamId, refreshTrigger }: ScheduleViewProps) => {
   const { user } = useAuth();
   const { roles: contextRoles, loading: contextLoading, profile: currentUserProfile } = useCurrentUserContext();
+  const [instanceId] = useState(() => newInstanceId('ScheduleView'));
+  useEffect(() => {
+    rlog(instanceId, 'MOUNT');
+    return () => rlog(instanceId, 'UNMOUNT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { toast } = useToast();
   const { favorites } = useTeamFavorites('schedule');
   const holidayRefetchTrigger = useHolidayRefetch();

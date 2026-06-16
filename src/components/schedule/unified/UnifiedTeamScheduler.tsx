@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { rlog, newInstanceId } from '@/lib/remountDebug';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Camera, Download, ZoomIn, ZoomOut, Calendar as CalendarIcon } from 'lucide-react';
@@ -64,6 +65,12 @@ interface TeamSection {
 export const UnifiedTeamScheduler: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [instanceId] = useState(() => newInstanceId('UnifiedTeamScheduler'));
+  useEffect(() => {
+    rlog(instanceId, 'MOUNT');
+    return () => rlog(instanceId, 'UNMOUNT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectionMode, setSelectionMode] = useState<'partnership' | 'multi-team'>('partnership');
   const [selectedPartnershipId, setSelectedPartnershipId] = useState<string>('');
   const [teamIds, setTeamIds] = useState<string[]>([]);

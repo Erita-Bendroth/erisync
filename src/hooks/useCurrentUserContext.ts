@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
+import { rlog, isFreezeContextLoadingEnabled } from '@/lib/remountDebug';
 
 interface UserProfile {
   first_name: string;
@@ -35,17 +36,26 @@ export function useCurrentUserContext(): CurrentUserContext {
   const [roles, setRoles] = useState<string[]>([]);
   const [teams, setTeams] = useState<UserTeam[]>([]);
   const [loading, setLoading] = useState(true);
+  const setLoadingSafe = (next: boolean) => {
+    if (isFreezeContextLoadingEnabled() && next === true && roles.length > 0) {
+      rlog('useCurrentUserContext', 'freeze: skip setLoading(true)');
+      return;
+    }
+    rlog('useCurrentUserContext', 'setLoading', { next });
+    setLoading(next);
+  };
 
   const fetchAll = useCallback(async () => {
+    rlog('useCurrentUserContext', 'fetchAll start', { userId: user?.id ?? null });
     if (!user) {
       setProfile(null);
       setRoles([]);
       setTeams([]);
-      setLoading(false);
+      setLoadingSafe(false);
       return;
     }
 
-    setLoading(true);
+    setLoadingSafe(true);
 
     try {
       // Fire all three queries in parallel — no timeouts
@@ -82,7 +92,8 @@ export function useCurrentUserContext(): CurrentUserContext {
     } catch (error) {
       console.error('Error fetching user context:', error);
     } finally {
-      setLoading(false);
+      setLoadingSafe(false);
+      rlog('useCurrentUserContext', 'fetchAll done');
     }
   }, [user]);
 

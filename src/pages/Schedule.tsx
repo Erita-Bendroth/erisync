@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSearchParams } from "react-router-dom";
+import {
+  rlog,
+  newInstanceId,
+  installGlobalRemountListeners,
+  isDisableScheduleUserContextEffectEnabled,
+} from "@/lib/remountDebug";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -55,6 +61,19 @@ const Schedule = () => {
   const { toast } = useToast();
   const { roles: userRoles, loading: contextLoading } = useCurrentUserContext();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [instanceId] = useState(() => newInstanceId('Schedule'));
+  installGlobalRemountListeners();
+  rlog(instanceId, 'render', {
+    userId: user?.id ?? null,
+    contextLoading,
+    rolesLen: userRoles.length,
+    tab: searchParams.get('tab'),
+  });
+  useEffect(() => {
+    rlog(instanceId, 'MOUNT');
+    return () => rlog(instanceId, 'UNMOUNT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const tabFromUrl = searchParams.get('tab');
   const teamFromUrl = searchParams.get('team') || '';
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -113,6 +132,12 @@ const Schedule = () => {
   };
 
   useEffect(() => {
+    rlog(instanceId, 'effect[user,contextLoading]', {
+      hasUser: !!user,
+      contextLoading,
+      disabled: isDisableScheduleUserContextEffectEnabled(),
+    });
+    if (isDisableScheduleUserContextEffectEnabled()) return;
     if (user && !contextLoading) {
       fetchTeams();
     }
