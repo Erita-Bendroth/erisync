@@ -503,14 +503,14 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                         <div className="w-[200px] font-medium text-sm text-muted-foreground sticky left-0 z-10 bg-background">
                           Team / Member
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex">
                           {displayDays.map((day, index) => {
                             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                             return (
                               <div
                                 key={index}
                                 className={cn(
-                                  "text-center p-2 rounded-lg border",
+                                  "text-center p-2 rounded-lg border min-w-[120px] w-[120px] flex-shrink-0",
                                   isWeekend && "bg-muted/50"
                                 )}
                               >

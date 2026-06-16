@@ -130,7 +130,7 @@ export function TeamSection({
                       <td
                         key={dateIndex}
                         className={cn(
-                          "p-2 text-center border-r last:border-r-0 min-w-[120px]",
+                          "p-2 text-center border-r last:border-r-0 min-w-[120px] w-[120px]",
                           isWeekendDay && "bg-muted/20",
                           canSchedule && "cursor-pointer hover:bg-accent/50 transition-colors"
                         )}
