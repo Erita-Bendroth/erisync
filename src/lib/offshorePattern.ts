@@ -53,6 +53,37 @@ export interface DayAssignment {
 }
 
 /**
+ * A shadow rule says: when `lead_user_id` gets a shift whose `code` is in
+ * `applies_to`, copy that same anchor onto `shadow_user_id` for the same
+ * dates. Used by the offshore roster grid to auto-mirror trainee/buddy pairs.
+ */
+export interface ShadowPairRule {
+  lead_user_id: string;
+  shadow_user_id: string;
+  applies_to: string[]; // shift codes like ["E","L","N"]
+  active: boolean;
+}
+
+/**
+ * Returns the user ids that should mirror `leadUserId` on a paint of `code`.
+ */
+export function shadowsFor(
+  leadUserId: string,
+  code: string,
+  pairs: ShadowPairRule[],
+): string[] {
+  const up = code.trim().toUpperCase();
+  return pairs
+    .filter(
+      (p) =>
+        p.active &&
+        p.lead_user_id === leadUserId &&
+        p.applies_to.map((s) => s.toUpperCase()).includes(up),
+    )
+    .map((p) => p.shadow_user_id);
+}
+
+/**
  * Default offshore preset, mirroring the turbine-troubleshooting roster:
  *   E  – Early   (no automatic WO for a standalone shift)
  *   L  – Late    (no automatic WO for a standalone shift)
