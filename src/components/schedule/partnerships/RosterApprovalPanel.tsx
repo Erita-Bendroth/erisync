@@ -166,31 +166,35 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
 
       setApprovals(formattedApprovals);
 
-      // Find teams without approval records
-      const approvedTeamIds = new Set(formattedApprovals.map(a => a.team_id));
-      const teamsWithoutApprovals = teams.filter(t => !approvedTeamIds.has(t.id));
-
-      if (teamsWithoutApprovals.length > 0) {
-        // Fetch manager info for teams without approvals
-        const missingTeamIds = teamsWithoutApprovals.map(t => t.id);
+      // Find every (team, manager) pair that is missing an approval record for
+      // the current roster version. A team can have multiple managers, and each
+      // one needs their own approval row — never collapse to one-per-team.
+      const allTeamIds = teams.map(t => t.id);
+      if (allTeamIds.length > 0) {
         const { data: teamManagers, error: managersError } = await supabase
           .from("team_members")
           .select(`team_id, user_id`)
-          .in("team_id", missingTeamIds)
+          .in("team_id", allTeamIds)
           .eq("is_manager", true);
 
         if (managersError) throw managersError;
 
-        // Fetch profiles for these managers
-        const missingManagerIds = teamManagers?.map(tm => tm.user_id).filter(Boolean) || [];
+        const existingPairs = new Set(
+          formattedApprovals.map(a => `${a.team_id}:${a.manager_id}`)
+        );
+        const missingPairs = (teamManagers || []).filter(
+          tm => tm.user_id && !existingPairs.has(`${tm.team_id}:${tm.user_id}`)
+        );
+
+        const missingManagerIds = [...new Set(missingPairs.map(tm => tm.user_id))];
         let missingManagersMap: Record<string, { first_name: string; last_name: string; email: string }> = {};
-        
+
         if (missingManagerIds.length > 0) {
           const { data: managerProfiles } = await supabase
             .from("profiles")
             .select("user_id, first_name, last_name, email")
             .in("user_id", missingManagerIds);
-          
+
           if (managerProfiles) {
             missingManagersMap = managerProfiles.reduce((acc, p) => {
               acc[p.user_id] = p;
@@ -199,19 +203,33 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
           }
         }
 
-        const missingList: MissingApproval[] = teamsWithoutApprovals.map(team => {
-          const teamManager = teamManagers?.find(tm => tm.team_id === team.id);
-          const profile = teamManager ? missingManagersMap[teamManager.user_id] : null;
+        const teamNameMap = new Map(teams.map(t => [t.id, t.name]));
+        const missingList: MissingApproval[] = missingPairs.map(tm => {
+          const profile = missingManagersMap[tm.user_id];
           return {
-            team_id: team.id,
-            team_name: team.name,
-            manager_id: teamManager?.user_id || null,
-            manager_name: profile 
-              ? `${profile.first_name} ${profile.last_name}` 
+            team_id: tm.team_id,
+            team_name: teamNameMap.get(tm.team_id) || "Unknown Team",
+            manager_id: tm.user_id,
+            manager_name: profile
+              ? `${profile.first_name} ${profile.last_name}`
               : null,
             manager_email: profile?.email || null,
           };
         });
+
+        // Also surface teams that have zero managers at all so admins can fix it.
+        const teamsWithAnyManager = new Set((teamManagers || []).map(tm => tm.team_id));
+        for (const team of teams) {
+          if (!teamsWithAnyManager.has(team.id)) {
+            missingList.push({
+              team_id: team.id,
+              team_name: team.name,
+              manager_id: null,
+              manager_name: null,
+              manager_email: null,
+            });
+          }
+        }
 
         setMissingApprovals(missingList);
       } else {
@@ -438,8 +456,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
           
           <div className="space-y-2 ml-7">
             {missingApprovals.map((missing) => (
-              <div 
-                key={missing.team_id} 
+              <div
+                key={`${missing.team_id}:${missing.manager_id ?? "none"}`}
                 className="flex items-center justify-between p-2 bg-background rounded border"
               >
                 <div className="flex items-center gap-2">
@@ -468,7 +486,9 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
             ))}
           </div>
 
-          {isAdmin && missingApprovals.some(m => m.manager_id) && (
+          {(isAdmin ||
+            missingApprovals.some(m => m.manager_id && m.manager_id === currentUserId)) &&
+            missingApprovals.some(m => m.manager_id) && (
             <Button
               variant="outline"
               size="sm"
