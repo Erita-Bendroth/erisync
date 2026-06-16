@@ -10,6 +10,8 @@ import { useHolidaySync } from "@/hooks/useHolidaySync";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileNavigation } from "@/components/mobile/MobileNavigation";
 import { Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { rlog, newInstanceId } from "@/lib/remountDebug";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -19,6 +21,13 @@ const Layout = ({ children }: LayoutProps) => {
   const { user, loading } = useAuth();
   const isMobile = useIsMobile();
   useHolidaySync();
+  const [instanceId] = useState(() => newInstanceId('Layout'));
+  rlog(instanceId, 'render', { loading, hasUser: !!user });
+  useEffect(() => {
+    rlog(instanceId, 'MOUNT');
+    return () => rlog(instanceId, 'UNMOUNT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Show loading while auth is resolving
   if (loading) {
