@@ -57,6 +57,7 @@ export function PartnershipRotationManager({
   partnershipId,
   partnershipName,
 }: PartnershipRotationManagerProps) {
+  const workspaceStorageKey = `roster-workspace:openRosterId:${partnershipId}`;
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoster, setSelectedRoster] = useState<Roster | null>(null);
@@ -73,6 +74,24 @@ export function PartnershipRotationManager({
     fetchCurrentUser();
     fetchRosters();
   }, [partnershipId]);
+
+  // Rehydrate workspace dialog after rosters arrive — if the user had a
+  // roster open and the component remounted (e.g. due to a tab refocus /
+  // auth context churn), reopen it automatically.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (showWorkspace || rosters.length === 0) return;
+    const storedId = window.sessionStorage.getItem(workspaceStorageKey);
+    if (!storedId) return;
+    const match = rosters.find((r) => r.id === storedId);
+    if (match) {
+      setSelectedRoster(match);
+      setShowWorkspace(true);
+    } else {
+      window.sessionStorage.removeItem(workspaceStorageKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rosters]);
 
   const fetchCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -186,6 +205,9 @@ export function PartnershipRotationManager({
   const handleEditRoster = (roster: Roster) => {
     setSelectedRoster(roster);
     setShowWorkspace(true);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(workspaceStorageKey, roster.id);
+    }
   };
 
   const handleCloneRoster = (roster: Roster) => {
@@ -535,7 +557,12 @@ export function PartnershipRotationManager({
       {showWorkspace && selectedRoster && (
         <PartnershipWorkspace
           open={showWorkspace}
-          onOpenChange={setShowWorkspace}
+          onOpenChange={(open) => {
+            setShowWorkspace(open);
+            if (!open && typeof window !== 'undefined') {
+              window.sessionStorage.removeItem(workspaceStorageKey);
+            }
+          }}
           partnershipId={partnershipId}
           partnershipName={partnershipName}
           rosterId={selectedRoster.id}
