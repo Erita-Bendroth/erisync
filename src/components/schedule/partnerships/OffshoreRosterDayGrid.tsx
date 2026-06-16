@@ -12,8 +12,12 @@ import {
   DayAssignment,
   ShiftCode,
   validateRecovery,
+  shadowsFor,
 } from "@/lib/offshorePattern";
 import { useToast } from "@/hooks/use-toast";
+import { usePartnershipShadowPairs } from "@/hooks/usePartnershipShadowPairs";
+import { useOffshoreCoverage } from "@/hooks/useOffshoreCoverage";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   partnershipId: string;
@@ -41,6 +45,8 @@ export function OffshoreRosterDayGrid({
 }: Props) {
   const { codes } = usePartnershipShiftCodes(partnershipId);
   const { assignments, replaceUserRange } = useRosterDayAssignments(rosterId);
+  const { pairs: shadowPairs } = usePartnershipShadowPairs(partnershipId);
+  const { gaps: coverageGaps } = useOffshoreCoverage(partnershipId, rosterId, codes);
   const { toast } = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedCodeId, setSelectedCodeId] = useState<string | null>(null);
@@ -144,6 +150,44 @@ export function OffshoreRosterDayGrid({
     const minDate = allDates.reduce((m, d) => (d < m ? d : m), startDate);
     const maxDate = allDates.reduce((m, d) => (d > m ? d : m), endDate);
     await replaceUserRange(userId, minDate, maxDate, working);
+
+    // Auto-mirror onto shadow members for E/L/N codes
+    const shadowIds = shadowsFor(userId, shift.code, shadowPairs as any);
+    if (shadowIds.length === 0) return;
+    let mirroredCount = 0;
+    const skipped: string[] = [];
+    for (const shadowId of shadowIds) {
+      let shadowRows = currentUserRows(shadowId);
+      const byDate = new Map(shadowRows.map((a) => [a.work_date, a]));
+      const dirtyDates: string[] = [];
+      for (const d of dateList) {
+        const existing = byDate.get(d);
+        // Skip if the shadow already has a manual non-WO anchor (e.g. vacation/training)
+        if (existing && existing.is_anchor && existing.generated_by === "manual") {
+          const existingCode = codes.find((c) => c.id === existing.shift_code_id);
+          if (existingCode && existingCode.id !== shift.id) {
+            skipped.push(`${d}`);
+            continue;
+          }
+        }
+        shadowRows = applyShiftWithRecovery(rosterId, shadowId, d, shift, codes, shadowRows);
+        dirtyDates.push(d);
+      }
+      if (dirtyDates.length === 0) continue;
+      mirroredCount += dirtyDates.length;
+      const allShadowDates = shadowRows.map((a) => a.work_date);
+      const minS = allShadowDates.reduce((m, d) => (d < m ? d : m), startDate);
+      const maxS = allShadowDates.reduce((m, d) => (d > m ? d : m), endDate);
+      await replaceUserRange(shadowId, minS, maxS, shadowRows);
+    }
+    if (mirroredCount > 0) {
+      toast({
+        title: `Shadow mirrored on ${shadowIds.length} member(s)`,
+        description: skipped.length
+          ? `Skipped ${skipped.length} day(s) with existing assignments`
+          : undefined,
+      });
+    }
   };
 
   useEffect(() => {
@@ -240,6 +284,15 @@ export function OffshoreRosterDayGrid({
     return out;
   }, [members, byUser, codes]);
 
+  const shortDates = useMemo(() => {
+    const map = new Map<string, string[]>();
+    coverageGaps.forEach((g) => {
+      if (!map.has(g.date)) map.set(g.date, []);
+      map.get(g.date)!.push(`${g.code}:${g.actual}/${g.required}`);
+    });
+    return map;
+  }, [coverageGaps]);
+
   if (codes.length === 0) {
     return (
       <Alert>
@@ -253,6 +306,32 @@ export function OffshoreRosterDayGrid({
 
   return (
     <div className="space-y-4 min-w-0 overflow-hidden">
+      {coverageGaps.length > 0 && (
+        <Alert variant="destructive" className="border-2">
+          <AlertTriangle className="w-4 h-4" />
+          <AlertDescription>
+            <div className="font-semibold">
+              Coverage gap: {shortDates.size} day{shortDates.size === 1 ? "" : "s"} below minimum
+              E/L/N staffing
+            </div>
+            <div className="mt-2 flex gap-1 flex-wrap max-h-24 overflow-auto">
+              {Array.from(shortDates.entries())
+                .slice(0, 60)
+                .map(([d, parts]) => (
+                  <Badge key={d} variant="outline" className="text-xs bg-background/40">
+                    {format(parseISO(d), "MMM d")} — {parts.join(", ")}
+                  </Badge>
+                ))}
+              {shortDates.size > 60 && (
+                <span className="text-xs text-muted-foreground self-center">
+                  +{shortDates.size - 60} more
+                </span>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
@@ -355,12 +434,13 @@ export function OffshoreRosterDayGrid({
                     const dow = parseISO(d).getDay();
                     const weekend = dow === 0 || dow === 6;
                     const isMonthStart = firstOfMonthDates.has(d);
+                    const isShort = shortDates.has(d);
                     return (
                       <div
                         key={d}
                         className={`shrink-0 border-r border-b text-center cursor-cell hover:opacity-80 flex items-center justify-center box-border ${
                           isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
-                        } ${!c && weekend ? "bg-muted/50" : ""}`}
+                        } ${!c && weekend ? "bg-muted/50" : ""} ${isShort ? "shadow-[inset_0_2px_0_0_hsl(var(--destructive))]" : ""}`}
                         style={{
                           width: 40,
                           height: 36,
@@ -373,7 +453,10 @@ export function OffshoreRosterDayGrid({
                           e.preventDefault();
                           clearCell(m.id, d);
                         }}
-                        title={c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign"}
+                        title={
+                          (isShort ? `Short staffing: ${shortDates.get(d)!.join(", ")}\n` : "") +
+                          (c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign")
+                        }
                       >
                         <span className={c ? "text-white font-semibold" : ""}>
                           {c?.code ?? ""}
