@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useSubstituteAssignments";
 import { SubstituteBadge } from "./SubstituteBadge";
 import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
+import { detectHolidays, type HolidayInfo } from "@/lib/holidayDetection";
 
 interface TeamAvailabilityEntry {
   user_id: string;
@@ -38,6 +39,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
   const [memberTeamMap, setMemberTeamMap] = useState<{ user_id: string; team_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [holidayMap, setHolidayMap] = useState<Map<string, Map<string, HolidayInfo>>>(new Map());
   const { roles } = useCurrentUserContext();
   const isPrivileged =
     roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
@@ -97,6 +99,15 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
         .lte("date", endDate);
 
       if (scheduleError) throw scheduleError;
+
+      // Detect public/personal holidays for these users across the visible range
+      try {
+        const hMap = await detectHolidays(workDays, memberIds, teamIds[0]);
+        setHolidayMap(hMap);
+      } catch (err) {
+        console.error("Error detecting holidays:", err);
+        setHolidayMap(new Map());
+      }
       
       console.log('TeamAvailabilityView - Schedule entries:', {
         total: scheduleData?.length || 0,
@@ -344,14 +355,39 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                             : "N"
                         : null;
 
+                      // Holiday lookup — only applied when the user has no scheduled
+                      // shift (a scheduled shift always wins per product rules).
+                      const holidayInfo = holidayMap.get(dateStr)?.get(user.user_id);
+                      const isHoliday =
+                        !!holidayInfo &&
+                        (holidayInfo.isPublicHoliday || holidayInfo.userHasHoliday);
+                      const hasWorkShift = entries.some(
+                        (e) =>
+                          e.availability_status === "available" &&
+                          (e.shift_type === "early" ||
+                            e.shift_type === "late" ||
+                            e.shift_type === "night" ||
+                            e.shift_type === "normal" ||
+                            e.shift_type === "weekend"),
+                      );
+                      const showHolidayUnavailable = isHoliday && !hasWorkShift;
+
                       return (
                         <TableCell
                           key={dayIndex}
                           className={`text-center ${
                             isToday ? "bg-primary/5" : ""
                           }`}
+                          title={showHolidayUnavailable ? (holidayInfo?.holidayName || "Public holiday") : undefined}
                         >
-                          {entries.length > 0 ? (
+                          {showHolidayUnavailable ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <XCircle className="h-5 w-5 text-red-500" />
+                              <span className="text-xs text-muted-foreground">
+                                Holiday
+                              </span>
+                            </div>
+                          ) : entries.length > 0 ? (
                             <div className="flex flex-col items-center gap-1">
                               {isHotline ? (
                                 <Badge
