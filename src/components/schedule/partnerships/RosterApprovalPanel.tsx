@@ -248,8 +248,10 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
 
     setCreatingMissing(true);
     try {
+      // Admins/planners can backfill every missing record; team managers can
+      // only create their own missing row.
       const recordsToCreate = missingApprovals
-        .filter(m => m.manager_id)
+        .filter(m => m.manager_id && (isAdmin || m.manager_id === currentUserId))
         .map(m => ({
           roster_id: rosterId,
           team_id: m.team_id,
