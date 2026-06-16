@@ -434,12 +434,13 @@ export function OffshoreRosterDayGrid({
                     const dow = parseISO(d).getDay();
                     const weekend = dow === 0 || dow === 6;
                     const isMonthStart = firstOfMonthDates.has(d);
+                    const isShort = shortDates.has(d);
                     return (
                       <div
                         key={d}
                         className={`shrink-0 border-r border-b text-center cursor-cell hover:opacity-80 flex items-center justify-center box-border ${
                           isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
-                        } ${!c && weekend ? "bg-muted/50" : ""}`}
+                        } ${!c && weekend ? "bg-muted/50" : ""} ${isShort ? "shadow-[inset_0_2px_0_0_hsl(var(--destructive))]" : ""}`}
                         style={{
                           width: 40,
                           height: 36,
@@ -452,7 +453,10 @@ export function OffshoreRosterDayGrid({
                           e.preventDefault();
                           clearCell(m.id, d);
                         }}
-                        title={c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign"}
+                        title={
+                          (isShort ? `Short staffing: ${shortDates.get(d)!.join(", ")}\n` : "") +
+                          (c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign")
+                        }
                       >
                         <span className={c ? "text-white font-semibold" : ""}>
                           {c?.code ?? ""}
