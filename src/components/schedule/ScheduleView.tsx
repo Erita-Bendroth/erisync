@@ -2117,6 +2117,15 @@ const getActivityColor = (entry: ScheduleEntry) => {
         endDate={timeView === "monthly" ? endOfMonth(currentMonth) : addDays(weekStart, 6)}
       />
 
+      {/* Open shift coverage requests (claim panel) */}
+      <OpenShiftRequestsPanel
+        teamIds={
+          selectedTeams.includes("all")
+            ? userTeams.map((t: any) => t.id)
+            : selectedTeams
+        }
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">
