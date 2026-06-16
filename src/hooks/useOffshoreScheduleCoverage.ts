@@ -146,5 +146,5 @@ export function useOffshoreScheduleCoverage(
     return out;
   }, [entries, requirements, partnershipId, startDate, endDate]);
 
-  return { gaps, loading, isOffshore: !!partnershipId };
+  return { gaps, loading, isOffshore: !!partnershipId, partnershipId };
 }
