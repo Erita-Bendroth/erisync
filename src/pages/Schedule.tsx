@@ -362,7 +362,7 @@ const Schedule = () => {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           {/* Mobile: Horizontal scrollable tabs */}
           <ScrollArea className="w-full md:hidden">
             <TabsList className="inline-flex w-max gap-1 px-1">
