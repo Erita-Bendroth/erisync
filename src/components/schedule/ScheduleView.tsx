@@ -44,6 +44,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { MobileScheduleCard } from '@/components/mobile/MobileScheduleCard';
 import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
 import { hoursToTimeString } from '@/lib/flexTimeUtils';
+import { OffshoreCoverageBanner } from './OffshoreCoverageBanner';
+import { endOfMonth } from 'date-fns';
 
 interface ScheduleEntry {
   id: string;
@@ -2102,6 +2104,17 @@ const getActivityColor = (entry: ScheduleEntry) => {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Offshore (E/L/N) coverage warning */}
+      <OffshoreCoverageBanner
+        teamIds={
+          selectedTeams.includes("all")
+            ? userTeams.map((t: any) => t.id)
+            : selectedTeams
+        }
+        startDate={timeView === "monthly" ? startOfMonth(currentMonth) : weekStart}
+        endDate={timeView === "monthly" ? endOfMonth(currentMonth) : addDays(weekStart, 6)}
+      />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
