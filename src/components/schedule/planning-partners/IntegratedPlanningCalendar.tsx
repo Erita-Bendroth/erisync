@@ -510,7 +510,7 @@ export function IntegratedPlanningCalendar({ onScheduleUpdate, onCreatePartnersh
                               <div
                                 key={index}
                                 className={cn(
-                                  "text-center p-2 rounded-lg border",
+                                  "text-center p-2 rounded-lg border min-w-[120px] w-[120px] flex-shrink-0",
                                   isWeekend && "bg-muted/50"
                                 )}
                               >
