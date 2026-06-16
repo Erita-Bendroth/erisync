@@ -69,17 +69,35 @@ export function useOffshoreScheduleCoverage(
 
       // 3) Requirements + schedule entries for all teams in the partnership.
       const partnershipTeamIds = (matched as any).team_ids as string[];
-      const [reqRes, entryRes] = await Promise.all([
+      const pageSize = 1000;
+      const fetchAllEntries = async () => {
+        const all: any[] = [];
+        let from = 0;
+        for (let i = 0; i < 50; i++) {
+          const { data, error } = await supabase
+            .from("schedule_entries")
+            .select("date, shift_type, availability_status, activity_type")
+            .in("team_id", partnershipTeamIds)
+            .gte("date", format(startDate, "yyyy-MM-dd"))
+            .lte("date", format(endDate, "yyyy-MM-dd"))
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          const rows = (data || []) as any[];
+          all.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      };
+      const [reqRes, entryRows] = await Promise.all([
         supabase
           .from("partnership_shift_requirements")
           .select("shift_type, staff_required")
           .eq("partnership_id", matched.id),
-        supabase
-          .from("schedule_entries")
-          .select("date, shift_type, availability_status, activity_type")
-          .in("team_id", partnershipTeamIds)
-          .gte("date", format(startDate, "yyyy-MM-dd"))
-          .lte("date", format(endDate, "yyyy-MM-dd")),
+        fetchAllEntries().catch((err) => {
+          console.error("useOffshoreScheduleCoverage: failed to load entries", err);
+          return [];
+        }),
       ]);
       if (cancelled) return;
       const reqMap: Record<string, number> = {};
@@ -88,7 +106,7 @@ export function useOffshoreScheduleCoverage(
       });
       setRequirements(reqMap);
       // Only count actually-working entries
-      const working = (entryRes.data || []).filter(
+      const working = entryRows.filter(
         (e: any) => e.availability_status === "available" && e.activity_type === "work",
       );
       setEntries(working.map((e: any) => ({ date: e.date, shift_type: e.shift_type })));
