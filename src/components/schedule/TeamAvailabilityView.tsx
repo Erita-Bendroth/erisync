@@ -36,6 +36,7 @@ interface TeamAvailabilityViewProps {
 export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewProps) {
   const [availabilityData, setAvailabilityData] = useState<TeamAvailabilityEntry[]>([]);
   const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
+  const [memberTeamMap, setMemberTeamMap] = useState<{ user_id: string; team_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const { roles } = useCurrentUserContext();
@@ -80,15 +81,16 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
       const startDate = format(workDays[0], "yyyy-MM-dd");
       const endDate = format(workDays[workDays.length - 1], "yyyy-MM-dd");
 
-      // Get all team members
+      // Get all team members (with their team_id so we can flag offshore users)
       const { data: teamMembers, error: membersError } = await supabase
         .from("team_members")
-        .select("user_id")
+        .select("user_id, team_id")
         .in("team_id", teamIds);
 
       if (membersError) throw membersError;
 
       const memberIds = [...new Set(teamMembers?.map(m => m.user_id) || [])];
+      setMemberTeamMap(teamMembers || []);
 
       // Get schedule entries for all team members - include notes for time block parsing
       const { data: scheduleData, error: scheduleError } = await supabase
