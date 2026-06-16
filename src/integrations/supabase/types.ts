@@ -745,6 +745,62 @@ export type Database = {
         }
         Relationships: []
       }
+      open_shift_requests: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          partnership_id: string | null
+          required: number
+          shift_date: string
+          shift_type: string
+          status: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          partnership_id?: string | null
+          required?: number
+          shift_date: string
+          shift_type: string
+          status?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          partnership_id?: string | null
+          required?: number
+          shift_date?: string
+          shift_type?: string
+          status?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "open_shift_requests_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partnership_capacity_config: {
         Row: {
           applies_to_weekends: boolean | null

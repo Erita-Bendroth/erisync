@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useSubstituteAssignments";
 import { SubstituteBadge } from "./SubstituteBadge";
 import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
+import { useOffshorePartnershipTeams } from "@/hooks/useOffshorePartnershipTeams";
 
 interface TeamAvailabilityEntry {
   user_id: string;
@@ -21,6 +22,7 @@ interface TeamAvailabilityEntry {
   activity_type: string;
   notes?: string;
   shift_type?: string;
+  team_id?: string;
   first_name: string;
   last_name: string;
   initials: string;
@@ -34,9 +36,13 @@ interface TeamAvailabilityViewProps {
 export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewProps) {
   const [availabilityData, setAvailabilityData] = useState<TeamAvailabilityEntry[]>([]);
   const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
+  const [memberTeamMap, setMemberTeamMap] = useState<{ user_id: string; team_id: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const { roles } = useCurrentUserContext();
+  const offshoreTeamIds = useOffshorePartnershipTeams(teamIds);
+  const offshoreTeamSet = new Set(offshoreTeamIds);
+  const hasOffshore = offshoreTeamIds.length > 0;
   const isPrivileged =
     roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
 
@@ -75,20 +81,21 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
       const startDate = format(workDays[0], "yyyy-MM-dd");
       const endDate = format(workDays[workDays.length - 1], "yyyy-MM-dd");
 
-      // Get all team members
+      // Get all team members (with their team_id so we can flag offshore users)
       const { data: teamMembers, error: membersError } = await supabase
         .from("team_members")
-        .select("user_id")
+        .select("user_id, team_id")
         .in("team_id", teamIds);
 
       if (membersError) throw membersError;
 
       const memberIds = [...new Set(teamMembers?.map(m => m.user_id) || [])];
+      setMemberTeamMap(teamMembers || []);
 
       // Get schedule entries for all team members - include notes for time block parsing
       const { data: scheduleData, error: scheduleError } = await supabase
         .from("schedule_entries")
-        .select("user_id, date, availability_status, activity_type, notes, shift_type")
+        .select("user_id, team_id, date, availability_status, activity_type, notes, shift_type")
         .in("user_id", memberIds)
         .gte("date", startDate)
         .lte("date", endDate);
@@ -324,6 +331,37 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                         ? allTeamMembers.find(p => p.user_id === subForCovering.absent_user_id)
                         : null;
 
+                      // Offshore: show E/L/N badge when this user belongs to an offshore
+                      // partnership team. Normal work days = Available. Anything else = N/A.
+                      const userIsOffshore =
+                        hasOffshore &&
+                        memberTeamMap.some(
+                          (m) => m.user_id === user.user_id && offshoreTeamSet.has(m.team_id),
+                        );
+                      const offshoreEntry = userIsOffshore
+                        ? entries.find(
+                            (e) =>
+                              e.team_id &&
+                              offshoreTeamSet.has(e.team_id) &&
+                              (e.shift_type === "early" ||
+                                e.shift_type === "late" ||
+                                e.shift_type === "night"),
+                          )
+                        : undefined;
+                      const offshoreCode = offshoreEntry?.shift_type
+                        ? offshoreEntry.shift_type === "early"
+                          ? "E"
+                          : offshoreEntry.shift_type === "late"
+                            ? "L"
+                            : "N"
+                        : null;
+                      const isNormalWorkDay = entries.some(
+                        (e) =>
+                          e.availability_status === "available" &&
+                          e.activity_type === "work" &&
+                          (!e.shift_type || e.shift_type === "normal"),
+                      );
+
                       return (
                         <TableCell
                           key={dayIndex}
@@ -331,7 +369,31 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                             isToday ? "bg-primary/5" : ""
                           }`}
                         >
-                          {entries.length > 0 ? (
+                          {userIsOffshore ? (
+                            <div className="flex flex-col items-center gap-1">
+                              {offshoreCode ? (
+                                <Badge
+                                  variant="secondary"
+                                  className={`font-mono text-xs ${
+                                    offshoreCode === "E"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                      : offshoreCode === "L"
+                                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+                                        : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300"
+                                  }`}
+                                >
+                                  {offshoreCode}
+                                </Badge>
+                              ) : isNormalWorkDay ? (
+                                <>
+                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  <span className="text-xs text-muted-foreground">Available</span>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground font-medium">N/A</span>
+                              )}
+                            </div>
+                          ) : entries.length > 0 ? (
                             <div className="flex flex-col items-center gap-1">
                               {isHotline ? (
                                 <Badge

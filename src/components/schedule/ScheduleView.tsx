@@ -45,6 +45,7 @@ import { MobileScheduleCard } from '@/components/mobile/MobileScheduleCard';
 import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
 import { hoursToTimeString } from '@/lib/flexTimeUtils';
 import { OffshoreCoverageBanner } from './OffshoreCoverageBanner';
+import { OpenShiftRequestsPanel } from './OpenShiftRequestsPanel';
 import { endOfMonth } from 'date-fns';
 
 interface ScheduleEntry {
@@ -2114,6 +2115,15 @@ const getActivityColor = (entry: ScheduleEntry) => {
         }
         startDate={timeView === "monthly" ? startOfMonth(currentMonth) : weekStart}
         endDate={timeView === "monthly" ? endOfMonth(currentMonth) : addDays(weekStart, 6)}
+      />
+
+      {/* Open shift coverage requests (claim panel) */}
+      <OpenShiftRequestsPanel
+        teamIds={
+          selectedTeams.includes("all")
+            ? userTeams.map((t: any) => t.id)
+            : selectedTeams
+        }
       />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
