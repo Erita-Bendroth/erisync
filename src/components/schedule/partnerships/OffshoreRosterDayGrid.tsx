@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -52,21 +52,6 @@ export function OffshoreRosterDayGrid({
     dates: new Set(),
   });
   const assignmentsRef = useRef<DayAssignment[]>([]);
-  const memberScrollerRef = useRef<HTMLDivElement>(null);
-  const dateScrollerRef = useRef<HTMLDivElement>(null);
-
-  const syncMemberScroll = () => {
-    if (!memberScrollerRef.current || !dateScrollerRef.current) return;
-    memberScrollerRef.current.scrollTop = dateScrollerRef.current.scrollTop;
-  };
-
-  const handleMemberWheel = (e: WheelEvent<HTMLDivElement>) => {
-    const dateScroller = dateScrollerRef.current;
-    if (!dateScroller) return;
-    e.preventDefault();
-    dateScroller.scrollTop += e.deltaY;
-    dateScroller.scrollLeft += e.deltaX;
-  };
 
   useEffect(() => {
     (async () => {
@@ -103,6 +88,28 @@ export function OffshoreRosterDayGrid({
     }
     return out;
   }, [startDate, endDate]);
+
+  const monthGroups = useMemo(() => {
+    const groups: { label: string; count: number }[] = [];
+    for (const d of dates) {
+      const label = format(parseISO(d), "MMMM yyyy");
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.count += 1;
+      else groups.push({ label, count: 1 });
+    }
+    return groups;
+  }, [dates]);
+
+  const firstOfMonthDates = useMemo(() => {
+    const set = new Set<string>();
+    let prevMonth = "";
+    for (const d of dates) {
+      const m = d.slice(0, 7);
+      if (m !== prevMonth && prevMonth !== "") set.add(d);
+      prevMonth = m;
+    }
+    return set;
+  }, [dates]);
 
   const byUser = useMemo(() => {
     const map = new Map<string, Map<string, DayAssignment>>();
@@ -280,81 +287,102 @@ export function OffshoreRosterDayGrid({
 
       <Card className="overflow-hidden min-w-0">
         <CardContent className="p-0 min-w-0">
-          <div className="flex w-full min-w-0 text-xs select-none">
-            <div
-              ref={memberScrollerRef}
-              onWheel={handleMemberWheel}
-              className="w-40 shrink-0 max-h-[60vh] overflow-hidden border-r bg-background"
-            >
-              <div className="h-12 sticky top-0 z-20 bg-background border-b flex items-center px-2 font-medium">
-                Member
-              </div>
-              {members.map((m) => (
+          <div className="w-full min-w-0 max-h-[60vh] overflow-auto text-xs select-none">
+            <div style={{ width: `${160 + dates.length * 40}px` }}>
+              {/* Month header row */}
+              <div className="flex sticky top-0 z-30 bg-background" style={{ height: 24 }}>
                 <div
-                  key={m.id}
-                  className="h-9 border-b flex items-center px-2 font-medium truncate"
-                  title={m.display_name}
-                >
-                  {m.display_name}
-                </div>
-              ))}
-            </div>
+                  className="shrink-0 border-r border-b bg-background sticky left-0 z-40"
+                  style={{ width: 160, height: 24 }}
+                />
+                {monthGroups.map((g, i) => (
+                  <div
+                    key={`${g.label}-${i}`}
+                    className="shrink-0 border-r border-b bg-muted/40 flex items-center justify-center font-semibold text-xs box-border"
+                    style={{ width: g.count * 40, height: 24 }}
+                  >
+                    {g.label}
+                  </div>
+                ))}
+              </div>
 
-            <div
-              ref={dateScrollerRef}
-              onScroll={syncMemberScroll}
-              className="flex-1 min-w-0 max-h-[60vh] overflow-auto"
-            >
-              <div style={{ width: `${dates.length * 40}px` }}>
-                <div className="flex h-12 border-b sticky top-0 z-10 bg-background">
+              {/* Day header row */}
+              <div className="flex sticky bg-background z-20" style={{ top: 24, height: 48 }}>
+                <div
+                  className="shrink-0 border-r border-b bg-background sticky left-0 z-30 flex items-center px-2 font-medium box-border"
+                  style={{ width: 160, height: 48 }}
+                >
+                  Member
+                </div>
+                {dates.map((d) => {
+                  const dt = parseISO(d);
+                  const dow = dt.getDay();
+                  const weekend = dow === 0 || dow === 6;
+                  const isMonthStart = firstOfMonthDates.has(d);
+                  return (
+                    <div
+                      key={d}
+                      className={`shrink-0 border-r border-b text-center flex flex-col justify-center box-border ${weekend ? "bg-muted" : "bg-background"}`}
+                      style={{
+                        width: 40,
+                        height: 48,
+                        borderLeft: isMonthStart ? "2px solid hsl(var(--border))" : undefined,
+                      }}
+                    >
+                      <div className="font-normal text-muted-foreground leading-tight">
+                        {format(dt, "EEE")[0]}
+                      </div>
+                      <div className="font-semibold leading-tight">{format(dt, "d")}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Body rows */}
+              {members.map((m) => (
+                <div key={m.id} className="flex" style={{ height: 36 }}>
+                  <div
+                    className="shrink-0 border-r border-b bg-background sticky left-0 z-10 flex items-center px-2 font-medium truncate box-border"
+                    style={{ width: 160, height: 36 }}
+                    title={m.display_name}
+                  >
+                    {m.display_name}
+                  </div>
                   {dates.map((d) => {
-                    const dt = parseISO(d);
-                    const dow = dt.getDay();
+                    const a = byUser.get(m.id)?.get(d);
+                    const c = a ? codes.find((x) => x.id === a.shift_code_id) : null;
+                    const isDragHighlighted = dragUserId === m.id && dragDates.has(d);
+                    const dow = parseISO(d).getDay();
                     const weekend = dow === 0 || dow === 6;
+                    const isMonthStart = firstOfMonthDates.has(d);
                     return (
                       <div
                         key={d}
-                        className={`w-10 shrink-0 border-r text-center flex flex-col justify-center ${weekend ? "bg-muted" : "bg-background"}`}
+                        className={`shrink-0 border-r border-b text-center cursor-cell hover:opacity-80 flex items-center justify-center box-border ${
+                          isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
+                        } ${!c && weekend ? "bg-muted/50" : ""}`}
+                        style={{
+                          width: 40,
+                          height: 36,
+                          backgroundColor: c ? c.color : undefined,
+                          borderLeft: isMonthStart ? "2px solid hsl(var(--border))" : undefined,
+                        }}
+                        onMouseDown={(e) => startDrag(m.id, d, e)}
+                        onMouseEnter={() => extendDrag(m.id, d)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          clearCell(m.id, d);
+                        }}
+                        title={c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign"}
                       >
-                        <div className="font-normal text-muted-foreground leading-tight">
-                          {format(dt, "EEE")[0]}
-                        </div>
-                        <div className="font-semibold leading-tight">{format(dt, "d")}</div>
+                        <span className={c ? "text-white font-semibold" : ""}>
+                          {c?.code ?? ""}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-
-                {members.map((m) => (
-                  <div key={m.id} className="flex h-9 border-b">
-                    {dates.map((d) => {
-                      const a = byUser.get(m.id)?.get(d);
-                      const c = a ? codes.find((x) => x.id === a.shift_code_id) : null;
-                      const isDragHighlighted = dragUserId === m.id && dragDates.has(d);
-                      return (
-                        <div
-                          key={d}
-                          className={`w-10 shrink-0 border-r text-center cursor-cell hover:opacity-80 flex items-center justify-center ${
-                            isDragHighlighted ? "ring-2 ring-inset ring-primary" : ""
-                          }`}
-                          style={c ? { backgroundColor: c.color } : {}}
-                          onMouseDown={(e) => startDrag(m.id, d, e)}
-                          onMouseEnter={() => extendDrag(m.id, d)}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            clearCell(m.id, d);
-                          }}
-                          title={c ? `${c.label}${a?.is_anchor ? "" : " (auto)"}` : "Click to assign"}
-                        >
-                          <span className={c ? "text-white font-semibold" : ""}>
-                            {c?.code ?? ""}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </CardContent>
