@@ -12,6 +12,24 @@ import { ShiftCode, isOffshoreByTeamNames, describeRecoveryRule } from "@/lib/of
 import { useToast } from "@/hooks/use-toast";
 import { ShadowPairsPanel } from "@/components/schedule/partnerships/ShadowPairsPanel";
 
+async function seedDefaultRequirements(partnershipId: string) {
+  const { data: existing } = await supabase
+    .from("partnership_shift_requirements")
+    .select("shift_type")
+    .eq("partnership_id", partnershipId);
+  const have = new Set((existing || []).map((r: any) => String(r.shift_type).toLowerCase()));
+  const missing = (["early", "late", "night"] as const).filter((s) => !have.has(s));
+  if (missing.length === 0) return;
+  await supabase.from("partnership_shift_requirements").insert(
+    missing.map((shift_type) => ({
+      partnership_id: partnershipId,
+      shift_type,
+      staff_required: 1,
+      notes: "Auto-seeded offshore minimum",
+    })),
+  );
+}
+
 interface Props {
   partnershipId: string;
 }
