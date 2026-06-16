@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { rlog } from "@/lib/remountDebug";
 
 interface AuthContextType {
   user: User | null;
@@ -118,6 +119,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         if (!mounted) return;
+        rlog('AuthProvider', `onAuthStateChange:${event}`, {
+          hasSession: !!currentSession,
+          sameUser:
+            initializedRef.current &&
+            currentSession?.user?.id === currentUserIdRef.current,
+        });
 
         if (event === 'TOKEN_REFRESHED' && !currentSession) {
           console.error('Token refresh failed, clearing session');
