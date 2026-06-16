@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type WheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -52,21 +52,6 @@ export function OffshoreRosterDayGrid({
     dates: new Set(),
   });
   const assignmentsRef = useRef<DayAssignment[]>([]);
-  const memberScrollerRef = useRef<HTMLDivElement>(null);
-  const dateScrollerRef = useRef<HTMLDivElement>(null);
-
-  const syncMemberScroll = () => {
-    if (!memberScrollerRef.current || !dateScrollerRef.current) return;
-    memberScrollerRef.current.scrollTop = dateScrollerRef.current.scrollTop;
-  };
-
-  const handleMemberWheel = (e: WheelEvent<HTMLDivElement>) => {
-    const dateScroller = dateScrollerRef.current;
-    if (!dateScroller) return;
-    e.preventDefault();
-    dateScroller.scrollTop += e.deltaY;
-    dateScroller.scrollLeft += e.deltaX;
-  };
 
   useEffect(() => {
     (async () => {
@@ -103,6 +88,28 @@ export function OffshoreRosterDayGrid({
     }
     return out;
   }, [startDate, endDate]);
+
+  const monthGroups = useMemo(() => {
+    const groups: { label: string; count: number }[] = [];
+    for (const d of dates) {
+      const label = format(parseISO(d), "MMMM yyyy");
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.count += 1;
+      else groups.push({ label, count: 1 });
+    }
+    return groups;
+  }, [dates]);
+
+  const firstOfMonthDates = useMemo(() => {
+    const set = new Set<string>();
+    let prevMonth = "";
+    for (const d of dates) {
+      const m = d.slice(0, 7);
+      if (m !== prevMonth && prevMonth !== "") set.add(d);
+      prevMonth = m;
+    }
+    return set;
+  }, [dates]);
 
   const byUser = useMemo(() => {
     const map = new Map<string, Map<string, DayAssignment>>();
