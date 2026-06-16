@@ -32,16 +32,36 @@ export function useOffshoreCoverage(
         return;
       }
       setLoading(true);
-      const [reqRes, asgRes] = await Promise.all([
+      const pageSize = 1000;
+      const fetchAllAnchors = async () => {
+        const all: { work_date: string; shift_code_id: string | null }[] = [];
+        let from = 0;
+        // Loop until we get a page smaller than pageSize (last page).
+        // Hard cap at 50 pages (50k rows) as a safety net.
+        for (let i = 0; i < 50; i++) {
+          const { data, error } = await supabase
+            .from("roster_day_assignments")
+            .select("work_date, shift_code_id, is_anchor")
+            .eq("roster_id", rosterId)
+            .eq("is_anchor", true)
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          const rows = (data || []) as any[];
+          all.push(...rows);
+          if (rows.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      };
+      const [reqRes, anchorRows] = await Promise.all([
         supabase
           .from("partnership_shift_requirements")
           .select("shift_type, staff_required")
           .eq("partnership_id", partnershipId),
-        supabase
-          .from("roster_day_assignments")
-          .select("work_date, shift_code_id, is_anchor")
-          .eq("roster_id", rosterId)
-          .eq("is_anchor", true),
+        fetchAllAnchors().catch((err) => {
+          console.error("useOffshoreCoverage: failed to load anchors", err);
+          return [];
+        }),
       ]);
       if (cancelled) return;
       const reqMap: Record<string, number> = {};
@@ -49,7 +69,7 @@ export function useOffshoreCoverage(
         if (r.shift_type) reqMap[r.shift_type.toLowerCase()] = r.staff_required;
       });
       setRequirements(reqMap);
-      setAnchors((asgRes.data || []) as any);
+      setAnchors(anchorRows as any);
       setLoading(false);
     })();
     return () => {
