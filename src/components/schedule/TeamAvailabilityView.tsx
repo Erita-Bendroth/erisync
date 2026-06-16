@@ -13,7 +13,6 @@ import {
 } from "@/hooks/useSubstituteAssignments";
 import { SubstituteBadge } from "./SubstituteBadge";
 import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
-import { useOffshorePartnershipTeams } from "@/hooks/useOffshorePartnershipTeams";
 
 interface TeamAvailabilityEntry {
   user_id: string;
@@ -40,9 +39,6 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
   const [loading, setLoading] = useState(true);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const { roles } = useCurrentUserContext();
-  const offshoreTeamIds = useOffshorePartnershipTeams(teamIds);
-  const offshoreTeamSet = new Set(offshoreTeamIds);
-  const hasOffshore = offshoreTeamIds.length > 0;
   const isPrivileged =
     roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
 
@@ -331,36 +327,22 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                         ? allTeamMembers.find(p => p.user_id === subForCovering.absent_user_id)
                         : null;
 
-                      // Offshore: show E/L/N badge when this user belongs to an offshore
-                      // partnership team. Normal work days = Available. Anything else = N/A.
-                      const userIsOffshore =
-                        hasOffshore &&
-                        memberTeamMap.some(
-                          (m) => m.user_id === user.user_id && offshoreTeamSet.has(m.team_id),
-                        );
-                      const offshoreEntry = userIsOffshore
-                        ? entries.find(
-                            (e) =>
-                              e.team_id &&
-                              offshoreTeamSet.has(e.team_id) &&
-                              (e.shift_type === "early" ||
-                                e.shift_type === "late" ||
-                                e.shift_type === "night"),
-                          )
-                        : undefined;
-                      const offshoreCode = offshoreEntry?.shift_type
-                        ? offshoreEntry.shift_type === "early"
+                      // Show E/L/N badge for any entry with an early/late/night shift_type,
+                      // regardless of partnership/offshore flag. Normal shifts fall back to
+                      // the standard Available / Unavailable indicator.
+                      const shiftEntry = entries.find(
+                        (e) =>
+                          e.shift_type === "early" ||
+                          e.shift_type === "late" ||
+                          e.shift_type === "night",
+                      );
+                      const shiftCode = shiftEntry?.shift_type
+                        ? shiftEntry.shift_type === "early"
                           ? "E"
-                          : offshoreEntry.shift_type === "late"
+                          : shiftEntry.shift_type === "late"
                             ? "L"
                             : "N"
                         : null;
-                      const isNormalWorkDay = entries.some(
-                        (e) =>
-                          e.availability_status === "available" &&
-                          e.activity_type === "work" &&
-                          (!e.shift_type || e.shift_type === "normal"),
-                      );
 
                       return (
                         <TableCell
@@ -369,31 +351,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                             isToday ? "bg-primary/5" : ""
                           }`}
                         >
-                          {userIsOffshore ? (
-                            <div className="flex flex-col items-center gap-1">
-                              {offshoreCode ? (
-                                <Badge
-                                  variant="secondary"
-                                  className={`font-mono text-xs ${
-                                    offshoreCode === "E"
-                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                                      : offshoreCode === "L"
-                                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
-                                        : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300"
-                                  }`}
-                                >
-                                  {offshoreCode}
-                                </Badge>
-                              ) : isNormalWorkDay ? (
-                                <>
-                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                  <span className="text-xs text-muted-foreground">Available</span>
-                                </>
-                              ) : (
-                                <span className="text-xs text-muted-foreground font-medium">N/A</span>
-                              )}
-                            </div>
-                          ) : entries.length > 0 ? (
+                          {entries.length > 0 ? (
                             <div className="flex flex-col items-center gap-1">
                               {isHotline ? (
                                 <Badge
@@ -403,14 +361,34 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
                                   <Phone className="h-3 w-3 mr-1" />
                                   Hotline
                                 </Badge>
+                              ) : shiftCode ? (
+                                <>
+                                  <Badge
+                                    variant="secondary"
+                                    className={`font-mono text-xs ${
+                                      shiftCode === "E"
+                                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                                        : shiftCode === "L"
+                                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+                                          : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300"
+                                    }`}
+                                  >
+                                    {shiftCode}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {shiftCode === "E" ? "Early" : shiftCode === "L" ? "Late" : "Night"}
+                                  </span>
+                                </>
                               ) : isAvailable ? (
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
                               ) : (
                                 <XCircle className="h-5 w-5 text-red-500" />
                               )}
-                              <span className="text-xs text-muted-foreground">
-                                {isAvailable ? "Available" : "Unavailable"}
-                              </span>
+                              {!shiftCode && !isHotline && (
+                                <span className="text-xs text-muted-foreground">
+                                  {isAvailable ? "Available" : "Unavailable"}
+                                </span>
+                              )}
                               {subForAbsence && subUser && (
                                 <SubstituteBadge
                                   substituteInitials={subUser.initials || "?"}
