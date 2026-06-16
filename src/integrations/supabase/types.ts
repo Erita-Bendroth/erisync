@@ -2724,6 +2724,10 @@ export type Database = {
         Args: { _team_id: string; _user_id: string }
         Returns: boolean
       }
+      is_partnership_teammate: {
+        Args: { _target: string; _viewer: string }
+        Returns: boolean
+      }
       log_profile_access: {
         Args: { _access_type?: string; _profile_user_id: string }
         Returns: undefined
