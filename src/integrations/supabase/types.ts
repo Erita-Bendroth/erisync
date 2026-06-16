@@ -753,6 +753,7 @@ export type Database = {
           created_by: string
           id: string
           notes: string | null
+          partnership_id: string | null
           required: number
           shift_date: string
           shift_type: string
@@ -767,6 +768,7 @@ export type Database = {
           created_by: string
           id?: string
           notes?: string | null
+          partnership_id?: string | null
           required?: number
           shift_date: string
           shift_type: string
@@ -781,6 +783,7 @@ export type Database = {
           created_by?: string
           id?: string
           notes?: string | null
+          partnership_id?: string | null
           required?: number
           shift_date?: string
           shift_type?: string
