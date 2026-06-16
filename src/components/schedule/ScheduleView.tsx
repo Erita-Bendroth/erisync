@@ -45,6 +45,7 @@ import { MobileScheduleCard } from '@/components/mobile/MobileScheduleCard';
 import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
 import { hoursToTimeString } from '@/lib/flexTimeUtils';
 import { OffshoreCoverageBanner } from './OffshoreCoverageBanner';
+import { OpenShiftRequestsPanel } from './OpenShiftRequestsPanel';
 import { endOfMonth } from 'date-fns';
 
 interface ScheduleEntry {
