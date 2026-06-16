@@ -857,6 +857,53 @@ export type Database = {
           },
         ]
       }
+      partnership_shadow_pairs: {
+        Row: {
+          active: boolean
+          applies_to: string[]
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_user_id: string
+          notes: string | null
+          partnership_id: string
+          shadow_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          applies_to?: string[]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_user_id: string
+          notes?: string | null
+          partnership_id: string
+          shadow_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          applies_to?: string[]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_user_id?: string
+          notes?: string | null
+          partnership_id?: string
+          shadow_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_shadow_pairs_partnership_id_fkey"
+            columns: ["partnership_id"]
+            isOneToOne: false
+            referencedRelation: "team_planning_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partnership_shift_codes: {
         Row: {
           code: string
