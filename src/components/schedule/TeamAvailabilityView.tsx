@@ -13,6 +13,7 @@ import {
 } from "@/hooks/useSubstituteAssignments";
 import { SubstituteBadge } from "./SubstituteBadge";
 import { useCurrentUserContext } from "@/hooks/useCurrentUserContext";
+import { useOffshorePartnershipTeams } from "@/hooks/useOffshorePartnershipTeams";
 
 interface TeamAvailabilityEntry {
   user_id: string;
@@ -21,6 +22,7 @@ interface TeamAvailabilityEntry {
   activity_type: string;
   notes?: string;
   shift_type?: string;
+  team_id?: string;
   first_name: string;
   last_name: string;
   initials: string;
@@ -37,6 +39,9 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
   const [loading, setLoading] = useState(true);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const { roles } = useCurrentUserContext();
+  const offshoreTeamIds = useOffshorePartnershipTeams(teamIds);
+  const offshoreTeamSet = new Set(offshoreTeamIds);
+  const hasOffshore = offshoreTeamIds.length > 0;
   const isPrivileged =
     roles.includes("admin") || roles.includes("planner") || roles.includes("manager");
 
@@ -88,7 +93,7 @@ export function TeamAvailabilityView({ workDays, userId }: TeamAvailabilityViewP
       // Get schedule entries for all team members - include notes for time block parsing
       const { data: scheduleData, error: scheduleError } = await supabase
         .from("schedule_entries")
-        .select("user_id, date, availability_status, activity_type, notes, shift_type")
+        .select("user_id, team_id, date, availability_status, activity_type, notes, shift_type")
         .in("user_id", memberIds)
         .gte("date", startDate)
         .lte("date", endDate);
