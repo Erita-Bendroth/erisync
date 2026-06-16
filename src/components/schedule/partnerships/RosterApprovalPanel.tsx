@@ -362,8 +362,8 @@ export function RosterApprovalPanel({ rosterId, teams, onRosterActivated }: Rost
   const approvedCount = approvals.filter((a) => a.state === "approved").length;
   const rejectedCount = approvals.filter((a) => a.state === "rejected").length;
   const totalTeams = teams.length;
-  const allApproved = approvals.length >= totalTeams && 
-                      approvals.length > 0 && 
+  const allApproved = approvals.length > 0 &&
+                      missingApprovals.length === 0 &&
                       approvals.every((a) => a.state === "approved");
   const pendingCount = approvals.filter((a) => a.state === "pending").length;
   const hasMissingRecords = missingApprovals.length > 0;
