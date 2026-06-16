@@ -27,6 +27,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const initializedRef = useRef(false);
+  // Track the current user id so we can ignore TOKEN_REFRESHED events that
+  // hand us a brand-new session object for the SAME user — without this
+  // guard every silent token refresh churns the auth context value, which
+  // re-renders every useAuth() consumer and tears down dialogs that live
+  // inside conditionally-rendered tab content (e.g. Partnership Settings →
+  // Rotation Roster workspace).
+  const currentUserIdRef = useRef<string | null>(null);
+  const sessionRef = useRef<Session | null>(null);
 
   const getSafeLocalStorage = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -83,6 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted || initializedRef.current) return;
       setSession(s);
       setUser(s?.user ?? null);
+      sessionRef.current = s;
+      currentUserIdRef.current = s?.user?.id ?? null;
       setLoading(false);
       setIsInitialized(true);
       initializedRef.current = true;
@@ -118,13 +128,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (event === 'SIGNED_OUT') {
+          currentUserIdRef.current = null;
+          sessionRef.current = null;
           markInitialized(null);
           return;
         }
 
-        // For SIGNED_IN or INITIAL_SESSION, always update state
-        // This ensures late arrivals (after timeout) still recover the UI
         if (currentSession) {
+          // Always keep latest tokens around for callers that need them.
+          sessionRef.current = currentSession;
+
+          const nextUserId = currentSession.user?.id ?? null;
+          const sameUser =
+            initializedRef.current && nextUserId === currentUserIdRef.current;
+
+          if (sameUser) {
+            // Silent token refresh (or any re-emit for the same user).
+            // Do NOT replace the user/session React state — that would
+            // produce a new context value reference and cascade re-renders
+            // / remounts through the whole app.
+            if (!isInitialized) {
+              setLoading(false);
+              setIsInitialized(true);
+            }
+            return;
+          }
+
+          currentUserIdRef.current = nextUserId;
           setSession(currentSession);
           setUser(currentSession.user);
           setLoading(false);
