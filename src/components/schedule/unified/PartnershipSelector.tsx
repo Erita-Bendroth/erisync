@@ -25,8 +25,21 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
 }) => {
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
   const [loading, setLoading] = useState(true);
-  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configDialogOpen, setConfigDialogOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.sessionStorage.getItem('partnership-settings:open') === '1';
+  });
   const [offshoreByPartnership, setOffshoreByPartnership] = useState<Record<string, boolean>>({});
+
+  const handleConfigDialogOpenChange = (open: boolean) => {
+    setConfigDialogOpen(open);
+    if (typeof window === 'undefined') return;
+    if (open) {
+      window.sessionStorage.setItem('partnership-settings:open', '1');
+    } else {
+      window.sessionStorage.removeItem('partnership-settings:open');
+    }
+  };
 
   useEffect(() => {
     fetchPartnerships();
@@ -125,7 +138,7 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setConfigDialogOpen(true)}
+              onClick={() => handleConfigDialogOpenChange(true)}
               title="Configure partnership capacity"
             >
               <Settings className="h-4 w-4" />
@@ -146,7 +159,7 @@ export const PartnershipSelector: React.FC<PartnershipSelectorProps> = ({
           partnershipName={selectedPartnership.partnership_name}
           teamIds={selectedPartnership.team_ids}
           open={configDialogOpen}
-          onOpenChange={setConfigDialogOpen}
+          onOpenChange={handleConfigDialogOpenChange}
         />
       )}
     </>
