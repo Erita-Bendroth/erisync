@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const APP_URL = Deno.env.get("APP_URL") ?? "https://erisync.lovable.app";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -148,33 +152,57 @@ serve(async (req) => {
       await admin.from("notifications").insert(notifRows);
     }
 
-    // Best-effort email broadcast — only attempted when transactional email exists.
+    // Best-effort email broadcast via Resend (matches sibling notification functions).
     let emailsSent = 0;
-    try {
-      const { data: profiles } = await admin
-        .from("profiles")
-        .select("user_id, email, first_name")
-        .in("user_id", memberIds);
-      const recipients = (profiles || []).filter((p: any) => p?.email);
-      for (const r of recipients) {
-        const { error: mailErr } = await admin.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "shift-coverage-request",
-            recipientEmail: r.email,
-            idempotencyKey: `coverage-${requestId}-${r.user_id}`,
-            templateData: {
-              firstName: r.first_name ?? "there",
-              shiftLabel,
-              shiftDate: body.shift_date,
-              link,
-              notes: body.notes ?? "",
-            },
-          },
+    if (memberIds.length > 0) {
+      try {
+        const { data: profiles } = await admin
+          .from("profiles")
+          .select("user_id, email, first_name")
+          .in("user_id", memberIds);
+        const recipients = (profiles || []).filter((p: any) => p?.email);
+        const ctaUrl = `${APP_URL}/schedule?openRequest=${requestId}`;
+        const formattedDate = new Date(body.shift_date).toLocaleDateString("en-GB", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric",
         });
-        if (!mailErr) emailsSent += 1;
+        const notesBlock = body.notes
+          ? `<p style="margin:16px 0;padding:12px 16px;background:#f3f4f6;border-left:3px solid #3b82f6;color:#374151;font-size:14px;">${body.notes.replace(/</g, "&lt;")}</p>`
+          : "";
+
+        for (const r of recipients) {
+          const firstName = r.first_name ?? "there";
+          const html = `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111827;">
+              <h2 style="color:#111827;margin:0 0 12px;">Coverage needed: ${shiftLabel}</h2>
+              <p>Hi ${firstName},</p>
+              <p>A shift on your team is open and needs coverage:</p>
+              <ul style="line-height:1.6;">
+                <li><strong>Shift:</strong> ${shiftLabel}</li>
+                <li><strong>Date:</strong> ${formattedDate}</li>
+              </ul>
+              ${notesBlock}
+              <p style="margin:24px 0;">
+                <a href="${ctaUrl}" style="display:inline-block;background:#3b82f6;color:#ffffff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Take this shift</a>
+              </p>
+              <p style="color:#6b7280;font-size:12px;margin-top:32px;">If you can't help, no action is needed. — EriSync</p>
+            </div>
+          `;
+          try {
+            const { error: mailErr } = await resend.emails.send({
+              from: "EriSync <noreply@erisync.xyz>",
+              to: [r.email],
+              subject: `Coverage needed: ${shiftLabel} on ${formattedDate}`,
+              html,
+            });
+            if (!mailErr) emailsSent += 1;
+            else console.error("[request-shift-coverage] resend error", mailErr);
+          } catch (sendErr) {
+            console.error("[request-shift-coverage] send threw", sendErr);
+          }
+        }
+      } catch (e) {
+        console.error("[request-shift-coverage] email batch failed", e);
       }
-    } catch (_e) {
-      // Transactional email not yet scaffolded — skip silently.
     }
 
     return new Response(
