@@ -10,6 +10,7 @@ import { Trash2, Plus, Sparkles } from "lucide-react";
 import { usePartnershipShiftCodes } from "@/hooks/usePartnershipShiftCodes";
 import { ShiftCode, isOffshoreByTeamNames, describeRecoveryRule } from "@/lib/offshorePattern";
 import { useToast } from "@/hooks/use-toast";
+import { ShadowPairsPanel } from "@/components/schedule/partnerships/ShadowPairsPanel";
 
 interface Props {
   partnershipId: string;
@@ -70,6 +71,8 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
     if (codes.length === 0) {
       seedPreset();
     }
+    // Seed default min staffing of 1 for E/L/N if no requirement rows yet
+    void seedDefaultRequirements(partnershipId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOffshoreTeam, codes.length]);
 
@@ -85,6 +88,7 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
     if (next && codes.length === 0) {
       await seedPreset();
     }
+    if (next) await seedDefaultRequirements(partnershipId);
     toast({ title: next ? "Offshore mode enabled" : "Offshore mode disabled" });
   };
 
@@ -136,6 +140,10 @@ export function OffshorePatternPanel({ partnershipId }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {(offshore || isOffshoreTeam) && (
+        <ShadowPairsPanel partnershipId={partnershipId} />
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
