@@ -54,10 +54,17 @@ const Schedule = () => {
   const { signOut, user } = useAuth();
   const { toast } = useToast();
   const { roles: userRoles, loading: contextLoading } = useCurrentUserContext();
-  const [searchParams] = useSearchParams();
-  const tabFromUrl = searchParams.get('tab') || 'schedule';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
   const teamFromUrl = searchParams.get('team') || '';
-  const [activeTab, setActiveTab] = useState(tabFromUrl);
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (tabFromUrl) return tabFromUrl;
+    if (typeof window !== 'undefined') {
+      const stored = window.sessionStorage.getItem('schedule:activeTab');
+      if (stored) return stored;
+    }
+    return 'schedule';
+  });
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [managerCoverageWeek, setManagerCoverageWeek] = useState<Date>(new Date());
   const [teams, setTeams] = useState<Array<{ id: string; name: string; parent_team_id: string | null }>>([]);
@@ -81,10 +88,29 @@ const Schedule = () => {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab) {
+    // Only update when the URL has an explicit tab AND it differs from the
+    // current active tab. This prevents stray re-renders (e.g. from auth
+    // context churn) from snapping the user back to the default tab.
+    if (tab && tab !== activeTab) {
       setActiveTab(tab);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Persist the active tab so it survives any unexpected remount.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.sessionStorage.setItem('schedule:activeTab', activeTab);
+  }, [activeTab]);
+
+  const handleTabChange = (next: string) => {
+    setActiveTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (params.get('tab') !== next) {
+      params.set('tab', next);
+      setSearchParams(params, { replace: true });
+    }
+  };
 
   useEffect(() => {
     if (user && !contextLoading) {
