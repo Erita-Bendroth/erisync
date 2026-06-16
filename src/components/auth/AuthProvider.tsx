@@ -147,9 +147,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Do NOT replace the user/session React state — that would
             // produce a new context value reference and cascade re-renders
             // / remounts through the whole app.
-            if (!isInitialized) {
+            if (!initializedRef.current) {
               setLoading(false);
               setIsInitialized(true);
+              initializedRef.current = true;
             }
             return;
           }
