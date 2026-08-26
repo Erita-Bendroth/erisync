@@ -77,20 +77,28 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   onCellClick,
   cellClickTitle,
 }) => {
-  const [rangeMode, setRangeMode] = useState<RangeMode>('week');
+  const [rangeMode, setRangeMode] = useState<RangeMode>('4weeks');
   const [extendedEntries, setExtendedEntries] = useState<ScheduleEntry[]>([]);
   const [loadingExtended, setLoadingExtended] = useState(false);
 
   const anchor = workDays[0] ?? new Date();
+  // Monday of the currently viewed week (week starts on Monday)
+  const rangeAnchor = useMemo(
+    () => startOfWeek(anchor, { weekStartsOn: 1 }),
+    [anchor],
+  );
 
   // All days to display for the selected range
   const days = useMemo(() => {
-    if (rangeMode === 'week') return workDays;
+    if (rangeMode === '4weeks') {
+      return eachDayOfInterval({ start: rangeAnchor, end: addDays(rangeAnchor, 27) });
+    }
     if (rangeMode === 'month') {
       return eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) });
     }
-    return eachDayOfInterval({ start: startOfYear(anchor), end: endOfYear(anchor) });
-  }, [rangeMode, workDays, anchor]);
+    // year: ~52 weeks starting at the current week's Monday
+    return eachDayOfInterval({ start: rangeAnchor, end: addDays(rangeAnchor, 364) });
+  }, [rangeMode, workDays, anchor, rangeAnchor]);
 
   const rangeStart = days[0] ?? null;
   const rangeEnd = days[days.length - 1] ?? null;
