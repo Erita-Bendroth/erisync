@@ -110,9 +110,9 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     rangeEnd,
   );
 
-  // Fetch entries ourselves for 4-week/month/year (prop only covers the visible week)
+  // Fetch entries ourselves for all ranges (prop only covers the currently-viewed week)
   useEffect(() => {
-    if (!open || rangeMode === '4weeks' || teamIds.length === 0 || !rangeStart || !rangeEnd) {
+    if (!open || teamIds.length === 0 || !rangeStart || !rangeEnd) {
       setExtendedEntries([]);
       return;
     }
