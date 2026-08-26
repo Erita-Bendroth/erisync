@@ -62,11 +62,15 @@ const SHIFT_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 1000;
 
-// Preferred column sizing at normal scale. Large teams proportionally scale the
-// whole matrix below these values instead of falling back to horizontal scroll.
+// Matrix sizing favors employee visibility first. Large teams fill the full
+// dialog width with compact fixed side columns instead of uniformly shrinking
+// every part of the table.
 const DATE_COL_W = 110;
+const DATE_COL_COMPACT_W = 54;
 const COVERAGE_COL_W = 150;
-const EMP_MIN_W = 64;
+const COVERAGE_COL_COMPACT_W = 62;
+const EMP_COMFORT_W = 112;
+const EMP_LARGE_W = 58;
 
 export const ScheduleMatrixDialog: React.FC<Props> = ({
   open,
@@ -129,21 +133,62 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     };
   }, [open]);
 
-  const matrixScale = useMemo(() => {
-    if (!containerWidth || !employees.length) return 1;
-    const preferredWidth = DATE_COL_W + COVERAGE_COL_W + employees.length * EMP_MIN_W;
-    return Math.min(1, Math.max(1, containerWidth - 2) / preferredWidth);
+  const matrixLayout = useMemo(() => {
+    const availableWidth = Math.max(320, containerWidth - 2);
+    const employeeCount = Math.max(1, employees.length);
+    const isLargeTeam = employeeCount >= 12;
+    const isVeryLargeTeam = employeeCount >= 24;
+    const preferredEmployeeWidth = isVeryLargeTeam ? EMP_LARGE_W : EMP_COMFORT_W;
+    const preferredDateWidth = isVeryLargeTeam ? 68 : DATE_COL_W;
+    const preferredCoverageWidth = isVeryLargeTeam ? 82 : COVERAGE_COL_W;
+    const preferredWidth = preferredDateWidth + preferredCoverageWidth + employeeCount * preferredEmployeeWidth;
+    const fillAvailableWidth = isLargeTeam || preferredWidth > availableWidth;
+
+    if (!fillAvailableWidth) {
+      const employeeWidth = Math.min(EMP_COMFORT_W, Math.max(76, preferredEmployeeWidth));
+      const width = DATE_COL_W + COVERAGE_COL_W + employeeCount * employeeWidth;
+      return {
+        width,
+        dateWidth: DATE_COL_W,
+        coverageWidth: COVERAGE_COL_W,
+        employeeWidth,
+        fillAvailableWidth,
+        dense: false,
+        veryDense: false,
+      };
+    }
+
+    const dateWidth = isVeryLargeTeam ? DATE_COL_COMPACT_W : Math.max(64, Math.min(DATE_COL_W, availableWidth * 0.08));
+    const coverageWidth = isVeryLargeTeam ? COVERAGE_COL_COMPACT_W : Math.max(76, Math.min(COVERAGE_COL_W, availableWidth * 0.1));
+    const employeeWidth = Math.max(22, (availableWidth - dateWidth - coverageWidth) / employeeCount);
+
+    return {
+      width: availableWidth,
+      dateWidth,
+      coverageWidth,
+      employeeWidth,
+      fillAvailableWidth,
+      dense: employeeWidth < 52,
+      veryDense: employeeWidth < 36,
+    };
   }, [containerWidth, employees.length]);
 
-  const dateColWidth = DATE_COL_W * matrixScale;
-  const coverageColWidth = COVERAGE_COL_W * matrixScale;
-  const empColWidth = EMP_MIN_W * matrixScale;
-  const matrixWidth = dateColWidth + coverageColWidth + employees.length * empColWidth;
-  const headerAvatarSize = Math.max(12, Math.min(28 * matrixScale, empColWidth - 2));
-  const headerFontSize = Math.max(7, 10 * matrixScale);
-  const cellFontSize = Math.max(6, 10 * matrixScale);
-  const cellPaddingX = Math.max(1, 4 * matrixScale);
-  const cellPaddingY = Math.max(1, 4 * matrixScale);
+  const { width: matrixWidth, dateWidth: dateColWidth, coverageWidth: coverageColWidth, employeeWidth: empColWidth, fillAvailableWidth, dense, veryDense } = matrixLayout;
+  const densityScale = Math.min(1, Math.max(0.65, empColWidth / EMP_LARGE_W));
+  const headerAvatarSize = dense ? Math.max(20, Math.min(24, empColWidth - 4)) : Math.min(30, Math.max(24, empColWidth * 0.42));
+  const headerAvatarWidth = dense ? Math.max(headerAvatarSize, empColWidth - 4) : headerAvatarSize;
+  const headerFontSize = dense ? 8 : Math.max(9, Math.min(11, empColWidth * 0.18));
+  const cellFontSize = veryDense ? 7 : Math.max(8, Math.min(10, empColWidth * 0.18));
+  const sideFontSize = dense ? 8 : 11;
+  const cellPaddingX = Math.max(1, Math.min(4, empColWidth * 0.08));
+  const cellPaddingY = Math.max(1, Math.min(4, 4 * densityScale));
+  const sidePaddingX = dense ? 4 : 10;
+  const sidePaddingY = dense ? 4 : 8;
+  const coverageCompact = coverageColWidth < 90;
+  const coverageBadgeFontSize = coverageCompact ? 8 : 10;
+  const columnWidthStyle = (width: number): React.CSSProperties => (
+    fillAvailableWidth ? { width: `${(width / matrixWidth) * 100}%` } : { width }
+  );
 
   const anchor = workDays[0] ?? new Date();
   // Monday of the currently viewed week (week starts on Monday)
@@ -250,8 +295,12 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     effectiveEntries.forEach((entry) => {
       if (!visibleUserIds.has(entry.user_id)) return;
       const key = `${entry.date}|${entry.user_id}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(entry);
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        map.set(key, [entry]);
+      }
     });
     map.forEach((entries) => {
       entries.sort((a, b) => {
@@ -272,8 +321,11 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       if (!visibleUserIds.has(entry.user_id)) return;
       if (entry.availability_status !== 'available') return;
       if (!['work', 'hotline_support', 'working_from_home'].includes(entry.activity_type)) return;
-      if (!map.has(entry.date)) map.set(entry.date, new Map());
-      const shifts = map.get(entry.date)!;
+      let shifts = map.get(entry.date);
+      if (!shifts) {
+        shifts = new Map();
+        map.set(entry.date, shifts);
+      }
       const key = entry.shift_type || 'normal';
       shifts.set(key, (shifts.get(key) ?? 0) + 1);
     });
@@ -294,18 +346,21 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
           <span
             key={shift}
             className={cn(
-              'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium',
+              'inline-flex items-center rounded font-medium leading-none',
+              coverageCompact ? 'gap-0.5 px-1 py-0.5' : 'gap-0.5 px-1.5 py-0.5',
               short
                 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                 : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
             )}
+            style={{ fontSize: coverageBadgeFontSize }}
+            title={`${shift} ${actual}/${required}`}
           >
-            {short && <AlertTriangle className="h-2.5 w-2.5" />}
-            {SHIFT_LABELS[shift]} {actual}/{required}
+            {short && !coverageCompact && <AlertTriangle className="h-2.5 w-2.5" />}
+            {SHIFT_LABELS[shift]}{coverageCompact ? '' : ' '}{actual}/{required}
           </span>
         );
       });
-      return <div className="flex flex-wrap gap-1">{parts}</div>;
+      return <div className={cn('flex flex-wrap', coverageCompact ? 'gap-0.5' : 'gap-1')}>{parts}</div>;
     }
 
     if (teamMinStaff > 0) {
@@ -313,29 +368,31 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       return (
         <span
           className={cn(
-            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
+            'inline-flex items-center rounded px-1.5 py-0.5 font-medium leading-none',
             short
               ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
               : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
           )}
+          style={{ fontSize: coverageBadgeFontSize }}
         >
-          {short && <AlertTriangle className="h-2.5 w-2.5" />}
-          {total}/{teamMinStaff} working
+          {short && !coverageCompact && <AlertTriangle className="h-2.5 w-2.5" />}
+          {total}/{teamMinStaff}{coverageCompact ? '' : ' working'}
         </span>
       );
     }
 
     if (!counts || total === 0) {
-      return <span className="text-[10px] text-muted-foreground">—</span>;
+      return <span className="text-muted-foreground" style={{ fontSize: coverageBadgeFontSize }}>—</span>;
     }
     return (
       <div className="flex flex-wrap gap-1">
         {Array.from(counts.entries()).map(([shift, count]) => (
           <span
             key={shift}
-            className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium"
+            className="rounded bg-muted px-1.5 py-0.5 font-medium leading-none"
+            style={{ fontSize: coverageBadgeFontSize }}
           >
-            {SHIFT_LABELS[shift] || shift.charAt(0).toUpperCase()} {count}
+            {SHIFT_LABELS[shift] || shift.charAt(0).toUpperCase()}{coverageCompact ? '' : ' '}{count}
           </span>
         ))}
       </div>
@@ -391,20 +448,20 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
         <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md">
           <table
             className="border-collapse text-xs table-fixed"
-            style={{ width: matrixWidth }}
+            style={{ width: fillAvailableWidth ? '100%' : matrixWidth }}
           >
             <colgroup>
-              <col style={{ width: dateColWidth }} />
+              <col style={columnWidthStyle(dateColWidth)} />
               {employees.map((employee) => (
-                <col key={employee.user_id} style={{ width: empColWidth }} />
+                <col key={employee.user_id} style={columnWidthStyle(empColWidth)} />
               ))}
-              <col style={{ width: coverageColWidth }} />
+              <col style={columnWidthStyle(coverageColWidth)} />
             </colgroup>
             <thead className="sticky top-0 z-20 bg-background shadow-sm">
               <tr>
                 <th
                   className="sticky left-0 z-30 bg-background border-b border-r text-left"
-                  style={{ padding: `${Math.max(2, 8 * matrixScale)}px`, fontSize: Math.max(7, 12 * matrixScale) }}
+                  style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: sideFontSize }}
                 >
                   Date
                 </th>
@@ -412,32 +469,37 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                   <th
                     key={employee.user_id}
                     className="border-b border-r text-center overflow-hidden"
-                    style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${cellPaddingX}px` }}
+                    style={{ padding: `${dense ? 3 : 6}px ${cellPaddingX}px` }}
                     title={`${employee.first_name} ${employee.last_name}`.trim() || employee.initials}
                   >
-                    <div className="flex min-w-0 flex-col items-center" style={{ gap: Math.max(1, 4 * matrixScale) }}>
+                    <div className="flex min-w-0 flex-col items-center" style={{ gap: dense ? 1 : 3 }}>
                       <div
-                        className="rounded-full bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold whitespace-nowrap"
+                        className={cn(
+                          'bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold whitespace-nowrap',
+                          dense ? 'rounded-sm px-0.5' : 'rounded-full',
+                        )}
                         style={{
-                          width: headerAvatarSize,
+                          width: headerAvatarWidth,
                           height: headerAvatarSize,
-                          fontSize: Math.min(headerFontSize, (headerAvatarSize * 1.5) / Math.max(1, (employee.initials || '??').length)),
+                          fontSize: Math.min(headerFontSize, (headerAvatarWidth * 1.6) / Math.max(1, (employee.initials || '??').length)),
                           lineHeight: 1,
                         }}
                       >
                         {employee.initials || '??'}
                       </div>
-                      <div className="truncate font-semibold w-full" style={{ fontSize: headerFontSize, lineHeight: 1.1 }}>
-                        {renderEmployeeName(employee)}
-                      </div>
+                      {!dense && (
+                        <div className="truncate font-semibold w-full" style={{ fontSize: headerFontSize, lineHeight: 1.1 }}>
+                          {renderEmployeeName(employee)}
+                        </div>
+                      )}
                     </div>
                   </th>
                 ))}
                 <th
                   className="sticky right-0 z-30 bg-background border-b border-l text-left overflow-hidden"
-                  style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${Math.max(2, 12 * matrixScale)}px`, fontSize: Math.max(7, 12 * matrixScale) }}
+                  style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: sideFontSize }}
                 >
-                  Coverage
+                  {coverageCompact ? 'Cov.' : 'Coverage'}
                 </th>
               </tr>
             </thead>
@@ -452,7 +514,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                         'sticky left-0 z-10 border-b border-r font-medium whitespace-nowrap overflow-hidden',
                         today ? 'bg-primary/10' : 'bg-background',
                       )}
-                      style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${Math.max(2, 12 * matrixScale)}px`, fontSize: Math.max(7, 12 * matrixScale) }}
+                      style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: sideFontSize }}
                     >
                       <div>{format(day, 'EEE')}</div>
                       <div className="text-muted-foreground font-normal">
@@ -469,10 +531,11 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                           onClick={() => onCellClick(employee, day)}
                           title={cellClickTitle(employee)}
                         >
-                          <div className="flex flex-col min-w-0" style={{ gap: Math.max(1, 4 * matrixScale), minHeight: Math.max(16, 32 * matrixScale) }}>
+                          <div className="flex flex-col min-w-0" style={{ gap: dense ? 1 : 3, minHeight: dense ? 24 : 32 }}>
                             {entries.map((entry) => {
                               const times = getShiftTimes(entry);
                               const shiftLabel = SHIFT_LABELS[entry.shift_type];
+                              const activityLabel = getActivityDisplayName(entry.activity_type);
                               return (
                                 <div
                                   key={entry.id}
@@ -480,17 +543,20 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                                     'rounded leading-tight overflow-hidden',
                                     getActivityColor(entry),
                                   )}
-                                  style={{ padding: `${Math.max(1, 2 * matrixScale)}px ${cellPaddingX}px`, fontSize: cellFontSize }}
+                                  style={{ padding: `${dense ? 1 : 2}px ${cellPaddingX}px`, fontSize: cellFontSize }}
+                                  title={`${shiftLabel ? `${shiftLabel} ` : ''}${activityLabel} ${times.start}–${times.end}`}
                                 >
                                   <div className="font-medium truncate">
                                     {shiftLabel && (
                                       <span className="mr-1 font-bold">{shiftLabel}</span>
                                     )}
-                                    {getActivityDisplayName(entry.activity_type)}
+                                    {!veryDense && activityLabel}
                                   </div>
-                                  <div className="opacity-80">
-                                    {times.start}–{times.end}
-                                  </div>
+                                  {!dense && (
+                                    <div className="opacity-80">
+                                      {times.start}–{times.end}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -506,7 +572,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                         'sticky right-0 z-10 border-b border-l align-top overflow-hidden',
                         today ? 'bg-primary/10' : 'bg-background',
                       )}
-                      style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${Math.max(2, 12 * matrixScale)}px`, fontSize: cellFontSize }}
+                      style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: cellFontSize }}
                     >
                       {renderCoverage(day)}
                     </td>
