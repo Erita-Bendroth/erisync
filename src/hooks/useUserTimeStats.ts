@@ -96,6 +96,14 @@ export const useUserTimeStats = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Fetch existing row (if any) to preserve carryover
+      const { data: existing } = await supabase
+        .from('user_time_allowances')
+        .select('vacation_days_carryover')
+        .eq('user_id', userId)
+        .eq('year', year)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('user_time_allowances')
         .upsert({
@@ -103,9 +111,10 @@ export const useUserTimeStats = ({
           year,
           vacation_days_allowance: vacationDays,
           flextime_hours_allowance: flextimeHours,
+          vacation_days_carryover: existing?.vacation_days_carryover ?? 0,
           is_override: true,
           set_by: user.id,
-        });
+        }, { onConflict: 'user_id,year' });
 
       if (error) throw error;
 
