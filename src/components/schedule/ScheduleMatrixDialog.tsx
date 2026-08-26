@@ -150,8 +150,8 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, rangeMode, teamIds.join(','), rangeStart?.getTime(), rangeEnd?.getTime()]);
 
-  // Use fetched entries for extended ranges, prop entries for the 4-week default
-  const effectiveEntries = rangeMode === '4weeks' ? scheduleEntries : extendedEntries;
+  // Always use fetched entries — prop data only covers the currently-viewed week
+  const effectiveEntries = extendedEntries;
 
   // Non-offshore fallback: team capacity minimum staff
   const [teamMinStaff, setTeamMinStaff] = useState<number>(0);
