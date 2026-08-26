@@ -33,9 +33,9 @@ interface Props {
   scheduleEntries: ScheduleEntry[];
   teamIds: string[];
   teamNames: Map<string, string>;
-  getActivityColor: (entry: ScheduleEntry) => string;
+  getActivityColor: (entry: any) => string;
   getActivityDisplayName: (activityType: string) => string;
-  getShiftTimes: (entry: ScheduleEntry) => { start: string; end: string };
+  getShiftTimes: (entry: any) => { start: string; end: string };
   renderEmployeeName: (employee: Employee) => React.ReactNode;
   onCellClick: (employee: Employee, day: Date) => void;
   cellClickTitle: (employee: Employee) => string;
