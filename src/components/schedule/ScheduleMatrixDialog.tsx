@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   format,
   isSameDay,
@@ -61,6 +61,12 @@ const SHIFT_LABELS: Record<string, string> = {
 };
 
 const PAGE_SIZE = 1000;
+
+// Column sizing: employee columns auto-fit the dialog width
+const DATE_COL_W = 110;
+const COVERAGE_COL_W = 150;
+const EMP_MIN_W = 64;
+const EMP_MAX_W = 140;
 
 export const ScheduleMatrixDialog: React.FC<Props> = ({
   open,
