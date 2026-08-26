@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   format,
   isSameDay,
@@ -62,6 +62,12 @@ const SHIFT_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 1000;
 
+// Column sizing: employee columns auto-fit the dialog width
+const DATE_COL_W = 110;
+const COVERAGE_COL_W = 150;
+const EMP_MIN_W = 64;
+const EMP_MAX_W = 140;
+
 export const ScheduleMatrixDialog: React.FC<Props> = ({
   open,
   onOpenChange,
@@ -80,6 +86,37 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   const [rangeMode, setRangeMode] = useState<RangeMode>('4weeks');
   const [extendedEntries, setExtendedEntries] = useState<ScheduleEntry[]>([]);
   const [loadingExtended, setLoadingExtended] = useState(false);
+
+  // Measure the scroll container so employee columns can auto-fit the width
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !open) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, [open]);
+
+  const empColWidth = useMemo(() => {
+    if (!employees.length) return EMP_MIN_W;
+    if (!containerWidth) return EMP_MIN_W;
+    const available = containerWidth - DATE_COL_W - COVERAGE_COL_W - employees.length - 2;
+    const per = Math.floor(available / employees.length);
+    return Math.max(EMP_MIN_W, Math.min(EMP_MAX_W, per));
+  }, [containerWidth, employees.length]);
+
+  // True when every column fits without horizontal scrolling
+  const fitsWithoutScroll = useMemo(() => {
+    if (!containerWidth || !employees.length) return false;
+    const available = containerWidth - DATE_COL_W - COVERAGE_COL_W - employees.length - 2;
+    return available / employees.length >= EMP_MIN_W;
+  }, [containerWidth, employees.length]);
+
+  const tableWidth = DATE_COL_W + COVERAGE_COL_W + employees.length * empColWidth;
 
   const anchor = workDays[0] ?? new Date();
   // Monday of the currently viewed week (week starts on Monday)
@@ -324,29 +361,42 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto border rounded-md">
-          <table className="border-collapse text-xs w-max min-w-full">
+        <div ref={scrollRef} className="flex-1 overflow-auto border rounded-md">
+          <table
+            className="border-collapse text-xs table-fixed"
+            style={{
+              width: fitsWithoutScroll ? '100%' : tableWidth,
+              minWidth: fitsWithoutScroll ? undefined : tableWidth,
+            }}
+          >
+            <colgroup>
+              <col style={{ width: DATE_COL_W }} />
+              {employees.map((employee) => (
+                <col key={employee.user_id} style={{ width: empColWidth }} />
+              ))}
+              <col style={{ width: COVERAGE_COL_W }} />
+            </colgroup>
             <thead className="sticky top-0 z-20 bg-background shadow-sm">
               <tr>
-                <th className="sticky left-0 z-30 bg-background border-b border-r px-3 py-2 text-left min-w-[110px]">
+                <th className="sticky left-0 z-30 bg-background border-b border-r px-2 py-2 text-left">
                   Date
                 </th>
                 {employees.map((employee) => (
                   <th
                     key={employee.user_id}
-                    className="border-b border-r px-2 py-2 text-center min-w-[90px] max-w-[120px]"
+                    className="border-b border-r px-1 py-2 text-center"
                   >
                     <div className="flex flex-col items-center gap-1">
                       <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
                         {employee.initials || '??'}
                       </div>
-                      <div className="truncate font-semibold max-w-[110px]">
+                      <div className="truncate font-semibold w-full">
                         {renderEmployeeName(employee)}
                       </div>
                     </div>
                   </th>
                 ))}
-                <th className="sticky right-0 z-30 bg-background border-b border-l px-3 py-2 text-left min-w-[150px]">
+                <th className="sticky right-0 z-30 bg-background border-b border-l px-3 py-2 text-left">
                   Coverage
                 </th>
               </tr>
