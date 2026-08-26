@@ -1,8 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { format, isSameDay } from 'date-fns';
+import {
+  format,
+  isSameDay,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  eachDayOfInterval,
+} from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOffshoreScheduleCoverage } from '@/hooks/useOffshoreScheduleCoverage';
 import { cn } from '@/lib/utils';
@@ -24,6 +33,8 @@ interface Employee {
   last_name: string;
   initials: string;
 }
+
+type RangeMode = 'week' | 'month' | 'year';
 
 interface Props {
   open: boolean;
@@ -49,6 +60,8 @@ const SHIFT_LABELS: Record<string, string> = {
   weekend: 'W',
 };
 
+const PAGE_SIZE = 1000;
+
 export const ScheduleMatrixDialog: React.FC<Props> = ({
   open,
   onOpenChange,
@@ -64,15 +77,73 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   onCellClick,
   cellClickTitle,
 }) => {
-  const weekStart = workDays[0] ?? null;
-  const weekEnd = workDays[workDays.length - 1] ?? null;
+  const [rangeMode, setRangeMode] = useState<RangeMode>('week');
+  const [extendedEntries, setExtendedEntries] = useState<ScheduleEntry[]>([]);
+  const [loadingExtended, setLoadingExtended] = useState(false);
 
-  // Offshore E/L/N minimum requirements (inactive for non-offshore teams)
+  const anchor = workDays[0] ?? new Date();
+
+  // All days to display for the selected range
+  const days = useMemo(() => {
+    if (rangeMode === 'week') return workDays;
+    if (rangeMode === 'month') {
+      return eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) });
+    }
+    return eachDayOfInterval({ start: startOfYear(anchor), end: endOfYear(anchor) });
+  }, [rangeMode, workDays, anchor]);
+
+  const rangeStart = days[0] ?? null;
+  const rangeEnd = days[days.length - 1] ?? null;
+
+  // Offshore E/L/N minimum requirements across the whole displayed range
   const { requirements, isOffshore } = useOffshoreScheduleCoverage(
     open ? teamIds : [],
-    weekStart,
-    weekEnd,
+    rangeStart,
+    rangeEnd,
   );
+
+  // Fetch entries ourselves for month/year (prop only covers the visible week)
+  useEffect(() => {
+    if (!open || rangeMode === 'week' || teamIds.length === 0 || !rangeStart || !rangeEnd) {
+      setExtendedEntries([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingExtended(true);
+    (async () => {
+      const all: ScheduleEntry[] = [];
+      let from = 0;
+      for (let i = 0; i < 100; i++) {
+        const { data, error } = await supabase
+          .from('schedule_entries')
+          .select('id, user_id, team_id, date, shift_type, activity_type, availability_status, notes')
+          .in('team_id', teamIds)
+          .gte('date', format(rangeStart, 'yyyy-MM-dd'))
+          .lte('date', format(rangeEnd, 'yyyy-MM-dd'))
+          .range(from, from + PAGE_SIZE - 1);
+        if (cancelled) return;
+        if (error) {
+          console.error('ScheduleMatrixDialog: failed to load entries', error);
+          break;
+        }
+        const rows = (data || []) as ScheduleEntry[];
+        all.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+      if (!cancelled) {
+        setExtendedEntries(all);
+        setLoadingExtended(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, rangeMode, teamIds.join(','), rangeStart?.getTime(), rangeEnd?.getTime()]);
+
+  // Use fetched entries for extended ranges, prop entries for the week
+  const effectiveEntries = rangeMode === 'week' ? scheduleEntries : extendedEntries;
 
   // Non-offshore fallback: team capacity minimum staff
   const [teamMinStaff, setTeamMinStaff] = useState<number>(0);
@@ -97,13 +168,14 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isOffshore, teamIds.join(',')]);
 
   // Group visible entries by date + employee, sorted by start time
   const cellMap = useMemo(() => {
     const map = new Map<string, ScheduleEntry[]>();
     const visibleUserIds = new Set(employees.map((e) => e.user_id));
-    scheduleEntries.forEach((entry) => {
+    effectiveEntries.forEach((entry) => {
       if (!visibleUserIds.has(entry.user_id)) return;
       const key = `${entry.date}|${entry.user_id}`;
       if (!map.has(key)) map.set(key, []);
@@ -118,12 +190,14 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       });
     });
     return map;
-  }, [scheduleEntries, employees, getShiftTimes]);
+  }, [effectiveEntries, employees, getShiftTimes]);
 
   // Per-day coverage counts (working entries of displayed employees)
   const dayCoverage = useMemo(() => {
+    const visibleUserIds = new Set(employees.map((e) => e.user_id));
     const map = new Map<string, Map<string, number>>();
-    scheduleEntries.forEach((entry) => {
+    effectiveEntries.forEach((entry) => {
+      if (!visibleUserIds.has(entry.user_id)) return;
       if (entry.availability_status !== 'available') return;
       if (!['work', 'hotline_support', 'working_from_home'].includes(entry.activity_type)) return;
       if (!map.has(entry.date)) map.set(entry.date, new Map());
@@ -132,7 +206,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       shifts.set(key, (shifts.get(key) ?? 0) + 1);
     });
     return map;
-  }, [scheduleEntries]);
+  }, [effectiveEntries, employees]);
 
   const renderCoverage = (day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -179,7 +253,6 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       );
     }
 
-    // No minimum configured: plain counts per shift
     if (!counts || total === 0) {
       return <span className="text-[10px] text-muted-foreground">—</span>;
     }
@@ -197,22 +270,44 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     );
   };
 
+  const rangeLabel = useMemo(() => {
+    if (rangeMode === 'week' && rangeStart && rangeEnd) {
+      return `${format(rangeStart, 'MMM d')} – ${format(rangeEnd, 'MMM d, yyyy')}`;
+    }
+    if (rangeMode === 'month') return format(anchor, 'MMMM yyyy');
+    return format(anchor, 'yyyy');
+  }, [rangeMode, rangeStart, rangeEnd, anchor]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[96vw] w-[96vw] h-[92vh] flex flex-col p-4 gap-2">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-3">
+          <DialogTitle className="flex items-center gap-3 flex-wrap">
             Schedule Matrix
-            {weekStart && weekEnd && (
-              <span className="text-sm font-normal text-muted-foreground">
-                {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d, yyyy')}
-              </span>
-            )}
+            <span className="text-sm font-normal text-muted-foreground">{rangeLabel}</span>
             {isOffshore && (
               <Badge variant="outline" className="text-xs">
                 Min E/L/N coverage
               </Badge>
             )}
+            {loadingExtended && (
+              <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-1 border rounded-md p-0.5">
+              {(['week', 'month', 'year'] as const).map((mode) => (
+                <Button
+                  key={mode}
+                  variant={rangeMode === mode ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs capitalize"
+                  onClick={() => setRangeMode(mode)}
+                >
+                  {mode}
+                </Button>
+              ))}
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -226,10 +321,15 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                 {employees.map((employee) => (
                   <th
                     key={employee.user_id}
-                    className="border-b border-r px-2 py-2 text-center min-w-[90px] max-w-[110px]"
+                    className="border-b border-r px-2 py-2 text-center min-w-[90px] max-w-[120px]"
                   >
-                    <div className="truncate font-semibold">
-                      {renderEmployeeName(employee)}
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                        {employee.initials || '??'}
+                      </div>
+                      <div className="truncate font-semibold max-w-[110px]">
+                        {renderEmployeeName(employee)}
+                      </div>
                     </div>
                   </th>
                 ))}
@@ -239,7 +339,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
               </tr>
             </thead>
             <tbody>
-              {workDays.map((day) => {
+              {days.map((day) => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const today = isSameDay(day, new Date());
                 return (
