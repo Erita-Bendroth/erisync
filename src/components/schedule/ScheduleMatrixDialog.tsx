@@ -34,7 +34,7 @@ interface Employee {
   initials: string;
 }
 
-type RangeMode = 'week' | 'month' | 'year';
+type RangeMode = '4weeks' | 'month' | 'year';
 
 interface Props {
   open: boolean;
