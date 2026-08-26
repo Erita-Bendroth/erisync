@@ -4,8 +4,8 @@ import {
   isSameDay,
   startOfMonth,
   endOfMonth,
-  startOfYear,
-  endOfYear,
+  startOfWeek,
+  addDays,
   eachDayOfInterval,
 } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
