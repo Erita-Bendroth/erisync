@@ -2129,6 +2129,42 @@ const getActivityColor = (entry: ScheduleEntry) => {
         }
       />
 
+      {/* Transposed full-screen matrix view */}
+      <ScheduleMatrixDialog
+        open={showMatrixDialog}
+        onOpenChange={setShowMatrixDialog}
+        workDays={workDays}
+        employees={employees}
+        scheduleEntries={scheduleEntries}
+        teamIds={
+          selectedTeams.includes("all")
+            ? userTeams.map((t: any) => t.id)
+            : selectedTeams
+        }
+        teamNames={new Map((teams || []).map((t: any) => [t.id, t.name]))}
+        getActivityColor={getActivityColor}
+        getActivityDisplayName={getActivityDisplayName}
+        getShiftTimes={getShiftTimesFromEntry}
+        renderEmployeeName={renderEmployeeName}
+        onCellClick={(employee, day) => {
+          if (user?.id === employee.user_id) {
+            // Own cell: open time entry dialog
+            setTimeEntryDate(day);
+            setShowTimeEntryModal(true);
+          } else if (isManager() || isPlanner()) {
+            // Manager/planner: edit team member schedule
+            handleDateClick(employee.user_id, day);
+          }
+        }}
+        cellClickTitle={(employee) =>
+          user?.id === employee.user_id
+            ? "Click to add time entry"
+            : (isManager() || isPlanner())
+              ? "Click to add/edit entry"
+              : ""
+        }
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">
