@@ -115,7 +115,9 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     const ro = typeof ResizeObserver !== 'undefined' && scrollRef.current
       ? new ResizeObserver(measure)
       : null;
-    ro?.observe(scrollRef.current);
+    if (ro && scrollRef.current) {
+      ro.observe(scrollRef.current);
+    }
     window.addEventListener('resize', measure);
 
     return () => {
