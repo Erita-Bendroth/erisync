@@ -2150,7 +2150,7 @@ const getActivityColor = (entry: ScheduleEntry) => {
           if (user?.id === employee.user_id) {
             // Own cell: open time entry dialog
             setTimeEntryDate(day);
-            setShowTimeEntryModal(true);
+            setTimeEntryDialogOpen(true);
           } else if (isManager() || isPlanner()) {
             // Manager/planner: edit team member schedule
             handleDateClick(employee.user_id, day);
