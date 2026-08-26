@@ -4,8 +4,8 @@ import {
   isSameDay,
   startOfMonth,
   endOfMonth,
-  startOfYear,
-  endOfYear,
+  startOfWeek,
+  addDays,
   eachDayOfInterval,
 } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -34,7 +34,7 @@ interface Employee {
   initials: string;
 }
 
-type RangeMode = 'week' | 'month' | 'year';
+type RangeMode = '4weeks' | 'month' | 'year';
 
 interface Props {
   open: boolean;
@@ -77,20 +77,28 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   onCellClick,
   cellClickTitle,
 }) => {
-  const [rangeMode, setRangeMode] = useState<RangeMode>('week');
+  const [rangeMode, setRangeMode] = useState<RangeMode>('4weeks');
   const [extendedEntries, setExtendedEntries] = useState<ScheduleEntry[]>([]);
   const [loadingExtended, setLoadingExtended] = useState(false);
 
   const anchor = workDays[0] ?? new Date();
+  // Monday of the currently viewed week (week starts on Monday)
+  const rangeAnchor = useMemo(
+    () => startOfWeek(anchor, { weekStartsOn: 1 }),
+    [anchor],
+  );
 
   // All days to display for the selected range
   const days = useMemo(() => {
-    if (rangeMode === 'week') return workDays;
+    if (rangeMode === '4weeks') {
+      return eachDayOfInterval({ start: rangeAnchor, end: addDays(rangeAnchor, 27) });
+    }
     if (rangeMode === 'month') {
       return eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) });
     }
-    return eachDayOfInterval({ start: startOfYear(anchor), end: endOfYear(anchor) });
-  }, [rangeMode, workDays, anchor]);
+    // year: ~52 weeks starting at the current week's Monday
+    return eachDayOfInterval({ start: rangeAnchor, end: addDays(rangeAnchor, 364) });
+  }, [rangeMode, workDays, anchor, rangeAnchor]);
 
   const rangeStart = days[0] ?? null;
   const rangeEnd = days[days.length - 1] ?? null;
@@ -102,9 +110,9 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     rangeEnd,
   );
 
-  // Fetch entries ourselves for month/year (prop only covers the visible week)
+  // Fetch entries ourselves for all ranges (prop only covers the currently-viewed week)
   useEffect(() => {
-    if (!open || rangeMode === 'week' || teamIds.length === 0 || !rangeStart || !rangeEnd) {
+    if (!open || teamIds.length === 0 || !rangeStart || !rangeEnd) {
       setExtendedEntries([]);
       return;
     }
@@ -113,7 +121,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     (async () => {
       const all: ScheduleEntry[] = [];
       let from = 0;
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 200; i++) {
         const { data, error } = await supabase
           .from('schedule_entries')
           .select('id, user_id, team_id, date, shift_type, activity_type, availability_status, notes')
@@ -142,8 +150,8 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, rangeMode, teamIds.join(','), rangeStart?.getTime(), rangeEnd?.getTime()]);
 
-  // Use fetched entries for extended ranges, prop entries for the week
-  const effectiveEntries = rangeMode === 'week' ? scheduleEntries : extendedEntries;
+  // Always use fetched entries — prop data only covers the currently-viewed week
+  const effectiveEntries = extendedEntries;
 
   // Non-offshore fallback: team capacity minimum staff
   const [teamMinStaff, setTeamMinStaff] = useState<number>(0);
@@ -271,12 +279,17 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   };
 
   const rangeLabel = useMemo(() => {
-    if (rangeMode === 'week' && rangeStart && rangeEnd) {
+    if (rangeStart && rangeEnd) {
       return `${format(rangeStart, 'MMM d')} – ${format(rangeEnd, 'MMM d, yyyy')}`;
     }
-    if (rangeMode === 'month') return format(anchor, 'MMMM yyyy');
-    return format(anchor, 'yyyy');
-  }, [rangeMode, rangeStart, rangeEnd, anchor]);
+    return '';
+  }, [rangeStart, rangeEnd]);
+
+  const RANGE_OPTIONS: { mode: RangeMode; label: string }[] = [
+    { mode: '4weeks', label: '4 Weeks' },
+    { mode: 'month', label: 'Month' },
+    { mode: 'year', label: 'Year' },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -296,15 +309,15 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
               </span>
             )}
             <div className="ml-auto flex items-center gap-1 border rounded-md p-0.5">
-              {(['week', 'month', 'year'] as const).map((mode) => (
+              {RANGE_OPTIONS.map(({ mode, label }) => (
                 <Button
                   key={mode}
                   variant={rangeMode === mode ? 'default' : 'ghost'}
                   size="sm"
-                  className="h-7 px-2.5 text-xs capitalize"
+                  className="h-7 px-2.5 text-xs"
                   onClick={() => setRangeMode(mode)}
                 >
-                  {mode}
+                  {label}
                 </Button>
               ))}
             </div>
