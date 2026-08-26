@@ -536,6 +536,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                               const times = getShiftTimes(entry);
                               const shiftLabel = SHIFT_LABELS[entry.shift_type];
                               const activityLabel = getActivityDisplayName(entry.activity_type);
+                              const note = entry.notes?.trim();
                               return (
                                 <div
                                   key={entry.id}
@@ -544,17 +545,23 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                                     getActivityColor(entry),
                                   )}
                                   style={{ padding: `${dense ? 1 : 2}px ${cellPaddingX}px`, fontSize: cellFontSize }}
-                                  title={`${shiftLabel ? `${shiftLabel} ` : ''}${activityLabel} ${times.start}–${times.end}`}
+                                  title={`${shiftLabel ? `${shiftLabel} ` : ''}${activityLabel} ${times.start}–${times.end}${note ? `\n${note}` : ''}`}
                                 >
                                   <div className="font-medium truncate">
                                     {shiftLabel && (
                                       <span className="mr-1 font-bold">{shiftLabel}</span>
                                     )}
                                     {!veryDense && activityLabel}
+                                    {note && dense && <span className="ml-0.5 font-bold">*</span>}
                                   </div>
                                   {!dense && (
                                     <div className="opacity-80">
                                       {times.start}–{times.end}
+                                    </div>
+                                  )}
+                                  {note && !dense && (
+                                    <div className="line-clamp-2 break-words italic opacity-75">
+                                      {note}
                                     </div>
                                   )}
                                 </div>
