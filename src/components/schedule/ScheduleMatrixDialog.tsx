@@ -448,20 +448,20 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
         <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md">
           <table
             className="border-collapse text-xs table-fixed"
-            style={{ width: matrixWidth }}
+            style={{ width: fillAvailableWidth ? '100%' : matrixWidth }}
           >
             <colgroup>
-              <col style={{ width: dateColWidth }} />
+              <col style={columnWidthStyle(dateColWidth)} />
               {employees.map((employee) => (
-                <col key={employee.user_id} style={{ width: empColWidth }} />
+                <col key={employee.user_id} style={columnWidthStyle(empColWidth)} />
               ))}
-              <col style={{ width: coverageColWidth }} />
+              <col style={columnWidthStyle(coverageColWidth)} />
             </colgroup>
             <thead className="sticky top-0 z-20 bg-background shadow-sm">
               <tr>
                 <th
                   className="sticky left-0 z-30 bg-background border-b border-r text-left"
-                  style={{ padding: `${Math.max(2, 8 * matrixScale)}px`, fontSize: Math.max(7, 12 * matrixScale) }}
+                  style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: sideFontSize }}
                 >
                   Date
                 </th>
@@ -469,32 +469,37 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                   <th
                     key={employee.user_id}
                     className="border-b border-r text-center overflow-hidden"
-                    style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${cellPaddingX}px` }}
+                    style={{ padding: `${dense ? 3 : 6}px ${cellPaddingX}px` }}
                     title={`${employee.first_name} ${employee.last_name}`.trim() || employee.initials}
                   >
-                    <div className="flex min-w-0 flex-col items-center" style={{ gap: Math.max(1, 4 * matrixScale) }}>
+                    <div className="flex min-w-0 flex-col items-center" style={{ gap: dense ? 1 : 3 }}>
                       <div
-                        className="rounded-full bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold whitespace-nowrap"
+                        className={cn(
+                          'bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold whitespace-nowrap',
+                          dense ? 'rounded-sm px-0.5' : 'rounded-full',
+                        )}
                         style={{
-                          width: headerAvatarSize,
+                          width: headerAvatarWidth,
                           height: headerAvatarSize,
-                          fontSize: Math.min(headerFontSize, (headerAvatarSize * 1.5) / Math.max(1, (employee.initials || '??').length)),
+                          fontSize: Math.min(headerFontSize, (headerAvatarWidth * 1.6) / Math.max(1, (employee.initials || '??').length)),
                           lineHeight: 1,
                         }}
                       >
                         {employee.initials || '??'}
                       </div>
-                      <div className="truncate font-semibold w-full" style={{ fontSize: headerFontSize, lineHeight: 1.1 }}>
-                        {renderEmployeeName(employee)}
-                      </div>
+                      {!dense && (
+                        <div className="truncate font-semibold w-full" style={{ fontSize: headerFontSize, lineHeight: 1.1 }}>
+                          {renderEmployeeName(employee)}
+                        </div>
+                      )}
                     </div>
                   </th>
                 ))}
                 <th
                   className="sticky right-0 z-30 bg-background border-b border-l text-left overflow-hidden"
-                  style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${Math.max(2, 12 * matrixScale)}px`, fontSize: Math.max(7, 12 * matrixScale) }}
+                  style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: sideFontSize }}
                 >
-                  Coverage
+                  {coverageCompact ? 'Cov.' : 'Coverage'}
                 </th>
               </tr>
             </thead>
@@ -509,7 +514,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                         'sticky left-0 z-10 border-b border-r font-medium whitespace-nowrap overflow-hidden',
                         today ? 'bg-primary/10' : 'bg-background',
                       )}
-                      style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${Math.max(2, 12 * matrixScale)}px`, fontSize: Math.max(7, 12 * matrixScale) }}
+                      style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: sideFontSize }}
                     >
                       <div>{format(day, 'EEE')}</div>
                       <div className="text-muted-foreground font-normal">
@@ -526,10 +531,11 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                           onClick={() => onCellClick(employee, day)}
                           title={cellClickTitle(employee)}
                         >
-                          <div className="flex flex-col min-w-0" style={{ gap: Math.max(1, 4 * matrixScale), minHeight: Math.max(16, 32 * matrixScale) }}>
+                          <div className="flex flex-col min-w-0" style={{ gap: dense ? 1 : 3, minHeight: dense ? 24 : 32 }}>
                             {entries.map((entry) => {
                               const times = getShiftTimes(entry);
                               const shiftLabel = SHIFT_LABELS[entry.shift_type];
+                              const activityLabel = getActivityDisplayName(entry.activity_type);
                               return (
                                 <div
                                   key={entry.id}
@@ -537,17 +543,20 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                                     'rounded leading-tight overflow-hidden',
                                     getActivityColor(entry),
                                   )}
-                                  style={{ padding: `${Math.max(1, 2 * matrixScale)}px ${cellPaddingX}px`, fontSize: cellFontSize }}
+                                  style={{ padding: `${dense ? 1 : 2}px ${cellPaddingX}px`, fontSize: cellFontSize }}
+                                  title={`${shiftLabel ? `${shiftLabel} ` : ''}${activityLabel} ${times.start}–${times.end}`}
                                 >
                                   <div className="font-medium truncate">
                                     {shiftLabel && (
                                       <span className="mr-1 font-bold">{shiftLabel}</span>
                                     )}
-                                    {getActivityDisplayName(entry.activity_type)}
+                                    {!veryDense && activityLabel}
                                   </div>
-                                  <div className="opacity-80">
-                                    {times.start}–{times.end}
-                                  </div>
+                                  {!dense && (
+                                    <div className="opacity-80">
+                                      {times.start}–{times.end}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -563,7 +572,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                         'sticky right-0 z-10 border-b border-l align-top overflow-hidden',
                         today ? 'bg-primary/10' : 'bg-background',
                       )}
-                      style={{ padding: `${Math.max(2, 8 * matrixScale)}px ${Math.max(2, 12 * matrixScale)}px`, fontSize: cellFontSize }}
+                      style={{ padding: `${sidePaddingY}px ${sidePaddingX}px`, fontSize: cellFontSize }}
                     >
                       {renderCoverage(day)}
                     </td>
