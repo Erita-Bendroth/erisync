@@ -87,6 +87,37 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   const [extendedEntries, setExtendedEntries] = useState<ScheduleEntry[]>([]);
   const [loadingExtended, setLoadingExtended] = useState(false);
 
+  // Measure the scroll container so employee columns can auto-fit the width
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !open) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, [open]);
+
+  const empColWidth = useMemo(() => {
+    if (!employees.length) return EMP_MIN_W;
+    if (!containerWidth) return EMP_MIN_W;
+    const available = containerWidth - DATE_COL_W - COVERAGE_COL_W - employees.length - 2;
+    const per = Math.floor(available / employees.length);
+    return Math.max(EMP_MIN_W, Math.min(EMP_MAX_W, per));
+  }, [containerWidth, employees.length]);
+
+  // True when every column fits without horizontal scrolling
+  const fitsWithoutScroll = useMemo(() => {
+    if (!containerWidth || !employees.length) return false;
+    const available = containerWidth - DATE_COL_W - COVERAGE_COL_W - employees.length - 2;
+    return available / employees.length >= EMP_MIN_W;
+  }, [containerWidth, employees.length]);
+
+  const tableWidth = DATE_COL_W + COVERAGE_COL_W + employees.length * empColWidth;
+
   const anchor = workDays[0] ?? new Date();
   // Monday of the currently viewed week (week starts on Monday)
   const rangeAnchor = useMemo(
