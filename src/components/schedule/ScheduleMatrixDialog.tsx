@@ -110,8 +110,8 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   const dateColWidth = DATE_COL_W * matrixScale;
   const coverageColWidth = COVERAGE_COL_W * matrixScale;
   const empColWidth = EMP_MIN_W * matrixScale;
-  const headerAvatarSize = Math.max(12, 28 * matrixScale);
-  const headerFontSize = Math.max(6, 10 * matrixScale);
+  const headerAvatarSize = Math.max(20, 28 * matrixScale);
+  const headerFontSize = Math.max(7, 10 * matrixScale);
   const cellFontSize = Math.max(6, 10 * matrixScale);
   const cellPaddingX = Math.max(1, 4 * matrixScale);
   const cellPaddingY = Math.max(1, 4 * matrixScale);
@@ -387,8 +387,13 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                   >
                     <div className="flex min-w-0 flex-col items-center" style={{ gap: Math.max(1, 4 * matrixScale) }}>
                       <div
-                        className="rounded-full bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold overflow-hidden"
-                        style={{ width: headerAvatarSize, height: headerAvatarSize, fontSize: headerFontSize }}
+                        className="rounded-full bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold whitespace-nowrap"
+                        style={{
+                          width: headerAvatarSize,
+                          height: headerAvatarSize,
+                          fontSize: Math.min(headerFontSize, (headerAvatarSize * 1.5) / Math.max(1, (employee.initials || '??').length)),
+                          lineHeight: 1,
+                        }}
                       >
                         {employee.initials || '??'}
                       </div>
