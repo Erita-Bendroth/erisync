@@ -309,15 +309,15 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
               </span>
             )}
             <div className="ml-auto flex items-center gap-1 border rounded-md p-0.5">
-              {(['week', 'month', 'year'] as const).map((mode) => (
+              {RANGE_OPTIONS.map(({ mode, label }) => (
                 <Button
                   key={mode}
                   variant={rangeMode === mode ? 'default' : 'ghost'}
                   size="sm"
-                  className="h-7 px-2.5 text-xs capitalize"
+                  className="h-7 px-2.5 text-xs"
                   onClick={() => setRangeMode(mode)}
                 >
-                  {mode}
+                  {label}
                 </Button>
               ))}
             </div>
