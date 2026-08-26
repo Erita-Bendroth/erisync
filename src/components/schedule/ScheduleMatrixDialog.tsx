@@ -387,8 +387,13 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
                   >
                     <div className="flex min-w-0 flex-col items-center" style={{ gap: Math.max(1, 4 * matrixScale) }}>
                       <div
-                        className="rounded-full bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold overflow-hidden"
-                        style={{ width: headerAvatarSize, height: headerAvatarSize, fontSize: headerFontSize }}
+                        className="rounded-full bg-primary/10 text-primary flex shrink-0 items-center justify-center font-bold whitespace-nowrap"
+                        style={{
+                          width: headerAvatarSize,
+                          height: headerAvatarSize,
+                          fontSize: Math.min(headerFontSize, (headerAvatarSize * 1.5) / Math.max(1, (employee.initials || '??').length)),
+                          lineHeight: 1,
+                        }}
                       >
                         {employee.initials || '??'}
                       </div>
