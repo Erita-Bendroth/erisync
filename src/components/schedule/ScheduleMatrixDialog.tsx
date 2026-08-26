@@ -62,11 +62,15 @@ const SHIFT_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 1000;
 
-// Preferred column sizing at normal scale. Large teams proportionally scale the
-// whole matrix below these values instead of falling back to horizontal scroll.
+// Matrix sizing favors employee visibility first. Large teams fill the full
+// dialog width with compact fixed side columns instead of uniformly shrinking
+// every part of the table.
 const DATE_COL_W = 110;
+const DATE_COL_COMPACT_W = 54;
 const COVERAGE_COL_W = 150;
-const EMP_MIN_W = 64;
+const COVERAGE_COL_COMPACT_W = 62;
+const EMP_COMFORT_W = 112;
+const EMP_LARGE_W = 58;
 
 export const ScheduleMatrixDialog: React.FC<Props> = ({
   open,
@@ -129,21 +133,62 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     };
   }, [open]);
 
-  const matrixScale = useMemo(() => {
-    if (!containerWidth || !employees.length) return 1;
-    const preferredWidth = DATE_COL_W + COVERAGE_COL_W + employees.length * EMP_MIN_W;
-    return Math.min(1, Math.max(1, containerWidth - 2) / preferredWidth);
+  const matrixLayout = useMemo(() => {
+    const availableWidth = Math.max(320, containerWidth - 2);
+    const employeeCount = Math.max(1, employees.length);
+    const isLargeTeam = employeeCount >= 12;
+    const isVeryLargeTeam = employeeCount >= 24;
+    const preferredEmployeeWidth = isVeryLargeTeam ? EMP_LARGE_W : EMP_COMFORT_W;
+    const preferredDateWidth = isVeryLargeTeam ? 68 : DATE_COL_W;
+    const preferredCoverageWidth = isVeryLargeTeam ? 82 : COVERAGE_COL_W;
+    const preferredWidth = preferredDateWidth + preferredCoverageWidth + employeeCount * preferredEmployeeWidth;
+    const fillAvailableWidth = isLargeTeam || preferredWidth > availableWidth;
+
+    if (!fillAvailableWidth) {
+      const employeeWidth = Math.min(EMP_COMFORT_W, Math.max(76, preferredEmployeeWidth));
+      const width = DATE_COL_W + COVERAGE_COL_W + employeeCount * employeeWidth;
+      return {
+        width,
+        dateWidth: DATE_COL_W,
+        coverageWidth: COVERAGE_COL_W,
+        employeeWidth,
+        fillAvailableWidth,
+        dense: false,
+        veryDense: false,
+      };
+    }
+
+    const dateWidth = isVeryLargeTeam ? DATE_COL_COMPACT_W : Math.max(64, Math.min(DATE_COL_W, availableWidth * 0.08));
+    const coverageWidth = isVeryLargeTeam ? COVERAGE_COL_COMPACT_W : Math.max(76, Math.min(COVERAGE_COL_W, availableWidth * 0.1));
+    const employeeWidth = Math.max(22, (availableWidth - dateWidth - coverageWidth) / employeeCount);
+
+    return {
+      width: availableWidth,
+      dateWidth,
+      coverageWidth,
+      employeeWidth,
+      fillAvailableWidth,
+      dense: employeeWidth < 52,
+      veryDense: employeeWidth < 36,
+    };
   }, [containerWidth, employees.length]);
 
-  const dateColWidth = DATE_COL_W * matrixScale;
-  const coverageColWidth = COVERAGE_COL_W * matrixScale;
-  const empColWidth = EMP_MIN_W * matrixScale;
-  const matrixWidth = dateColWidth + coverageColWidth + employees.length * empColWidth;
-  const headerAvatarSize = Math.max(12, Math.min(28 * matrixScale, empColWidth - 2));
-  const headerFontSize = Math.max(7, 10 * matrixScale);
-  const cellFontSize = Math.max(6, 10 * matrixScale);
-  const cellPaddingX = Math.max(1, 4 * matrixScale);
-  const cellPaddingY = Math.max(1, 4 * matrixScale);
+  const { width: matrixWidth, dateWidth: dateColWidth, coverageWidth: coverageColWidth, employeeWidth: empColWidth, fillAvailableWidth, dense, veryDense } = matrixLayout;
+  const densityScale = Math.min(1, Math.max(0.65, empColWidth / EMP_LARGE_W));
+  const headerAvatarSize = dense ? Math.max(20, Math.min(24, empColWidth - 4)) : Math.min(30, Math.max(24, empColWidth * 0.42));
+  const headerAvatarWidth = dense ? Math.max(headerAvatarSize, empColWidth - 4) : headerAvatarSize;
+  const headerFontSize = dense ? 8 : Math.max(9, Math.min(11, empColWidth * 0.18));
+  const cellFontSize = veryDense ? 7 : Math.max(8, Math.min(10, empColWidth * 0.18));
+  const sideFontSize = dense ? 8 : 11;
+  const cellPaddingX = Math.max(1, Math.min(4, empColWidth * 0.08));
+  const cellPaddingY = Math.max(1, Math.min(4, 4 * densityScale));
+  const sidePaddingX = dense ? 4 : 10;
+  const sidePaddingY = dense ? 4 : 8;
+  const coverageCompact = coverageColWidth < 90;
+  const coverageBadgeFontSize = coverageCompact ? 8 : 10;
+  const columnWidthStyle = (width: number): React.CSSProperties => (
+    fillAvailableWidth ? { width: `${(width / matrixWidth) * 100}%` } : { width }
+  );
 
   const anchor = workDays[0] ?? new Date();
   // Monday of the currently viewed week (week starts on Monday)
@@ -250,8 +295,12 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     effectiveEntries.forEach((entry) => {
       if (!visibleUserIds.has(entry.user_id)) return;
       const key = `${entry.date}|${entry.user_id}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(entry);
+      const existing = map.get(key);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        map.set(key, [entry]);
+      }
     });
     map.forEach((entries) => {
       entries.sort((a, b) => {
@@ -272,8 +321,11 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       if (!visibleUserIds.has(entry.user_id)) return;
       if (entry.availability_status !== 'available') return;
       if (!['work', 'hotline_support', 'working_from_home'].includes(entry.activity_type)) return;
-      if (!map.has(entry.date)) map.set(entry.date, new Map());
-      const shifts = map.get(entry.date)!;
+      let shifts = map.get(entry.date);
+      if (!shifts) {
+        shifts = new Map();
+        map.set(entry.date, shifts);
+      }
       const key = entry.shift_type || 'normal';
       shifts.set(key, (shifts.get(key) ?? 0) + 1);
     });
@@ -294,18 +346,21 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
           <span
             key={shift}
             className={cn(
-              'inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium',
+              'inline-flex items-center rounded font-medium leading-none',
+              coverageCompact ? 'gap-0.5 px-1 py-0.5' : 'gap-0.5 px-1.5 py-0.5',
               short
                 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                 : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
             )}
+            style={{ fontSize: coverageBadgeFontSize }}
+            title={`${shift} ${actual}/${required}`}
           >
-            {short && <AlertTriangle className="h-2.5 w-2.5" />}
-            {SHIFT_LABELS[shift]} {actual}/{required}
+            {short && !coverageCompact && <AlertTriangle className="h-2.5 w-2.5" />}
+            {SHIFT_LABELS[shift]}{coverageCompact ? '' : ' '}{actual}/{required}
           </span>
         );
       });
-      return <div className="flex flex-wrap gap-1">{parts}</div>;
+      return <div className={cn('flex flex-wrap', coverageCompact ? 'gap-0.5' : 'gap-1')}>{parts}</div>;
     }
 
     if (teamMinStaff > 0) {
@@ -313,29 +368,31 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
       return (
         <span
           className={cn(
-            'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
+            'inline-flex items-center rounded px-1.5 py-0.5 font-medium leading-none',
             short
               ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
               : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
           )}
+          style={{ fontSize: coverageBadgeFontSize }}
         >
-          {short && <AlertTriangle className="h-2.5 w-2.5" />}
-          {total}/{teamMinStaff} working
+          {short && !coverageCompact && <AlertTriangle className="h-2.5 w-2.5" />}
+          {total}/{teamMinStaff}{coverageCompact ? '' : ' working'}
         </span>
       );
     }
 
     if (!counts || total === 0) {
-      return <span className="text-[10px] text-muted-foreground">—</span>;
+      return <span className="text-muted-foreground" style={{ fontSize: coverageBadgeFontSize }}>—</span>;
     }
     return (
       <div className="flex flex-wrap gap-1">
         {Array.from(counts.entries()).map(([shift, count]) => (
           <span
             key={shift}
-            className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium"
+            className="rounded bg-muted px-1.5 py-0.5 font-medium leading-none"
+            style={{ fontSize: coverageBadgeFontSize }}
           >
-            {SHIFT_LABELS[shift] || shift.charAt(0).toUpperCase()} {count}
+            {SHIFT_LABELS[shift] || shift.charAt(0).toUpperCase()}{coverageCompact ? '' : ' '}{count}
           </span>
         ))}
       </div>
