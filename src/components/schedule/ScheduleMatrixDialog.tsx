@@ -279,12 +279,17 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
   };
 
   const rangeLabel = useMemo(() => {
-    if (rangeMode === 'week' && rangeStart && rangeEnd) {
+    if (rangeStart && rangeEnd) {
       return `${format(rangeStart, 'MMM d')} – ${format(rangeEnd, 'MMM d, yyyy')}`;
     }
-    if (rangeMode === 'month') return format(anchor, 'MMMM yyyy');
-    return format(anchor, 'yyyy');
-  }, [rangeMode, rangeStart, rangeEnd, anchor]);
+    return '';
+  }, [rangeStart, rangeEnd]);
+
+  const RANGE_OPTIONS: { mode: RangeMode; label: string }[] = [
+    { mode: '4weeks', label: '4 Weeks' },
+    { mode: 'month', label: 'Month' },
+    { mode: 'year', label: 'Year' },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
