@@ -390,7 +390,8 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md">
           <table
-            className="w-full border-collapse text-xs table-fixed"
+            className="border-collapse text-xs table-fixed"
+            style={{ width: matrixWidth }}
           >
             <colgroup>
               <col style={{ width: dateColWidth }} />
