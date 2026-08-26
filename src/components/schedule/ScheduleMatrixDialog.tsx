@@ -110,9 +110,9 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     rangeEnd,
   );
 
-  // Fetch entries ourselves for month/year (prop only covers the visible week)
+  // Fetch entries ourselves for 4-week/month/year (prop only covers the visible week)
   useEffect(() => {
-    if (!open || rangeMode === 'week' || teamIds.length === 0 || !rangeStart || !rangeEnd) {
+    if (!open || rangeMode === '4weeks' || teamIds.length === 0 || !rangeStart || !rangeEnd) {
       setExtendedEntries([]);
       return;
     }
@@ -121,7 +121,7 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     (async () => {
       const all: ScheduleEntry[] = [];
       let from = 0;
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 200; i++) {
         const { data, error } = await supabase
           .from('schedule_entries')
           .select('id, user_id, team_id, date, shift_type, activity_type, availability_status, notes')
@@ -150,8 +150,8 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, rangeMode, teamIds.join(','), rangeStart?.getTime(), rangeEnd?.getTime()]);
 
-  // Use fetched entries for extended ranges, prop entries for the week
-  const effectiveEntries = rangeMode === 'week' ? scheduleEntries : extendedEntries;
+  // Use fetched entries for extended ranges, prop entries for the 4-week default
+  const effectiveEntries = rangeMode === '4weeks' ? scheduleEntries : extendedEntries;
 
   // Non-offshore fallback: team capacity minimum staff
   const [teamMinStaff, setTeamMinStaff] = useState<number>(0);
