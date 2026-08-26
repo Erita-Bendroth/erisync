@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useHolidayRefetch } from '@/hooks/useHolidayRefetch';
 import { format, addDays, subDays, startOfWeek, isSameDay, isWeekend, addWeeks, subWeeks, addMonths, subMonths, startOfMonth, subMonths as dateFnsSubMonths, parseISO } from 'date-fns';
 
-import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock, Home } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Check, ChevronDown, Calendar, FileText, Clock, Home, LayoutGrid } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCurrentUserContext } from '@/hooks/useCurrentUserContext';
@@ -46,6 +46,7 @@ import { MobileBottomSheet } from '@/components/mobile/MobileBottomSheet';
 import { hoursToTimeString } from '@/lib/flexTimeUtils';
 import { OffshoreCoverageBanner } from './OffshoreCoverageBanner';
 import { OpenShiftRequestsPanel } from './OpenShiftRequestsPanel';
+import { ScheduleMatrixDialog } from './ScheduleMatrixDialog';
 import { endOfMonth } from 'date-fns';
 
 interface ScheduleEntry {
@@ -200,6 +201,8 @@ const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
 const weekEnd = addDays(weekStart, 6); // Sunday end
 // Show Monday through Sunday (full week)
 const workDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)); // Mon-Sun
+
+  const [showMatrixDialog, setShowMatrixDialog] = useState(false);
 
   const handleEditShift = (entry: ScheduleEntry) => {
     if (!isManager() && !isPlanner()) return;
@@ -2126,6 +2129,42 @@ const getActivityColor = (entry: ScheduleEntry) => {
         }
       />
 
+      {/* Transposed full-screen matrix view */}
+      <ScheduleMatrixDialog
+        open={showMatrixDialog}
+        onOpenChange={setShowMatrixDialog}
+        workDays={workDays}
+        employees={employees}
+        scheduleEntries={scheduleEntries}
+        teamIds={
+          selectedTeams.includes("all")
+            ? userTeams.map((t: any) => t.id)
+            : selectedTeams
+        }
+        teamNames={new Map((teams || []).map((t: any) => [t.id, t.name]))}
+        getActivityColor={getActivityColor}
+        getActivityDisplayName={getActivityDisplayName}
+        getShiftTimes={getShiftTimesFromEntry}
+        renderEmployeeName={renderEmployeeName}
+        onCellClick={(employee, day) => {
+          if (user?.id === employee.user_id) {
+            // Own cell: open time entry dialog
+            setTimeEntryDate(day);
+            setTimeEntryDialogOpen(true);
+          } else if (isManager() || isPlanner()) {
+            // Manager/planner: edit team member schedule
+            handleDateClick(employee.user_id, day);
+          }
+        }}
+        cellClickTitle={(employee) =>
+          user?.id === employee.user_id
+            ? "Click to add time entry"
+            : (isManager() || isPlanner())
+              ? "Click to add/edit entry"
+              : ""
+        }
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">
@@ -2408,6 +2447,19 @@ const getActivityColor = (entry: ScheduleEntry) => {
                 Monthly
               </Button>
             </div>
+
+            {/* Matrix view (transposed, full-screen) */}
+            {timeView === "weekly" && employees.length > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setShowMatrixDialog(true)}
+              >
+                <LayoutGrid className="w-4 h-4 mr-1.5" />
+                Matrix
+              </Button>
+            )}
 
             {/* Date Picker for easy navigation */}
             <DatePicker 
