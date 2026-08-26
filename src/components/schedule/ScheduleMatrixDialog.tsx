@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   format,
   isSameDay,
@@ -89,28 +89,57 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
 
   // Measure the scroll container so employee columns can auto-fit the width
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !open) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) setContainerWidth(entry.contentRect.width);
-    });
-    ro.observe(el);
-    setContainerWidth(el.clientWidth);
-    return () => ro.disconnect();
+  const [containerWidth, setContainerWidth] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    return Math.max(320, Math.floor(window.innerWidth * 0.96 - 34));
+  });
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const measure = () => {
+      const el = scrollRef.current;
+      const measuredWidth = el?.getBoundingClientRect().width ?? 0;
+      const viewportFallback = typeof window === 'undefined'
+        ? 0
+        : Math.max(320, Math.floor(window.innerWidth * 0.96 - 34));
+      const nextWidth = Math.floor(measuredWidth || viewportFallback);
+      if (nextWidth > 0) {
+        setContainerWidth((current) => (Math.abs(current - nextWidth) > 1 ? nextWidth : current));
+      }
+    };
+
+    measure();
+    const frame = window.requestAnimationFrame(measure);
+    const settleTimer = window.setTimeout(measure, 80);
+    const lateSettleTimer = window.setTimeout(measure, 250);
+    const ro = typeof ResizeObserver !== 'undefined' && scrollRef.current
+      ? new ResizeObserver(measure)
+      : null;
+    if (ro && scrollRef.current) {
+      ro.observe(scrollRef.current);
+    }
+    window.addEventListener('resize', measure);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(settleTimer);
+      window.clearTimeout(lateSettleTimer);
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
   }, [open]);
 
   const matrixScale = useMemo(() => {
     if (!containerWidth || !employees.length) return 1;
     const preferredWidth = DATE_COL_W + COVERAGE_COL_W + employees.length * EMP_MIN_W;
-    return Math.min(1, containerWidth / preferredWidth);
+    return Math.min(1, Math.max(1, containerWidth - 2) / preferredWidth);
   }, [containerWidth, employees.length]);
 
   const dateColWidth = DATE_COL_W * matrixScale;
   const coverageColWidth = COVERAGE_COL_W * matrixScale;
   const empColWidth = EMP_MIN_W * matrixScale;
-  const headerAvatarSize = Math.max(20, 28 * matrixScale);
+  const matrixWidth = dateColWidth + coverageColWidth + employees.length * empColWidth;
+  const headerAvatarSize = Math.max(12, Math.min(28 * matrixScale, empColWidth - 2));
   const headerFontSize = Math.max(7, 10 * matrixScale);
   const cellFontSize = Math.max(6, 10 * matrixScale);
   const cellPaddingX = Math.max(1, 4 * matrixScale);
@@ -361,7 +390,8 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden border rounded-md">
           <table
-            className="w-full border-collapse text-xs table-fixed"
+            className="border-collapse text-xs table-fixed"
+            style={{ width: matrixWidth }}
           >
             <colgroup>
               <col style={{ width: dateColWidth }} />
