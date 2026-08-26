@@ -361,29 +361,42 @@ export const ScheduleMatrixDialog: React.FC<Props> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto border rounded-md">
-          <table className="border-collapse text-xs w-max min-w-full">
+        <div ref={scrollRef} className="flex-1 overflow-auto border rounded-md">
+          <table
+            className="border-collapse text-xs table-fixed"
+            style={{
+              width: fitsWithoutScroll ? '100%' : tableWidth,
+              minWidth: fitsWithoutScroll ? undefined : tableWidth,
+            }}
+          >
+            <colgroup>
+              <col style={{ width: DATE_COL_W }} />
+              {employees.map((employee) => (
+                <col key={employee.user_id} style={{ width: empColWidth }} />
+              ))}
+              <col style={{ width: COVERAGE_COL_W }} />
+            </colgroup>
             <thead className="sticky top-0 z-20 bg-background shadow-sm">
               <tr>
-                <th className="sticky left-0 z-30 bg-background border-b border-r px-3 py-2 text-left min-w-[110px]">
+                <th className="sticky left-0 z-30 bg-background border-b border-r px-2 py-2 text-left">
                   Date
                 </th>
                 {employees.map((employee) => (
                   <th
                     key={employee.user_id}
-                    className="border-b border-r px-2 py-2 text-center min-w-[90px] max-w-[120px]"
+                    className="border-b border-r px-1 py-2 text-center"
                   >
                     <div className="flex flex-col items-center gap-1">
                       <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
                         {employee.initials || '??'}
                       </div>
-                      <div className="truncate font-semibold max-w-[110px]">
+                      <div className="truncate font-semibold w-full">
                         {renderEmployeeName(employee)}
                       </div>
                     </div>
                   </th>
                 ))}
-                <th className="sticky right-0 z-30 bg-background border-b border-l px-3 py-2 text-left min-w-[150px]">
+                <th className="sticky right-0 z-30 bg-background border-b border-l px-3 py-2 text-left">
                   Coverage
                 </th>
               </tr>
